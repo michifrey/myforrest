@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MyForrest – Wald im Wandel</title>
+  <meta name="description" content="Fotos vom Joggen, Wandern und Biken dokumentieren, wie sich der Wald über die Zeit verändert.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%232f6b3a' d='M12 2 5 12h4l-4 6h6v4h2v-4h6l-4-6h4z'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 5 12h4l-4 6h6v4h2v-4h6l-4-6h4z"/></svg>
+      <div>
+        <h1>MyForrest</h1>
+        <p>Wald im Wandel – Street View für die Natur, über die Zeit</p>
+      </div>
+    </div>
+    <div class="actions">
+      <label class="filter">
+        <span>Filter</span>
+        <select id="tag-filter"><option value="">Alle Spots</option></select>
+      </label>
+      <button id="open-upload" class="primary">Fotos hochladen</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <div id="map" aria-label="Karte der Foto-Spots"></div>
+    <div id="pick-hint" class="pick-hint" hidden>Klicke auf die Karte, um den Standort zu wählen · <button id="pick-cancel" class="link">Abbrechen</button></div>
+
+    <aside id="panel" class="panel">
+      <section id="welcome">
+        <h2>Willkommen im Wald</h2>
+        <p>Jeder Punkt auf der Karte ist ein <strong>Spot</strong>: ein Ort, an dem über die Zeit Fotos entstanden sind.
+          Wähle einen Spot, um durch die Jahre zu blättern oder Vorher/Nachher zu vergleichen.</p>
+        <div id="stats" class="stats"></div>
+        <h3>So kommen Fotos rein</h3>
+        <ol class="howto">
+          <li><strong>Handyfotos mit GPS</strong> – einfach hochladen, Ort und Zeit kommen aus den Bilddaten.</li>
+          <li><strong>Action-Cam im Intervallmodus</strong> beim Joggen oder Biken + <strong>GPX-Track</strong> von Uhr, Strava oder Komoot –
+            die Fotos werden automatisch über die Aufnahmezeit auf der Strecke verortet.</li>
+          <li><strong>Ohne GPS</strong> – Standort einfach auf der Karte wählen.</li>
+        </ol>
+        <div class="legend">
+          <span><i class="dot ok"></i>Spot</span>
+          <span><i class="dot damage"></i>Schäden</span>
+          <span><i class="dot neo"></i>Neophyten</span>
+        </div>
+      </section>
+
+      <section id="spot" hidden>
+        <div class="spot-head">
+          <button id="close-spot" class="icon" aria-label="Schliessen">×</button>
+          <h2 id="spot-title"></h2>
+          <p id="spot-meta" class="muted"></p>
+          <div id="spot-tags" class="chips"></div>
+        </div>
+
+        <div class="viewer">
+          <img id="viewer-img" alt="">
+          <div id="viewer-caption" class="caption"></div>
+        </div>
+        <div class="timeline">
+          <input id="time-slider" type="range" min="0" value="0" aria-label="Zeitachse">
+          <div class="timeline-labels"><span id="t-first"></span><span id="t-last"></span></div>
+          <div id="thumbs" class="thumbs"></div>
+        </div>
+
+        <button id="open-compare" class="secondary wide">Vorher / Nachher vergleichen</button>
+        <div id="compare" class="compare" hidden>
+          <div class="compare-pick">
+            <label>Vorher <select id="cmp-a"></select></label>
+            <label>Nachher <select id="cmp-b"></select></label>
+          </div>
+          <div class="swipe" id="swipe">
+            <img id="cmp-img-b" alt="Nachher">
+            <div class="swipe-top" id="swipe-top"><img id="cmp-img-a" alt="Vorher"></div>
+            <div class="swipe-handle" id="swipe-handle"></div>
+          </div>
+          <input id="swipe-range" type="range" min="0" max="100" value="50" aria-label="Vergleichsregler">
+        </div>
+
+        <div class="photo-details">
+          <h3>Beobachtungen auf diesem Foto</h3>
+          <div id="photo-tags" class="chips editable"></div>
+          <textarea id="photo-note" rows="2" placeholder="Notiz, z. B. «3 Fichten umgestürzt nach Sturm»"></textarea>
+          <div class="row">
+            <button id="save-photo" class="secondary">Speichern</button>
+            <button id="identify" class="secondary" hidden>Pflanze bestimmen</button>
+            <button id="delete-photo" class="danger link">Foto löschen</button>
+          </div>
+          <div id="identify-results"></div>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <dialog id="upload-dialog">
+    <form id="upload-form" method="dialog">
+      <h2>Fotos hochladen</h2>
+      <label class="field">
+        <span>Fotos (JPEG, PNG, WebP)</span>
+        <input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple required>
+      </label>
+      <label class="field">
+        <span>GPX-Track <em>optional – verortet Fotos ohne GPS über die Aufnahmezeit</em></span>
+        <input type="file" name="gpx" accept=".gpx,application/gpx+xml">
+      </label>
+
+      <fieldset class="field">
+        <legend>Standort für Fotos ohne GPS <em>optional</em></legend>
+        <div class="row">
+          <button type="button" id="pick-on-map" class="secondary">Auf Karte wählen</button>
+          <button type="button" id="use-geo" class="secondary">Mein Standort</button>
+          <span id="picked" class="muted">nicht gesetzt</span>
+        </div>
+      </fieldset>
+
+      <div class="grid2">
+        <label class="field">
+          <span>Aktivität</span>
+          <select name="activity">
+            <option value="">–</option>
+            <option value="joggen">Joggen</option>
+            <option value="wandern">Wandern</option>
+            <option value="biken">Biken</option>
+            <option value="sonstiges">Sonstiges</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Datum <em>falls nicht im Foto</em></span>
+          <input type="datetime-local" name="takenAtLocal">
+        </label>
+      </div>
+
+      <fieldset class="field">
+        <legend>Beobachtungen</legend>
+        <div id="upload-tags" class="checks"></div>
+      </fieldset>
+      <label class="field">
+        <span>Notiz</span>
+        <textarea name="note" rows="2"></textarea>
+      </label>
+
+      <details>
+        <summary>Zeitabgleich für GPX</summary>
+        <div class="grid2">
+          <label class="field">
+            <span>Zeitzone der Kamera (Minuten zu UTC)</span>
+            <input type="number" name="utcOffsetMinutes" step="15">
+          </label>
+          <label class="field">
+            <span>Kamera-Uhr korrigieren (Sekunden)</span>
+            <input type="number" name="clockShiftSeconds" value="0">
+          </label>
+        </div>
+        <p class="muted small">Tipp: Fotografiere zu Beginn die Uhrzeit deines Handys – geht die Kamera z. B. 40 s nach, trage +40 ein.</p>
+      </details>
+
+      <div id="upload-result" class="upload-result"></div>
+      <div class="row end">
+        <button type="button" id="upload-cancel" class="link">Schliessen</button>
+        <button type="submit" id="upload-submit" class="primary">Hochladen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
