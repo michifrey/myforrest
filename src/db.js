@@ -23,7 +23,7 @@ const SCHEMA = `
     lat             REAL NOT NULL,
     lon             REAL NOT NULL,
     heading         REAL,
-    location_source TEXT NOT NULL CHECK (location_source IN ('exif', 'gpx', 'manual')),
+    location_source TEXT NOT NULL CHECK (location_source IN ('exif', 'gpx', 'manual', 'spot')),
     activity        TEXT,
     note            TEXT,
     created_at      INTEGER NOT NULL

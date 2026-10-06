@@ -141,3 +141,29 @@ test('plant identification reports when not configured', async () => {
     assert.equal(res.status, 501);
   });
 });
+
+test('repeat photos are pinned to the chosen spot', async () => {
+  await withServer({}, async (base) => {
+    const first = (await (await upload(base, [['gps.jpg', fixture('gps.jpg')]])).json()).created[0];
+
+    // Device position ~30 m away (outside the 25 m radius) but plausible → kept, same spot.
+    let res = await upload(base, [['nogps.jpg', fixture('nogps.jpg')]],
+      { spotId: String(first.spotId), lat: '47.37527', lon: '8.5375' });
+    assert.equal(res.status, 201);
+    let p = (await res.json()).created[0];
+    assert.equal(p.spotId, first.spotId);
+    assert.equal(p.locationSource, 'spot');
+    assert.equal(p.lat, 47.37527);
+
+    // Implausible position → spot centre instead.
+    const spot = await (await fetch(`${base}/api/spots/${first.spotId}`)).json();
+    res = await upload(base, [['nogps.jpg', fixture('nogps.jpg')]], { spotId: String(first.spotId), lat: '48', lon: '9' });
+    p = (await res.json()).created[0];
+    assert.equal(p.spotId, first.spotId);
+    assert.deepEqual([p.lat, p.lon], [spot.lat, spot.lon]);
+
+    res = await upload(base, [['nogps.jpg', fixture('nogps.jpg')]], { spotId: '999' });
+    assert.equal(res.status, 400);
+    assert.equal((await (await fetch(`${base}/api/spots`)).json()).length, 1);
+  });
+});

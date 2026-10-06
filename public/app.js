@@ -14,7 +14,7 @@ const state = {
 
 const fmtDate = (iso) => new Date(iso).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
 const fmtDateTime = (iso) => new Date(iso).toLocaleString('de-CH', { dateStyle: 'medium', timeStyle: 'short' });
-const SOURCE_LABEL = { exif: 'GPS aus Foto', gpx: 'über GPX-Track', manual: 'manuell gesetzt' };
+const SOURCE_LABEL = { exif: 'GPS aus Foto', gpx: 'über GPX-Track', manual: 'manuell gesetzt', spot: 'Wiederholungsfoto' };
 
 function el(tag, props = {}, children = []) {
   const node = document.createElement(tag);
@@ -337,6 +337,243 @@ form.addEventListener('submit', async (e) => {
   $('upload-result').replaceChildren(...result);
   await loadSpots({ fit: created.length > 0 && !state.spot });
   if (created.length) await openSpot(created[created.length - 1].spotId, created[created.length - 1].id);
+});
+
+/* ---------- Rephotography (repeat photo with overlay) ---------- */
+
+const cam = { stream: null, watchId: null, position: null, ref: null, blob: null, mode: 'blend' };
+
+const toRad = (d) => (d * Math.PI) / 180;
+function distanceM(a, b) {
+  const h = Math.sin(toRad(b.lat - a.lat) / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(toRad(b.lon - a.lon) / 2) ** 2;
+  return 12742000 * Math.asin(Math.sqrt(h));
+}
+
+/** Largest box with the reference photo's aspect ratio that fits the camera area. */
+function layoutStage() {
+  if (!cam.ref) return;
+  const area = document.querySelector('.cam-area').getBoundingClientRect();
+  const ratio = cam.ref.naturalWidth / cam.ref.naturalHeight;
+  let w = area.width;
+  let h = w / ratio;
+  if (h > area.height) { h = area.height; w = h * ratio; }
+  const portraitScreen = area.height > area.width;
+  $('cam-hint').hidden = portraitScreen === ratio < 1;
+  Object.assign($('cam-stage').style, { width: `${Math.floor(w)}px`, height: `${Math.floor(h)}px` });
+}
+
+/** Draws the reference photo's edges (Sobel) as bright lines on a transparent canvas. */
+function renderEdges(img) {
+  const canvas = $('cam-edges');
+  const scale = Math.min(1, 720 / Math.max(img.naturalWidth, img.naturalHeight));
+  const w = Math.round(img.naturalWidth * scale);
+  const h = Math.round(img.naturalHeight * scale);
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, w, h);
+  const src = ctx.getImageData(0, 0, w, h).data;
+  const gray = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) gray[i] = 0.299 * src[i * 4] + 0.587 * src[i * 4 + 1] + 0.114 * src[i * 4 + 2];
+  const mag = new Float32Array(w * h);
+  let max = 0;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      const gx = gray[i - w + 1] + 2 * gray[i + 1] + gray[i + w + 1] - gray[i - w - 1] - 2 * gray[i - 1] - gray[i + w - 1];
+      const gy = gray[i + w - 1] + 2 * gray[i + w] + gray[i + w + 1] - gray[i - w - 1] - 2 * gray[i - w] - gray[i - w + 1];
+      mag[i] = Math.hypot(gx, gy);
+      if (mag[i] > max) max = mag[i];
+    }
+  }
+  const out = ctx.createImageData(w, h);
+  const threshold = max * 0.18;
+  for (let i = 0; i < w * h; i++) {
+    if (mag[i] < threshold) continue;
+    out.data[i * 4] = 255;
+    out.data[i * 4 + 1] = 225;
+    out.data[i * 4 + 2] = 77;
+    out.data[i * 4 + 3] = Math.min(255, 80 + (mag[i] / max) * 400);
+  }
+  ctx.putImageData(out, 0, 0);
+}
+
+function applyOverlay() {
+  const opacity = Number($('cam-opacity').value) / 100;
+  $('cam-ref').hidden = cam.mode !== 'blend';
+  $('cam-edges').hidden = cam.mode !== 'edges';
+  $('cam-ref').style.opacity = String(opacity);
+  $('cam-edges').style.opacity = String(Math.min(1, opacity * 1.6));
+  $('cam-opacity').disabled = cam.mode === 'off';
+  document.querySelectorAll('.seg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === cam.mode)));
+}
+
+function updateCamInfo() {
+  const parts = [`Referenz vom ${fmtDate(state.spot.photos[state.index].takenAt)}`];
+  const info = $('cam-info');
+  info.replaceChildren(parts[0]);
+  if (cam.position) {
+    const d = distanceM(cam.position, state.spot);
+    const far = d > 25;
+    info.append(' · ', el('span', {
+      class: far ? 'far' : '',
+      text: `${far ? 'noch ' : ''}≈ ${Math.round(d)} m zum Spot (±${Math.round(cam.position.accuracy)} m)`,
+    }));
+  } else {
+    info.append(' · Standort wird ermittelt …');
+  }
+}
+
+function startWatchingPosition() {
+  if (!navigator.geolocation) return;
+  cam.watchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      cam.position = { lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy };
+      updateCamInfo();
+    },
+    () => {},
+    { enableHighAccuracy: true, maximumAge: 5000 },
+  );
+}
+
+async function openCamera() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    // Insecure context (plain http on a phone) or old browser: fall back to the native camera app.
+    alert('Live-Overlay braucht HTTPS. Es öffnet sich die normale Kamera – das Foto wird trotzdem diesem Spot zugeordnet.');
+    $('rephoto-file').click();
+    return;
+  }
+  const photo = state.spot.photos[state.index];
+  cam.ref = $('cam-ref');
+  cam.ref.src = photo.url;
+  await cam.ref.decode().catch(() => {});
+  try {
+    cam.stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1440 } },
+      audio: false,
+    });
+  } catch (err) {
+    alert(`Kamera nicht verfügbar (${err.message}). Es öffnet sich die normale Kamera.`);
+    $('rephoto-file').click();
+    return;
+  }
+  $('cam-video').srcObject = cam.stream;
+  renderEdges(cam.ref);
+  showCaptureMode();
+  $('camera').hidden = false;
+  document.body.style.overflow = 'hidden';
+  layoutStage();
+  applyOverlay();
+  updateCamInfo();
+  startWatchingPosition();
+}
+
+function closeCamera() {
+  cam.stream?.getTracks().forEach((t) => t.stop());
+  cam.stream = null;
+  if (cam.watchId !== null) navigator.geolocation.clearWatch(cam.watchId);
+  cam.watchId = null;
+  cam.blob = null;
+  $('camera').hidden = true;
+  document.body.style.overflow = '';
+}
+
+function showCaptureMode() {
+  if ($('cam-shot').src.startsWith('blob:')) URL.revokeObjectURL($('cam-shot').src);
+  $('cam-shot').hidden = true;
+  $('cam-shot').removeAttribute('src');
+  $('cam-controls').hidden = false;
+  $('cam-confirm').hidden = true;
+  applyOverlay();
+}
+
+/** Captures exactly the framing visible in the stage (same aspect as the reference). */
+function capture() {
+  const video = $('cam-video');
+  const stage = $('cam-stage').getBoundingClientRect();
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  if (!vw || !vh) return;
+  const scale = Math.max(stage.width / vw, stage.height / vh);
+  const sw = stage.width / scale;
+  const sh = stage.height / scale;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(sw);
+  canvas.height = Math.round(sh);
+  canvas.getContext('2d').drawImage(video, (vw - sw) / 2, (vh - sh) / 2, sw, sh, 0, 0, canvas.width, canvas.height);
+  canvas.toBlob((blob) => {
+    cam.blob = blob;
+    $('cam-shot').src = URL.createObjectURL(blob);
+    $('cam-shot').hidden = false;
+    $('cam-ref').hidden = true;
+    $('cam-edges').hidden = true;
+    $('cam-controls').hidden = true;
+    $('cam-confirm').hidden = false;
+  }, 'image/jpeg', 0.9);
+}
+
+/** Uploads a repeat photo to the current spot and opens the before/after view. */
+async function uploadRephoto(file, name, position) {
+  const spotId = state.spot.id;
+  const refIndex = state.index;
+  const fd = new FormData();
+  fd.append('photos', file, name);
+  fd.append('spotId', String(spotId));
+  fd.append('takenAt', new Date().toISOString());
+  fd.append('utcOffsetMinutes', String(-new Date().getTimezoneOffset()));
+  if (position) {
+    fd.append('lat', String(position.lat));
+    fd.append('lon', String(position.lon));
+  }
+  const res = await api('/api/photos', { method: 'POST', body: fd });
+  if (!res.created.length) throw new Error(res.skipped.map((s) => s.reason).join(', ') || 'Upload fehlgeschlagen');
+  const created = res.created[0];
+  await Promise.all([loadSpots(), openSpot(spotId, created.id)]);
+  // Compare the reference with the new photo straight away.
+  $('cmp-a').value = String(Math.min(refIndex, state.spot.photos.length - 1));
+  $('cmp-b').value = String(state.spot.photos.findIndex((p) => p.id === created.id));
+  updateCompare();
+  $('compare').hidden = false;
+}
+
+$('open-camera').addEventListener('click', openCamera);
+$('cam-close').addEventListener('click', closeCamera);
+$('cam-capture').addEventListener('click', capture);
+$('cam-retake').addEventListener('click', showCaptureMode);
+$('cam-opacity').addEventListener('input', applyOverlay);
+document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => {
+  cam.mode = b.dataset.mode;
+  applyOverlay();
+}));
+window.addEventListener('resize', layoutStage);
+document.addEventListener('keydown', (e) => {
+  if ($('camera').hidden) return;
+  if (e.key === 'Escape') closeCamera();
+  if (e.key === ' ' && !$('cam-controls').hidden) { e.preventDefault(); capture(); }
+});
+
+$('cam-save').addEventListener('click', async (e) => {
+  e.target.disabled = true;
+  try {
+    await uploadRephoto(cam.blob, `wiederholung-${Date.now()}.jpg`, cam.position);
+    closeCamera();
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    e.target.disabled = false;
+  }
+});
+
+$('rephoto-file').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    await uploadRephoto(file, file.name, null);
+  } catch (err) {
+    alert(err.message);
+  }
 });
 
 /* ---------- Init ---------- */

@@ -8,7 +8,7 @@ const express = require('express');
 const multer = require('multer');
 
 const { openDb, transaction } = require('./db');
-const { isValidCoord, positionAt } = require('./geo');
+const { distanceM, isValidCoord, positionAt } = require('./geo');
 const { parseGpx } = require('./gpx');
 const { readPhotoMeta, imageExtension } = require('./exif');
 const { assignSpot, refreshSpot } = require('./spots');
@@ -159,6 +159,16 @@ function createApp({
     const activity = ACTIVITIES.includes(b.activity) ? b.activity : null;
     const note = b.note ? String(b.note).slice(0, 2000) : null;
     const tags = parseTags(b.tags);
+    // Repeat photos taken at a known spot (rephotography) are pinned to that spot.
+    let targetSpot = null;
+    if (b.spotId !== undefined && b.spotId !== '') {
+      const sid = Number(b.spotId);
+      targetSpot = Number.isSafeInteger(sid) && sid > 0
+        ? db.prepare('SELECT id, lat, lon FROM spots WHERE id = ?').get(sid)
+        : null;
+      if (!targetSpot) return [400, { error: 'Spot nicht gefunden' }];
+    }
+    const nearSpot = (p) => distanceM(p, targetSpot) <= Math.max(4 * spotRadiusM, 100);
     const track = gpxFile ? parseGpx(await fsp.readFile(gpxFile.path, 'utf8')) : [];
     if (gpxFile && !track.length) {
       return [400, { error: 'GPX-Datei enthält keine Punkte mit Zeitstempel' }];
@@ -180,8 +190,14 @@ function createApp({
 
       let pos = null;
       let source = null;
-      if (isValidCoord(meta.lat, meta.lon)) {
-        pos = { lat: meta.lat, lon: meta.lon };
+      const exifPos = isValidCoord(meta.lat, meta.lon) ? { lat: meta.lat, lon: meta.lon } : null;
+      if (targetSpot) {
+        // Keep the device position when it is plausible, otherwise use the spot centre.
+        if (exifPos && nearSpot(exifPos)) [pos, source] = [exifPos, 'exif'];
+        else if (manual && nearSpot(manual)) [pos, source] = [manual, 'spot'];
+        else [pos, source] = [{ lat: targetSpot.lat, lon: targetSpot.lon }, 'spot'];
+      } else if (exifPos) {
+        pos = exifPos;
         source = 'exif';
       } else if (track.length && meta.takenAt !== null && (pos = positionAt(track, takenAt))) {
         source = 'gpx';
@@ -202,7 +218,7 @@ function createApp({
       const file = `${crypto.randomUUID()}.${ext}`;
       await fsp.rename(f.path, path.join(uploadDir, file));
       const photo = transaction(db, () => {
-        const spotId = assignSpot(db, pos.lat, pos.lon, spotRadiusM);
+        const spotId = targetSpot ? targetSpot.id : assignSpot(db, pos.lat, pos.lon, spotRadiusM);
         const id = Number(db.prepare(`
           INSERT INTO photos (spot_id, file, original_name, taken_at, lat, lon, heading,
                               location_source, activity, note, created_at)

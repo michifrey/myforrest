@@ -13,6 +13,11 @@ verändert.
   einem *Spot* zusammengefasst. Die Farbe zeigt Schäden (orange) oder Neophyten (violett).
 - **Zeitreise pro Spot**: Mit dem Zeitregler und der Thumbnail-Leiste durch alle Aufnahmen blättern.
 - **Vorher/Nachher-Vergleich**: Zwei beliebige Aufnahmen mit einem Wischregler überlagern.
+- **Wiederholungsfotos mit Overlay**: Am Spot öffnet *Wiederholungsfoto aufnehmen* die Kamera. Das
+  gewählte Referenzfoto liegt halbtransparent oder als Kontur über dem Livebild, sodass sich Ausschnitt
+  und Standort genau treffen lassen. Angezeigt werden auch die Entfernung zum Spot und, falls nötig,
+  ein Hinweis, das Handy zu drehen. Das Foto wird im Format der Referenz gespeichert, fest diesem
+  Spot zugeordnet und direkt im Vorher/Nachher-Vergleich geöffnet.
 - **Drei Wege, Fotos zu verorten**:
   1. **GPS aus dem Foto** (EXIF), wie bei normalen Handyfotos.
   2. **Automatisch über einen GPX-Track**: Eine Action-Cam im Intervallmodus (z. B. alle 5 s) beim
@@ -36,6 +41,11 @@ npm install
 npm start            # http://localhost:3000
 npm test
 ```
+
+**Auf dem Handy:** Browser lassen die Kamera für das Live-Overlay nur über HTTPS zu (oder auf
+`localhost`). Im Heimnetz geht das z. B. mit einem Tunnel (`cloudflared tunnel --url http://localhost:3000`)
+oder einem Reverse-Proxy wie Caddy. Ohne HTTPS öffnet sich die normale Kamera-App: Das Foto landet
+trotzdem am richtigen Spot, nur ohne Overlay.
 
 Konfiguration über Umgebungsvariablen:
 
@@ -68,7 +78,7 @@ public/              Frontend (Leaflet, ohne Build-Schritt)
 | `GET`    | `/api/config`                | Tag-Vokabular, Aktivitäten, aktivierte Features          |
 | `GET`    | `/api/spots?tag=…`           | Alle Spots mit Anzahl Fotos, Zeitraum und Tags           |
 | `GET`    | `/api/spots/:id`             | Ein Spot mit allen Fotos chronologisch                   |
-| `POST`   | `/api/photos`                | Upload (multipart: `photos[]`, optional `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `utcOffsetMinutes`, `clockShiftSeconds`) |
+| `POST`   | `/api/photos`                | Upload (multipart: `photos[]`, optional `spotId` für Wiederholungsfotos, `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `utcOffsetMinutes`, `clockShiftSeconds`) |
 | `PATCH`  | `/api/photos/:id`            | Tags und Notiz ändern                                    |
 | `DELETE` | `/api/photos/:id`            | Foto löschen                                             |
 | `POST`   | `/api/photos/:id/identify`   | Pflanzen bestimmen (Pl@ntNet)                            |
@@ -76,8 +86,8 @@ public/              Frontend (Leaflet, ohne Build-Schritt)
 ## Roadmap
 
 **Phase 2: Mehr und bessere Fotos**
-- Wiederholungsfotos: Am Spot zeigt das Handy das letzte Foto halbtransparent über dem Kamerabild,
-  damit neue Aufnahmen denselben Ausschnitt treffen (Rephotografie).
+- Automatischer Feinabgleich von Wiederholungsfotos: Bild an der Referenz ausrichten (Homographie),
+  damit der Vergleich pixelgenau wird.
 - Video statt Einzelbilder: Frames aus GoPro- und Insta360-Videos extrahieren und die eingebettete
   GPS-Telemetrie (GPMF) direkt nutzen. 360°-Aufnahmen machen es dann wirklich zu Street View.
 - Blickrichtung berücksichtigen: Spots zusätzlich nach Himmelsrichtung trennen.
