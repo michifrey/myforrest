@@ -203,7 +203,7 @@ function renderMarkers() {
     const anchor = pinAnchor(s, size);
     const icon = L.divIcon({
       className: 'pin-icon',
-      html: `<div class="pin ${pinKind(s)}${state.spot?.id === s.id ? ' active' : ''}"><b>${s.photoCount}</b>${s.irregularities.length ? '<i class="flag">!</i>' : ''}</div>`,
+      html: `<div class="pin ${pinKind(s)}${state.spot?.id === s.id ? ' active' : ''}"><b>${s.photoCount}</b>${s.irregularities.length ? '<i class="flag">!</i>' : ''}${s.storm ? `<i class="storm-flag" title="Sturm">${WIND_ICON}</i>` : ''}</div>`,
       iconSize: [size, size],
       iconAnchor: anchor,
       tooltipAnchor: [size / 2 - anchor[0], -size * 1.1 + (size * 1.2 - anchor[1])],
@@ -212,6 +212,7 @@ function renderMarkers() {
     const extra = [
       s.change?.fraction >= 0.05 ? `≈ ${Math.round(s.change.fraction * 100)} % verändert${s.change.top ? ` (${s.change.top})` : ''}` : '',
       ...s.irregularities,
+      s.storm ? `${s.storm.max.text}${s.storm.count > 1 ? ` (stärkstes von ${s.storm.count} Sturmereignissen)` : ''}` : '',
       s.species.length ? `Baumarten: ${s.species.join(', ')}` : '',
       hasHeading(s) ? headingText(s.heading) : '',
     ].filter(Boolean);
@@ -236,9 +237,14 @@ async function loadSpots({ fit = false } = {}) {
   const filter = $('tag-filter').value;
   const special = filter.startsWith('@') ? filter : null;
   const tag = special ? '' : filter;
-  const spots = await api(`/api/spots${tag ? `?tag=${encodeURIComponent(tag)}` : ''}`);
+  const [spots, storms] = await Promise.all([
+    api(`/api/spots${tag ? `?tag=${encodeURIComponent(tag)}` : ''}`),
+    api('/api/storms/spots').catch(() => []),
+  ]);
+  for (const s of spots) s.storm = storms.find((x) => x.spotId === s.id) || null;
   state.spots = special === '@change' ? spots.filter((s) => s.change?.fraction >= 0.05)
     : special === '@irregular' ? spots.filter((s) => s.irregularities.length)
+    : special === '@storm' ? spots.filter((s) => s.storm)
       : spots;
   renderMarkers();
   renderStats(!filter);
@@ -331,6 +337,7 @@ async function openSpot(id, photoId) {
   showPhoto(state.index);
   updateSpotChange(state.spot);
   renderChronicle(state.spot);
+  loadSpotStorms(state.spot);
   renderSpecies(state.spot);
   renderElevation(state.spot);
   map.setView([state.spot.lat, state.spot.lon], Math.max(map.getZoom(), 15));
@@ -410,10 +417,11 @@ const fmtDoy = (d) => new Date(Date.UTC(2023, 0, 1 + d)).toLocaleDateString('de-
 
 function colourText(t, spot) {
   const lowland = `~${fmtDoy(t.colourDoy)}`;
-  if (t.colourDoyHere === null || t.colourDoyHere === t.colourDoy) return `Färbung typisch ab ${lowland} (Flachland)`;
+  if (t.colourDoyHere === null || (t.colourDoyHere === t.colourDoy && !t.colourRef)) return `Färbung typisch ab ${lowland} (Flachland)`;
   const here = [spot.elevation !== null ? `${Math.round(spot.elevation)} m` : null,
     spot.landform === 'senke' ? 'Senke' : null,
     spot.landform !== 'senke' && spot.exposition && spot.exposition !== 'eben' ? spot.exposition : null].filter(Boolean).join(', ');
+  if (t.colourRef) return `Färbung hier${here ? ` (${here})` : ''} typisch ab ~${fmtDoy(t.colourDoyHere)} · ${t.colourRef}`;
   return `Färbung hier (${here}) typisch ab ~${fmtDoy(t.colourDoyHere)}; im Flachland ab ${lowland}`;
 }
 
@@ -653,6 +661,7 @@ async function updateCompare() {
       }));
     }
     renderRegions(change, b);
+    stormNote(a, b, change, () => token === compareToken);
   } catch {
     // Change detection is an extra; the aligned comparison still works without it.
   }
@@ -848,6 +857,7 @@ async function renderContext(photo) {
   } else if (w) {
     parts.push(el('p', { class: 'calm-note', text: 'Keine Auffälligkeiten gegenüber dem langjährigen Mittel.' }));
   }
+  parts.push(...climateExtras(ctx));
   if (ctx.weather) parts.push(el('p', { class: 'wx-source', text: `Wetterdaten: ${ctx.weather.source}` }));
   body.replaceChildren(...parts);
 }
@@ -855,12 +865,14 @@ async function renderContext(photo) {
 /** All recorded irregularities of a spot, oldest first: the spot's record over the years. */
 function renderChronicle(spot) {
   const items = spot.photos.flatMap((p, index) => (p.context?.irregularities || [])
-    .map((irr) => ({ p, index, irr })));
+    .map((irr) => ({ t: Date.parse(p.takenAt), node: el('li', { 'data-severity': irr.severity }, [
+      el('time', { datetime: p.takenAt, text: fmtDate(p.takenAt) }),
+      el('button', { type: 'button', text: irr.title, onclick: () => showPhoto(index) }),
+    ]) })));
+  items.push(...stormChronicleItems(spot)); // storm events between the visits
+  items.sort((a, b) => a.t - b.t);
   $('chronicle-wrap').hidden = !items.length;
-  $('chronicle').replaceChildren(...items.map(({ p, index, irr }) => el('li', { 'data-severity': irr.severity }, [
-    el('time', { datetime: p.takenAt, text: fmtDate(p.takenAt) }),
-    el('button', { type: 'button', text: irr.title, onclick: () => showPhoto(index) }),
-  ])));
+  $('chronicle').replaceChildren(...items.map((i) => i.node));
 }
 
 function updateSwipe() {
@@ -1262,6 +1274,74 @@ $('rephoto-file').addEventListener('change', async (e) => {
   }
 });
 
+/* ---------- Storms, frost nights in hollows (routes/climate.js) ---------- */
+
+const WIND_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 5.5h8.5a2 2 0 1 0-2-2M1 8.5h12a2 2 0 1 1-2 2M1 11.5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+const fmtTemp = (v) => `${v.toFixed(1).replace('-', '−')} °C`;
+
+/** Loads the storm events of a spot and adds them to the chronicle. */
+async function loadSpotStorms(spot) {
+  const data = await api(`/api/spots/${spot.id}/storms`).catch(() => null);
+  if (!data || state.spot !== spot) return;
+  spot.storms = data.events;
+  renderChronicle(spot);
+}
+
+function stormChronicleItems(spot) {
+  return (spot.storms || []).map((e) => {
+    const t = Date.parse(`${e.date}T12:00:00Z`);
+    // Jump to the windthrow photo, or else to the first photo after the storm.
+    const target = e.windthrowPhotos.length
+      ? spot.photos.findIndex((p) => p.id === e.windthrowPhotos[0])
+      : spot.photos.findIndex((p) => Date.parse(p.takenAt) > t);
+    const label = `${e.bft >= 12 ? 'Orkan' : 'Sturm'}: Böen ${e.gust} km/h${e.from16 ? ` aus ${e.from16}` : ''}` +
+      (e.windthrowPhotos.length ? ' · vermutlich Ursache des Windwurfs' : '');
+    return {
+      t,
+      node: el('li', { class: 'storm', 'data-severity': e.bft >= 11 ? 'stark' : 'auffällig', title: `${e.class}, Beaufort ${e.bft}` }, [
+        el('time', { datetime: e.date, text: fmtDate(t) }),
+        target >= 0 ? el('button', { type: 'button', text: label, onclick: () => showPhoto(target) }) : el('span', { text: label }),
+      ]),
+    };
+  });
+}
+
+/** Frost nights with the estimated minimum in the hollow. */
+function climateExtras(ctx) {
+  const out = [];
+  const nf = ctx.nightFrost;
+  if (nf?.frostNights?.length && nf.strength > 0) {
+    out.push(el('div', { class: 'frost-nights' }, [
+      el('h4', { text: 'Frostnächte in der Senke nach dem Laubaustrieb (geschätzt)' }),
+      el('table', { class: 'frost-table' }, [
+        el('tr', {}, ['Nacht auf', 'Modell', 'Senke', 'Wind', 'Wolken'].map((h) => el('th', { text: h }))),
+        ...nf.frostNights.map((n) => el('tr', {}, [
+          el('td', { text: fmtDate(`${n.date}T12:00:00Z`) }),
+          el('td', { text: fmtTemp(n.tmin) }),
+          el('td', { class: 'est', text: fmtTemp(n.est) }),
+          el('td', { text: `${n.wind.toFixed(1)} m/s` }),
+          el('td', { text: `${n.cloud} %` }),
+        ])),
+      ]),
+      el('p', { class: 'hint', text: 'Windstille, klare Nächte kühlen Senken stärker ab als das Wettermodell zeigt; Schätzung aus Wind, Bewölkung und Geländeform.' }),
+    ]));
+  }
+  return out;
+}
+
+/** In the before/after view: the most likely storm when windthrow shows up. */
+async function stormNote(a, b, change, current) {
+  if (!change.summary.some((s) => s.class === 'windwurf') && !b.tags.includes('sturmschaden')) return;
+  const res = await api(`/api/photos/${a.id}/storm?to=${b.id}`).catch(() => null);
+  if (!res || !current()) return;
+  $('cmp-regions').append(el('p', {
+    class: `storm-note${res.storm ? '' : ' none'}`,
+    text: res.storm
+      ? `Windwurf: ${res.text} (${res.storm.class}).`
+      : `Kein Sturm (Böen ab 75 km/h) zwischen ${fmtDate(res.from)} und ${fmtDate(res.to)} im Wettermodell.`,
+  }));
+}
+
 /* ---------- Init ---------- */
 
 (async function init() {
@@ -1269,6 +1349,7 @@ $('rephoto-file').addEventListener('change', async (e) => {
   $('tag-filter').append(
     el('option', { value: '@change', text: 'Starke Veränderung (≥ 5 %)' }),
     el('option', { value: '@irregular', text: 'Auffälligkeiten' }),
+    el('option', { value: '@storm', text: 'Von Sturm betroffen' }),
   );
   for (const [key, label] of Object.entries(state.config.tags)) {
     $('tag-filter').append(el('option', { value: key, text: label }));

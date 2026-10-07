@@ -349,3 +349,13 @@ test('requireLogin enforces accounts for uploads and edits', async () => {
     assert.equal((await ben.req(`/api/photos/${p.id}`, { method: 'PATCH', json: { note: 'x' } })).status, 200);
   });
 });
+
+test('once accounts exist, only admins may import phenology reference data', async () => {
+  await withServer({}, async (base) => {
+    const csv = 'source;station_id;station_name;lat;lon;elevation;species;year;doy\ntest;1;X;47;8;500;Fagus sylvatica;2024;280\n';
+    const post = (headers = {}) => fetch(`${base}/api/phenoref/import?format=generic`, { method: 'POST', body: csv, headers: { 'Content-Type': 'text/plain', ...headers } });
+    assert.equal((await post()).status, 200, 'open without accounts');
+    await fetch(`${base}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'a@b.ch', name: 'Admin', password: 'geheim1234' }) });
+    assert.equal((await post()).status, 403, 'anonymous refused once accounts exist');
+  });
+});

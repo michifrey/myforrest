@@ -176,10 +176,40 @@ den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen und eine Notiz.
 - **Kaltluftseen**: Mit dem Topographischen Positionsindex (wie tief liegt der Spot unter dem Mittel seiner
   Umgebung in 300 m und 600 m Umkreis) erkennt die App Senken und Talböden, in denen sich nachts Kaltluft
   sammelt, sowie Kuppen und Rücken. In Senken beginnt die Herbstfärbung bis zu 5 Tage früher. Zeigt das
-  Wettermodell nach dem Laubaustrieb Nächte unter 3 °C, wird Spätfrost-Gefahr gemeldet. Braune junge
-  Blätter im Frühsommer gelten dann als **Frostschaden** (neuer Tag) statt als frühe Herbstfärbung.
+  Wettermodell nach dem Laubaustrieb Nächte unter 3 °C, wird Spätfrost-Gefahr gemeldet (genauer: siehe
+  *Nächtliche Abkühlung*). Braune junge Blätter im Frühsommer gelten dann als **Frostschaden** (neuer Tag) statt als frühe Herbstfärbung.
   Auf Kuppen gibt es bei Windwurf einen Hinweis auf die exponierte Lage. Die Geländeform lässt sich auch
   von Hand setzen.
+- **Nächtliche Abkühlung in Senken**: Statt der festen 3-°C-Schwelle schätzt die App für jede Nacht nach dem
+  Laubaustrieb, wie stark sich die Senke abkühlt. Grundlage sind die stündlichen Werte von Wind (10 m) und
+  Bewölkung aus dem Wettermodell: Windstille (≤ 1,5 m/s) und klarer Himmel (≤ 20 % Bewölkung) ergeben volle
+  Ausstrahlung, ab 5 m/s Wind oder 80 % Bewölkung keine. Multipliziert mit der Ausprägung der Senke (aus dem
+  Positionsindex) liegt das Minimum in der Senke bis zu 7 °C unter dem Modellwert. Nur Nächte, die so
+  geschätzt unter 0 °C fallen, zählen als Spätfrost. Im Kontext des Fotos stehen diese Frostnächte mit
+  Modellminimum, geschätztem Minimum in der Senke, Wind und Bewölkung. Fehlen Stundenwerte, gilt die alte
+  3-°C-Regel.
+- **Sturmereignisse**: Für jeden Spot lädt die App die täglichen Spitzenböen und die vorherrschende
+  Windrichtung (Open-Meteo, ERA5; die letzten Tage aus der Prognose-API). Ein Tag mit Böen ab 75 km/h gilt als
+  Sturm, aufeinanderfolgende Sturmtage bilden ein Ereignis. Die Stärke folgt der Beaufort-Skala der
+  DWD-Warnungen (Sturmböen Bft 9, schwere Sturmböen 10, orkanartige Böen 11, Orkanböen 12).
+  - Zeigt ein Foto Windwurf (eingeordnete Region oder Tag *Sturmschaden*), sucht die App den stärksten Sturm
+    seit dem letzten Foto ohne Windwurf und nennt ihn: „vermutlich Sturm am 12.03.2026, Böen 104 km/h aus
+    WSW“, samt der Richtung, in die die Bäume vermutlich gefallen sind. Findet sich kein Sturm, weist sie auf
+    andere Ursachen hin (Holzschlag, Schneebruch, lokale Gewitterböen).
+  - Ohne Windwurf erscheint ein Sturm seit dem letzten Besuch als Hinweis, auf Schäden zu achten.
+  - Stürme stehen in der Chronik des Spots, im Vorher/Nachher-Vergleich bei Windwurf, und auf der Karte
+    tragen betroffene Spots ein Wind-Abzeichen; der Filter *Von Sturm betroffen* zeigt nur diese.
+
+  ERA5 rechnet auf einem Raster von rund 25 km und glättet Böenspitzen; die Werte sind eher eine untere Grenze.
+- **Phänologie-Referenzdaten**: Statt pauschaler Gradienten kann die App den Beginn der Herbstfärbung aus
+  regionalen Beobachtungsreihen nehmen. Unterstützt sind die Jahresmelder-Daten des DWD (Phase
+  *Blattverfärbung* für Rotbuche, Stiel- und Traubeneiche, Hänge-Birke, Rosskastanie, Eberesche, Linden,
+  Ahorne und weitere) und ein einfaches CSV-Format für andere Quellen wie MeteoSchweiz. Für einen Spot zählen
+  die Stationen im Umkreis von 60 km (100 m Höhenunterschied wiegen wie 10 km Distanz) mit mindestens fünf
+  Jahren in den letzten zehn abgeschlossenen Jahren. Bis zu drei Stationen werden gewichtet gemittelt und mit
+  2,5 Tagen pro 100 m auf die Höhe des Spots umgerechnet. Exposition und Kaltluft kommen wie bisher dazu.
+  Die Quelle steht im Steckbrief und im Text der Auffälligkeit, z. B. „Referenz: DWD-Station Hinterzarten,
+  12 km, 880 m, Mittel 2016–2025 (+2 weitere)“. Ohne passende Station gelten die Gradienten.
 - **Sonne & Wetter auf der Karte**: Ein eigener Kartenmodus zeigt für den gewählten Spot (oder die Kartenmitte)
   und ein beliebiges Datum in Vergangenheit oder Zukunft:
   - Sonnenbahn, Auf- und Untergangsrichtung, Sonnenstand zur gewählten Uhrzeit und den Schatten eines
@@ -360,6 +390,11 @@ src/weather.js       Wetterdaten und Mittel 1991–2020 von Open-Meteo (mit Cach
 src/irregularities.js  Auffälligkeiten (Trockenheit, Wärme, frühe Laubverfärbung …)
 src/trees.js         Waldbaumarten mit Phänologie, Trockenheitsempfindlichkeit und Gefahren
 src/phenology.js     Korrektur der Herbstfärbung für Höhe, Exposition und Kaltluftseen
+src/phenoref.js      Phänologie-Referenzreihen (DWD-Jahresmelder, generisches CSV) und Stationsauswahl
+src/storms.js        Sturmereignisse aus Spitzenböen, Verknüpfung mit Windwurf
+src/nightcool.js     Nächtliche Abkühlung in Senken aus Wind und Bewölkung
+src/openmeteo.js     Zeitreihen aus Archiv und Prognose von Open-Meteo zusammensetzen
+src/routes/climate.js  Routen und Analyse-Hooks für Stürme, Phänologie-Referenz und Frostnächte
 src/elevation.js     Geländehöhe, Hangneigung, Exposition und Geländeform (Copernicus-DEM über Open-Meteo)
 src/exif.js          Aufnahmezeit, GPS und Blickrichtung aus den Bilddaten
 src/gpx.js           GPX-Parser
@@ -410,6 +445,13 @@ scripts/generate-icons.js  Erzeugt die App-Icons aus dem Logo (`node scripts/gen
 | `GET`    | `/api/weather/day/spots?date=` | Tagesniederschlag an allen Spots                       |
 | `GET`    | `/api/horizon?lat=&lon=`       | Geländehorizont (36 Richtungen) und Himmelssicht       |
 | `GET`    | `/api/trees`                 | Liste der unterstützten Baumarten mit Steckbrief         |
+| `GET`    | `/api/spots/:id/storms`      | Sturmereignisse am Spot (ab 12 Monate vor dem ersten Foto), mit verknüpften Windwurf-Fotos |
+| `GET`    | `/api/photos/:id/storm?to=`  | Wahrscheinlichster Sturm zwischen zwei Fotos             |
+| `GET`    | `/api/storms/spots`          | Spots mit Sturm seit dem ersten Foto (aus dem Cache; fehlende werden im Hintergrund geladen) |
+| `GET`    | `/api/phenoref`              | Geladene Phänologie-Reihen (Stationen, Beobachtungen, Arten) |
+| `GET`    | `/api/spots/:id/phenoref`    | Referenz für den Beginn der Herbstfärbung am Spot, pro Art mit Stationen |
+| `POST`   | `/api/phenoref/sync`         | DWD-Jahresmelder-Daten herunterladen (braucht Zugang zu `opendata.dwd.de`) |
+| `POST`   | `/api/phenoref/import?format=` | Datei als Text importieren: `generic` (CSV) oder `dwd&kind=stations\|plants\|phases\|observations&name=<Dateiname>` |
 | `PATCH`  | `/api/spots/:id`             | Höhe (`{ elevation: 950 }`), Exposition (`{ exposition: 'S' }`, auch `'eben'`) und/oder Geländeform (`{ landform: 'senke' }`) von Hand setzen; `null` ermittelt den Wert neu |
 | `POST`   | `/api/spots/:id/species`     | Baumart einem Spot zuordnen (`{ scientificName }`)       |
 | `DELETE` | `/api/spots/:id/species?name=` | Baumart vom Spot entfernen                             |
@@ -462,10 +504,13 @@ und `hidden`. Schreibende Anfragen mit Sitzungs-Cookie brauchen den Header `X-CS
 - Einordnung lernen statt Regeln: aus den bestätigten Tags ein Modell trainieren; Baumarten auch ohne
   Pl@ntNet direkt im Bild erkennen (z. B. Nadel-/Laubholzanteil pro Region) und Verfärbungen der
   richtigen Art zuordnen.
-- Phänologie verfeinern: regionale Beobachtungsreihen (MeteoSchweiz/DWD) statt pauschaler Gradienten
-  für Höhe, Exposition und Kaltluft; nächtliche Abkühlung in Senken aus Wind und Bewölkung abschätzen.
-- Sturmereignisse aus Winddaten (Böen) mit Windwurf-Funden verknüpfen; Phänologie-Daten
-  (z. B. MeteoSchweiz/DWD) als Referenz für den Beginn der Herbstfärbung pro Region und Höhenlage.
+- ~~Sturmereignisse aus Böen mit Windwurf-Funden verknüpfen~~, ~~DWD-Phänologie als Referenz für den Beginn
+  der Herbstfärbung~~, ~~nächtliche Abkühlung in Senken aus Wind und Bewölkung~~ (umgesetzt, siehe oben).
+- Phänologie weiter: MeteoSchweiz-Daten direkt lesen (heute über das generische CSV), Referenz auch für den
+  Laubaustrieb (Spätfrost erst nach dem tatsächlichen Austrieb der Region) und für das laufende Jahr
+  (Sofortmelder) statt nur des Zehnjahresmittels.
+- Stürme genauer: Böen aus feiner aufgelösten Modellen (z. B. ICON-D2) oder Stationsmessungen, Sturmwarnungen
+  aus der Prognose als Hinweis, betroffene Spots nach einem Sturm zu besuchen.
 - Vegetationsdichte verfeinern: Himmel und Vegetation mit einem Segmentierungsmodell statt Farbregeln
   trennen (Schnee, helle Felsen und Mauern gelten heute teils als Himmel); Kennzahlen nur im Bildteil
   vergleichen, den alle Fotos eines Spots abdecken.
@@ -494,6 +539,13 @@ und `hidden`. Schreibende Anfragen mit Sitzungs-Cookie brauchen den Header `X-CS
 - Satellitendaten: enthält modifizierte Copernicus-Sentinel-Daten, bezogen über
   [Earth Search](https://earth-search.aws.element84.com/v1) (Element 84, AWS Open Data). Der Server braucht dafür Zugang zu
   `earth-search.aws.element84.com` und `sentinel-cogs.s3.us-west-2.amazonaws.com`.
+- Phänologie-Referenzdaten: Deutscher Wetterdienst, Open Data (`opendata.dwd.de`, Jahresmelder Wildwachsende
+  Pflanzen). Sie werden nicht automatisch geladen: `POST /api/phenoref/sync` lädt sie herunter, oder einzelne
+  Dateien werden importiert, z. B. `curl --data-binary @PH_Beschreibung_Phaenologie_Stationen_Jahresmelder.txt
+  'localhost:3000/api/phenoref/import?format=dwd&kind=stations'` und danach jede Datei
+  `PH_Jahresmelder_Wildwachsende_Pflanze_<Art>_….txt` mit `kind=observations&name=<Dateiname>`. Das generische
+  CSV hat die Spalten `source;station_id;station_name;lat;lon;elevation;species;year;doy` (lateinischer
+  Artname, Tag im Jahr der beginnenden Blattverfärbung).
 - Kartendaten © OpenStreetMap-Mitwirkende. Bei stärkerer Nutzung braucht es einen eigenen
   Tile-Anbieter (siehe Tile Usage Policy).
 - Der Service Worker braucht HTTPS (oder `localhost`). Nach Änderungen an der Liste vorgehaltener Dateien

@@ -1076,3 +1076,20 @@ summary { cursor: pointer; color: var(--muted); font-weight: 600; font-size: 0.9
   .mod-log li { grid-template-columns: 1fr; gap: 0; }
   .mod-users th:nth-child(2), .mod-users td:nth-child(2) { display: none; }
 }
+/* ---------- Storms and frost nights (routes/climate.js) ---------- */
+.pin .storm-flag {
+  position: absolute; left: -7px; bottom: -7px; transform: rotate(45deg);
+  width: 18px; height: 18px; border-radius: 50%; background: var(--wet); color: #fff;
+  display: grid; place-items: center; border: 2px solid #fbf8f0;
+}
+.pin .storm-flag svg { width: 11px; height: 11px; }
+.chronicle li.storm::before { border-radius: 2px; transform: rotate(45deg); background: var(--wet); }
+.chronicle li.storm span { color: var(--muted); }
+.storm-note { margin: 0.5rem 0 0; font-size: 0.85rem; font-weight: 600; color: var(--c-windwurf); }
+.storm-note.none { color: var(--muted); font-weight: 500; }
+.frost-nights { margin-top: 0.7rem; }
+.frost-nights h4 { margin: 0 0 0.35rem; font: 700 0.85rem/1.3 var(--font-body); }
+.frost-table { border-collapse: collapse; width: 100%; font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+.frost-table th { text-align: left; font-weight: 600; color: var(--muted); padding: 0.2rem 0.4rem 0.2rem 0; border-bottom: 1px solid var(--border); }
+.frost-table td { padding: 0.2rem 0.4rem 0.2rem 0; border-bottom: 1px solid var(--border); }
+.frost-table .est { font-weight: 700; color: var(--wet); }
