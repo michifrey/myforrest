@@ -2,7 +2,7 @@
 
 // Installable app (manifest, service worker, offline queue): the parts that
 // can be checked without a browser. The real offline round trip is verified
-// in headless Chromium (see README, «Installierbare App»).
+// in headless Chromium (see docs/funktionen.md, «Installierbare App mit Offline-Upload»).
 
 const test = require('node:test');
 const assert = require('node:assert/strict');

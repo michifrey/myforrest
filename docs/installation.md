@@ -1,0 +1,88 @@
+# Installation und Konfiguration
+
+## Voraussetzungen
+
+Node.js ≥ 22.5 (nutzt das eingebaute `node:sqlite`). Für Videos zusätzlich `ffmpeg`
+(z. B. `apt install ffmpeg` oder `brew install ffmpeg`).
+
+## Starten
+
+```bash
+npm install
+npm start            # http://localhost:3000
+npm test
+```
+
+## Auf dem Handy
+
+Browser lassen die Kamera für das Live-Overlay nur über HTTPS zu (oder auf `localhost`). Im Heimnetz geht das z. B. mit einem Tunnel (`cloudflared tunnel --url http://localhost:3000`)
+oder einem Reverse-Proxy wie Caddy. Ohne HTTPS öffnet sich die normale Kamera-App: Das Foto landet
+trotzdem am richtigen Spot, nur ohne Overlay.
+
+## Umgebungsvariablen
+
+| Variable           | Standard | Bedeutung                                      |
+|--------------------|----------|------------------------------------------------|
+| `PORT`             | `3000`   | HTTP-Port                                      |
+| `DATA_DIR`         | `./data` | SQLite-Datenbank und hochgeladene Bilder       |
+| `SPOT_RADIUS_M`    | `25`     | Radius, in dem Fotos zum selben Spot gehören   |
+| `HEADING_TOLERANCE_DEG` | `45` | Abweichung der Blickrichtung (±°), bis zu der Fotos zum selben Spot gehören |
+| `PLANTNET_API_KEY` | –        | Aktiviert die Pflanzenbestimmung               |
+| `PUBLIC_URL`       | –        | Öffentliche Adresse für Foto-Links im Export (sonst aus der Anfrage) |
+| `FFMPEG_PATH`      | `ffmpeg` | ffmpeg für die Bilder aus Videos               |
+| `VIDEO_MAX_MB`     | `4096`   | Maximale Grösse eines Videos                   |
+| `SENTINEL_STAC_URL`| Earth Search | STAC-API für Sentinel-2 L2A; leer = Satellitenkontext aus |
+| `REQUIRE_LOGIN`    | –        | `1`: Uploads und Änderungen nur mit Konto      |
+| `ADMIN_EMAIL`      | –        | Dieses Konto wird Admin (sonst das erste Konto) |
+| `DETECTOR_URL`     | –        | Externer Objektdetektor (siehe [unten](#externer-detektor)); ohne ihn laufen die eingebauten Heuristiken |
+
+## Externer Detektor
+
+Mit `DETECTOR_URL` schickt die App jedes Foto beim ersten Abruf seiner Erkennungen an diesen Dienst:
+
+```
+POST $DETECTOR_URL
+Content-Type: image/jpeg | image/png | image/webp
+<Bilddaten>
+```
+
+Antwort (JSON; ein reines Array der Erkennungen geht auch):
+
+```json
+{
+  "model": "yolo-forest-v3",
+  "detections": [
+    { "label": "liegender_stamm", "score": 0.87, "box": [0.12, 0.55, 0.81, 0.70] }
+  ]
+}
+```
+
+`box` ist `[x0, y0, x1, y1]`, normiert auf 0–1 im (nach EXIF gedrehten) Bild. Pixelwerte (ein Wert > 1,5)
+werden mit der Bildgrösse umgerechnet. Labels: `liegender_stamm`, `wurzelteller`, `totholz`, `holzpolter`,
+`rueckegasse`. Gängige englische Namen (`fallen_tree`, `root_plate`, `deadwood`, `log_pile`,
+`skid_trail` …) werden übersetzt, unbekannte Labels bleiben, wie sie sind. Ist der Dienst nicht
+erreichbar, fallen die Heuristiken ein, und die Antwort enthält einen Hinweis.
+
+## Phänologie-Referenzdaten laden
+
+Die Referenzreihen für den Beginn der Herbstfärbung (siehe
+[Phänologie-Referenzdaten](funktionen.md#phänologie-referenzdaten)) stammen vom Deutschen Wetterdienst
+(Open Data, `opendata.dwd.de`, Jahresmelder Wildwachsende Pflanzen). Sie werden nicht automatisch geladen:
+
+- `POST /api/phenoref/sync` lädt sie herunter (braucht Zugang zu `opendata.dwd.de`), oder
+- einzelne Dateien werden importiert, zuerst die Stationen, danach jede Datei
+  `PH_Jahresmelder_Wildwachsende_Pflanze_<Art>_….txt` mit `kind=observations&name=<Dateiname>`:
+
+```bash
+curl --data-binary @PH_Beschreibung_Phaenologie_Stationen_Jahresmelder.txt \
+  'localhost:3000/api/phenoref/import?format=dwd&kind=stations'
+```
+
+Andere Quellen wie MeteoSchweiz lassen sich als generisches CSV importieren (`format=generic`). Es hat die
+Spalten `source;station_id;station_name;lat;lon;elevation;species;year;doy` (lateinischer Artname, Tag im
+Jahr der beginnenden Blattverfärbung).
+
+## Weiter
+
+- [Betrieb, Datenschutz und Datenquellen](betrieb.md): was vor einem öffentlichen Betrieb zu beachten ist
+- [Architektur](architektur.md) und [REST-API](api.md)
