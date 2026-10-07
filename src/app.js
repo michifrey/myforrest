@@ -15,7 +15,8 @@ const { assignSpot, refreshSpot } = require('./spots');
 const { TAGS, parseTags } = require('./tags');
 const { identifyPlant } = require('./plantnet');
 const { alignImages, extractFeatures } = require('./align');
-const { IDENTITY, multiply } = require('./homography');
+const { IDENTITY, multiply, invert } = require('./homography');
+const { computeChange, renderHeatmap } = require('./change');
 
 const ACTIVITIES = ['joggen', 'wandern', 'biken', 'sonstiges'];
 const NEOPHYTE_MIN_SCORE = 0.3;
@@ -341,6 +342,64 @@ function createApp({
     await fsp.rm(path.join(uploadDir, photo.file), { force: true });
     res.status(204).end();
   });
+
+  /* ---------- Change detection between two aligned photos ---------- */
+
+  const changeCache = new Map();
+  /** Change between photo `fromId` (before, defines the view) and `toId`. */
+  function changeBetween(fromId, toId) {
+    const a = getPhoto.get(fromId);
+    const b = getPhoto.get(toId);
+    if (!a || !b) return { status: 404, error: 'Foto nicht gefunden' };
+    if (a.spot_id !== b.spot_id) return { status: 422, error: 'Fotos gehören zu verschiedenen Spots' };
+    if (!a.align_h || !b.align_h) return { status: 422, error: 'Mindestens eines der Fotos ist nicht ausgerichtet' };
+    const key = `${a.id}:${b.id}:${a.align_h}:${b.align_h}`;
+    if (!changeCache.has(key)) {
+      const hAinv = invert(JSON.parse(a.align_h));
+      const job = (async () => {
+        if (!hAinv) throw new Error('Ausrichtung nicht invertierbar');
+        const result = await computeChange(
+          path.join(uploadDir, a.file),
+          path.join(uploadDir, b.file),
+          multiply(hAinv, JSON.parse(b.align_h)),
+        );
+        // Keep only what the routes need; the per-pixel scores are large.
+        return { changedFraction: result.changedFraction, coverage: result.coverage, png: await renderHeatmap(result) };
+      })();
+      job.catch(() => changeCache.delete(key));
+      changeCache.set(key, job);
+      if (changeCache.size > 30) changeCache.delete(changeCache.keys().next().value);
+    }
+    return { job: changeCache.get(key) };
+  }
+
+  const changeRoute = (handler) => async (req, res, next) => {
+    const id = idParam(req, res);
+    if (id === null) return;
+    const to = Number(req.query.to);
+    if (!Number.isSafeInteger(to) || to <= 0) return res.status(400).json({ error: 'Parameter "to" fehlt' });
+    const c = changeBetween(id, to);
+    if (c.error) return res.status(c.status).json({ error: c.error });
+    try {
+      handler(res, await c.job, id, to);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  app.get('/api/photos/:id/change', changeRoute((res, r, id, to) => {
+    res.json({
+      from: id,
+      to,
+      changedFraction: Math.round(r.changedFraction * 1000) / 1000,
+      coverage: Math.round(r.coverage * 1000) / 1000,
+      heatmap: `/api/photos/${id}/change.png?to=${to}`,
+    });
+  }));
+
+  app.get('/api/photos/:id/change.png', changeRoute((res, r) => {
+    res.type('png').set('Cache-Control', 'private, max-age=300').send(r.png);
+  }));
 
   app.post('/api/photos/:id/identify', async (req, res, next) => {
     const id = idParam(req, res);

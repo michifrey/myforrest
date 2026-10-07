@@ -192,3 +192,30 @@ test('photos of a spot are aligned into a common frame', async () => {
     assert.deepEqual(spot.photos.map((p) => Boolean(p.alignment)), [true, true, false]);
   });
 });
+
+test('change between aligned photos is reported with a heatmap', async () => {
+  const blob = (name) => new Blob([fs.readFileSync(path.join(__dirname, 'fixtures', name))], { type: 'image/jpeg' });
+  await withServer({}, async (base) => {
+    const a = (await (await upload(base, [['a.jpg', blob('align-a.jpg')]], { lat: '47.1', lon: '8.1' })).json()).created[0];
+    const b = (await (await upload(base, [['b.jpg', blob('align-b.jpg')]],
+      { spotId: String(a.spotId), refPhotoId: String(a.id) })).json()).created[0];
+
+    let res = await fetch(`${base}/api/photos/${a.id}/change?to=${b.id}`);
+    assert.equal(res.status, 200);
+    const change = await res.json();
+    // The fixture adds a fallen trunk and a shrub (~8 % of the frame) and darkens everything.
+    assert.ok(change.changedFraction > 0.04 && change.changedFraction < 0.2, `changed ${change.changedFraction}`);
+
+    res = await fetch(`${base}${change.heatmap}`);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('content-type'), 'image/png');
+    assert.equal(Buffer.from(await res.arrayBuffer()).subarray(1, 4).toString(), 'PNG');
+
+    const same = await (await fetch(`${base}/api/photos/${a.id}/change?to=${a.id}`)).json();
+    assert.equal(same.changedFraction, 0);
+
+    const other = (await (await upload(base, [['o.jpg', blob('align-other.jpg')]], { spotId: String(a.spotId) })).json()).created[0];
+    assert.equal((await fetch(`${base}/api/photos/${a.id}/change?to=${other.id}`)).status, 422);
+    assert.equal((await fetch(`${base}/api/photos/${a.id}/change`)).status, 400);
+  });
+});

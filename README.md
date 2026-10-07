@@ -23,6 +23,11 @@ verändert.
   dann deckungsgleich übereinander, und mit *Stabilisiert* wirkt das Durchblättern der Zeitleiste
   wie ein Zeitraffer. Die Originalfotos bleiben unverändert, gespeichert wird nur die Transformation.
   Fotos aus einem ganz anderen Blickwinkel werden erkannt und bleiben unausgerichtet.
+- **Veränderungs-Heatmap**: Auf zwei ausgerichteten Fotos markiert eine Heatmap, wo sich etwas verändert
+  hat (gelb → rot), und nennt den Anteil der veränderten Fläche. Erkannt werden neue oder verschwundene
+  Strukturen (umgestürzte Bäume, Lichtungen, Bewuchs) sowie Farbwechsel wie grün → braun. Unterschiedliches
+  Licht und kleine Restverschiebungen werden ausgeglichen. Im Kopf jedes Spots steht zudem, wie viel sich
+  seit dem ersten Foto verändert hat.
 - **Drei Wege, Fotos zu verorten**:
   1. **GPS aus dem Foto** (EXIF), wie bei normalen Handyfotos.
   2. **Automatisch über einen GPX-Track**: Eine Action-Cam im Intervallmodus (z. B. alle 5 s) beim
@@ -70,6 +75,7 @@ src/db.js            SQLite-Schema (spots, photos, photo_tags, identifications)
 src/spots.js         Gruppierung von Fotos zu Spots
 src/align.js         Bildregistrierung (ORB-Merkmale, Matching, RANSAC)
 src/homography.js    3×3-Homographien: Verkettung, Inverse
+src/change.js        Veränderungserkennung und Heatmap
 src/exif.js          Aufnahmezeit, GPS und Blickrichtung aus den Bilddaten
 src/gpx.js           GPX-Parser
 src/geo.js           Distanzen und Interpolation auf dem Track
@@ -87,6 +93,8 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
 | `GET`    | `/api/spots/:id`             | Ein Spot mit allen Fotos chronologisch                   |
 | `POST`   | `/api/photos`                | Upload (multipart: `photos[]`, optional `spotId` und `refPhotoId` für Wiederholungsfotos, `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `utcOffsetMinutes`, `clockShiftSeconds`) |
 | `POST`   | `/api/spots/:id/align`       | Ausrichtung aller Fotos eines Spots neu berechnen        |
+| `GET`    | `/api/photos/:id/change?to=` | Anteil veränderter Fläche zwischen zwei ausgerichteten Fotos |
+| `GET`    | `/api/photos/:id/change.png?to=` | Heatmap der Veränderung (PNG, in der Ansicht des ersten Fotos) |
 | `PATCH`  | `/api/photos/:id`            | Tags und Notiz ändern                                    |
 | `DELETE` | `/api/photos/:id`            | Foto löschen                                             |
 | `POST`   | `/api/photos/:id/identify`   | Pflanzen bestimmen (Pl@ntNet)                            |
@@ -103,8 +111,8 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
 **Phase 3: Automatische Auswertung**
 - Objekterkennung: umgestürzte Bäume, Wurzelteller, Totholz, Holzpolter und Rückegassen,
   z. B. mit einem feinjustierten YOLO- oder Segmentierungsmodell.
-- Veränderungserkennung: auf den bereits ausgerichteten Aufnahmen eines Spots Unterschiede
-  automatisch markieren (z. B. als Heatmap).
+- Veränderungen klassifizieren: die Heatmap-Regionen automatisch als Windwurf, Kahlschlag, Verfärbung
+  oder neuer Bewuchs einordnen und Spots mit starker Veränderung auf der Karte hervorheben.
 - Vegetationsdichte: Grünanteil und Kronendach-Deckung aus den Bildern schätzen und als Zeitreihe
   zeigen.
 - Arten und Neophyten: Hotspot-Karten und Ausbreitungsfronten, Export zu Info Flora / iNaturalist.
