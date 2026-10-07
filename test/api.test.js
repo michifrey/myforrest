@@ -9,15 +9,19 @@ const { createApp } = require('../src/app');
 
 const fixture = (name) => new Blob([fs.readFileSync(path.join(__dirname, 'fixtures', name))], { type: 'image/jpeg' });
 
+// Weather lookups must never reach the network in tests.
+const noWeather = async () => new Response('offline', { status: 503 });
+
 async function withServer(opts, fn) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'myforrest-'));
-  const app = createApp({ dataDir, ...opts });
+  const app = createApp({ dataDir, weatherFetch: noWeather, ...opts });
   const server = app.listen(0);
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
     await fn(base, dataDir);
   } finally {
+    await app.locals.idle();
     server.close();
     app.locals.db.close();
     fs.rmSync(dataDir, { recursive: true, force: true });
@@ -217,5 +221,58 @@ test('change between aligned photos is reported with a heatmap', async () => {
     const other = (await (await upload(base, [['o.jpg', blob('align-other.jpg')]], { spotId: String(a.spotId) })).json()).created[0];
     assert.equal((await fetch(`${base}/api/photos/${a.id}/change?to=${other.id}`)).status, 422);
     assert.equal((await fetch(`${base}/api/photos/${a.id}/change`)).status, 400);
+  });
+});
+
+test('changes are classified and early colouring in a drought is recorded as an irregularity', async () => {
+  const blob = (name) => new Blob([fs.readFileSync(path.join(__dirname, 'fixtures', name))], { type: 'image/jpeg' });
+  const DAY = 86400000;
+  // Open-Meteo stand-in: normal 3 mm/day and 15 °C; from June 2026 no rain and 4 °C warmer.
+  const dryFrom = Date.UTC(2026, 5, 1);
+  const weatherFetch = async (url) => {
+    const q = new URL(url).searchParams;
+    const time = [];
+    for (let t = Date.parse(`${q.get('start_date')}T00:00:00Z`); t <= Date.parse(`${q.get('end_date')}T00:00:00Z`); t += DAY) {
+      time.push(new Date(t).toISOString().slice(0, 10));
+    }
+    const dry = (d) => Date.parse(`${d}T00:00:00Z`) >= dryFrom;
+    return new Response(JSON.stringify({ daily: {
+      time,
+      precipitation_sum: time.map((d) => (dry(d) ? 0 : 3)),
+      temperature_2m_mean: time.map((d) => (dry(d) ? 19 : 15)),
+      temperature_2m_max: time.map((d) => (dry(d) ? 31 : 21)),
+    } }));
+  };
+  await withServer({ weatherFetch }, async (base) => {
+    const a = (await (await upload(base, [['a.jpg', blob('canopy-a.jpg')]],
+      { lat: '47.36', lon: '8.58', takenAt: '2026-05-20T09:00:00Z' })).json()).created[0];
+    const b = (await (await upload(base, [['b.jpg', blob('canopy-b.jpg')]],
+      { spotId: String(a.spotId), refPhotoId: String(a.id), takenAt: '2026-08-12T09:00:00Z' })).json()).created[0];
+
+    assert.ok(b.alignment, 'canopy photos align');
+    const classes = b.change.summary.map((x) => x.class).sort();
+    assert.deepEqual(classes, ['auflichtung', 'verfaerbung']);
+
+    const ctx = await (await fetch(`${base}/api/photos/${b.id}/context`)).json();
+    assert.ok(ctx.weather.last90.precipRatio < 0.3);
+    const types = ctx.irregularities.map((i) => i.type);
+    assert.ok(types.includes('trockenheit') && types.includes('fruehe_verfaerbung'), types.join(','));
+    assert.match(ctx.irregularities.find((i) => i.type === 'fruehe_verfaerbung').text, /Trockenstress/);
+
+    const spots = await (await fetch(`${base}/api/spots`)).json();
+    assert.ok(spots[0].change.fraction > 0.2);
+    assert.ok(spots[0].irregularities.includes('Frühe Laubverfärbung'));
+
+    const change = await (await fetch(`${base}/api/photos/${a.id}/change?to=${b.id}`)).json();
+    assert.equal(change.regions[0].bbox.length, 4);
+  });
+});
+
+test('weather outages are recorded without failing the upload', async () => {
+  await withServer({}, async (base) => {
+    const p = (await (await upload(base, [['gps.jpg', fixture('gps.jpg')]])).json()).created[0];
+    const ctx = await (await fetch(`${base}/api/photos/${p.id}/context`)).json();
+    assert.equal(ctx.weather, null);
+    assert.match(ctx.weatherError, /503/);
   });
 });

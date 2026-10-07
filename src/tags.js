@@ -8,6 +8,7 @@ const TAGS = {
   totholz: 'Totholz',
   holzschlag: 'Holzschlag / Rodung',
   verjuengung: 'Verjüngung / Aufforstung',
+  fruehverfaerbung: 'Frühe Laubverfärbung',
   neophyt: 'Neophyt',
   wegschaden: 'Weg / Erosion',
 };

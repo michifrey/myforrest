@@ -17,6 +17,9 @@ const { identifyPlant } = require('./plantnet');
 const { alignImages, extractFeatures } = require('./align');
 const { IDENTITY, multiply, invert } = require('./homography');
 const { computeChange, renderHeatmap } = require('./change');
+const { classifyChange } = require('./classify');
+const { createWeather } = require('./weather');
+const { assess } = require('./irregularities');
 
 const ACTIVITIES = ['joggen', 'wandern', 'biken', 'sonstiges'];
 const NEOPHYTE_MIN_SCORE = 0.3;
@@ -26,12 +29,14 @@ function createApp({
   spotRadiusM = 25,
   plantnetKey = process.env.PLANTNET_API_KEY,
   fetchImpl = fetch,
+  weatherFetch = fetch,
 } = {}) {
   const uploadDir = path.join(dataDir, 'uploads');
   const tmpDir = path.join(dataDir, 'tmp');
   fs.mkdirSync(uploadDir, { recursive: true });
   fs.mkdirSync(tmpDir, { recursive: true });
   const db = openDb(path.join(dataDir, 'myforrest.db'));
+  const weather = createWeather({ db, fetchImpl: weatherFetch });
 
   const upload = multer({
     dest: tmpDir,
@@ -69,6 +74,8 @@ function createApp({
     note: p.note,
     tags: tagsOf.all(p.id).map((r) => r.tag),
     alignment: p.align_h ? { h: JSON.parse(p.align_h), inliers: p.align_inliers } : null,
+    change: p.change_json ? JSON.parse(p.change_json) : null,
+    context: p.context_json ? JSON.parse(p.context_json) : null,
     identifications: idsOf.all(p.id).map((r) => ({
       scientificName: r.scientific_name,
       commonName: r.common_name,
@@ -131,7 +138,85 @@ function createApp({
     db.prepare('UPDATE photos SET align_h = NULL, align_inliers = NULL WHERE spot_id = ?').run(spotId);
     const ids = db.prepare('SELECT id FROM photos WHERE spot_id = ? ORDER BY taken_at, id').all(spotId);
     for (const { id } of ids) await alignPhoto(id);
+    for (const { id } of ids) {
+      await analyzeChange(id);
+      refreshIrregularities(id);
+    }
   }
+
+  /* ---------- Analysis per photo: classified change and weather context ---------- */
+
+  const setChange = db.prepare('UPDATE photos SET change_json = ? WHERE id = ?');
+  const setContext = db.prepare('UPDATE photos SET context_json = ? WHERE id = ?');
+
+  /** Classifies the change of a photo against the spot's first aligned photo. */
+  async function analyzeChange(photoId) {
+    const photo = getPhoto.get(photoId);
+    if (!photo) return;
+    const base = db.prepare(
+      'SELECT * FROM photos WHERE spot_id = ? AND align_h IS NOT NULL ORDER BY taken_at, id LIMIT 1',
+    ).get(photo.spot_id);
+    if (!photo.align_h || !base || base.id === photo.id || base.taken_at > photo.taken_at) {
+      setChange.run(null, photoId);
+      return;
+    }
+    const c = changeBetween(base.id, photo.id);
+    if (c.error) return setChange.run(null, photoId);
+    const r = await c.job;
+    setChange.run(JSON.stringify({
+      base: base.id,
+      baseTakenAt: new Date(base.taken_at).toISOString(),
+      fraction: Math.round(r.changedFraction * 1000) / 1000,
+      summary: r.summary,
+      regions: r.regions,
+    }), photoId);
+  }
+
+  const irregularitiesOf = (photo, weatherCtx) => assess({
+    takenAt: photo.taken_at,
+    tags: tagsOf.all(photo.id).map((t) => t.tag),
+    change: photo.change_json ? JSON.parse(photo.change_json) : null,
+    weather: weatherCtx,
+  });
+
+  /** Fetches weather for the photo's place and date and records the irregularities. */
+  async function analyzeContext(photoId) {
+    const photo = getPhoto.get(photoId);
+    if (!photo) return null;
+    let weatherCtx = null;
+    let weatherError = null;
+    try {
+      weatherCtx = await weather.context(photo.lat, photo.lon, photo.taken_at);
+    } catch (err) {
+      weatherError = err.message;
+    }
+    const ctx = {
+      computedAt: new Date().toISOString(),
+      weather: weatherCtx,
+      weatherError,
+      irregularities: irregularitiesOf(photo, weatherCtx),
+    };
+    setContext.run(JSON.stringify(ctx), photoId);
+    return ctx;
+  }
+
+  /** Re-evaluates the irregularities (after tag or change updates) without refetching weather. */
+  function refreshIrregularities(photoId) {
+    const photo = getPhoto.get(photoId);
+    if (!photo?.context_json) return;
+    const ctx = JSON.parse(photo.context_json);
+    ctx.irregularities = irregularitiesOf(photo, ctx.weather);
+    setContext.run(JSON.stringify(ctx), photoId);
+  }
+
+  // Background work (weather lookups) is tracked so tests and shutdown can wait for it.
+  const pending = new Set();
+  const background = (promise) => {
+    const p = promise.catch((err) => console.error('Hintergrundanalyse fehlgeschlagen:', err.message))
+      .finally(() => pending.delete(p));
+    pending.add(p);
+  };
+  app.locals.idle = () => Promise.all([...pending]);
 
   const safeAlign = (fn) => fn.catch((err) => console.error('Ausrichtung fehlgeschlagen:', err.message));
 
@@ -156,7 +241,9 @@ function createApp({
              MIN(p.taken_at) AS first_taken,
              MAX(p.taken_at) AS last_taken,
              GROUP_CONCAT(DISTINCT t.tag) AS tags,
-             (SELECT file FROM photos WHERE spot_id = s.id ORDER BY taken_at DESC LIMIT 1) AS latest_file
+             (SELECT file FROM photos WHERE spot_id = s.id ORDER BY taken_at DESC LIMIT 1) AS latest_file,
+             (SELECT change_json FROM photos WHERE spot_id = s.id ORDER BY taken_at DESC LIMIT 1) AS latest_change,
+             (SELECT context_json FROM photos WHERE spot_id = s.id ORDER BY taken_at DESC LIMIT 1) AS latest_context
       FROM spots s
       JOIN photos p ON p.spot_id = s.id
       LEFT JOIN photo_tags t ON t.photo_id = p.id
@@ -173,6 +260,10 @@ function createApp({
       lastTaken: new Date(r.last_taken).toISOString(),
       tags: r.tags ? r.tags.split(',').sort() : [],
       latestUrl: `/uploads/${r.latest_file}`,
+      change: r.latest_change ? (({ fraction, summary }) => ({ fraction, top: summary[0]?.label || null }))(JSON.parse(r.latest_change)) : null,
+      irregularities: r.latest_context
+        ? JSON.parse(r.latest_context).irregularities.filter((i) => i.severity !== 'hinweis').map((i) => i.title)
+        : [],
     })));
   });
 
@@ -310,6 +401,8 @@ function createApp({
         return id;
       });
       await safeAlign(alignPhoto(photoId, refPhotoId));
+      await safeAlign(analyzeChange(photoId));
+      background(analyzeContext(photoId));
       created.push(photoJson(getPhoto.get(photoId)));
     }
     return [created.length ? 201 : 422, { created, skipped, spots: [...touchedSpots] }];
@@ -327,6 +420,7 @@ function createApp({
         db.prepare('UPDATE photos SET note = ? WHERE id = ?').run(body.note ? String(body.note).slice(0, 2000) : null, id);
       }
     });
+    refreshIrregularities(id);
     res.json(photoJson(getPhoto.get(id)));
   });
 
@@ -340,7 +434,41 @@ function createApp({
       refreshSpot(db, photo.spot_id);
     });
     await fsp.rm(path.join(uploadDir, photo.file), { force: true });
+    // The spot's first photo may have gone: re-evaluate the others' change.
+    const rest = db.prepare('SELECT id FROM photos WHERE spot_id = ?').all(photo.spot_id);
+    background((async () => {
+      for (const { id: other } of rest) {
+        await analyzeChange(other);
+        refreshIrregularities(other);
+      }
+    })());
     res.status(204).end();
+  });
+
+  app.get('/api/photos/:id/context', async (req, res, next) => {
+    const id = idParam(req, res);
+    if (id === null) return;
+    const photo = getPhoto.get(id);
+    if (!photo) return res.status(404).json({ error: 'Foto nicht gefunden' });
+    try {
+      const stored = photo.context_json ? JSON.parse(photo.context_json) : null;
+      // Retry missing weather after an hour; recent periods may still have been incomplete.
+      const stale = !stored || (!stored.weather && Date.now() - Date.parse(stored.computedAt) > 3600000);
+      res.json(stale ? await analyzeContext(id) : stored);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.post('/api/photos/:id/context', async (req, res, next) => {
+    const id = idParam(req, res);
+    if (id === null) return;
+    if (!getPhoto.get(id)) return res.status(404).json({ error: 'Foto nicht gefunden' });
+    try {
+      res.json(await analyzeContext(id));
+    } catch (err) {
+      next(err);
+    }
   });
 
   /* ---------- Change detection between two aligned photos ---------- */
@@ -364,7 +492,12 @@ function createApp({
           multiply(hAinv, JSON.parse(b.align_h)),
         );
         // Keep only what the routes need; the per-pixel scores are large.
-        return { changedFraction: result.changedFraction, coverage: result.coverage, png: await renderHeatmap(result) };
+        return {
+          changedFraction: result.changedFraction,
+          coverage: result.coverage,
+          ...classifyChange(result),
+          png: await renderHeatmap(result),
+        };
       })();
       job.catch(() => changeCache.delete(key));
       changeCache.set(key, job);
@@ -394,6 +527,8 @@ function createApp({
       changedFraction: Math.round(r.changedFraction * 1000) / 1000,
       coverage: Math.round(r.coverage * 1000) / 1000,
       heatmap: `/api/photos/${id}/change.png?to=${to}`,
+      summary: r.summary,
+      regions: r.regions,
     });
   }));
 

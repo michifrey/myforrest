@@ -144,6 +144,7 @@
             <img id="cmp-img-b" alt="Nachher">
             <div class="swipe-top" id="swipe-top"><img id="cmp-img-a" alt="Vorher"></div>
             <img id="cmp-heat-img" class="heat" alt="" hidden>
+            <div id="cmp-boxes" class="boxes" aria-hidden="true"></div>
             <div class="swipe-handle" id="swipe-handle"></div>
           </div>
           <input id="swipe-range" type="range" min="0" max="100" value="50" aria-label="Vergleichsregler">
@@ -156,6 +157,7 @@
             <label class="toggle"><input type="checkbox" id="cmp-heat" checked> Veränderungen hervorheben</label>
             <span class="heat-legend" aria-hidden="true"><i></i>wenig<b></b>stark</span>
           </div>
+          <div id="cmp-regions" class="regions"></div>
         </div>
 
         <div class="photo-details">
@@ -169,6 +171,16 @@
           </div>
           <div id="identify-results"></div>
         </div>
+
+        <section class="context" aria-labelledby="context-title">
+          <h3 class="label" id="context-title">Kontext zur Aufnahme</h3>
+          <div id="context-body" aria-live="polite"></div>
+        </section>
+
+        <section id="chronicle-wrap" class="chronicle-wrap" hidden>
+          <h3 class="label">Auffälligkeiten-Chronik</h3>
+          <ol id="chronicle" class="chronicle"></ol>
+        </section>
       </section>
     </aside>
   </section>

@@ -114,6 +114,20 @@ den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen und eine Notiz.
   Strukturen (umgestürzte Bäume, Lichtungen, Bewuchs) sowie Farbwechsel wie grün → braun. Unterschiedliches
   Licht und kleine Restverschiebungen werden ausgeglichen. Im Kopf jedes Spots steht zudem, wie viel sich
   seit dem ersten Foto verändert hat.
+- **Einordnung der Veränderungen**: Veränderte Regionen werden automatisch eingeordnet als
+  *Windwurf / liegende Stämme*, *Auflichtung / Holzschlag*, *Verfärbung (grün → gelb/braun)*,
+  *neuer Bewuchs* oder *sonstige Veränderung*. Grundlage sind Grünanteil, Helligkeit, Textur,
+  Kantenrichtung und Form. Im Vergleich erscheinen sie als beschriftete Rahmen und lassen sich mit
+  einem Klick als Beobachtung (Tag) übernehmen. Auf der Karte erscheinen Spots mit starker Veränderung
+  im Tooltip, und es gibt einen Filter dafür.
+- **Wetter-Kontext und Auffälligkeiten**: Zu jedem Foto werden die Wetterdaten am Standort geladen
+  (Open-Meteo, ERA5): Niederschlag, Temperatur, Hitzetage und längste Trockenphase der 90 Tage vor
+  der Aufnahme sowie der Niederschlag der letzten 12 Monate, jeweils gegenüber dem Mittel 1991–2020.
+  Daraus werden Auffälligkeiten abgeleitet und am Foto festgehalten: Trockenheit, Wärme, Nässe und vor
+  allem **frühe Laubverfärbung** mit vermuteter Ursache. Ein Beispiel: Laub verfärbt sich im August
+  bei 20 % des üblichen Niederschlags, das deutet auf Trockenstress hin. Bei unauffälligem Wetter
+  verweist der Text auf andere Ursachen wie Schädlinge. Jeder Spot hat eine Auffälligkeiten-Chronik
+  über die Jahre, und auf der Karte sind betroffene Spots mit „!“ markiert.
 - **Drei Wege, Fotos zu verorten**:
   1. **GPS aus dem Foto** (EXIF), wie bei normalen Handyfotos.
   2. **Automatisch über einen GPX-Track**: Eine Action-Cam im Intervallmodus (z. B. alle 5 s) beim
@@ -162,6 +176,9 @@ src/spots.js         Gruppierung von Fotos zu Spots
 src/align.js         Bildregistrierung (ORB-Merkmale, Matching, RANSAC)
 src/homography.js    3×3-Homographien: Verkettung, Inverse
 src/change.js        Veränderungserkennung und Heatmap
+src/classify.js      Einordnung der veränderten Regionen
+src/weather.js       Wetterdaten und Mittel 1991–2020 von Open-Meteo (mit Cache)
+src/irregularities.js  Auffälligkeiten (Trockenheit, Wärme, frühe Laubverfärbung …)
 src/exif.js          Aufnahmezeit, GPS und Blickrichtung aus den Bilddaten
 src/gpx.js           GPX-Parser
 src/geo.js           Distanzen und Interpolation auf dem Track
@@ -180,8 +197,10 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
 | `GET`    | `/api/spots/:id`             | Ein Spot mit allen Fotos chronologisch                   |
 | `POST`   | `/api/photos`                | Upload (multipart: `photos[]`, optional `spotId` und `refPhotoId` für Wiederholungsfotos, `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `utcOffsetMinutes`, `clockShiftSeconds`) |
 | `POST`   | `/api/spots/:id/align`       | Ausrichtung aller Fotos eines Spots neu berechnen        |
-| `GET`    | `/api/photos/:id/change?to=` | Anteil veränderter Fläche zwischen zwei ausgerichteten Fotos |
+| `GET`    | `/api/photos/:id/change?to=` | Veränderte Fläche zwischen zwei ausgerichteten Fotos, mit eingeordneten Regionen |
 | `GET`    | `/api/photos/:id/change.png?to=` | Heatmap der Veränderung (PNG, in der Ansicht des ersten Fotos) |
+| `GET`    | `/api/photos/:id/context`    | Wetter-Kontext und Auffälligkeiten (wird beim ersten Abruf berechnet und gespeichert) |
+| `POST`   | `/api/photos/:id/context`    | Wetter-Kontext neu laden                                 |
 | `PATCH`  | `/api/photos/:id`            | Tags und Notiz ändern                                    |
 | `DELETE` | `/api/photos/:id`            | Foto löschen                                             |
 | `POST`   | `/api/photos/:id/identify`   | Pflanzen bestimmen (Pl@ntNet)                            |
@@ -198,8 +217,10 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
 **Phase 3: Automatische Auswertung**
 - Objekterkennung: umgestürzte Bäume, Wurzelteller, Totholz, Holzpolter und Rückegassen,
   z. B. mit einem feinjustierten YOLO- oder Segmentierungsmodell.
-- Veränderungen klassifizieren: die Heatmap-Regionen automatisch als Windwurf, Kahlschlag, Verfärbung
-  oder neuer Bewuchs einordnen und Spots mit starker Veränderung auf der Karte hervorheben.
+- Einordnung lernen statt Regeln: aus den bestätigten Tags ein Modell trainieren und Baumarten
+  unterscheiden (Buche verfärbt anders als Fichte).
+- Sturmereignisse aus Winddaten (Böen) mit Windwurf-Funden verknüpfen; Phänologie-Daten
+  (z. B. MeteoSchweiz/DWD) als Referenz für den Beginn der Herbstfärbung pro Region und Höhenlage.
 - Vegetationsdichte: Grünanteil und Kronendach-Deckung aus den Bildern schätzen und als Zeitreihe
   zeigen.
 - Arten und Neophyten: Hotspot-Karten und Ausbreitungsfronten, Export zu Info Flora / iNaturalist.
@@ -212,5 +233,8 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
 - Bilder werden unverändert gespeichert und ausgeliefert, **inklusive EXIF-Daten** (GPS,
   Kameramodell). Vor einem öffentlichen Betrieb sollten Metadaten entfernt und Personen sowie
   Kennzeichen automatisch verpixelt werden.
+- Wetterdaten von [Open-Meteo.com](https://open-meteo.com) (ERA5-Reanalyse, CC BY 4.0). Der Server braucht
+  dafür Internetzugang zu `archive-api.open-meteo.com`. Die Daten werden pro ~10-km-Zelle gecacht; die
+  Normalwerte 1991–2020 werden nur einmal pro Zelle geladen.
 - Kartendaten © OpenStreetMap-Mitwirkende. Bei stärkerer Nutzung braucht es einen eigenen
   Tile-Anbieter (siehe Tile Usage Policy).

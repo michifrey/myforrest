@@ -51,6 +51,8 @@ const SCHEMA = `
 const MIGRATIONS = [
   ['photos', 'align_h', 'TEXT'], // JSON homography into the spot's common frame
   ['photos', 'align_inliers', 'INTEGER'],
+  ['photos', 'change_json', 'TEXT'], // classified change against the spot's first aligned photo
+  ['photos', 'context_json', 'TEXT'], // weather context and irregularities at capture time
 ];
 
 function openDb(file) {
