@@ -24,13 +24,22 @@ function exifDateToUtc(value, offsetMin) {
   return Number.isFinite(asUtc) ? asUtc - offsetMin * 60 * 1000 : null;
 }
 
-/** Reads capture time, GPS position and viewing direction from an image. */
+/** GPS altitude in metres (negative below sea level), or null. */
+function altitudeOf(tags) {
+  const alt = Number(tags.GPSAltitude);
+  if (!Number.isFinite(alt)) return null;
+  const ref = tags.GPSAltitudeRef;
+  const below = (ref && typeof ref === 'object' ? ref[0] : Number(ref)) === 1;
+  return Math.round((below ? -alt : alt) * 10) / 10;
+}
+
+/** Reads capture time, GPS position, altitude and viewing direction from an image. */
 async function readPhotoMeta(buffer, fallbackOffsetMin = 0) {
   let tags = {};
   let gps = null;
   try {
     tags = (await exifr.parse(buffer, {
-      pick: ['DateTimeOriginal', 'CreateDate', 'OffsetTimeOriginal', 'OffsetTime', 'GPSImgDirection'],
+      pick: ['DateTimeOriginal', 'CreateDate', 'OffsetTimeOriginal', 'OffsetTime', 'GPSImgDirection', 'GPSAltitude', 'GPSAltitudeRef'],
       reviveValues: false,
     })) || {};
     gps = await exifr.gps(buffer);
@@ -44,6 +53,7 @@ async function readPhotoMeta(buffer, fallbackOffsetMin = 0) {
     lat: gps && Number.isFinite(gps.latitude) ? gps.latitude : null,
     lon: gps && Number.isFinite(gps.longitude) ? gps.longitude : null,
     heading: Number.isFinite(heading) ? heading : null,
+    altitude: altitudeOf(tags),
   };
 }
 

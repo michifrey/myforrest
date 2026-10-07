@@ -87,34 +87,26 @@ function warpInto(a, b, hAtoB) {
   return { planes, valid };
 }
 
-/**
- * Computes the change score between photo A (`fileA`, the "before" view) and
- * photo B (`fileB`), where `hBtoA` maps B onto A in normalised coordinates.
- */
-async function computeChange(fileA, fileB, hBtoA) {
-  const hAtoB = invert(hBtoA);
-  if (!hAtoB) throw new Error('Ausrichtung nicht invertierbar');
-  const [a, b] = await Promise.all([loadRGB(fileA, WORK_SIZE), loadRGB(fileB, WORK_SIZE * 1.5)]);
-  const { width: w, height: h } = a;
-  const n = w * h;
-  const A = [0, 1, 2].map((c) => Float32Array.from({ length: n }, (_, i) => a.data[i * 3 + c] / 255));
-  const { planes: B, valid } = warpInto(a, b, hAtoB);
-
-  // Global gain match per channel (lighting, exposure, white balance), then
-  // fill areas B does not cover with A so they read as "unchanged".
+/** Per-channel gain/offset that maps B onto A, estimated on the pixels in `mask`. */
+function matchGain(A, Braw, mask, valid) {
+  const n = valid.length;
   let count = 0;
-  for (let i = 0; i < n; i++) count += valid[i];
-  if (count < n * 0.2) return { width: w, height: h, score: new Float32Array(n), valid, changedFraction: 0, coverage: count / n };
-  for (let c = 0; c < 3; c++) {
+  for (let i = 0; i < n; i++) count += mask[i];
+  return [0, 1, 2].map((c) => {
     let ma = 0; let mb = 0;
-    for (let i = 0; i < n; i++) if (valid[i]) { ma += A[c][i]; mb += B[c][i]; }
+    for (let i = 0; i < n; i++) if (mask[i]) { ma += A[c][i]; mb += Braw[c][i]; }
     ma /= count; mb /= count;
     let va = 0; let vb = 0;
-    for (let i = 0; i < n; i++) if (valid[i]) { va += (A[c][i] - ma) ** 2; vb += (B[c][i] - mb) ** 2; }
+    for (let i = 0; i < n; i++) if (mask[i]) { va += (A[c][i] - ma) ** 2; vb += (Braw[c][i] - mb) ** 2; }
     const gain = Math.sqrt(va / Math.max(vb, 1e-9));
-    for (let i = 0; i < n; i++) B[c][i] = valid[i] ? clamp01((B[c][i] - mb) * gain + ma) : A[c][i];
-  }
+    // Areas B does not cover are filled with A so they read as "unchanged".
+    return Float32Array.from({ length: n }, (_, i) => (valid[i] ? clamp01((Braw[c][i] - mb) * gain + ma) : A[c][i]));
+  });
+}
 
+/** Change score per pixel for A and a gain-matched B (see header comment). */
+function scorePair(A, B, w, h) {
+  const n = w * h;
   const gray = (P) => Float32Array.from({ length: n }, (_, i) => 0.299 * P[0][i] + 0.587 * P[1][i] + 0.114 * P[2][i]);
   const ga = gray(A);
   const gb = gray(B);
@@ -163,6 +155,38 @@ async function computeChange(fileA, fileB, hBtoA) {
   }
   const score = blur(raw, w, h, 2);
 
+  return { score, ga, gb };
+}
+
+/**
+ * Computes the change score between photo A (`fileA`, the "before" view) and
+ * photo B (`fileB`), where `hBtoA` maps B onto A in normalised coordinates.
+ */
+async function computeChange(fileA, fileB, hBtoA) {
+  const hAtoB = invert(hBtoA);
+  if (!hAtoB) throw new Error('Ausrichtung nicht invertierbar');
+  const [a, b] = await Promise.all([loadRGB(fileA, WORK_SIZE), loadRGB(fileB, WORK_SIZE * 1.5)]);
+  const { width: w, height: h } = a;
+  const n = w * h;
+  const A = [0, 1, 2].map((c) => Float32Array.from({ length: n }, (_, i) => a.data[i * 3 + c] / 255));
+  const { planes: Braw, valid } = warpInto(a, b, hAtoB);
+
+  let count = 0;
+  for (let i = 0; i < n; i++) count += valid[i];
+  if (count < n * 0.2) return { width: w, height: h, score: new Float32Array(n), valid, changedFraction: 0, coverage: count / n };
+
+  // Match lighting/exposure/white balance globally, then once more using only
+  // the pixels the first pass found unchanged: large changes (a bright
+  // clearing, yellowed canopy) would otherwise skew the match everywhere.
+  let B = matchGain(A, Braw, valid, valid);
+  let pass = scorePair(A, B, w, h);
+  const stable = Uint8Array.from(valid, (v, i) => (v && pass.score[i] < 0.2 ? 1 : 0));
+  if (stable.reduce((acc, v) => acc + v, 0) >= count * 0.2) {
+    B = matchGain(A, Braw, stable, valid);
+    pass = scorePair(A, B, w, h);
+  }
+  const { score, ga, gb } = pass;
+
   // Ignore the uncovered area and a thin border around it.
   const cover = blur(Float32Array.from(valid), w, h, 3);
   let changed = 0;
@@ -170,7 +194,11 @@ async function computeChange(fileA, fileB, hBtoA) {
     if (cover[i] < 0.999) { score[i] = 0; continue; }
     if (score[i] >= CHANGED) changed++;
   }
-  return { width: w, height: h, score, valid, changedFraction: changed / count, coverage: count / n };
+  return {
+    width: w, height: h, score, valid, changedFraction: changed / count, coverage: count / n,
+    // Inputs for classifying the changed regions (B is gain-matched to A).
+    before: A, after: B, grayBefore: ga, grayAfter: gb,
+  };
 }
 
 /** Transparent → yellow → orange → red overlay as PNG (A's view, downscaled). */

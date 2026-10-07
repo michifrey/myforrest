@@ -36,6 +36,17 @@ const SCHEMA = `
     PRIMARY KEY (photo_id, tag)
   );
 
+  CREATE TABLE IF NOT EXISTS spot_species (
+    id              INTEGER PRIMARY KEY,
+    spot_id         INTEGER NOT NULL REFERENCES spots (id) ON DELETE CASCADE,
+    scientific_name TEXT NOT NULL,
+    source          TEXT NOT NULL CHECK (source IN ('plantnet', 'manual')),
+    photo_id        INTEGER REFERENCES photos (id) ON DELETE CASCADE,
+    score           REAL,
+    created_at      INTEGER NOT NULL,
+    UNIQUE (spot_id, scientific_name, source)
+  );
+
   CREATE TABLE IF NOT EXISTS identifications (
     id              INTEGER PRIMARY KEY,
     photo_id        INTEGER NOT NULL REFERENCES photos (id) ON DELETE CASCADE,
@@ -51,6 +62,18 @@ const SCHEMA = `
 const MIGRATIONS = [
   ['photos', 'align_h', 'TEXT'], // JSON homography into the spot's common frame
   ['photos', 'align_inliers', 'INTEGER'],
+  ['photos', 'change_json', 'TEXT'], // classified change against the spot's first aligned photo
+  ['photos', 'context_json', 'TEXT'], // weather context and irregularities at capture time
+  ['photos', 'altitude', 'REAL'], // GPS altitude from EXIF (m)
+  ['spots', 'elevation', 'REAL'], // terrain elevation (m a.s.l.)
+  ['spots', 'elevation_source', 'TEXT'], // 'dem' | 'gps' | 'manual'
+  ['spots', 'slope', 'REAL'], // terrain slope (°)
+  ['spots', 'aspect', 'REAL'], // direction the slope faces (° from north), null when flat
+  ['spots', 'terrain_source', 'TEXT'], // 'dem' | 'manual'
+  ['spots', 'tpi300', 'REAL'], // topographic position index (m) within 300 m
+  ['spots', 'tpi600', 'REAL'], // … within 600 m
+  ['spots', 'landform', 'TEXT'], // 'senke' | 'hang' | 'kuppe' | 'ebene'
+  ['spots', 'landform_source', 'TEXT'], // 'dem' | 'manual'
 ];
 
 function openDb(file) {

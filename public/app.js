@@ -1,11 +1,12 @@
 'use strict';
 
 const $ = (id) => document.getElementById(id);
-const DAMAGE_TAGS = ['sturmschaden', 'borkenkaefer', 'trockenschaden', 'holzschlag'];
+const DAMAGE_TAGS = ['sturmschaden', 'borkenkaefer', 'trockenschaden', 'holzschlag', 'fruehverfaerbung', 'frostschaden'];
 
 const state = {
   config: { tags: {}, plantnet: false },
   spots: [],
+  trees: [],
   spot: null,
   index: 0,
   picked: null,
@@ -151,13 +152,22 @@ function renderMarkers() {
     const size = Math.round(28 + Math.min(Math.log2(s.photoCount) * 5, 16));
     const icon = L.divIcon({
       className: 'pin-icon',
-      html: `<div class="pin ${pinKind(s)}${state.spot?.id === s.id ? ' active' : ''}"><b>${s.photoCount}</b></div>`,
+      html: `<div class="pin ${pinKind(s)}${state.spot?.id === s.id ? ' active' : ''}"><b>${s.photoCount}</b>${s.irregularities.length ? '<i class="flag">!</i>' : ''}</div>`,
       iconSize: [size, size],
       iconAnchor: [size / 2, size * 1.2],
       tooltipAnchor: [0, -size * 1.1],
     });
     const m = L.marker([s.lat, s.lon], { icon, title: `Spot ${s.id}`, riseOnHover: true });
-    m.bindTooltip(`Spot ${s.id} · ${s.photoCount} Foto${s.photoCount === 1 ? '' : 's'} · ${fmtDate(s.firstTaken)}–${fmtDate(s.lastTaken)}`, { direction: 'top' });
+    const extra = [
+      s.change?.fraction >= 0.05 ? `≈ ${Math.round(s.change.fraction * 100)} % verändert${s.change.top ? ` (${s.change.top})` : ''}` : '',
+      ...s.irregularities,
+      s.species.length ? `Baumarten: ${s.species.join(', ')}` : '',
+    ].filter(Boolean);
+    const tip = el('div', {}, [
+      el('div', { text: `Spot ${s.id} · ${s.photoCount} Foto${s.photoCount === 1 ? '' : 's'} · ${fmtDate(s.firstTaken)}–${fmtDate(s.lastTaken)}` }),
+      ...extra.map((t) => el('div', { class: 'muted', text: t })),
+    ]);
+    m.bindTooltip(tip, { direction: 'top' });
     m.on('click', () => openSpot(s.id));
     state.markers.addLayer(m);
     pins.set(s.id, m);
@@ -169,10 +179,15 @@ function highlightPin(id) {
 }
 
 async function loadSpots({ fit = false } = {}) {
-  const tag = $('tag-filter').value;
-  state.spots = await api(`/api/spots${tag ? `?tag=${encodeURIComponent(tag)}` : ''}`);
+  const filter = $('tag-filter').value;
+  const special = filter.startsWith('@') ? filter : null;
+  const tag = special ? '' : filter;
+  const spots = await api(`/api/spots${tag ? `?tag=${encodeURIComponent(tag)}` : ''}`);
+  state.spots = special === '@change' ? spots.filter((s) => s.change?.fraction >= 0.05)
+    : special === '@irregular' ? spots.filter((s) => s.irregularities.length)
+      : spots;
   renderMarkers();
-  renderStats(!tag);
+  renderStats(!filter);
   if (fit && state.spots.length) {
     // Keep spots clear of the floating toolbar and (on wide screens) the side panel.
     const wide = window.matchMedia('(min-width: 861px)').matches;
@@ -259,6 +274,9 @@ async function openSpot(id, photoId) {
   fillCompareSelects();
   showPhoto(state.index);
   updateSpotChange(state.spot);
+  renderChronicle(state.spot);
+  renderSpecies(state.spot);
+  renderElevation(state.spot);
   map.setView([state.spot.lat, state.spot.lon], Math.max(map.getZoom(), 15));
 }
 
@@ -289,7 +307,8 @@ function showPhoto(i) {
       onclick: (e) => e.currentTarget.setAttribute('aria-pressed', String(e.currentTarget.getAttribute('aria-pressed') !== 'true')),
     })));
   $('photo-note').value = p.note || '';
-  $('identify').hidden = !state.config.plantnet;
+  renderContext(p);
+  $('identify-group').hidden = !state.config.plantnet;
   renderIdentifications(p);
 }
 
@@ -303,9 +322,169 @@ function renderIdentifications(p) {
       r.commonName ? ` – ${r.commonName}` : '',
       ` (${Math.round(r.score * 100)} %)`,
       r.neophyte ? el('span', { class: 'neo', text: ` · Neophyt: ${r.neophyte}` }) : '',
+      r.tree && r.score >= 0.25 ? el('span', { class: 'tree-note', text: ` · Baum: ${r.tree.name}, beim Spot erfasst` }) : '',
     ]))),
   ]));
 }
+
+/* ---------- Tree species of a spot ---------- */
+
+const TREE_ICONS = {
+  nadel: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1 3.5 8H6l-3 4.5h4V15h2v-2.5h4L10 8h2.5z"/></svg>',
+  laub: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a5 5 0 0 0-4.6 7A4 4 0 0 0 7 14h.2v1.5h1.6V14H9a4 4 0 0 0 3.6-5.5A5 5 0 0 0 8 1.5z"/></svg>',
+};
+const DROUGHT = { hoch: 'hoch', mittel: 'mittel', gering: 'gering' };
+const fmtDoy = (d) => new Date(Date.UTC(2023, 0, 1 + d)).toLocaleDateString('de-CH', { day: '2-digit', month: 'long', timeZone: 'UTC' });
+
+function colourText(t, spot) {
+  const lowland = `~${fmtDoy(t.colourDoy)}`;
+  if (t.colourDoyHere === null || t.colourDoyHere === t.colourDoy) return `Färbung typisch ab ${lowland} (Flachland)`;
+  const here = [spot.elevation !== null ? `${Math.round(spot.elevation)} m` : null,
+    spot.landform === 'senke' ? 'Senke' : null,
+    spot.landform !== 'senke' && spot.exposition && spot.exposition !== 'eben' ? spot.exposition : null].filter(Boolean).join(', ');
+  return `Färbung hier (${here}) typisch ab ~${fmtDoy(t.colourDoyHere)}; im Flachland ab ${lowland}`;
+}
+
+const ELEV_SOURCE = { dem: 'Höhenmodell', gps: 'GPS der Fotos', manual: 'manuell' };
+const MOUNTAIN_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 14 6 5l3 5 2-3 4 7z"/></svg>';
+
+const COMPASS_CODES = { 0: 'N', 45: 'NO', 90: 'O', 135: 'SO', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
+const days = (n) => `${Math.abs(n)} ${Math.abs(n) === 1 ? 'Tag' : 'Tage'}`;
+
+function renderElevation(spot) {
+  const text = $('spot-elev-text');
+  text.innerHTML = MOUNTAIN_ICON;
+  const parts = [];
+  parts.push(spot.elevation === null ? 'Höhe unbekannt'
+    : `${Math.round(spot.elevation)} m ü. M. (${ELEV_SOURCE[spot.elevationSource] || 'unbekannt'})`);
+  // "eben" adds nothing once the landform (hollow, plain, …) is known.
+  if (spot.exposition && !(spot.exposition === 'eben' && spot.landform)) {
+    parts.push(spot.exposition === 'eben' ? 'eben'
+      : `${spot.exposition}${spot.terrainSource === 'dem' ? `, ${Math.round(spot.slope)}° steil` : ''} (${ELEV_SOURCE[spot.terrainSource]})`);
+  }
+  if (spot.landform && spot.landform !== 'hang' && spot.landform !== 'ebene') {
+    const depth = Number.isFinite(spot.tpi600) && spot.tpi600 !== 0
+      ? `, ${Math.abs(Math.round(spot.tpi600))} m ${spot.tpi600 < 0 ? 'tiefer' : 'höher'} als die Umgebung`
+      : '';
+    parts.push(`${spot.landformLabel}${depth} (${ELEV_SOURCE[spot.landformSource]})`);
+  }
+  const shift = spot.colourShiftDays;
+  if (shift) {
+    const labels = { altitude: 'Höhe', exposition: 'Exposition', coldPool: 'Kaltluft' };
+    const contributions = Object.entries(spot.colourShift).filter(([, v]) => v);
+    const detail = contributions.length > 1
+      ? ` (${contributions.map(([k, v]) => `${labels[k]} ${v > 0 ? '+' : '−'}${Math.abs(v)}`).join(', ')})`
+      : '';
+    parts.push(`Herbstfärbung ~${days(shift)} ${shift < 0 ? 'früher' : 'später'} als im Flachland${detail}`);
+  } else if (spot.elevation === null && !spot.exposition && !spot.landform) {
+    parts.push('Herbstfärbung wird für das Flachland bewertet');
+  }
+  text.append(parts.join(' · '));
+  $('spot-elev-form').hidden = true;
+  $('spot-elev-edit').hidden = false;
+  $('spot-elev-input').value = spot.elevation ?? '';
+  $('spot-expo-select').value = spot.terrainSource === 'manual'
+    ? (spot.exposition === 'eben' ? 'eben' : COMPASS_CODES[spot.aspect] || '')
+    : '';
+  $('spot-landform-select').value = spot.landformSource === 'manual' ? spot.landform : '';
+}
+
+async function saveTerrain(body) {
+  const current = state.spot.photos[state.index].id;
+  await api(`/api/spots/${state.spot.id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  await Promise.all([openSpot(state.spot.id, current), loadSpots()]);
+}
+
+$('spot-elev-edit').addEventListener('click', () => {
+  $('spot-elev-form').hidden = false;
+  $('spot-elev-edit').hidden = true;
+  $('spot-elev-input').focus();
+});
+$('spot-elev-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const body = {};
+  const raw = $('spot-elev-input').value;
+  if (raw !== '' && Number(raw) !== state.spot.elevation) body.elevation = Number(raw);
+  const expo = $('spot-expo-select').value || null;
+  const currentManual = state.spot.terrainSource === 'manual';
+  if (expo || currentManual) body.exposition = expo;
+  const form = $('spot-landform-select').value || null;
+  if (form || state.spot.landformSource === 'manual') body.landform = form;
+  if (!Object.keys(body).length) return renderElevation(state.spot);
+  try {
+    await saveTerrain(body);
+  } catch (err) {
+    alert(err.message);
+  }
+});
+$('spot-elev-auto').addEventListener('click', () => saveTerrain({ elevation: null, exposition: null, landform: null }).catch((err) => alert(err.message)));
+
+function treeChip(t) {
+  const chip = el('span', { class: `tree-chip ${t.group}${t.invasive ? ' invasive' : ''}`, title: t.scientificName });
+  chip.innerHTML = TREE_ICONS[t.group];
+  chip.append(t.name);
+  return chip;
+}
+
+function renderSpecies(spot) {
+  const species = spot.species || [];
+  const conifers = species.filter((t) => t.group === 'nadel').length;
+  $('species-summary').replaceChildren(...(species.length
+    ? [...species.map(treeChip), el('span', { class: 'muted small', text: `${species.length - conifers} Laub · ${conifers} Nadel` })]
+    : [el('span', { class: 'empty muted', text: 'noch keine erfasst' })]));
+  $('species-list').replaceChildren(...species.map((t) => el('li', {}, [
+    el('header', {}, [
+      treeChip(t),
+      el('i', { text: t.scientificName }),
+      el('span', { class: 'src', text: t.sources.includes('plantnet') ? `Pl@ntNet${t.score ? ` ${Math.round(t.score * 100)} %` : ''}` : 'manuell' }),
+      el('button', { type: 'button', class: 'link remove', 'aria-label': `${t.name} entfernen`, text: 'entfernen', onclick: () => removeSpecies(t) }),
+    ]),
+    el('dl', {}, [
+      el('dt', { text: 'Herbst' }),
+      el('dd', { text: t.evergreen ? 'immergrün – Verfärbung ist ein Warnsignal' : colourText(t, spot) }),
+      el('dt', { text: 'Trockenheit' }),
+      el('dd', { text: `Empfindlichkeit ${DROUGHT[t.drought]}` }),
+      ...(t.threats.length ? [el('dt', { text: 'Achten auf' }), el('dd', { text: t.threats.join(', ') })] : []),
+      ...(t.invasive ? [el('dt', { text: 'Hinweis' }), el('dd', { text: 'invasiver Neophyt' })] : []),
+    ]),
+  ])));
+  const known = new Set(species.map((t) => t.scientificName));
+  const options = (group, label) => el('optgroup', { label }, state.trees
+    .filter((t) => t.group === group && !known.has(t.scientificName))
+    .map((t) => el('option', { value: t.scientificName, text: `${t.name} (${t.scientificName})` })));
+  $('species-select').replaceChildren(
+    el('option', { value: '', text: 'Baumart wählen …' }),
+    options('laub', 'Laubbäume'),
+    options('nadel', 'Nadelbäume'),
+  );
+}
+
+async function refreshAfterSpecies() {
+  const current = state.spot.photos[state.index].id;
+  const open = $('species-box').open;
+  await Promise.all([openSpot(state.spot.id, current), loadSpots()]);
+  $('species-box').open = open;
+}
+
+async function removeSpecies(t) {
+  await api(`/api/spots/${state.spot.id}/species?name=${encodeURIComponent(t.scientificName)}`, { method: 'DELETE' });
+  await refreshAfterSpecies();
+}
+
+$('species-add').addEventListener('click', async () => {
+  const scientificName = $('species-select').value;
+  if (!scientificName) return;
+  await api(`/api/spots/${state.spot.id}/species`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scientificName }),
+  });
+  await refreshAfterSpecies();
+});
 
 $('time-slider').addEventListener('input', (e) => showPhoto(Number(e.target.value)));
 $('close-spot').addEventListener('click', () => {
@@ -340,13 +519,17 @@ $('identify').addEventListener('click', async (e) => {
   e.target.disabled = true;
   e.target.textContent = 'Bestimme …';
   try {
-    await api(`/api/photos/${p.id}/identify`, { method: 'POST' });
+    await api(`/api/photos/${p.id}/identify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ organ: $('identify-organ').value }),
+    });
     await Promise.all([openSpot(state.spot.id, p.id), loadSpots()]);
   } catch (err) {
     alert(err.message);
   } finally {
     e.target.disabled = false;
-    e.target.textContent = 'Pflanze bestimmen';
+    e.target.textContent = 'Art bestimmen';
   }
 });
 
@@ -372,6 +555,8 @@ async function updateCompare() {
   const alignOn = $('cmp-align').checked;
   const heat = $('cmp-heat-img');
   heat.hidden = true;
+  $('cmp-boxes').replaceChildren();
+  $('cmp-regions').replaceChildren();
   await showFramed($('swipe'), $('cmp-img-a'), a, null);
   const aligned = await showFramed($('swipe'), $('cmp-img-b'), b, alignOn ? a : null, false);
   const canCompare = alignOn && aligned && a.id !== b.id;
@@ -388,29 +573,222 @@ async function updateCompare() {
     if ($('cmp-heat').checked) {
       heat.src = change.heatmap;
       heat.hidden = false;
+      $('cmp-boxes').replaceChildren(...change.regions.filter((r) => r.area >= 0.01).map((r) => {
+        const [x0, y0, x1, y1] = r.bbox;
+        const box = el('div', { class: `box ${r.class}${y0 < 0.1 ? ' below' : ''}` }, el('span', { text: r.label }));
+        Object.assign(box.style, { left: `${x0 * 100}%`, top: `${y0 * 100}%`, width: `${(x1 - x0) * 100}%`, height: `${(y1 - y0) * 100}%` });
+        return box;
+      }));
     }
+    renderRegions(change, b);
   } catch {
     // Change detection is an extra; the aligned comparison still works without it.
   }
 }
 
-/** Badge in the spot header: how much changed between the first and the latest aligned photo. */
-async function updateSpotChange(spot) {
-  const badge = $('spot-change');
-  badge.hidden = true;
-  const aligned = spot.photos.filter((p) => p.alignment);
-  if (aligned.length < 2) return;
-  const first = aligned[0];
-  const last = aligned[aligned.length - 1];
-  try {
-    const change = await api(`/api/photos/${first.id}/change?to=${last.id}`);
-    if (state.spot?.id !== spot.id) return;
-    badge.textContent = `≈ ${pct(change.changedFraction)} der Ansicht verändert seit ${fmtDate(first.takenAt)}`;
-    badge.classList.toggle('calm', change.changedFraction < 0.05);
-    badge.hidden = false;
-  } catch {
-    // Not critical for the spot view.
+/** Classified changes of the compared pair, with one click to record them as tags on the later photo. */
+function renderRegions(change, later) {
+  const box = $('cmp-regions');
+  if (!change.summary.length) return box.replaceChildren();
+  const rows = change.summary.map((s) => el('div', { class: `region-row ${s.class}` }, [
+    el('i'), el('b', { text: s.label }), el('span', { text: `≈ ${pct(s.area)} der Ansicht` }),
+  ]));
+  const missing = [...new Set(change.summary.map((s) => s.tag).filter(Boolean))].filter((t) => !later.tags.includes(t));
+  const children = [...rows];
+  if (missing.length) {
+    children.push(el('button', {
+      type: 'button',
+      class: 'secondary suggest',
+      text: `Als Beobachtung übernehmen: ${missing.map((t) => state.config.tags[t] || t).join(', ')}`,
+      onclick: () => addTags(later, missing),
+    }));
   }
+  children.push(el('p', { class: 'hint', text: 'Automatische Einordnung anhand von Farbe, Helligkeit, Struktur und Form – bitte prüfen.' }));
+  box.replaceChildren(...children);
+}
+
+async function addTags(photo, tags) {
+  const keep = [$('cmp-a').value, $('cmp-b').value, $('compare').hidden];
+  await api(`/api/photos/${photo.id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tags: [...new Set([...photo.tags, ...tags])] }),
+  });
+  await Promise.all([openSpot(state.spot.id, state.spot.photos[state.index].id), loadSpots()]);
+  [$('cmp-a').value, $('cmp-b').value] = keep;
+  $('compare').hidden = keep[2];
+  if (!keep[2]) updateCompare();
+}
+
+/** Badge in the spot header: change of the latest analysed photo against the spot's first photo. */
+function updateSpotChange(spot) {
+  const badge = $('spot-change');
+  const latest = [...spot.photos].reverse().find((p) => p.change);
+  badge.hidden = !latest;
+  if (!latest) return;
+  const { fraction, summary, baseTakenAt } = latest.change;
+  const top = fraction >= 0.05 && summary[0] ? ` · ${summary[0].label}` : '';
+  badge.textContent = `≈ ${pct(fraction)} der Ansicht verändert seit ${fmtDate(baseTakenAt)}${top}`;
+  badge.classList.toggle('calm', fraction < 0.05);
+}
+
+/* ---------- Weather context and irregularities ---------- */
+
+const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+const SVGNS = 'http://www.w3.org/2000/svg';
+function svg(tag, attrs = {}, children = []) {
+  const node = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
+  node.append(...children);
+  return node;
+}
+const signed = (v, unit) => `${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(v).toFixed(1)} ${unit}`;
+
+/** Monthly precipitation (bars, coloured dry/wet) against the 1991–2020 normal (ticks). */
+function precipChart(monthly) {
+  const W = 360; const H = 150; const left = 30; const bottom = 20; const top = 8;
+  const max = Math.max(10, ...monthly.flatMap((m) => [m.precip, m.normal]));
+  const nice = Math.ceil(max / 50) * 50;
+  const y = (v) => top + (H - top - bottom) * (1 - v / nice);
+  const step = (W - left) / monthly.length;
+  const bw = Math.min(18, step - 6);
+  const wrap = el('div', { class: 'wx-chart' });
+  const tip = el('div', { class: 'wx-tip', hidden: '' });
+  const nodes = [
+    svg('line', { class: 'grid', x1: left, x2: W, y1: y(0), y2: y(0) }),
+    svg('line', { class: 'grid', x1: left, x2: W, y1: y(nice / 2), y2: y(nice / 2), 'stroke-dasharray': '2 3' }),
+    svg('text', { class: 'axis', x: left - 4, y: y(nice) + 3, 'text-anchor': 'end' }, [`${nice}`]),
+    svg('text', { class: 'axis', x: left - 4, y: y(nice / 2) + 3, 'text-anchor': 'end' }, [`${nice / 2}`]),
+    svg('text', { class: 'axis', x: left - 4, y: y(0) + 3, 'text-anchor': 'end' }, ['0']),
+  ];
+  monthly.forEach((m, i) => {
+    const cx = left + step * i + step / 2;
+    const [yr, mo] = m.month.split('-').map(Number);
+    const dry = m.precip < m.normal;
+    const h = Math.max(0, y(0) - y(m.precip));
+    const r = Math.min(4, bw / 2, h);
+    // Bar with rounded data end, anchored square on the baseline.
+    const x0 = cx - bw / 2; const yTop = y(m.precip); const yb = y(0);
+    const d = h > 0
+      ? `M${x0} ${yb}V${yTop + r}Q${x0} ${yTop} ${x0 + r} ${yTop}H${x0 + bw - r}Q${x0 + bw} ${yTop} ${x0 + bw} ${yTop + r}V${yb}Z`
+      : '';
+    if (d) nodes.push(svg('path', { class: `bar ${dry ? 'dry' : 'wet'}`, d }));
+    nodes.push(svg('line', { class: 'norm', x1: cx - bw / 2 - 3, x2: cx + bw / 2 + 3, y1: y(m.normal), y2: y(m.normal) }));
+    nodes.push(svg('text', { class: 'axis', x: cx, y: H - 6, 'text-anchor': 'middle' }, [MONTHS[mo - 1][0]]));
+    const label = `${MONTHS[mo - 1]} ${yr}${m.days < 28 ? ` (${m.days} Tage)` : ''}`;
+    const ratio = m.normal ? Math.round((m.precip / m.normal) * 100) : null;
+    const hit = svg('rect', { class: 'hit', x: cx - step / 2, y: top, width: step, height: H - top - bottom + 4, tabindex: 0, 'aria-label': `${label}: ${m.precip} mm, Mittel ${m.normal} mm` });
+    const show = () => {
+      tip.replaceChildren(el('strong', { text: label }), `${m.precip} mm · Mittel ${m.normal} mm${ratio !== null ? ` · ${ratio} %` : ''}`);
+      tip.hidden = false;
+      const box = wrap.getBoundingClientRect();
+      const sv = wrap.querySelector('svg').getBoundingClientRect();
+      const half = tip.offsetWidth / 2 + 4;
+      tip.style.left = `${Math.min(Math.max(sv.left - box.left + (cx / W) * sv.width, half), box.width - half)}px`;
+      tip.style.top = `${sv.top - box.top + (y(Math.max(m.precip, m.normal)) / H) * sv.height}px`;
+    };
+    hit.addEventListener('mouseenter', show);
+    hit.addEventListener('focus', show);
+    hit.addEventListener('mouseleave', () => { tip.hidden = true; });
+    hit.addEventListener('blur', () => { tip.hidden = true; });
+    nodes.push(hit);
+  });
+  // Screen-reader table; wrapped because tables ignore the 1 px box of .sr-only.
+  const table = el('div', { class: 'sr-only' }, el('table', {}, [
+    el('caption', { text: 'Monatlicher Niederschlag in mm im Vergleich zum Mittel 1991–2020' }),
+    el('tr', {}, [el('th', { text: 'Monat' }), el('th', { text: 'Niederschlag' }), el('th', { text: 'Mittel' })]),
+    ...monthly.map((m) => el('tr', {}, [el('td', { text: m.month }), el('td', { text: String(m.precip) }), el('td', { text: String(m.normal) })])),
+  ]));
+  wrap.append(
+    el('h4', { text: 'Niederschlag der letzten 12 Monate (mm)' }),
+    el('div', { class: 'wx-legend' }, [
+      el('span', {}, [el('i', { style: 'background: var(--dry)' }), 'trockener als üblich']),
+      el('span', {}, [el('i', { style: 'background: var(--wet)' }), 'nasser als üblich']),
+      el('span', {}, [el('i', { class: 'tick' }), 'Mittel 1991–2020']),
+    ]),
+    svg('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Monatlicher Niederschlag gegenüber dem langjährigen Mittel' }, nodes),
+    tip,
+    table,
+  );
+  return wrap;
+}
+
+let contextToken = 0;
+async function renderContext(photo) {
+  const token = ++contextToken;
+  const body = $('context-body');
+  body.replaceChildren(el('p', { class: 'context-loading', text: 'Wetterdaten und Auffälligkeiten werden ermittelt …' }));
+  let ctx;
+  try {
+    ctx = await api(`/api/photos/${photo.id}/context`);
+  } catch (err) {
+    if (token === contextToken) body.replaceChildren(el('p', { class: 'context-loading', text: `Kontext nicht verfügbar: ${err.message}` }));
+    return;
+  }
+  if (token !== contextToken || !state.spot) return;
+  photo.context = ctx;
+  renderChronicle(state.spot);
+  if (state.spot.elevation === null) {
+    // The first context lookup also determines the spot's elevation.
+    const fresh = await api(`/api/spots/${state.spot.id}`).catch(() => null);
+    if (fresh && fresh.elevation !== null && state.spot?.id === fresh.id) {
+      for (const k of ['elevation', 'elevationSource', 'slope', 'aspect', 'exposition', 'terrainSource', 'landform',
+        'landformLabel', 'landformSource', 'tpi300', 'tpi600', 'colourShift', 'colourShiftDays', 'species']) {
+        state.spot[k] = fresh[k];
+      }
+      renderElevation(state.spot);
+      renderSpecies(state.spot);
+    }
+  }
+
+  const parts = [];
+  const w = ctx.weather?.last90;
+  if (w) {
+    const tile = (value, label, sub) => el('div', { class: 'wx-tile' }, [el('span', { text: label }), el('b', { text: value }), el('em', { text: sub })]);
+    parts.push(el('p', { class: 'muted small', text: `90 Tage vor der Aufnahme (${fmtDate(w.from)} – ${fmtDate(w.to)}), verglichen mit dem Mittel 1991–2020:` }));
+    parts.push(el('div', { class: 'wx-tiles' }, [
+      tile(`${Math.round(w.precip)} mm`, 'Niederschlag', w.precipRatio !== null ? `${Math.round(w.precipRatio * 100)} % des Mittels (${Math.round(w.precipNormal)} mm)` : ''),
+      tile(signed(w.tempAnomaly, '°C'), 'Temperatur', `Mittel ${w.tempMean.toFixed(1)} °C statt ${w.tempNormal.toFixed(1)} °C`),
+      tile(String(w.hotDays), 'Hitzetage ≥ 30 °C', `üblich ${Math.round(w.hotDaysNormal)}`),
+      tile(`${w.longestDrySpell} Tage`, 'Längste Trockenphase', 'ohne nennenswerten Regen'),
+    ]));
+    if (ctx.weather.monthly?.length) parts.push(precipChart(ctx.weather.monthly));
+  } else {
+    parts.push(el('p', { class: 'context-loading', text: `Wetterdaten nicht verfügbar${ctx.weatherError ? ` (${ctx.weatherError})` : ''}.` }));
+  }
+
+  if (ctx.irregularities.length) {
+    for (const irr of ctx.irregularities) {
+      const card = el('article', { class: 'irregular', 'data-severity': irr.severity }, [
+        el('header', {}, [el('h4', { text: irr.title }), el('span', { class: 'sev', text: irr.severity === 'hinweis' ? 'Hinweis' : irr.severity })]),
+        el('p', { text: irr.text }),
+      ]);
+      if (irr.suggestedTag && !photo.tags.includes(irr.suggestedTag)) {
+        card.append(el('button', {
+          type: 'button',
+          class: 'btn primary btn-tag',
+          text: `Als „${state.config.tags[irr.suggestedTag]}“ festhalten`,
+          onclick: () => addTags(photo, [irr.suggestedTag]),
+        }));
+      }
+      parts.push(card);
+    }
+  } else if (w) {
+    parts.push(el('p', { class: 'calm-note', text: 'Keine Auffälligkeiten gegenüber dem langjährigen Mittel.' }));
+  }
+  if (ctx.weather) parts.push(el('p', { class: 'wx-source', text: `Wetterdaten: ${ctx.weather.source}` }));
+  body.replaceChildren(...parts);
+}
+
+/** All recorded irregularities of a spot, oldest first: the spot's record over the years. */
+function renderChronicle(spot) {
+  const items = spot.photos.flatMap((p, index) => (p.context?.irregularities || [])
+    .map((irr) => ({ p, index, irr })));
+  $('chronicle-wrap').hidden = !items.length;
+  $('chronicle').replaceChildren(...items.map(({ p, index, irr }) => el('li', { 'data-severity': irr.severity }, [
+    el('time', { datetime: p.takenAt, text: fmtDate(p.takenAt) }),
+    el('button', { type: 'button', text: irr.title, onclick: () => showPhoto(index) }),
+  ])));
 }
 
 function updateSwipe() {
@@ -811,7 +1189,11 @@ $('rephoto-file').addEventListener('change', async (e) => {
 /* ---------- Init ---------- */
 
 (async function init() {
-  state.config = await api('/api/config');
+  [state.config, state.trees] = await Promise.all([api('/api/config'), api('/api/trees')]);
+  $('tag-filter').append(
+    el('option', { value: '@change', text: 'Starke Veränderung (≥ 5 %)' }),
+    el('option', { value: '@irregular', text: 'Auffälligkeiten' }),
+  );
   for (const [key, label] of Object.entries(state.config.tags)) {
     $('tag-filter').append(el('option', { value: key, text: label }));
     $('upload-tags').append(el('label', {}, [el('input', { type: 'checkbox', value: key }), label]));
