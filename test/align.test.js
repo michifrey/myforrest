@@ -40,3 +40,18 @@ test('recovers a perspective warp despite lighting and scene changes', async () 
 test('refuses to align unrelated photos', async () => {
   assert.equal(await alignImages(fx('align-other.jpg'), fx('align-a.jpg')), null);
 });
+
+test('change detection finds the edited regions and ignores the lighting change', async () => {
+  const { computeChange } = require('../src/change');
+  const r = await alignImages(fx('align-b.jpg'), fx('align-a.jpg'));
+  const c = await computeChange(fx('align-a.jpg'), fx('align-b.jpg'), r.h);
+  const at = (bx, by) => {
+    const [u, v] = apply(r.h, bx / truth.b[0], by / truth.b[1]);
+    return c.score[Math.round(v * c.height) * c.width + Math.round(u * c.width)];
+  };
+  assert.ok(at(495, 115) > 0.8, 'new shrub detected');
+  assert.ok(at(235, 355) > 0.8, 'fallen trunk detected');
+  assert.ok(at(150, 150) < 0.2, 'unchanged area stays quiet');
+  const same = await computeChange(fx('align-a.jpg'), fx('align-a.jpg'), IDENTITY);
+  assert.equal(same.changedFraction, 0);
+});

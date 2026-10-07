@@ -117,6 +117,7 @@
           <p class="eyebrow">Spot</p>
           <h2 id="spot-title"></h2>
           <p id="spot-meta" class="muted"></p>
+          <p id="spot-change" class="change-badge" hidden></p>
           <div id="spot-tags" class="chips"></div>
         </div>
 
@@ -142,6 +143,7 @@
           <div class="swipe" id="swipe">
             <img id="cmp-img-b" alt="Nachher">
             <div class="swipe-top" id="swipe-top"><img id="cmp-img-a" alt="Vorher"></div>
+            <img id="cmp-heat-img" class="heat" alt="" hidden>
             <div class="swipe-handle" id="swipe-handle"></div>
           </div>
           <input id="swipe-range" type="range" min="0" max="100" value="50" aria-label="Vergleichsregler">
@@ -149,6 +151,10 @@
             <label class="toggle"><input type="checkbox" id="cmp-align" checked> Automatisch ausrichten</label>
             <span id="cmp-status" class="muted small"></span>
             <button id="realign" class="link small">Neu berechnen</button>
+          </div>
+          <div class="row heat-row">
+            <label class="toggle"><input type="checkbox" id="cmp-heat" checked> Veränderungen hervorheben</label>
+            <span class="heat-legend" aria-hidden="true"><i></i>wenig<b></b>stark</span>
           </div>
         </div>
 

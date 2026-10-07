@@ -119,7 +119,7 @@ async function showFramed(stage, img, photo, frame, setAspect = true) {
 }
 
 const stageObserver = new ResizeObserver((entries) => {
-  for (const e of entries) e.target.querySelectorAll('img').forEach(applyWarp);
+  for (const e of entries) e.target.querySelectorAll('img:not(.heat)').forEach(applyWarp);
 });
 stageObserver.observe($('viewer-stage'));
 stageObserver.observe($('swipe'));
@@ -258,6 +258,7 @@ async function openSpot(id, photoId) {
 
   fillCompareSelects();
   showPhoto(state.index);
+  updateSpotChange(state.spot);
   map.setView([state.spot.lat, state.spot.lon], Math.max(map.getZoom(), 15));
 }
 
@@ -360,16 +361,56 @@ function fillCompareSelects() {
   updateCompare();
 }
 
+const pct = (f) => (f < 0.01 && f > 0 ? '< 1 %' : `${Math.round(f * 100)} %`);
+let compareToken = 0;
+
 async function updateCompare() {
+  const token = ++compareToken;
   const photos = state.spot.photos;
   const a = photos[Number($('cmp-a').value)];
   const b = photos[Number($('cmp-b').value)];
   const alignOn = $('cmp-align').checked;
+  const heat = $('cmp-heat-img');
+  heat.hidden = true;
   await showFramed($('swipe'), $('cmp-img-a'), a, null);
   const aligned = await showFramed($('swipe'), $('cmp-img-b'), b, alignOn ? a : null, false);
+  const canCompare = alignOn && aligned && a.id !== b.id;
+  $('cmp-heat').disabled = !canCompare;
   $('cmp-status').textContent = !alignOn ? ''
     : aligned ? (a.id === b.id ? '' : 'Deckungsgleich ausgerichtet')
       : 'Nicht ausrichtbar – Blickwinkel zu verschieden';
+  if (!canCompare) return;
+
+  try {
+    const change = await api(`/api/photos/${a.id}/change?to=${b.id}`);
+    if (token !== compareToken) return;
+    $('cmp-status').textContent = `Ausgerichtet · ≈ ${pct(change.changedFraction)} verändert`;
+    if ($('cmp-heat').checked) {
+      heat.src = change.heatmap;
+      heat.hidden = false;
+    }
+  } catch {
+    // Change detection is an extra; the aligned comparison still works without it.
+  }
+}
+
+/** Badge in the spot header: how much changed between the first and the latest aligned photo. */
+async function updateSpotChange(spot) {
+  const badge = $('spot-change');
+  badge.hidden = true;
+  const aligned = spot.photos.filter((p) => p.alignment);
+  if (aligned.length < 2) return;
+  const first = aligned[0];
+  const last = aligned[aligned.length - 1];
+  try {
+    const change = await api(`/api/photos/${first.id}/change?to=${last.id}`);
+    if (state.spot?.id !== spot.id) return;
+    badge.textContent = `≈ ${pct(change.changedFraction)} der Ansicht verändert seit ${fmtDate(first.takenAt)}`;
+    badge.classList.toggle('calm', change.changedFraction < 0.05);
+    badge.hidden = false;
+  } catch {
+    // Not critical for the spot view.
+  }
 }
 
 function updateSwipe() {
@@ -385,6 +426,7 @@ $('open-compare').addEventListener('click', () => {
 $('cmp-a').addEventListener('change', updateCompare);
 $('cmp-b').addEventListener('change', updateCompare);
 $('cmp-align').addEventListener('change', updateCompare);
+$('cmp-heat').addEventListener('change', updateCompare);
 $('stabilize').addEventListener('change', () => showPhoto(state.index));
 $('realign').addEventListener('click', async (e) => {
   const { id } = state.spot;
