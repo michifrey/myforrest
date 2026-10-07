@@ -197,8 +197,8 @@ function createApp({
       if (!t) continue;
       const e = merged.get(t.sci) || {
         ...treeJson(t),
-        // Expected start of colouring at this spot's altitude.
-        colourDoyHere: expectedColourDoy(t.colourDoy, terrain),
+        // Expected start of colouring at this spot: regional reference series if loaded, else gradients.
+        ...((here) => ({ colourDoyHere: here?.doy ?? expectedColourDoy(t.colourDoy, terrain), colourRef: here?.ref.label ?? null }))(climate.colourHere(spotId, t, terrain)),
         sources: [],
         score: null,
       };
@@ -273,14 +273,22 @@ function createApp({
     return terrainOf(spotId).elevation;
   }
 
-  const irregularitiesOf = (photo, weatherCtx) => assess({
-    takenAt: photo.taken_at,
-    tags: tagsOf.all(photo.id).map((t) => t.tag),
-    change: photo.change_json ? JSON.parse(photo.change_json) : null,
-    weather: weatherCtx,
-    species: spotTrees(photo.spot_id),
-    ...terrainOf(photo.spot_id),
-  });
+  const irregularitiesOf = (photo, ctx) => {
+    const species = spotTrees(photo.spot_id);
+    const terrain = terrainOf(photo.spot_id);
+    // Storm link, frost nights in hollows and phenology references (routes/climate.js).
+    const extra = climate.decorate(photo, ctx, terrain, species);
+    return [...assess({
+      takenAt: photo.taken_at,
+      tags: tagsOf.all(photo.id).map((t) => t.tag),
+      change: photo.change_json ? JSON.parse(photo.change_json) : null,
+      weather: ctx.weather,
+      species,
+      ...terrain,
+      nightFrost: extra.nightFrost,
+      phenoRef: extra.phenoRef,
+    }), ...extra.irregularities];
+  };
 
   /** Species changed: re-evaluate every photo of the spot. */
   function reassessSpot(spotId) {
@@ -303,8 +311,9 @@ function createApp({
       computedAt: new Date().toISOString(),
       weather: weatherCtx,
       weatherError,
-      irregularities: irregularitiesOf(photo, weatherCtx),
     };
+    await climate.enrich(photo, ctx, { elevation: terrainOf(photo.spot_id).elevation });
+    ctx.irregularities = irregularitiesOf(photo, ctx);
     setContext.run(JSON.stringify(ctx), photoId);
     return ctx;
   }
@@ -314,7 +323,7 @@ function createApp({
     const photo = getPhoto.get(photoId);
     if (!photo?.context_json) return;
     const ctx = JSON.parse(photo.context_json);
-    ctx.irregularities = irregularitiesOf(photo, ctx.weather);
+    ctx.irregularities = irregularitiesOf(photo, ctx);
     setContext.run(JSON.stringify(ctx), photoId);
   }
 
@@ -337,6 +346,8 @@ function createApp({
     }
     return id;
   };
+
+  const climate = require('./routes/climate')(app, { db, weatherFetch, getPhoto, terrainOf, background, reassessSpot });
 
   app.get('/api/config', (req, res) => {
     res.json({ tags: TAGS, activities: ACTIVITIES, plantnet: Boolean(plantnetKey), spotRadiusM });
