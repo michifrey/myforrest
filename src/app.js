@@ -89,6 +89,8 @@ function createApp({
     lon: p.lon,
     heading: p.heading,
     locationSource: p.location_source,
+    panorama: Boolean(p.panorama),
+    videoTime: p.video_time ?? null,
     activity: p.activity,
     note: p.note,
     tags: tagsOf.all(p.id).map((r) => r.tag),
@@ -873,6 +875,7 @@ function createApp({
   });
 
   require('./routes/species')(app, { db, spotRadiusM });
+  require('./routes/video')(app, { db, uploadDir, tmpDir, spotRadiusM, activities: ACTIVITIES, photoJson, getPhoto, setTags, alignPhoto, analyzeChange, analyzeContext, background, safeAlign });
 
   app.use('/api', (req, res) => res.status(404).json({ error: 'Nicht gefunden' }));
 

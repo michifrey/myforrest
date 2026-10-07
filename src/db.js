@@ -77,6 +77,8 @@ const MIGRATIONS = [
   ['spots', 'heading', 'REAL'], // viewing direction (° from north): circular mean of the photos' headings
   ['photos', 'thumb_file', 'TEXT'], // 320 px WebP preview in data/thumbs
   ['photos', 'large_file', 'TEXT'], // 1280 px WebP preview in data/thumbs
+  ['photos', 'panorama', 'INTEGER'], // 1 = equirectangular 360° image
+  ['photos', 'video_time', 'REAL'], // position (s) in the source video for frames taken from a video
 ];
 
 function openDb(file) {

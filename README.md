@@ -232,6 +232,26 @@ den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen und eine Notiz.
   das Gerät wieder online ist. Auf dem Handy nimmt *Mit Kamera aufnehmen* im Upload-Dialog direkt ein Foto
   auf und setzt den aktuellen Standort, falls das Foto kein GPS hat. Ohne Service Worker (z. B. über
   http auf einer fremden IP) funktioniert die App wie bisher, nur ohne Offline-Modus.
+- **Videos statt Einzelbilder**: *Foto beitragen* nimmt auch Videos an, z. B. von einer GoPro oder ein
+  360°-Video. Entlang der Strecke wird etwa alle 25 m (Spot-Radius, einstellbar) ein Bild aus dem Video
+  gezogen, und jedes Bild läuft wie ein normales Foto durch Spot-Zuordnung, Ausrichtung und
+  Veränderungserkennung. Kommt die Strecke an einem bestehenden Spot vorbei, wird das Bild an der
+  nächstgelegenen Stelle gezogen. So füllt jede Runde dieselben Spots weiter.
+  - **GoPro-Telemetrie (GPMF)**: Die GPS-Spur (GPS5 bzw. GPS9 ab HERO11, mit GPSU-Zeit, SCAL-Skalierung
+    sowie Fix und Genauigkeit) wird direkt aus der MP4-Datei gelesen, ohne Zusatzprogramm. Daraus ergeben
+    sich Position, UTC-Aufnahmezeit, Höhe und Blickrichtung (Fahrtrichtung) jedes Bildes.
+  - **Ohne Telemetrie** wird das Video über einen mitgeschickten GPX-Track verortet; die Startzeit kommt
+    aus dem Video-Header (UTC) oder dem Datumsfeld und lässt sich mit *Kamera-Uhr korrigieren* verschieben.
+    Mit einem auf der Karte gewählten Standort wird stattdessen alle N Sekunden ein Bild gezogen.
+  - **360° wie Street View**: Videos im Seitenverhältnis 2:1 (equirektangulär) oder mit Spherical-Video-
+    Metadaten liefern Panoramen. Diese erscheinen im Spot als drehbare 360°-Ansicht (ziehen, Mausrad oder
+    Pinch zum Zoomen, Pfeiltasten, Vollbild) mit Himmelsrichtung des Blicks; *Flach* zeigt das ganze Panorama.
+  - Insta360-Rohdateien (`.insv`, zwei ungestitchte Fischaugen) und GoPro-MAX-Rohdateien (`.360`) werden
+    nicht direkt verarbeitet: Sie müssen zuerst in Insta360 Studio bzw. GoPro Player als 360°-MP4
+    exportiert werden. Deren GPS steckt nicht im Export, daher den GPX-Track mitschicken.
+  - Die Bilder zieht das Systemprogramm `ffmpeg` (Pfad über `FFMPEG_PATH`). Fehlt es, meldet die App das
+    beim Upload. Fortschritt (Hochladen, Bilder extrahieren) und Ergebnis (Bilder, Strecke, Spots) werden
+    im Upload-Dialog angezeigt.
 - **Drei Wege, Fotos zu verorten**:
   1. **GPS aus dem Foto** (EXIF), wie bei normalen Handyfotos.
   2. **Automatisch über einen GPX-Track**: Eine Action-Cam im Intervallmodus (z. B. alle 5 s) beim
@@ -248,7 +268,8 @@ den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen und eine Notiz.
 
 ## Schnellstart
 
-Voraussetzung: Node.js ≥ 22.5 (nutzt das eingebaute `node:sqlite`).
+Voraussetzung: Node.js ≥ 22.5 (nutzt das eingebaute `node:sqlite`). Für Videos zusätzlich `ffmpeg`
+(z. B. `apt install ffmpeg` oder `brew install ffmpeg`).
 
 ```bash
 npm install
@@ -271,6 +292,8 @@ Konfiguration über Umgebungsvariablen:
 | `HEADING_TOLERANCE_DEG` | `45` | Abweichung der Blickrichtung (±°), bis zu der Fotos zum selben Spot gehören |
 | `PLANTNET_API_KEY` | –        | Aktiviert die Pflanzenbestimmung               |
 | `PUBLIC_URL`       | –        | Öffentliche Adresse für Foto-Links im Export (sonst aus der Anfrage) |
+| `FFMPEG_PATH`      | `ffmpeg` | ffmpeg für die Bilder aus Videos               |
+| `VIDEO_MAX_MB`     | `4096`   | Maximale Grösse eines Videos                   |
 
 ## Aufbau
 
@@ -292,6 +315,10 @@ src/phenology.js     Korrektur der Herbstfärbung für Höhe, Exposition und Kal
 src/elevation.js     Geländehöhe, Hangneigung, Exposition und Geländeform (Copernicus-DEM über Open-Meteo)
 src/exif.js          Aufnahmezeit, GPS und Blickrichtung aus den Bilddaten
 src/gpx.js           GPX-Parser
+src/mp4.js           MP4-Boxen lesen: Telemetrie-Spur, Startzeit, Dauer, 360°-Metadaten
+src/gpmf.js          GoPro-Telemetrie (GPMF): GPS5/GPS9, GPSU, SCAL
+src/video.js         Bilder entlang der Strecke planen, Blickrichtung, ffmpeg-Aufruf
+src/routes/video.js  Video-Upload und Fortschritt (/api/videos)
 src/geo.js           Distanzen und Interpolation auf dem Track
 src/plantnet.js      Anbindung an die Pl@ntNet-API
 src/neophytes.js     Liste invasiver Neophyten (Schwarze Liste CH / BfN)
@@ -302,7 +329,8 @@ src/routes/species.js  API-Routen für Arten, Funde, Ausbreitung und Export
 docs/screenshots/    Bilder für dieses README
 public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet die Waldszene,
                      sun.js berechnet Sonnenstand und Einstrahlung, sunmap.js den Kartenmodus „Sonne & Wetter“,
-                     hotspots.js den Kartenmodus „Arten & Neophyten“)
+                     hotspots.js den Kartenmodus „Arten & Neophyten“,
+                     video.js den Video-Upload und die 360°-Ansicht)
 public/sw.js         Service Worker: App-Shell vorhalten, Laufzeit-Caches, Background Sync
 public/offline-queue.js  Warteschlange für Uploads ohne Verbindung (IndexedDB, von Seite und Service Worker genutzt)
 public/pwa.js        Registrierung, Warteschlangen-Anzeige, Installieren-Knopf, Kamera-Aufnahme im Upload
@@ -319,6 +347,9 @@ scripts/generate-icons.js  Erzeugt die App-Icons aus dem Logo (`node scripts/gen
 | `GET`    | `/api/spots/:id`             | Ein Spot mit Blickrichtung und allen Fotos chronologisch (jedes Foto mit `url`, `thumbUrl` und `largeUrl`) |
 | `GET`    | `/thumbs/:datei`             | Vorschaubilder (WebP)                                    |
 | `POST`   | `/api/photos`                | Upload (multipart: `photos[]` als JPEG, PNG, WebP oder HEIC, optional `spotId` und `refPhotoId` für Wiederholungsfotos, `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `utcOffsetMinutes`, `clockShiftSeconds`) |
+| `POST`   | `/api/videos`                | Video-Upload (multipart: `video`, optional `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `clockShiftSeconds`, `frameDistanceM`, `frameIntervalS`, `panorama` = `auto`/`1`/`0`, `async=1` für Hintergrundverarbeitung) |
+| `GET`    | `/api/videos/jobs/:id`       | Fortschritt und Ergebnis eines Video-Uploads mit `async=1` |
+| `GET`    | `/api/videos/config`         | ffmpeg verfügbar? Standardabstand und -intervall         |
 | `POST`   | `/api/spots/:id/align`       | Ausrichtung aller Fotos eines Spots neu berechnen        |
 | `GET`    | `/api/photos/:id/change?to=` | Veränderte Fläche zwischen zwei ausgerichteten Fotos, mit eingeordneten Regionen |
 | `GET`    | `/api/photos/:id/change.png?to=` | Heatmap der Veränderung (PNG, in der Ansicht des ersten Fotos) |
@@ -343,8 +374,10 @@ scripts/generate-icons.js  Erzeugt die App-Icons aus dem Logo (`node scripts/gen
 ## Roadmap
 
 **Phase 2: Mehr und bessere Fotos**
-- Video statt Einzelbilder: Frames aus GoPro- und Insta360-Videos extrahieren und die eingebettete
-  GPS-Telemetrie (GPMF) direkt nutzen. 360°-Aufnahmen machen es dann wirklich zu Street View.
+- ~~Video statt Einzelbilder~~ (umgesetzt: GoPro mit GPMF, 360°-MP4, GPX). Offen: Insta360-`.insv` direkt
+  lesen (Fischaugen stitchen, GPS aus dem Datei-Trailer), 360°-Fotos auch beim Foto-Upload erkennen,
+  Ausrichtung und Veränderungserkennung für Panoramen (statt Homographie), Bilder unscharfer Frames
+  verwerfen.
 - Bestehende Spots mit gemischten Blickrichtungen auf Wunsch aufteilen (neue Fotos werden bereits
   nach Richtung getrennt).
 - PWA: Kartenausschnitt einer geplanten Route gezielt für offline vorladen; Push-Benachrichtigung,
