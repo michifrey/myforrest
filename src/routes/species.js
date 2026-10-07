@@ -52,6 +52,13 @@ module.exports = function speciesRoutes(app, { db, spotRadiusM = 25, publicUrl =
     if (!f) return;
     const buffer = req.query.buffer === undefined ? 25 : Number(req.query.buffer);
     if (!Number.isFinite(buffer) || buffer < 0 || buffer > 1000) return res.status(400).json({ error: 'buffer muss zwischen 0 und 1000 m liegen' });
+    // shape=convex: convex hull; otherwise alpha shape with α in metres (`alpha`, default automatic).
+    let alpha = 'auto';
+    if (req.query.shape === 'convex') alpha = null;
+    else if (req.query.alpha !== undefined && req.query.alpha !== '' && req.query.alpha !== 'auto') {
+      alpha = Number(req.query.alpha);
+      if (!Number.isFinite(alpha) || alpha < 10 || alpha > 5000) return res.status(400).json({ error: 'alpha muss zwischen 10 und 5000 m liegen' });
+    }
     const occ = listOccurrences(db, f);
     const first = occ[0];
     res.json({
@@ -59,7 +66,7 @@ module.exports = function speciesRoutes(app, { db, spotRadiusM = 25, publicUrl =
       commonName: first ? (first.neophyte || first.commonName) : null,
       neophyte: first ? first.neophyte || null : null,
       count: occ.length,
-      ...spreadFronts(occ, { buffer }),
+      ...spreadFronts(occ, { buffer, alpha }),
     });
   });
 

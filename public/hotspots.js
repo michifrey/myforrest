@@ -5,7 +5,7 @@
  *  - Hotspots: kernel density (Gaussian kernel, adjustable radius) of the
  *    findings of all neophytes, all species or one species, drawn on a canvas
  *    overlay below the spot pins.
- *  - Ausbreitung: per species the occupied area per year (nested hulls,
+ *  - Ausbreitung: per species the occupied area per year (nested alpha shapes or hulls,
  *    coloured by year) with a year slider and the estimated spread rate.
  *  - Export: Darwin Core and iNaturalist CSV downloads with filters.
  * Relies on globals from app.js (map, state, api, el, $, openSpot).
@@ -22,6 +22,7 @@
     bandwidth: 150, // m
     occ: [],
     spread: null,
+    outline: 'auto', // alpha shape with automatic α, a fixed α in metres, or 'convex'
     yearIndex: 0,
     playing: null,
     token: 0,
@@ -194,7 +195,8 @@
     if (!name) { renderSpread(); drawFronts(); return; }
     let data = null;
     try {
-      data = await api(`/api/spread?species=${encodeURIComponent(name)}&minScore=${hs.minScore}`);
+      const outline = hs.outline === 'convex' ? '&shape=convex' : `&alpha=${hs.outline}`;
+      data = await api(`/api/spread?species=${encodeURIComponent(name)}&minScore=${hs.minScore}${outline}`);
     } catch {
       data = null;
     }
@@ -204,7 +206,8 @@
     renderSpread();
     drawFronts();
     const last = data?.years[data.years.length - 1];
-    if (last) map.fitBounds(L.latLngBounds(last.hull), { padding: [60, 60], maxZoom: 17 });
+    if (last && !hs.keepView) map.fitBounds(L.latLngBounds(last.hull), { padding: [60, 60], maxZoom: 17 });
+    hs.keepView = false;
   }
 
   /* ---------- Map drawing ---------- */
@@ -231,18 +234,19 @@
     frontLayer.clearLayers();
     if (!hs.open || hs.tab !== 'spread' || !hs.spread?.years.length) return;
     const ys = hs.spread.years;
-    // Largest (newest) first, so the older, smaller hulls on top stay hoverable.
+    // Largest (newest) first, so the older, smaller outlines on top stay hoverable.
     for (let i = hs.yearIndex; i >= 0; i--) {
       const y = ys[i];
       const current = i === hs.yearIndex;
-      L.polygon(y.hull, {
+      const parts = y.patches > 1 ? ` in ${fmt(y.patches)} Teilbeständen` : '';
+      L.polygon(y.polygons || [y.hull], {
         color: yearColour(i, ys.length),
         weight: current ? 3 : 1.5,
         dashArray: current ? null : '4 4',
         fillColor: yearColour(i, ys.length),
         fillOpacity: current ? 0.12 : 0.08,
         className: 'sp-front',
-      }).bindTooltip(`${y.year}: ${fmt(y.cumulativeCount)} Funde bis dahin · ${fmt(y.areaM2 / 10000, 2)} ha`, { sticky: true })
+      }).bindTooltip(`${y.year}: ${fmt(y.cumulativeCount)} Funde bis dahin · ${fmt(y.areaM2 / 10000, 2)} ha${parts}`, { sticky: true })
         .addTo(frontLayer);
     }
     const yearOf = (o) => new Date(o.takenAt).getUTCFullYear();
@@ -295,6 +299,14 @@
       ]),
       el('div', { id: 'sp-spread', role: 'tabpanel', hidden: '' }, [
         el('p', { id: 'sp-rate', class: 'sp-rate' }),
+        el('div', { class: 'sp-row' }, [
+          el('label', { for: 'sp-outline', class: 'small muted', text: 'Umriss' }),
+          el('select', { id: 'sp-outline' }, [
+            el('option', { value: 'auto', text: 'Alpha-Shape, α automatisch' }),
+            ...[50, 100, 200, 500, 1000].map((a) => el('option', { value: String(a), text: `Alpha-Shape, α = ${a < 1000 ? `${a} m` : '1 km'}` })),
+            el('option', { value: 'convex', text: 'Konvexe Hülle' }),
+          ]),
+        ]),
         el('div', { class: 'sun-time' }, [
           el('button', { type: 'button', id: 'sp-play', class: 'secondary sun-play', 'aria-label': 'Jahre abspielen', text: '▶' }),
           el('label', { for: 'sp-year', class: 'sr-only', text: 'Jahr' }),
@@ -373,17 +385,22 @@
       ? [el('span', { class: 'muted small', text: name }), el('b', { text: s.text })]
       : [el('span', { class: 'muted small', text: 'Für die Ausbreitung braucht es Funde einer Art.' })]));
     $('sp-years').replaceChildren(...(years.length ? [el('table', {}, [
-      el('thead', {}, el('tr', {}, ['', 'Jahr', 'neu', 'total', 'Fläche', 'Front'].map((h) => el('th', { text: h })))),
+      el('thead', {}, el('tr', {}, ['', 'Jahr', 'neu', 'total', 'Fläche', 'Teile', 'Front'].map((h) => el('th', { text: h })))),
       el('tbody', {}, years.map((y, i) => el('tr', { class: i === hs.yearIndex ? 'current' : '', 'data-i': String(i) }, [
         el('td', {}, el('i', { class: 'sp-swatch', style: `background:${yearColour(i, years.length)}` })),
         el('td', { text: String(y.year) }),
         el('td', { text: fmt(y.count) }),
         el('td', { text: fmt(y.cumulativeCount) }),
-        el('td', { text: `${fmt(y.areaM2 / 10000, 2)} ha` }),
+        el('td', { text: `${fmt(y.areaM2 / 10000, 2)} ha`, title: s.shape === 'alpha' ? `konvexe Hülle: ${fmt(y.convexAreaM2 / 10000, 2)} ha` : '' }),
+        el('td', { text: fmt(y.patches ?? 1) }),
         el('td', { text: `${fmt(y.frontRadiusM)} m` }),
       ]))),
     ])] : []));
-    $('sp-method').textContent = s ? `Methode: ${s.method} Puffer ${s.bufferM} m um jeden Fund. Die Schätzung hängt stark davon ab, wo gesucht wurde.` : '';
+    const auto = s?.shape === 'alpha' && hs.outline === 'auto' ? ' (automatisch: 2,5-mal der Abstand, innerhalb dessen 90 % der Funde einen Nachbarn haben)' : '';
+    $('sp-outline').options[0].textContent = s?.shape === 'alpha' && hs.outline === 'auto' ? `Alpha-Shape, α automatisch (${fmt(s.alphaM)} m)` : 'Alpha-Shape, α automatisch';
+    $('sp-method').textContent = s
+      ? `Methode: ${s.method}${s.shape === 'alpha' ? ` α = ${fmt(s.alphaM)} m${auto}.` : ''} Puffer ${s.bufferM} m um jeden Fund. Die Schätzung hängt stark davon ab, wo gesucht wurde.`
+      : '';
   }
 
   function exportQuery() {
@@ -510,6 +527,7 @@
     $('sp-bw-out').textContent = `${hs.bandwidth} m`;
     density.redraw();
   });
+  $('sp-outline').addEventListener('change', (e) => { hs.outline = e.target.value; hs.keepView = true; loadSpread(); });
   $('sp-year').addEventListener('input', (e) => { stopPlay(); setYear(Number(e.target.value)); });
   $('sp-years').addEventListener('click', (e) => {
     const row = e.target.closest('tr[data-i]');

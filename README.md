@@ -267,8 +267,14 @@ den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen und eine Notiz.
     Neophyten, aller Arten oder einer gewählten Art häufen, mit Legende in Funden pro km². Die Spot-Marker
     weichen solange den einzelnen Funden; ein Klick auf einen Fund öffnet sein Foto.
   - **Ausbreitungsfronten**: Pro Art die besiedelte Fläche Jahr für Jahr als ineinanderliegende Umrisse
-    (konvexe Hülle aller Funde bis zu diesem Jahr, jeder Fund um 25 m gepuffert), eingefärbt nach Jahr, mit
-    Zeitregler und Abspielen. Dazu eine Schätzung wie „Ausbreitung ~120 m/Jahr nach NO“: Die Rate ist die
+    (Alpha-Shape aller Funde bis zu diesem Jahr, jeder Fund um 25 m gepuffert), eingefärbt nach Jahr, mit
+    Zeitregler und Abspielen. Die Alpha-Shape folgt dem tatsächlichen Bestand: Sie zerfällt in
+    **Teilbestände**, wo Funde mehr als 2α auseinanderliegen, und lässt fundfreie Flächen breiter als 2α als
+    Lücken offen. α ergibt sich automatisch aus den Abständen der Funde (2,5-mal der Abstand, innerhalb dessen
+    90 % der Funde einen Nachbarn haben), lässt sich aber auch fest wählen (50 m bis 1 km) oder auf die
+    konvexe Hülle umstellen. Fläche und Anzahl Teilbestände stehen pro Jahr in der Tabelle. Technisch ist es
+    die α-Hülle als morphologisches Schliessen auf einem Raster (Dilatation um α, Erosion um α − Puffer, mit
+    exakten Distanztransformationen), umrandet per Marching Squares. Dazu eine Schätzung wie „Ausbreitung ~120 m/Jahr nach NO“: Die Rate ist die
     Steigung (kleinste Quadrate) des Abstands vom Schwerpunkt der Erstfunde zum jeweils entferntesten Fund,
     die Richtung das gewichtete Mittel der Funde, die die Front nach aussen geschoben haben. Zeigen diese in
     alle Richtungen, steht „in alle Richtungen“. Die Schätzung hängt stark davon ab, wo gesucht wurde, und ist
@@ -471,6 +477,7 @@ src/plantnet.js      Anbindung an die Pl@ntNet-API
 src/neophytes.js     Liste invasiver Neophyten (Schwarze Liste CH / BfN)
 src/occurrences.js   Funde aus den Pl@ntNet-Bestimmungen, Filter und Artenübersicht
 src/spread.js        Ausbreitungsfronten: Umrisse pro Jahr, Rate und Richtung
+src/alphashape.js    Alpha-Shapes: Distanztransformation, Schliessen, Marching Squares, Teilbestände und Lücken
 src/export.js        CSV-Export nach Darwin Core und im iNaturalist-Importformat
 src/routes/species.js  API-Routen für Arten, Funde, Ausbreitung und Export
 src/auth.js          Konten, Passwort-Hashing (scrypt), Sitzungen, Rate-Limit
@@ -541,7 +548,7 @@ und `hidden`. Schreibende Anfragen mit Sitzungs-Cookie brauchen den Header `X-CS
 | `POST`   | `/api/photos/:id/identify`   | Pflanzen bestimmen (Pl@ntNet)                            |
 | `GET`    | `/api/species`               | Arten mit Funden: Anzahl, Spots, Jahre, Neophyt ja/nein  |
 | `GET`    | `/api/occurrences`           | Funde (bestes Pl@ntNet-Ergebnis pro Foto). Filter für diese und die folgenden Routen: `species`, `neophytes=1`, `minScore` (Standard 0,2), `bbox=west,süd,ost,nord`, `from`/`to` (Datum) |
-| `GET`    | `/api/spread?species=`       | Ausbreitungsfronten einer Art: Umriss, Fläche und Frontabstand pro Jahr, Rate und Richtung (`buffer` in m, Standard 25) |
+| `GET`    | `/api/spread?species=`       | Ausbreitungsfronten einer Art: Umriss (`polygons` mit Lücken), Fläche, Teilbestände und Frontabstand pro Jahr, Rate und Richtung (`buffer` in m, Standard 25; `alpha` in m, Standard automatisch; `shape=convex` für die konvexe Hülle) |
 | `GET`    | `/api/export/dwc.csv`        | Funde als Darwin-Core-Occurrence-CSV (Info Flora, GBIF)  |
 | `GET`    | `/api/export/inaturalist.csv` | Funde im CSV-Importformat von iNaturalist               |
 | `GET`    | `/api/spots/:id/vegetation`  | Grünanteil, Kronendach-Deckung, Lückenanteil und GCC pro Foto (`pending`: noch in Berechnung) |
@@ -592,8 +599,8 @@ und `hidden`. Schreibende Anfragen mit Sitzungs-Cookie brauchen den Header `X-CS
   vergleichen, den alle Fotos eines Spots abdecken.
 - Arten und Neophyten: Hotspot-Karten, Ausbreitungsfronten und Datei-Export zu Info Flora / iNaturalist
   sind umgesetzt. Offen: direkter Upload über die APIs (OAuth-Konto bei iNaturalist bzw. Info Flora),
-  Bestätigung der automatischen Bestimmungen durch Menschen vor dem Export, Alpha-Shapes statt konvexer
-  Hüllen für zerstückelte Bestände und eine Korrektur für ungleich verteilten Suchaufwand.
+  Bestätigung der automatischen Bestimmungen durch Menschen vor dem Export und eine Korrektur für
+  ungleich verteilten Suchaufwand; die Ausbreitungsrate pro Teilbestand statt für die ganze Art.
 - Satellitenkontext ausbauen: NDVI-Rückgänge auch ohne Fotos melden (Frühwarnung für Spots), weitere
   Indizes (z. B. NDMI für Trockenstress, Sentinel-2 B11), Landsat für die Zeit vor 2017; Sturmereignisse
   (z. B. MeteoSchweiz/DWD) als Kontext.
