@@ -416,3 +416,27 @@ test('hollows are recognised as cold-air pools and can be set by hand', async ()
     assert.deepEqual([spot.landform, spot.landformSource], ['senke', 'dem']);
   });
 });
+
+test('day weather endpoints for the map', async () => {
+  const fake = async (url) => {
+    if (!url.includes('hourly=')) return new Response('offline', { status: 503 });
+    const d = new URL(url).searchParams.get('start_date');
+    const time = Array.from({ length: 24 }, (_, h) => `${d}T${String(h).padStart(2, '0')}:00`);
+    return new Response(JSON.stringify({ utc_offset_seconds: 0, hourly: {
+      time, precipitation: time.map(() => 0.5), shortwave_radiation: time.map(() => 100),
+      cloud_cover: time.map(() => 80), temperature_2m: time.map(() => 12),
+    } }));
+  };
+  await withServer({ weatherFetch: fake }, async (base) => {
+    await upload(base, [['gps.jpg', fixture('gps.jpg')]]);
+    let res = await fetch(`${base}/api/weather/day?lat=47.375&lon=8.5375&date=2025-08-01`);
+    const day = await res.json();
+    assert.equal(day.source, 'archive');
+    assert.equal(day.hourly.length, 24);
+    assert.equal(day.totals.precip, 12);
+    res = await fetch(`${base}/api/weather/day?lat=47.375&lon=8.5375&date=gestern`);
+    assert.equal(res.status, 400);
+    const spots = await (await fetch(`${base}/api/weather/day/spots?date=2025-08-01`)).json();
+    assert.deepEqual(spots.spots.map((s) => s.precip), [12]);
+  });
+});

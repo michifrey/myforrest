@@ -91,12 +91,44 @@
         <span class="sr-only">Filter</span>
         <select id="tag-filter"><option value="">Alle Spots</option></select>
       </label>
+      <button type="button" id="sun-toggle" class="pill-btn" aria-expanded="false" aria-controls="sunpanel">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.6"/><path d="M10 1.5v2.4M10 16.1v2.4M1.5 10h2.4M16.1 10h2.4M4 4l1.7 1.7M14.3 14.3 16 16M4 16l1.7-1.7M14.3 5.7 16 4"/></svg>
+        Sonne &amp; Wetter
+      </button>
       <div class="legend">
         <span><i class="dot ok"></i>Spot</span>
         <span><i class="dot damage"></i>Schäden</span>
         <span><i class="dot neo"></i>Neophyten</span>
       </div>
     </div>
+    <section id="sunpanel" class="sunpanel" hidden aria-labelledby="sun-title">
+      <header class="sun-head">
+        <div>
+          <p class="eyebrow">Sonnenstand &amp; Wetter</p>
+          <h2 id="sun-title">Sonne über dem Wald</h2>
+          <p id="sun-place" class="muted small"></p>
+        </div>
+        <button type="button" id="sun-close" class="icon" aria-label="Schliessen">×</button>
+      </header>
+      <div class="sun-controls">
+        <button type="button" id="sun-prev" class="secondary" aria-label="Vorheriger Tag">‹</button>
+        <label class="sr-only" for="sun-date">Datum</label>
+        <input type="date" id="sun-date">
+        <button type="button" id="sun-next" class="secondary" aria-label="Nächster Tag">›</button>
+        <button type="button" id="sun-today" class="link small">Heute</button>
+      </div>
+      <div class="sun-time">
+        <button type="button" id="sun-play" class="secondary sun-play" aria-label="Tagesverlauf abspielen">▶</button>
+        <label class="sr-only" for="sun-slider">Uhrzeit</label>
+        <input type="range" id="sun-slider" min="0" max="1439" step="5" value="720">
+        <output id="sun-clock" for="sun-slider">12:00</output>
+      </div>
+      <div id="sun-tiles" class="sun-tiles"></div>
+      <p id="sun-dayline" class="sun-dayline"></p>
+      <div id="sun-charts"></div>
+      <p id="sun-source" class="wx-source"></p>
+    </section>
+
     <div id="pick-hint" class="pick-hint" hidden>Klicke auf die Karte, um den Standort zu wählen · <button id="pick-cancel" class="link">Abbrechen</button></div>
 
     <aside id="panel" class="panel">
@@ -360,7 +392,9 @@
   </dialog>
 
   <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="sun.js"></script>
   <script src="forest.js"></script>
   <script src="app.js"></script>
+  <script src="sunmap.js"></script>
 </body>
 </html>

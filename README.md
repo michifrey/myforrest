@@ -155,6 +155,17 @@ den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen und eine Notiz.
   Blätter im Frühsommer gelten dann als **Frostschaden** (neuer Tag) statt als frühe Herbstfärbung.
   Auf Kuppen gibt es bei Windwurf einen Hinweis auf die exponierte Lage. Die Geländeform lässt sich auch
   von Hand setzen.
+- **Sonne & Wetter auf der Karte**: Ein eigener Kartenmodus zeigt für den gewählten Spot (oder die Kartenmitte)
+  und ein beliebiges Datum in Vergangenheit oder Zukunft:
+  - Sonnenbahn, Auf- und Untergangsrichtung, Sonnenstand zur gewählten Uhrzeit und den Schatten eines
+    25-m-Baums auf der Karte;
+  - Sonnenhöhe, Richtung, Tageslänge und die Einstrahlung bei klarem Himmel, auf ebenem Boden und auf dem
+    Hang des Spots (Neigung und Exposition), samt Tagessumme in kWh/m²;
+  - für vergangene Tage die gemessene Einstrahlung und den Regen pro Stunde (ERA5), für die nächsten
+    ~16 Tage die Prognose; die Tagesregenmenge erscheint an jedem Spot auf der Karte.
+
+  Der Tagesverlauf lässt sich mit dem Schieberegler, im Diagramm oder per Abspielen durchgehen. Der
+  Sonnenstand wird lokal berechnet (NOAA-Algorithmus) und funktioniert für jedes Datum.
 - **Drei Wege, Fotos zu verorten**:
   1. **GPS aus dem Foto** (EXIF), wie bei normalen Handyfotos.
   2. **Automatisch über einen GPX-Track**: Eine Action-Cam im Intervallmodus (z. B. alle 5 s) beim
@@ -215,7 +226,8 @@ src/geo.js           Distanzen und Interpolation auf dem Track
 src/plantnet.js      Anbindung an die Pl@ntNet-API
 src/neophytes.js     Liste invasiver Neophyten (Schwarze Liste CH / BfN)
 docs/screenshots/    Bilder für dieses README
-public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet die Waldszene)
+public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet die Waldszene,
+                     sun.js berechnet Sonnenstand und Einstrahlung, sunmap.js den Kartenmodus „Sonne & Wetter“)
 ```
 
 ### API
@@ -229,6 +241,8 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
 | `POST`   | `/api/spots/:id/align`       | Ausrichtung aller Fotos eines Spots neu berechnen        |
 | `GET`    | `/api/photos/:id/change?to=` | Veränderte Fläche zwischen zwei ausgerichteten Fotos, mit eingeordneten Regionen |
 | `GET`    | `/api/photos/:id/change.png?to=` | Heatmap der Veränderung (PNG, in der Ansicht des ersten Fotos) |
+| `GET`    | `/api/weather/day?lat=&lon=&date=` | Stundenwerte eines Tages (Einstrahlung, Regen, Bewölkung, Temperatur): Messung oder Prognose |
+| `GET`    | `/api/weather/day/spots?date=` | Tagesniederschlag an allen Spots                       |
 | `GET`    | `/api/trees`                 | Liste der unterstützten Baumarten mit Steckbrief         |
 | `PATCH`  | `/api/spots/:id`             | Höhe (`{ elevation: 950 }`), Exposition (`{ exposition: 'S' }`, auch `'eben'`) und/oder Geländeform (`{ landform: 'senke' }`) von Hand setzen; `null` ermittelt den Wert neu |
 | `POST`   | `/api/spots/:id/species`     | Baumart einem Spot zuordnen (`{ scientificName }`)       |

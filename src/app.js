@@ -583,6 +583,50 @@ function createApp({
     res.status(204).end();
   });
 
+  /* ---------- Weather of a single day (sun & weather map mode) ---------- */
+
+  const parseDate = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? v : null);
+
+  app.get('/api/weather/day', async (req, res) => {
+    const lat = Number(req.query.lat);
+    const lon = Number(req.query.lon);
+    const date = parseDate(req.query.date);
+    if (!isValidCoord(lat, lon) || !date) return res.status(400).json({ error: 'lat, lon und date (JJJJ-MM-TT) angeben' });
+    const elevation = req.query.elevation !== undefined && req.query.elevation !== '' ? Number(req.query.elevation) : null;
+    try {
+      res.json(await weather.day(lat, lon, date, { elevation: Number.isFinite(elevation) ? elevation : null }));
+    } catch (err) {
+      res.json({ date, source: null, hourly: [], totals: null, error: err.message });
+    }
+  });
+
+  /** Daily precipitation at every spot for a date; spots in one ~10 km cell share a lookup. */
+  app.get('/api/weather/day/spots', async (req, res) => {
+    const date = parseDate(req.query.date);
+    if (!date) return res.status(400).json({ error: 'date (JJJJ-MM-TT) angeben' });
+    const spots = db.prepare('SELECT id, lat, lon FROM spots').all();
+    const byCell = new Map();
+    for (const s of spots) {
+      const key = `${s.lat.toFixed(1)},${s.lon.toFixed(1)}`;
+      if (!byCell.has(key)) byCell.set(key, { lat: s.lat, lon: s.lon, ids: [] });
+      byCell.get(key).ids.push(s.id);
+    }
+    const out = [];
+    let source = null;
+    for (const c of byCell.values()) {
+      let precip = null;
+      try {
+        const d = await weather.day(c.lat, c.lon, date);
+        precip = d.totals?.precip ?? null;
+        source = source || d.source;
+      } catch {
+        // Leave this cell without a value.
+      }
+      for (const id of c.ids) out.push({ spotId: id, precip });
+    }
+    res.json({ date, source, spots: out });
+  });
+
   app.get('/api/trees', (req, res) => {
     res.json(TREES.map(treeJson).sort((a, b) => a.name.localeCompare(b.name, 'de')));
   });

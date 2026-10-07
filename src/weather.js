@@ -8,6 +8,9 @@
  */
 
 const ARCHIVE = 'https://archive-api.open-meteo.com/v1/archive';
+const FORECAST = 'https://api.open-meteo.com/v1/forecast';
+const HOURLY = 'precipitation,shortwave_radiation,cloud_cover,temperature_2m';
+const FORECAST_DAYS = 15;
 const DAILY = 'precipitation_sum,temperature_2m_mean,temperature_2m_max,temperature_2m_min';
 // Leaf-out to early summer (~15 April to ~14 June): fresh leaves are frost-tender.
 const LEAF_OUT_FROM = 104;
@@ -143,7 +146,56 @@ function createWeather({ db, fetchImpl = fetch, now = () => Date.now() }) {
     };
   }
 
-  return { context };
+  /**
+   * Hourly weather of one local calendar day: measured (archive) for the
+   * past, forecast for the coming ~16 days, nothing beyond. Times are
+   * returned as UTC milliseconds; the day boundaries follow the location's
+   * time zone.
+   */
+  async function day(lat, lon, date, { elevation = null } = {}) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Datum im Format JJJJ-MM-TT erwartet');
+    const offset = Math.round((Date.parse(`${date}T12:00:00Z`) - now()) / DAY);
+    const source = offset <= -ARCHIVE_DELAY_DAYS ? 'archive' : offset <= FORECAST_DAYS ? 'forecast' : null;
+    if (!source || offset < -365 * 85) return { date, source: null, hourly: [], totals: null };
+    const key = `day:${source}:${place(lat, lon, elevation)}:${date}`;
+    return cached(key, source === 'archive' ? Infinity : 3600000, async () => {
+      const base = source === 'archive' ? ARCHIVE : FORECAST;
+      const url = `${base}?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}` +
+        (Number.isFinite(elevation) ? `&elevation=${Math.round(elevation)}` : '') +
+        `&start_date=${date}&end_date=${date}&hourly=${HOURLY}&timezone=auto`;
+      const res = await fetchImpl(url, { signal: AbortSignal.timeout(30000) });
+      if (!res.ok) throw new Error(`Open-Meteo antwortete mit HTTP ${res.status}`);
+      const body = await res.json();
+      const h = body.hourly;
+      if (!h?.time) throw new Error('Open-Meteo lieferte keine Stundenwerte');
+      const shift = (body.utc_offset_seconds || 0) * 1000;
+      const hourly = h.time.map((t, i) => ({
+        t: Date.parse(`${t}:00Z`) - shift,
+        precip: h.precipitation?.[i] ?? null,
+        radiation: h.shortwave_radiation?.[i] ?? null,
+        cloud: h.cloud_cover?.[i] ?? null,
+        temp: h.temperature_2m?.[i] ?? null,
+      }));
+      const vals = (k) => hourly.map((x) => x[k]).filter(Number.isFinite);
+      const sum = (k) => vals(k).reduce((a, b) => a + b, 0);
+      const r1 = (v) => Math.round(v * 10) / 10;
+      return {
+        date,
+        source,
+        timezone: body.timezone || null,
+        hourly,
+        totals: {
+          precip: vals('precip').length ? r1(sum('precip')) : null,
+          radiationKwh: vals('radiation').length ? Math.round(sum('radiation') / 10) / 100 : null,
+          cloudMean: vals('cloud').length ? Math.round(sum('cloud') / vals('cloud').length) : null,
+          tmin: vals('temp').length ? r1(Math.min(...vals('temp'))) : null,
+          tmax: vals('temp').length ? r1(Math.max(...vals('temp'))) : null,
+        },
+      };
+    });
+  }
+
+  return { context, day };
 }
 
 module.exports = { createWeather, doy, climatology };

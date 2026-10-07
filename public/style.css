@@ -47,6 +47,9 @@
   /* weather chart: validated against --surface in both modes */
   --dry: #b5651d;
   --wet: #2f6fb0;
+  /* sun & weather charts: validated categorical pair (+ --wet for rain) */
+  --sun: #a8780c;
+  --measured: #b03a8c;
   /* change classes */
   --c-windwurf: #c2611d;
   --c-auflichtung: #c99512;
@@ -93,6 +96,8 @@
     --tile-filter: invert(0.92) hue-rotate(180deg) saturate(0.45) brightness(0.82) sepia(0.25);
     --dry: #c27730;
     --wet: #4f8fcc;
+    --sun: #b98a2a;
+    --measured: #c75aa6;
     --c-windwurf: #f08a3e;
     --c-auflichtung: #e2b93b;
     --c-verfaerbung: #c99063;
@@ -578,6 +583,60 @@ input[type="checkbox"] { accent-color: var(--accent); width: 1.05rem; height: 1.
 .identify-group select { padding: 0.45rem 0.5rem; font-size: 0.85rem; }
 .ident .tree-note { color: var(--accent); font-weight: 700; }
 
+/* ---------- Sun & weather map mode ---------- */
+.pill-btn {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  background: var(--glass); backdrop-filter: blur(12px);
+  border: 1px solid var(--border); box-shadow: var(--shadow); padding: 0.55rem 1rem;
+}
+.pill-btn svg { width: 18px; height: 18px; fill: none; stroke: var(--sun); stroke-width: 1.8; stroke-linecap: round; }
+.pill-btn svg circle { fill: var(--sun); }
+.pill-btn[aria-expanded="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.pill-btn[aria-expanded="true"] svg { stroke: var(--accent-text); }
+.pill-btn[aria-expanded="true"] svg circle { fill: var(--accent-text); }
+.sunpanel {
+  position: absolute; z-index: 650; left: 1.2rem; top: 8.6rem; bottom: 1.2rem; width: min(400px, calc(100% - 2.4rem));
+  overflow-y: auto; overscroll-behavior: contain;
+  background: var(--glass); backdrop-filter: blur(18px) saturate(1.3);
+  border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow);
+  padding: 1.2rem 1.2rem 1.4rem;
+}
+.sun-head { display: flex; justify-content: space-between; gap: 1rem; }
+.sun-head h2 { font-size: 1.5rem; }
+.sun-controls, .sun-time { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.9rem; }
+.sun-controls input { flex: 1; min-width: 0; }
+.sun-controls .secondary, .sun-play { width: 2.3rem; height: 2.3rem; padding: 0; flex: none; font-size: 1.1rem; }
+.sun-time input { flex: 1; accent-color: var(--sun); }
+.sun-time output { font: 500 1.4rem/1 var(--font-display); min-width: 3.4rem; text-align: right; font-variant-numeric: tabular-nums; }
+.sun-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.9rem; }
+.sun-dayline { font-size: 0.82rem; color: var(--muted); margin: 0.7rem 0 0; line-height: 1.5; }
+.sun-dayline b { color: var(--text); font-weight: 700; }
+.sun-chart { position: relative; margin-top: 0.8rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem 0.7rem 0.4rem; }
+.sun-chart h4 { margin: 0; font: 700 0.8rem/1.3 var(--font-body); }
+.sun-chart svg { display: block; width: 100%; height: auto; overflow: visible; touch-action: none; }
+.sun-chart .grid { stroke: var(--border); stroke-width: 1; }
+.sun-chart .axis { fill: var(--muted); font: 600 9px var(--font-body); }
+.sun-chart .clear { fill: color-mix(in srgb, var(--sun) 22%, transparent); stroke: var(--sun); stroke-width: 2; }
+.sun-chart .clear-slope { fill: none; stroke: var(--sun); stroke-width: 2; stroke-dasharray: 5 4; }
+.sun-chart .measured { fill: none; stroke: var(--measured); stroke-width: 2; }
+.sun-chart .rain { fill: var(--wet); }
+.sun-chart .now { stroke: var(--text); stroke-width: 1.5; opacity: 0.6; }
+.sun-chart .cross { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 3; }
+.sun-chart .hit { fill: transparent; cursor: crosshair; }
+.wx-legend .dash { width: 14px; height: 0; border-top: 2px dashed var(--sun); border-radius: 0; vertical-align: 3px; }
+.sun-marker { width: 22px; height: 22px; border-radius: 50%; background: radial-gradient(circle, #ffe9a8 0 35%, #f3b51c 36% 60%, rgb(243 181 28 / 0) 61%); filter: drop-shadow(0 0 8px rgb(255 200 60 / 0.9)); }
+.map-label {
+  background: var(--glass); color: var(--text); border: 1px solid var(--border); border-radius: 8px;
+  font: 700 0.7rem/1 var(--font-body); padding: 0.25rem 0.4rem; white-space: nowrap; box-shadow: var(--shadow);
+}
+.rain-badge {
+  display: inline-flex; align-items: center; gap: 0.2rem; white-space: nowrap;
+  background: var(--wet); color: #fff; border-radius: 999px; padding: 0.15rem 0.45rem 0.15rem 0.35rem;
+  font: 700 0.68rem/1 var(--font-body); box-shadow: 0 2px 6px rgb(0 0 0 / 0.3); border: 1.5px solid #fbf8f0;
+}
+.rain-badge svg { width: 10px; height: 10px; fill: currentColor; }
+.rain-badge.dry { background: var(--surface); color: var(--muted); }
+
 /* ---------- Change classes ---------- */
 .windwurf { --cc: var(--c-windwurf); }
 .auflichtung { --cc: var(--c-auflichtung); }
@@ -746,6 +805,10 @@ summary { cursor: pointer; color: var(--muted); font-weight: 600; font-size: 0.9
   #map { position: relative; height: 62svh; }
   .map-toolbar { top: 4.6rem; left: 12px; right: 12px; }
   .legend { display: none; }
+  .sunpanel {
+    position: relative; inset: auto; width: auto; margin: 0; border-radius: 0; border-inline: none;
+    background: var(--surface); backdrop-filter: none; overflow: visible; padding: 1.2rem 16px;
+  }
   .pick-hint { top: 4.6rem; width: max-content; max-width: calc(100% - 24px); }
   .panel {
     position: relative; inset: auto; width: auto; margin: -1.6rem 0 0;

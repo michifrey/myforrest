@@ -223,3 +223,37 @@ test('hollows: earlier colouring, late frost after leaf-out; ridges: exposed to 
   const ridge = assess({ takenAt: Date.UTC(2026, 1, 10), change: storm, species: [tree('Fichte')], landform: 'kuppe' });
   assert.match(ridge.find((i) => i.type === 'windexponiert').text, /Fichten/);
 });
+
+test('a single day: archive in the past, forecast soon, nothing far ahead', async () => {
+  const urls = [];
+  const fetchImpl = async (url) => {
+    urls.push(url);
+    const q = new URL(url).searchParams;
+    const d = q.get('start_date');
+    const time = Array.from({ length: 24 }, (_, h) => `${d}T${String(h).padStart(2, '0')}:00`);
+    return new Response(JSON.stringify({
+      timezone: 'Europe/Zurich',
+      utc_offset_seconds: 7200,
+      hourly: {
+        time,
+        precipitation: time.map((_, h) => (h >= 14 && h < 17 ? 2.5 : 0)),
+        shortwave_radiation: time.map((_, h) => (h >= 6 && h <= 20 ? 400 : 0)),
+        cloud_cover: time.map(() => 50),
+        temperature_2m: time.map((_, h) => 10 + h / 2),
+      },
+    }));
+  };
+  const weather = createWeather({ db: new DatabaseSync(':memory:'), fetchImpl, now: () => Date.UTC(2026, 9, 7, 12) });
+  const past = await weather.day(47.36, 8.58, '2026-07-12');
+  assert.equal(past.source, 'archive');
+  assert.match(urls[0], /archive-api\.open-meteo\.com.*hourly=precipitation,shortwave_radiation/);
+  assert.equal(past.hourly[0].t, Date.UTC(2026, 6, 11, 22), 'local midnight CEST = 22:00 UTC the day before');
+  assert.deepEqual(past.totals, { precip: 7.5, radiationKwh: 6, cloudMean: 50, tmin: 10, tmax: 21.5 });
+
+  const soon = await weather.day(47.36, 8.58, '2026-10-12');
+  assert.equal(soon.source, 'forecast');
+  assert.match(urls[1], /api\.open-meteo\.com\/v1\/forecast/);
+  assert.equal((await weather.day(47.36, 8.58, '2027-03-01')).source, null);
+  await weather.day(47.36, 8.58, '2026-07-12');
+  assert.equal(urls.length, 2, 'archive days are cached');
+});
