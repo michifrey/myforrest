@@ -60,12 +60,13 @@
         </div>
 
         <div class="viewer">
-          <img id="viewer-img" alt="">
+          <div class="stage" id="viewer-stage"><img id="viewer-img" alt=""></div>
           <div id="viewer-caption" class="caption"></div>
         </div>
         <div class="timeline">
           <input id="time-slider" type="range" min="0" value="0" aria-label="Zeitachse">
           <div class="timeline-labels"><span id="t-first"></span><span id="t-last"></span></div>
+          <label class="toggle"><input type="checkbox" id="stabilize" checked> Stabilisiert – ausgerichtete Fotos deckungsgleich zeigen</label>
           <div id="thumbs" class="thumbs"></div>
         </div>
 
@@ -83,6 +84,11 @@
             <div class="swipe-handle" id="swipe-handle"></div>
           </div>
           <input id="swipe-range" type="range" min="0" max="100" value="50" aria-label="Vergleichsregler">
+          <div class="row align-row">
+            <label class="toggle"><input type="checkbox" id="cmp-align" checked> Automatisch ausrichten</label>
+            <span id="cmp-status" class="muted small"></span>
+            <button id="realign" class="link small">Neu berechnen</button>
+          </div>
         </div>
 
         <div class="photo-details">

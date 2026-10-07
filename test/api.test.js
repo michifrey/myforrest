@@ -167,3 +167,28 @@ test('repeat photos are pinned to the chosen spot', async () => {
     assert.equal((await (await fetch(`${base}/api/spots`)).json()).length, 1);
   });
 });
+
+test('photos of a spot are aligned into a common frame', async () => {
+  const blob = (name) => new Blob([fs.readFileSync(path.join(__dirname, 'fixtures', name))], { type: 'image/jpeg' });
+  await withServer({}, async (base) => {
+    const at = { lat: '47.1', lon: '8.1' };
+    const a = (await (await upload(base, [['a.jpg', blob('align-a.jpg')]], at)).json()).created[0];
+    assert.deepEqual(a.alignment.h, [1, 0, 0, 0, 1, 0, 0, 0, 1]);
+
+    const b = (await (await upload(base, [['b.jpg', blob('align-b.jpg')]],
+      { spotId: String(a.spotId), refPhotoId: String(a.id) })).json()).created[0];
+    assert.ok(b.alignment && b.alignment.inliers >= 20);
+    // B's top-left corner lands where the generator put it in A (−18 px, 12 px).
+    const h = b.alignment.h;
+    assert.ok(Math.abs((h[2] / h[8]) * 640 + 18) < 2 && Math.abs((h[5] / h[8]) * 480 - 12) < 2);
+
+    const other = (await (await upload(base, [['o.jpg', blob('align-other.jpg')]],
+      { spotId: String(a.spotId) })).json()).created[0];
+    assert.equal(other.alignment, null);
+
+    const res = await fetch(`${base}/api/spots/${a.spotId}/align`, { method: 'POST' });
+    const spot = await res.json();
+    assert.equal(res.status, 200);
+    assert.deepEqual(spot.photos.map((p) => Boolean(p.alignment)), [true, true, false]);
+  });
+});

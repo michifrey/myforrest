@@ -46,6 +46,84 @@ function tagChip(tag) {
   return el('span', { class: tagClass(tag), text: state.config.tags[tag] || tag });
 }
 
+/* ---------- Alignment (homographies in normalised image coordinates) ---------- */
+
+const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+function hMul(a, b) {
+  const r = [];
+  for (let i = 0; i < 3; i++) {
+    for (let j = 0; j < 3; j++) r.push(a[i * 3] * b[j] + a[i * 3 + 1] * b[3 + j] + a[i * 3 + 2] * b[6 + j]);
+  }
+  return r.map((v) => v / r[8]);
+}
+function hInv(m) {
+  const [a, b, c, d, e, f, g, h, i] = m;
+  const r = [e * i - f * h, c * h - b * i, b * f - c * e, f * g - d * i, a * i - c * g, c * d - a * f, d * h - e * g, b * g - a * h, a * e - b * d];
+  return r.map((v) => v / r[8]);
+}
+
+/** Transform that maps `photo` onto `frame`, or null when either is not aligned. */
+function relativeAlignment(photo, frame) {
+  if (photo.id === frame.id) return IDENTITY;
+  if (!photo.alignment || !frame.alignment) return null;
+  return hMul(hInv(frame.alignment.h), photo.alignment.h);
+}
+
+/** CSS matrix3d for a normalised homography drawn into a box of w × h pixels. */
+function cssMatrix(m, w, h) {
+  const p = hMul(hMul([w, 0, 0, 0, h, 0, 0, 0, 1], m), [1 / w, 0, 0, 0, 1 / h, 0, 0, 0, 1]);
+  return `matrix3d(${p[0]},${p[3]},0,${p[6]},${p[1]},${p[4]},0,${p[7]},0,0,1,0,${p[2]},${p[5]},0,${p[8]})`;
+}
+
+const imageSizes = new Map();
+function imageSize(url) {
+  if (!imageSizes.has(url)) {
+    imageSizes.set(url, new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+      img.onerror = () => resolve({ w: 4, h: 3 });
+      img.src = url;
+    }));
+  }
+  return imageSizes.get(url);
+}
+
+const warps = new WeakMap();
+function applyWarp(img) {
+  const m = warps.get(img);
+  if (!m) {
+    img.style.transform = '';
+    img.style.objectFit = 'cover';
+    return;
+  }
+  const box = img.parentElement.closest('.stage, .swipe').getBoundingClientRect();
+  img.style.objectFit = 'fill';
+  img.style.transform = cssMatrix(m, box.width, box.height);
+}
+
+/**
+ * Shows `photo` in `img`. With a `frame` photo it is warped into the frame's
+ * view (if both are aligned); `setAspect` gives the stage the aspect ratio of
+ * whatever defines the view. Returns whether the photo is shown aligned.
+ */
+async function showFramed(stage, img, photo, frame, setAspect = true) {
+  const token = (img.dataset.token = String(Number(img.dataset.token || 0) + 1));
+  const rel = frame ? relativeAlignment(photo, frame) : null;
+  const size = await imageSize((rel ? frame : photo).url);
+  if (img.dataset.token !== token) return Boolean(rel);
+  if (setAspect) stage.style.setProperty('--ar', String(size.w / size.h));
+  img.src = photo.url;
+  warps.set(img, rel);
+  applyWarp(img);
+  return Boolean(rel);
+}
+
+const stageObserver = new ResizeObserver((entries) => {
+  for (const e of entries) e.target.querySelectorAll('img').forEach(applyWarp);
+});
+stageObserver.observe($('viewer-stage'));
+stageObserver.observe($('swipe'));
+
 /* ---------- Map ---------- */
 
 const map = L.map('map', { zoomControl: true }).setView([47.2, 8.4], 8);
@@ -133,11 +211,14 @@ function showPhoto(i) {
   const photos = state.spot.photos;
   state.index = i;
   const p = photos[i];
-  $('viewer-img').src = p.url;
+  const stabilize = $('stabilize').checked && photos.length > 1;
+  const frame = stabilize ? photos.find((x) => x.alignment) : null;
+  showFramed($('viewer-stage'), $('viewer-img'), p, frame);
   $('viewer-img').alt = `Spot ${state.spot.id} am ${fmtDate(p.takenAt)}`;
   const parts = [fmtDateTime(p.takenAt), SOURCE_LABEL[p.locationSource]];
   if (p.activity) parts.push(p.activity[0].toUpperCase() + p.activity.slice(1));
   if (p.heading !== null) parts.push(`Blickrichtung ${Math.round(p.heading)}°`);
+  if (stabilize) parts.push(frame && relativeAlignment(p, frame) ? 'ausgerichtet' : 'nicht ausgerichtet');
   $('viewer-caption').textContent = parts.join(' · ');
   $('time-slider').value = String(i);
   [...$('thumbs').children].forEach((b, j) => b.setAttribute('aria-current', String(i === j)));
@@ -224,10 +305,16 @@ function fillCompareSelects() {
   updateCompare();
 }
 
-function updateCompare() {
+async function updateCompare() {
   const photos = state.spot.photos;
-  $('cmp-img-a').src = photos[Number($('cmp-a').value)].url;
-  $('cmp-img-b').src = photos[Number($('cmp-b').value)].url;
+  const a = photos[Number($('cmp-a').value)];
+  const b = photos[Number($('cmp-b').value)];
+  const alignOn = $('cmp-align').checked;
+  await showFramed($('swipe'), $('cmp-img-a'), a, null);
+  const aligned = await showFramed($('swipe'), $('cmp-img-b'), b, alignOn ? a : null, false);
+  $('cmp-status').textContent = !alignOn ? ''
+    : aligned ? (a.id === b.id ? '' : 'Deckungsgleich ausgerichtet')
+      : 'Nicht ausrichtbar – Blickwinkel zu verschieden';
 }
 
 function updateSwipe() {
@@ -242,6 +329,28 @@ $('open-compare').addEventListener('click', () => {
 });
 $('cmp-a').addEventListener('change', updateCompare);
 $('cmp-b').addEventListener('change', updateCompare);
+$('cmp-align').addEventListener('change', updateCompare);
+$('stabilize').addEventListener('change', () => showPhoto(state.index));
+$('realign').addEventListener('click', async (e) => {
+  const { id } = state.spot;
+  const current = state.spot.photos[state.index].id;
+  const [a, b] = [$('cmp-a').value, $('cmp-b').value];
+  e.target.disabled = true;
+  e.target.textContent = 'Berechne …';
+  try {
+    await api(`/api/spots/${id}/align`, { method: 'POST' });
+    await openSpot(id, current);
+    $('cmp-a').value = a;
+    $('cmp-b').value = b;
+    $('compare').hidden = false;
+    await updateCompare();
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    e.target.disabled = false;
+    e.target.textContent = 'Neu berechnen';
+  }
+});
 $('swipe-range').addEventListener('input', updateSwipe);
 
 /* ---------- Upload ---------- */
@@ -520,6 +629,7 @@ async function uploadRephoto(file, name, position) {
   const fd = new FormData();
   fd.append('photos', file, name);
   fd.append('spotId', String(spotId));
+  fd.append('refPhotoId', String(state.spot.photos[refIndex].id));
   fd.append('takenAt', new Date().toISOString());
   fd.append('utcOffsetMinutes', String(-new Date().getTimezoneOffset()));
   if (position) {

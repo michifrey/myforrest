@@ -47,9 +47,19 @@ const SCHEMA = `
   );
 `;
 
+/** Columns added after the first version; added in place to existing databases. */
+const MIGRATIONS = [
+  ['photos', 'align_h', 'TEXT'], // JSON homography into the spot's common frame
+  ['photos', 'align_inliers', 'INTEGER'],
+];
+
 function openDb(file) {
   const db = new DatabaseSync(file);
   db.exec(SCHEMA);
+  for (const [table, column, type] of MIGRATIONS) {
+    const exists = db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column);
+    if (!exists) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+  }
   return db;
 }
 

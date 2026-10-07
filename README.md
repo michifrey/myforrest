@@ -18,6 +18,11 @@ verändert.
   und Standort genau treffen lassen. Angezeigt werden auch die Entfernung zum Spot und, falls nötig,
   ein Hinweis, das Handy zu drehen. Das Foto wird im Format der Referenz gespeichert, fest diesem
   Spot zugeordnet und direkt im Vorher/Nachher-Vergleich geöffnet.
+- **Automatische Feinausrichtung**: Fotos eines Spots werden per Bildregistrierung aufeinander
+  ausgerichtet (Merkmalspunkte + RANSAC-Homographie). Im Vorher/Nachher-Vergleich liegen beide Bilder
+  dann deckungsgleich übereinander, und mit *Stabilisiert* wirkt das Durchblättern der Zeitleiste
+  wie ein Zeitraffer. Die Originalfotos bleiben unverändert, gespeichert wird nur die Transformation.
+  Fotos aus einem ganz anderen Blickwinkel werden erkannt und bleiben unausgerichtet.
 - **Drei Wege, Fotos zu verorten**:
   1. **GPS aus dem Foto** (EXIF), wie bei normalen Handyfotos.
   2. **Automatisch über einen GPX-Track**: Eine Action-Cam im Intervallmodus (z. B. alle 5 s) beim
@@ -63,6 +68,8 @@ server.js            Einstiegspunkt
 src/app.js           Express-App und REST-API
 src/db.js            SQLite-Schema (spots, photos, photo_tags, identifications)
 src/spots.js         Gruppierung von Fotos zu Spots
+src/align.js         Bildregistrierung (ORB-Merkmale, Matching, RANSAC)
+src/homography.js    3×3-Homographien: Verkettung, Inverse
 src/exif.js          Aufnahmezeit, GPS und Blickrichtung aus den Bilddaten
 src/gpx.js           GPX-Parser
 src/geo.js           Distanzen und Interpolation auf dem Track
@@ -78,7 +85,8 @@ public/              Frontend (Leaflet, ohne Build-Schritt)
 | `GET`    | `/api/config`                | Tag-Vokabular, Aktivitäten, aktivierte Features          |
 | `GET`    | `/api/spots?tag=…`           | Alle Spots mit Anzahl Fotos, Zeitraum und Tags           |
 | `GET`    | `/api/spots/:id`             | Ein Spot mit allen Fotos chronologisch                   |
-| `POST`   | `/api/photos`                | Upload (multipart: `photos[]`, optional `spotId` für Wiederholungsfotos, `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `utcOffsetMinutes`, `clockShiftSeconds`) |
+| `POST`   | `/api/photos`                | Upload (multipart: `photos[]`, optional `spotId` und `refPhotoId` für Wiederholungsfotos, `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `utcOffsetMinutes`, `clockShiftSeconds`) |
+| `POST`   | `/api/spots/:id/align`       | Ausrichtung aller Fotos eines Spots neu berechnen        |
 | `PATCH`  | `/api/photos/:id`            | Tags und Notiz ändern                                    |
 | `DELETE` | `/api/photos/:id`            | Foto löschen                                             |
 | `POST`   | `/api/photos/:id/identify`   | Pflanzen bestimmen (Pl@ntNet)                            |
@@ -86,8 +94,6 @@ public/              Frontend (Leaflet, ohne Build-Schritt)
 ## Roadmap
 
 **Phase 2: Mehr und bessere Fotos**
-- Automatischer Feinabgleich von Wiederholungsfotos: Bild an der Referenz ausrichten (Homographie),
-  damit der Vergleich pixelgenau wird.
 - Video statt Einzelbilder: Frames aus GoPro- und Insta360-Videos extrahieren und die eingebettete
   GPS-Telemetrie (GPMF) direkt nutzen. 360°-Aufnahmen machen es dann wirklich zu Street View.
 - Blickrichtung berücksichtigen: Spots zusätzlich nach Himmelsrichtung trennen.
@@ -97,8 +103,8 @@ public/              Frontend (Leaflet, ohne Build-Schritt)
 **Phase 3: Automatische Auswertung**
 - Objekterkennung: umgestürzte Bäume, Wurzelteller, Totholz, Holzpolter und Rückegassen,
   z. B. mit einem feinjustierten YOLO- oder Segmentierungsmodell.
-- Veränderungserkennung: Aufnahmen eines Spots aufeinander ausrichten (Feature-Matching) und
-  Unterschiede automatisch markieren.
+- Veränderungserkennung: auf den bereits ausgerichteten Aufnahmen eines Spots Unterschiede
+  automatisch markieren (z. B. als Heatmap).
 - Vegetationsdichte: Grünanteil und Kronendach-Deckung aus den Bildern schätzen und als Zeitreihe
   zeigen.
 - Arten und Neophyten: Hotspot-Karten und Ausbreitungsfronten, Export zu Info Flora / iNaturalist.

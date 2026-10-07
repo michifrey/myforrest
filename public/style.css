@@ -126,7 +126,17 @@ textarea { width: 100%; resize: vertical; }
 .chips.editable .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 
 .viewer { margin-top: 1rem; background: #000; border-radius: var(--radius); overflow: hidden; }
-.viewer img { display: block; width: 100%; max-height: 52vh; object-fit: contain; }
+.stage {
+  position: relative; overflow: hidden; background: #000; margin: 0 auto;
+  aspect-ratio: var(--ar, 4 / 3);
+  width: min(100%, calc(52vh * var(--ar, 1.3333)));
+}
+.stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.stage img, .swipe img { transform-origin: 0 0; }
+.toggle { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--muted); margin-top: 0.3rem; }
+.toggle input { accent-color: var(--accent); }
+.align-row { justify-content: space-between; margin-top: 0.2rem; }
+.align-row .toggle { margin-top: 0; }
 .caption { background: var(--surface-2); color: var(--text); padding: 0.4rem 0.7rem; font-size: 0.85rem; }
 
 .timeline { margin-top: 0.75rem; }
@@ -140,7 +150,7 @@ textarea { width: 100%; resize: vertical; }
 .compare { margin-top: 0.75rem; }
 .compare-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem; }
 .compare-pick select { width: 100%; }
-.swipe { position: relative; margin-top: 0.5rem; border-radius: var(--radius); overflow: hidden; background: #000; aspect-ratio: 4 / 3; }
+.swipe { position: relative; margin-top: 0.5rem; border-radius: var(--radius); overflow: hidden; background: #000; aspect-ratio: var(--ar, 4 / 3); }
 .swipe img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .swipe-top { position: absolute; inset: 0; clip-path: inset(0 50% 0 0); }
 .swipe-handle { position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; background: #fff; box-shadow: 0 0 6px rgb(0 0 0 / 0.6); pointer-events: none; }

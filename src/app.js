@@ -14,6 +14,8 @@ const { readPhotoMeta, imageExtension } = require('./exif');
 const { assignSpot, refreshSpot } = require('./spots');
 const { TAGS, parseTags } = require('./tags');
 const { identifyPlant } = require('./plantnet');
+const { alignImages, extractFeatures } = require('./align');
+const { IDENTITY, multiply } = require('./homography');
 
 const ACTIVITIES = ['joggen', 'wandern', 'biken', 'sonstiges'];
 const NEOPHYTE_MIN_SCORE = 0.3;
@@ -61,6 +63,7 @@ function createApp({
     activity: p.activity,
     note: p.note,
     tags: tagsOf.all(p.id).map((r) => r.tag),
+    alignment: p.align_h ? { h: JSON.parse(p.align_h), inliers: p.align_inliers } : null,
     identifications: idsOf.all(p.id).map((r) => ({
       scientificName: r.scientific_name,
       commonName: r.common_name,
@@ -74,6 +77,58 @@ function createApp({
     const ins = db.prepare('INSERT INTO photo_tags (photo_id, tag) VALUES (?, ?)');
     for (const t of tags) ins.run(photoId, t);
   };
+
+  /* ---------- Alignment of photos within a spot ---------- */
+
+  // Small cache so aligning against the same reference does not re-extract features.
+  const featureCache = new Map();
+  const cachedFeatures = async (file) => {
+    if (featureCache.has(file)) return featureCache.get(file);
+    const f = extractFeatures(file);
+    featureCache.set(file, f);
+    if (featureCache.size > 40) featureCache.delete(featureCache.keys().next().value);
+    f.catch(() => featureCache.delete(file));
+    return f;
+  };
+  const setAlignment = db.prepare('UPDATE photos SET align_h = ?, align_inliers = ? WHERE id = ?');
+
+  /**
+   * Aligns a photo into its spot's common frame (that of the first aligned
+   * photo). Tries the reference photo first, then aligned photos closest in
+   * time, and chains the transforms. Leaves the photo unaligned on failure.
+   */
+  async function alignPhoto(photoId, refPhotoId = null) {
+    const photo = getPhoto.get(photoId);
+    if (!photo) return;
+    const aligned = db.prepare(
+      'SELECT * FROM photos WHERE spot_id = ? AND id != ? AND align_h IS NOT NULL',
+    ).all(photo.spot_id, photo.id);
+    if (!aligned.length) {
+      setAlignment.run(JSON.stringify(IDENTITY), null, photo.id);
+      return;
+    }
+    aligned.sort((a, b) =>
+      (b.id === refPhotoId) - (a.id === refPhotoId) ||
+      Math.abs(a.taken_at - photo.taken_at) - Math.abs(b.taken_at - photo.taken_at));
+    for (const ref of aligned.slice(0, 3)) {
+      const r = await alignImages(path.join(uploadDir, photo.file), path.join(uploadDir, ref.file), {
+        getFeatures: cachedFeatures,
+      });
+      if (r) {
+        setAlignment.run(JSON.stringify(multiply(JSON.parse(ref.align_h), r.h)), r.inliers, photo.id);
+        return;
+      }
+    }
+    setAlignment.run(null, null, photo.id);
+  }
+
+  async function realignSpot(spotId) {
+    db.prepare('UPDATE photos SET align_h = NULL, align_inliers = NULL WHERE spot_id = ?').run(spotId);
+    const ids = db.prepare('SELECT id FROM photos WHERE spot_id = ? ORDER BY taken_at, id').all(spotId);
+    for (const { id } of ids) await alignPhoto(id);
+  }
+
+  const safeAlign = (fn) => fn.catch((err) => console.error('Ausrichtung fehlgeschlagen:', err.message));
 
   const idParam = (req, res) => {
     const id = Number(req.params.id);
@@ -116,13 +171,31 @@ function createApp({
     })));
   });
 
+  const spotJson = (id) => {
+    const spot = db.prepare('SELECT id, lat, lon FROM spots WHERE id = ?').get(id);
+    if (!spot) return null;
+    const photos = db.prepare('SELECT * FROM photos WHERE spot_id = ? ORDER BY taken_at, id').all(id);
+    return { ...spot, photos: photos.map(photoJson) };
+  };
+
   app.get('/api/spots/:id', (req, res) => {
     const id = idParam(req, res);
     if (id === null) return;
-    const spot = db.prepare('SELECT id, lat, lon FROM spots WHERE id = ?').get(id);
+    const spot = spotJson(id);
     if (!spot) return res.status(404).json({ error: 'Spot nicht gefunden' });
-    const photos = db.prepare('SELECT * FROM photos WHERE spot_id = ? ORDER BY taken_at, id').all(id);
-    res.json({ ...spot, photos: photos.map(photoJson) });
+    res.json(spot);
+  });
+
+  app.post('/api/spots/:id/align', async (req, res, next) => {
+    const id = idParam(req, res);
+    if (id === null) return;
+    if (!spotJson(id)) return res.status(404).json({ error: 'Spot nicht gefunden' });
+    try {
+      await realignSpot(id);
+      res.json(spotJson(id));
+    } catch (err) {
+      next(err);
+    }
   });
 
   app.post('/api/photos', (req, res, next) => {
@@ -168,6 +241,7 @@ function createApp({
         : null;
       if (!targetSpot) return [400, { error: 'Spot nicht gefunden' }];
     }
+    const refPhotoId = Number.isSafeInteger(Number(b.refPhotoId)) ? Number(b.refPhotoId) : null;
     const nearSpot = (p) => distanceM(p, targetSpot) <= Math.max(4 * spotRadiusM, 100);
     const track = gpxFile ? parseGpx(await fsp.readFile(gpxFile.path, 'utf8')) : [];
     if (gpxFile && !track.length) {
@@ -217,7 +291,7 @@ function createApp({
 
       const file = `${crypto.randomUUID()}.${ext}`;
       await fsp.rename(f.path, path.join(uploadDir, file));
-      const photo = transaction(db, () => {
+      const photoId = transaction(db, () => {
         const spotId = targetSpot ? targetSpot.id : assignSpot(db, pos.lat, pos.lon, spotRadiusM);
         const id = Number(db.prepare(`
           INSERT INTO photos (spot_id, file, original_name, taken_at, lat, lon, heading,
@@ -228,9 +302,10 @@ function createApp({
         setTags(id, tags);
         refreshSpot(db, spotId);
         touchedSpots.add(spotId);
-        return getPhoto.get(id);
+        return id;
       });
-      created.push(photoJson(photo));
+      await safeAlign(alignPhoto(photoId, refPhotoId));
+      created.push(photoJson(getPhoto.get(photoId)));
     }
     return [created.length ? 201 : 422, { created, skipped, spots: [...touchedSpots] }];
   }
