@@ -13,22 +13,37 @@ MyForrest ──/api/export/myforrest.gpkg──▶ GeoPackage (LV95, alle 15 mi
                                           QGIS Server ──▶ /ows/  WMS · WMTS · WFS
 ```
 
-## 1. QGIS-Projekt anlegen (einmalig, in QGIS Desktop)
+## 1. Das QGIS-Projekt
 
-1. GeoPackage herunterladen: `https://<dein-server>/api/export/myforrest.gpkg` (LV95).
-2. In QGIS öffnen; die Layer `spots`, `photos`, `findings` und `spread_fronts` hinzufügen.
-3. Projekt-KBS auf **EPSG:2056 (CH1903+ / LV95)** setzen und die Layer gestalten
-   (z. B. `spread_fronts` nach `year` abgestuft, `findings` nach `neophyte`).
-4. Die Datenquelle auf den Pfad im Container umstellen: Layer → *Datenquelle ändern* →
-   `/io/data/myforrest.gpkg` (oder das Projekt mit relativen Pfaden neben einer Kopie der Datei speichern
-   und den Pfad danach im Projekt anpassen).
-5. *Projekt → Eigenschaften → QGIS Server*:
-   - *Service-Fähigkeiten*: Titel, Kurzbeschreibung, Kontakt, Nutzungsbedingungen (Lizenzen der Fotos,
-     z. B. CC BY-SA 4.0) ausfüllen.
-   - *WMS*: KBS einschränken auf EPSG:2056, EPSG:4326, EPSG:3857; Ausdehnung „Aktuelle Kartenansicht“.
-   - *WMTS*: die gewünschten Layer veröffentlichen (Kachelmatrix EPSG:2056 und EPSG:3857).
-   - *WFS*: Layer zum Abfragen freigeben, Genauigkeit 2 Dezimalen (cm in LV95).
-6. Als `deploy/qgis-server/project/myforrest.qgz` speichern.
+`project/myforrest.qgz` ist fertig und wird mitgeliefert. Es liest `../data/myforrest.gpkg` (im Container
+`/io/data/myforrest.gpkg`, vom Export-Dienst alle 15 Minuten erneuert), ist in **LV95 (EPSG:2056)** und enthält:
+
+| Ebene (WMS-Name) | Darstellung |
+|------------------|-------------|
+| `spread_fronts` – Ausbreitungsfronten | Fläche pro Art und Jahr, violett von hell (früher) bis dunkel (neuer); ältere, kleinere Umrisse liegen oben |
+| `spots` – Spots | Kreis nach Anzahl Fotos, grün *ohne Befund*, orange *mit Schäden* (Sturm, Borkenkäfer, Trockenheit, Holzschlag, Erosion, Frost), goldener Pfeil in Blickrichtung |
+| `findings` – Pflanzenfunde | Neophyten als violette Rauten, andere Pflanzen als grüne Punkte |
+| `photos` – Fotos | nur über WFS (keine Kartenebene) |
+
+Dazu die Server-Einstellungen: Titel, Beschreibung, Schlagwörter und Nutzungsbedingungen; WMS in
+EPSG:2056, 4326, 3857 und 21781 mit GetFeatureInfo (JSON, mit Geometrie); WFS für alle Ebenen
+(2 Dezimalen = cm in LV95); WMTS für die ganze Karte und jede Ebene in den Kachelgittern EPSG:2056 und
+EPSG:3857. Die Farben sind die der App.
+
+Das Projekt wird mit [`build-project.py`](build-project.py) (PyQGIS) erzeugt; nach Änderungen an Stilen oder
+Ebenen neu bauen, mit einem beliebigen Export als Vorlage:
+
+```sh
+curl -o /tmp/myforrest.gpkg https://<dein-server>/api/export/myforrest.gpkg
+python3 build-project.py /tmp/myforrest.gpkg     # braucht python3-qgis (QGIS ≥ 3.28)
+```
+
+Feinschliff in QGIS Desktop ist jederzeit möglich: `project/myforrest.qgz` öffnen (dafür eine Kopie des
+GeoPackages unter `data/myforrest.gpkg` neben den Ordner `project` legen), anpassen, speichern.
+
+Geprüft mit QGIS Server 3.34 LTR gegen einen Export mit Demo-Daten: WMS GetCapabilities, GetMap in LV95,
+GetLegendGraphic und GetFeatureInfo, WFS GetFeature (GeoJSON in LV95) sowie WMTS GetCapabilities und
+GetTile im LV95-Gitter.
 
 ## 2. Starten
 
@@ -57,8 +72,8 @@ Geoportale laden Dienste nur über HTTPS.
 
 ## Hinweise
 
-- Das Setup ist eine Vorlage und wurde ohne laufendes Docker erstellt; vor dem Produktivbetrieb
-  einmal durchspielen.
+- Docker Compose selbst wurde ohne laufendes Docker erstellt (QGIS Server und Projekt sind geprüft, siehe
+  oben); vor dem Produktivbetrieb einmal durchspielen.
 - Ausgeblendete (moderierte) Fotos erscheinen in keinem Dienst. Fotos und Funde tragen ihre Lizenz
   (`license`) und den Namen der Person, die sie hochgeladen hat (`author`), als Attribute mit.
 - LV95 wird mit den Näherungsformeln von swisstopo berechnet (Genauigkeit ~1 m), was der

@@ -388,9 +388,10 @@ einbinden.
 - **GeoPackage**: `/api/export/myforrest.gpkg` liefert alle Collections als eine Datei (LV95, mit
   `?crs=4326` in WGS84), ohne GDAL direkt mit SQLite geschrieben. Die Fusszeile der App verlinkt beides.
 - **QGIS Server**: Für WMS, WMTS und WFS mit eigener Gestaltung, wie sie Geoportale wie map.geo.admin.ch
-  einbinden, liegt unter [`deploy/qgis-server`](../deploy/qgis-server/README.md) eine Vorlage mit Docker
-  Compose: MyForrest, QGIS Server und nginx, dazu ein Dienst, der das GeoPackage alle 15 Minuten neu
-  exportiert.
+  einbinden, liegt unter [`deploy/qgis-server`](../deploy/qgis-server/README.md) ein fertiges QGIS-Projekt
+  mit Stilen in den Farben der App (Ausbreitungsfronten nach Jahr, Spots nach Befund mit Pfeil in
+  Blickrichtung, Neophyten hervorgehoben) und eine Docker-Compose-Vorlage: MyForrest, QGIS Server und
+  nginx, dazu ein Dienst, der das GeoPackage alle 15 Minuten neu exportiert.
 
 Ausgeblendete (moderierte) Fotos erscheinen in keinem Dienst.
 
