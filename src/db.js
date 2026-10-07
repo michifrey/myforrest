@@ -74,6 +74,8 @@ const MIGRATIONS = [
   ['spots', 'tpi600', 'REAL'], // … within 600 m
   ['spots', 'landform', 'TEXT'], // 'senke' | 'hang' | 'kuppe' | 'ebene'
   ['spots', 'landform_source', 'TEXT'], // 'dem' | 'manual'
+  ['photos', 'panorama', 'INTEGER'], // 1 = equirectangular 360° image
+  ['photos', 'video_time', 'REAL'], // position (s) in the source video for frames taken from a video
 ];
 
 function openDb(file) {
