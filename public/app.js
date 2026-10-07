@@ -110,10 +110,11 @@ function applyWarp(img) {
 async function showFramed(stage, img, photo, frame, setAspect = true) {
   const token = (img.dataset.token = String(Number(img.dataset.token || 0) + 1));
   const rel = frame ? relativeAlignment(photo, frame) : null;
-  const size = await imageSize((rel ? frame : photo).url);
+  // The 1280 px preview has the original's aspect ratio, so alignments apply unchanged.
+  const size = await imageSize(viewUrl(rel ? frame : photo));
   if (img.dataset.token !== token) return Boolean(rel);
   if (setAspect) stage.style.setProperty('--ar', String(size.w / size.h));
-  img.src = photo.url;
+  img.src = viewUrl(photo);
   warps.set(img, rel);
   applyWarp(img);
   return Boolean(rel);
@@ -145,30 +146,77 @@ const pinKind = (spot) => {
 };
 const pins = new Map();
 
+/* ---------- Viewing direction and previews ---------- */
+
+const COMPASS_DE = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'];
+const compassLabel = (deg) => COMPASS_DE[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
+const headingText = (deg) => `Blick nach ${compassLabel(deg)} (${Math.round(deg)}°)`;
+const thumbUrl = (p) => p.thumbUrl || p.url;
+const viewUrl = (p) => p.largeUrl || p.url;
+
+/** Other spots at (about) the same place, e.g. the same clearing seen in another direction. */
+function siblingSpots(spot) {
+  const radius = state.config.spotRadiusM || 25;
+  return state.spots.filter((o) => o.id !== spot.id && distanceM(o, spot) <= radius);
+}
+
+const hasHeading = (s) => s.heading !== null && s.heading !== undefined;
+
+/**
+ * Pin anchor: spots sharing a place are pushed apart along their viewing
+ * direction (far enough for neighbouring directions not to overlap), so each
+ * stays clickable; the cone below them marks the actual place.
+ */
+function pinAnchor(s, size) {
+  const others = hasHeading(s) ? siblingSpots(s) : [];
+  if (!others.length) return [size / 2, size * 1.2];
+  const minDiff = Math.min(180, ...others.filter(hasHeading).map((o) => {
+    const d = Math.abs((((s.heading - o.heading) % 360) + 360) % 360);
+    return d > 180 ? 360 - d : d;
+  }));
+  const shift = Math.min(60, Math.max(30, (size + 6) / (2 * Math.sin(Math.max(minDiff, 1) * Math.PI / 360))));
+  const rad = (s.heading * Math.PI) / 180;
+  return [size / 2 - Math.sin(rad) * shift, size * 1.2 + Math.cos(rad) * shift];
+}
+
+/** View cone of a spot, drawn in the shadow pane below all pins. */
+function coneMarker(s) {
+  return L.marker([s.lat, s.lon], {
+    pane: 'shadowPane',
+    interactive: false,
+    keyboard: false,
+    icon: L.divIcon({ className: 'pin-cone', html: `<i style="--h:${Number(s.heading)}deg"></i>`, iconSize: [0, 0], iconAnchor: [0, 0] }),
+  });
+}
+
 function renderMarkers() {
   state.markers.clearLayers();
   pins.clear();
   for (const s of state.spots) {
     const size = Math.round(28 + Math.min(Math.log2(s.photoCount) * 5, 16));
+    const anchor = pinAnchor(s, size);
     const icon = L.divIcon({
       className: 'pin-icon',
       html: `<div class="pin ${pinKind(s)}${state.spot?.id === s.id ? ' active' : ''}"><b>${s.photoCount}</b>${s.irregularities.length ? '<i class="flag">!</i>' : ''}</div>`,
       iconSize: [size, size],
-      iconAnchor: [size / 2, size * 1.2],
-      tooltipAnchor: [0, -size * 1.1],
+      iconAnchor: anchor,
+      tooltipAnchor: [size / 2 - anchor[0], -size * 1.1 + (size * 1.2 - anchor[1])],
     });
     const m = L.marker([s.lat, s.lon], { icon, title: `Spot ${s.id}`, riseOnHover: true });
     const extra = [
       s.change?.fraction >= 0.05 ? `≈ ${Math.round(s.change.fraction * 100)} % verändert${s.change.top ? ` (${s.change.top})` : ''}` : '',
       ...s.irregularities,
       s.species.length ? `Baumarten: ${s.species.join(', ')}` : '',
+      hasHeading(s) ? headingText(s.heading) : '',
     ].filter(Boolean);
     const tip = el('div', {}, [
+      el('img', { class: 'tip-thumb', src: s.latestThumbUrl || s.latestUrl, alt: '' }),
       el('div', { text: `Spot ${s.id} · ${s.photoCount} Foto${s.photoCount === 1 ? '' : 's'} · ${fmtDate(s.firstTaken)}–${fmtDate(s.lastTaken)}` }),
       ...extra.map((t) => el('div', { class: 'muted', text: t })),
     ]);
     m.bindTooltip(tip, { direction: 'top' });
     m.on('click', () => openSpot(s.id));
+    if (hasHeading(s)) state.markers.addLayer(coneMarker(s));
     state.markers.addLayer(m);
     pins.set(s.id, m);
   }
@@ -228,7 +276,7 @@ function renderStats(updateHero = true) {
   const recent = [...state.spots].sort((a, b) => Date.parse(b.lastTaken) - Date.parse(a.lastTaken)).slice(0, 4);
   $('recent').replaceChildren(...(recent.length
     ? recent.map((s) => el('button', { type: 'button', onclick: () => openSpot(s.id) }, [
-      el('img', { src: s.latestUrl, alt: '', loading: 'lazy' }),
+      el('img', { src: s.latestThumbUrl || s.latestUrl, alt: '', loading: 'lazy' }),
       el('div', {}, [
         el('strong', { text: `Spot ${s.id}` }),
         el('span', { text: `${s.photoCount} Foto${s.photoCount === 1 ? '' : 's'} · zuletzt ${fmtDate(s.lastTaken)}` }),
@@ -258,7 +306,9 @@ async function openSpot(id, photoId) {
   const years = new Set(photos.map((p) => new Date(p.takenAt).getFullYear()));
   $('spot-meta').textContent =
     `${state.spot.lat.toFixed(5)}, ${state.spot.lon.toFixed(5)} · ${photos.length} Foto${photos.length === 1 ? '' : 's'} · ` +
-    `${fmtDate(photos[0].takenAt)} – ${fmtDate(photos[photos.length - 1].takenAt)} (${years.size} Jahr${years.size === 1 ? '' : 'e'})`;
+    `${fmtDate(photos[0].takenAt)} – ${fmtDate(photos[photos.length - 1].takenAt)} (${years.size} Jahr${years.size === 1 ? '' : 'e'})` +
+    (hasHeading(state.spot) ? ` · ${headingText(state.spot.heading)}` : '');
+  renderSiblings(state.spot);
   const allTags = [...new Set(photos.flatMap((p) => p.tags))].sort();
   $('spot-tags').replaceChildren(...allTags.map(tagChip));
 
@@ -269,7 +319,7 @@ async function openSpot(id, photoId) {
   $('t-last').textContent = fmtDate(photos[photos.length - 1].takenAt);
   $('thumbs').replaceChildren(...photos.map((p, i) =>
     el('button', { type: 'button', title: fmtDateTime(p.takenAt), onclick: () => showPhoto(i) },
-      el('img', { src: p.url, alt: `Foto vom ${fmtDate(p.takenAt)}`, loading: 'lazy' }))));
+      el('img', { src: thumbUrl(p), alt: `Foto vom ${fmtDate(p.takenAt)}`, loading: 'lazy' }))));
 
   fillCompareSelects();
   showPhoto(state.index);
@@ -278,6 +328,21 @@ async function openSpot(id, photoId) {
   renderSpecies(state.spot);
   renderElevation(state.spot);
   map.setView([state.spot.lat, state.spot.lon], Math.max(map.getZoom(), 15));
+}
+
+/** Links to spots at the same place that look in another direction. */
+function renderSiblings(spot) {
+  const others = siblingSpots(spot);
+  $('spot-siblings').hidden = !others.length;
+  $('spot-siblings').replaceChildren(...(others.length ? [
+    el('span', { class: 'muted', text: 'Am selben Ort: ' }),
+    ...others.map((o) => el('button', {
+      type: 'button',
+      class: 'link small',
+      onclick: () => openSpot(o.id),
+      text: `Spot ${o.id}${hasHeading(o) ? ` (${compassLabel(o.heading)})` : ''}`,
+    })),
+  ] : []));
 }
 
 function showPhoto(i) {
@@ -1055,7 +1120,7 @@ async function openCamera() {
   }
   const photo = state.spot.photos[state.index];
   cam.ref = $('cam-ref');
-  cam.ref.src = photo.url;
+  cam.ref.src = viewUrl(photo);
   await cam.ref.decode().catch(() => {});
   try {
     cam.stream = await navigator.mediaDevices.getUserMedia({

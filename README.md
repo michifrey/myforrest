@@ -33,7 +33,8 @@ Der Ablauf hat drei Schritte:
 ![Karte mit Spots und Übersicht](docs/screenshots/map.jpg)
 
 Jeder Marker ist ein **Spot**, also ein Ort, an dem über die Zeit Fotos entstanden sind. Fotos, die
-weniger als 25 m auseinander liegen, landen automatisch im selben Spot. Die Zahl im Marker nennt die
+weniger als 25 m auseinander liegen und in dieselbe Richtung blicken (±45°), landen automatisch im
+selben Spot. Ein goldener Sichtkegel am Marker zeigt die Blickrichtung. Die Zahl im Marker nennt die
 Anzahl Fotos, die Farbe den Befund: grün für unauffällig, orange für Schäden (Sturm, Borkenkäfer,
 Trockenheit, Holzschlag, Erosion) und violett für Neophyten. Oben links lässt sich die Karte nach
 Beobachtungen filtern. Rechts stehen Kennzahlen und die zuletzt fotografierten Spots.
@@ -98,6 +99,30 @@ den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen und eine Notiz.
 - **Karte mit Spots**: Fotos, die innerhalb von 25 m aufgenommen wurden, werden automatisch zu
   einem *Spot* zusammengefasst. Die Farbe zeigt Schäden (orange) oder Neophyten (violett).
 - **Zeitreise pro Spot**: Mit dem Zeitregler und der Thumbnail-Leiste durch alle Aufnahmen blättern.
+- **Blickrichtung**: Spots werden zusätzlich nach Himmelsrichtung getrennt. Die Richtung stammt aus dem
+  Kompass des Handys (EXIF `GPSImgDirection`). Regel für neue Fotos:
+  - Foto **mit** Blickrichtung: Es kommt zum nächsten Spot im Umkreis von 25 m, dessen Richtung höchstens
+    ±45° abweicht. Gibt es keinen, kommt es zum nächsten Spot ohne Richtung (ältere Spots oder Fotos ohne
+    Kompass), der damit eine Richtung erhält. Sonst entsteht ein neuer Spot. Dieselbe Lichtung nach Norden
+    und nach Süden fotografiert ergibt also zwei Spots.
+  - Foto **ohne** Blickrichtung: wie bisher der nächste Spot im Umkreis, egal in welche Richtung er blickt.
+  - Wiederholungsfotos bleiben immer fest dem gewählten Spot zugeordnet.
+
+  Die Richtung eines Spots ist das zirkuläre Mittel seiner Fotos (350° und 10° ergeben 0°). Blicken die
+  Fotos eines Spots in sehr verschiedene Richtungen, hat der Spot keine Richtung. Bestehende Spots werden
+  beim Start nur um ihre Richtung ergänzt und nie aufgeteilt. Auf der Karte zeigt ein goldener Sichtkegel
+  die Richtung. Liegen mehrere Spots am selben Ort, rücken ihre Marker in Blickrichtung auseinander, damit
+  jeder anklickbar bleibt. Im Kopf des Spots stehen die Richtung („Blick nach NO (45°)“) und Links zu den
+  anderen Spots am selben Ort.
+- **Vorschaubilder**: Beim Upload entstehen zwei WebP-Vorschaubilder (320 px für Leiste, Listen und
+  Karten-Tooltip, 1280 px für Betrachter, Vergleich und Kamera-Overlay), richtig gedreht und im
+  Seitenverhältnis des Originals. Die Ausrichtungen gelten deshalb unverändert. Für ältere Fotos werden
+  die Vorschaubilder beim Start im Hintergrund nachgerechnet. Bis dahin zeigt die App das Original.
+  Analyse und Ausrichtung arbeiten weiter mit dem Original.
+- **HEIC-Fotos vom iPhone**: `.heic`/`.heif` werden angenommen und als JPEG gespeichert. Die Umwandlung
+  macht der WebAssembly-Decoder von `heic-convert`, weil sharp HEIC meist nicht lesen kann. Aufnahmezeit,
+  GPS, Höhe und Blickrichtung werden vorher aus dem EXIF-Block der Originaldatei gelesen. Das gespeicherte
+  JPEG enthält keine EXIF-Daten.
 - **Vorher/Nachher-Vergleich**: Zwei beliebige Aufnahmen mit einem Wischregler überlagern.
 - **Wiederholungsfotos mit Overlay**: Am Spot öffnet *Wiederholungsfoto aufnehmen* die Kamera. Das
   gewählte Referenzfoto liegt halbtransparent oder als Kontur über dem Livebild, sodass sich Ausschnitt
@@ -202,6 +227,7 @@ Konfiguration über Umgebungsvariablen:
 | `PORT`             | `3000`   | HTTP-Port                                      |
 | `DATA_DIR`         | `./data` | SQLite-Datenbank und hochgeladene Bilder       |
 | `SPOT_RADIUS_M`    | `25`     | Radius, in dem Fotos zum selben Spot gehören   |
+| `HEADING_TOLERANCE_DEG` | `45` | Abweichung der Blickrichtung (±°), bis zu der Fotos zum selben Spot gehören |
 | `PLANTNET_API_KEY` | –        | Aktiviert die Pflanzenbestimmung               |
 
 ## Aufbau
@@ -210,7 +236,9 @@ Konfiguration über Umgebungsvariablen:
 server.js            Einstiegspunkt
 src/app.js           Express-App und REST-API
 src/db.js            SQLite-Schema (spots, photos, photo_tags, identifications)
-src/spots.js         Gruppierung von Fotos zu Spots
+src/spots.js         Gruppierung von Fotos zu Spots (Ort und Blickrichtung)
+src/thumbs.js        Vorschaubilder (WebP, 320 und 1280 px) in data/thumbs
+src/heic.js          HEIC-Erkennung, EXIF aus HEIC, Umwandlung nach JPEG
 src/align.js         Bildregistrierung (ORB-Merkmale, Matching, RANSAC)
 src/homography.js    3×3-Homographien: Verkettung, Inverse
 src/change.js        Veränderungserkennung und Heatmap
@@ -235,9 +263,10 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
 | Methode  | Pfad                         | Zweck                                                    |
 |----------|------------------------------|----------------------------------------------------------|
 | `GET`    | `/api/config`                | Tag-Vokabular, Aktivitäten, aktivierte Features          |
-| `GET`    | `/api/spots?tag=…`           | Alle Spots mit Anzahl Fotos, Zeitraum und Tags           |
-| `GET`    | `/api/spots/:id`             | Ein Spot mit allen Fotos chronologisch                   |
-| `POST`   | `/api/photos`                | Upload (multipart: `photos[]`, optional `spotId` und `refPhotoId` für Wiederholungsfotos, `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `utcOffsetMinutes`, `clockShiftSeconds`) |
+| `GET`    | `/api/spots?tag=…`           | Alle Spots mit Anzahl Fotos, Zeitraum, Tags, Blickrichtung (`heading`) und Vorschaubild (`latestThumbUrl`) |
+| `GET`    | `/api/spots/:id`             | Ein Spot mit Blickrichtung und allen Fotos chronologisch (jedes Foto mit `url`, `thumbUrl` und `largeUrl`) |
+| `GET`    | `/thumbs/:datei`             | Vorschaubilder (WebP)                                    |
+| `POST`   | `/api/photos`                | Upload (multipart: `photos[]` als JPEG, PNG, WebP oder HEIC, optional `spotId` und `refPhotoId` für Wiederholungsfotos, `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `utcOffsetMinutes`, `clockShiftSeconds`) |
 | `POST`   | `/api/spots/:id/align`       | Ausrichtung aller Fotos eines Spots neu berechnen        |
 | `GET`    | `/api/photos/:id/change?to=` | Veränderte Fläche zwischen zwei ausgerichteten Fotos, mit eingeordneten Regionen |
 | `GET`    | `/api/photos/:id/change.png?to=` | Heatmap der Veränderung (PNG, in der Ansicht des ersten Fotos) |
@@ -258,8 +287,9 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
 **Phase 2: Mehr und bessere Fotos**
 - Video statt Einzelbilder: Frames aus GoPro- und Insta360-Videos extrahieren und die eingebettete
   GPS-Telemetrie (GPMF) direkt nutzen. 360°-Aufnahmen machen es dann wirklich zu Street View.
-- Blickrichtung berücksichtigen: Spots zusätzlich nach Himmelsrichtung trennen.
-- Vorschaubilder, HEIC-Unterstützung, installierbare PWA mit Offline-Upload.
+- Bestehende Spots mit gemischten Blickrichtungen auf Wunsch aufteilen (neue Fotos werden bereits
+  nach Richtung getrennt).
+- Installierbare PWA mit Offline-Upload.
 - Benutzerkonten, Moderation, Lizenz pro Foto (z. B. CC BY-SA).
 
 **Phase 3: Automatische Auswertung**
@@ -282,7 +312,8 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
 - Der Prototyp hat **keine Authentifizierung**. Er sollte nur lokal oder in einem vertrauenswürdigen
   Netz laufen, bis Benutzerkonten umgesetzt sind.
 - Bilder werden unverändert gespeichert und ausgeliefert, **inklusive EXIF-Daten** (GPS,
-  Kameramodell). Vor einem öffentlichen Betrieb sollten Metadaten entfernt und Personen sowie
+  Kameramodell). Ausnahmen sind die Vorschaubilder und die aus HEIC umgewandelten JPEGs, die keine
+  EXIF-Daten enthalten. Vor einem öffentlichen Betrieb sollten Metadaten entfernt und Personen sowie
   Kennzeichen automatisch verpixelt werden.
 - Wetterdaten von [Open-Meteo.com](https://open-meteo.com) (ERA5-Reanalyse, CC BY 4.0). Der Server braucht
   dafür Internetzugang zu `archive-api.open-meteo.com` und, für die Geländehöhe, zu `api.open-meteo.com`. Die Daten werden pro ~10-km-Zelle gecacht; die

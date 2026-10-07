@@ -11,7 +11,9 @@ const { openDb, transaction } = require('./db');
 const { distanceM, isValidCoord, positionAt } = require('./geo');
 const { parseGpx } = require('./gpx');
 const { readPhotoMeta, imageExtension } = require('./exif');
-const { assignSpot, refreshSpot } = require('./spots');
+const { assignSpot, refreshSpot, backfillSpotHeadings, HEADING_TOLERANCE_DEG } = require('./spots');
+const { isHeic, heicExif, heicToJpeg } = require('./heic');
+const { createThumbnails } = require('./thumbs');
 const { TAGS, parseTags } = require('./tags');
 const { identifyPlant } = require('./plantnet');
 const { alignImages, extractFeatures } = require('./align');
@@ -33,6 +35,7 @@ const TREE_MIN_SCORE = 0.25;
 function createApp({
   dataDir = path.join(__dirname, '..', 'data'),
   spotRadiusM = 25,
+  headingToleranceDeg = HEADING_TOLERANCE_DEG,
   plantnetKey = process.env.PLANTNET_API_KEY,
   fetchImpl = fetch,
   weatherFetch = fetch,
@@ -42,6 +45,8 @@ function createApp({
   fs.mkdirSync(uploadDir, { recursive: true });
   fs.mkdirSync(tmpDir, { recursive: true });
   const db = openDb(path.join(dataDir, 'myforrest.db'));
+  backfillSpotHeadings(db);
+  const thumbs = createThumbnails({ db, uploadDir, thumbDir: path.join(dataDir, 'thumbs') });
   const weather = createWeather({ db, fetchImpl: weatherFetch });
   const elevationService = createElevation({ db, fetchImpl: weatherFetch });
 
@@ -60,6 +65,7 @@ function createApp({
     app.use(`/vendor/fonts/${font}`, express.static(dir, { maxAge: '30d' }));
   }
   app.use('/uploads', express.static(uploadDir, { maxAge: '7d', immutable: true }));
+  app.use('/thumbs', express.static(path.join(dataDir, 'thumbs'), { maxAge: '7d', immutable: true }));
 
   const tagsOf = db.prepare('SELECT tag FROM photo_tags WHERE photo_id = ? ORDER BY tag');
   const idsOf = db.prepare(
@@ -71,6 +77,7 @@ function createApp({
     id: p.id,
     spotId: p.spot_id,
     url: `/uploads/${p.file}`,
+    ...thumbs.urls(p),
     originalName: p.original_name,
     takenAt: new Date(p.taken_at).toISOString(),
     lat: p.lat,
@@ -326,6 +333,8 @@ function createApp({
     pending.add(p);
   };
   app.locals.idle = () => Promise.all([...pending]);
+  // Previews for photos uploaded before they existed.
+  background(thumbs.backfill());
 
   const safeAlign = (fn) => fn.catch((err) => console.error('Ausrichtung fehlgeschlagen:', err.message));
 
@@ -345,12 +354,13 @@ function createApp({
   app.get('/api/spots', (req, res) => {
     const tag = req.query.tag ? String(req.query.tag) : null;
     const rows = db.prepare(`
-      SELECT s.id, s.lat, s.lon, s.elevation,
+      SELECT s.id, s.lat, s.lon, s.elevation, s.heading,
              COUNT(DISTINCT p.id) AS photo_count,
              MIN(p.taken_at) AS first_taken,
              MAX(p.taken_at) AS last_taken,
              GROUP_CONCAT(DISTINCT t.tag) AS tags,
              (SELECT file FROM photos WHERE spot_id = s.id ORDER BY taken_at DESC LIMIT 1) AS latest_file,
+             (SELECT thumb_file FROM photos WHERE spot_id = s.id ORDER BY taken_at DESC LIMIT 1) AS latest_thumb,
              (SELECT change_json FROM photos WHERE spot_id = s.id ORDER BY taken_at DESC LIMIT 1) AS latest_change,
              (SELECT context_json FROM photos WHERE spot_id = s.id ORDER BY taken_at DESC LIMIT 1) AS latest_context
       FROM spots s
@@ -365,11 +375,13 @@ function createApp({
       lat: r.lat,
       lon: r.lon,
       elevation: r.elevation,
+      heading: r.heading,
       photoCount: r.photo_count,
       firstTaken: new Date(r.first_taken).toISOString(),
       lastTaken: new Date(r.last_taken).toISOString(),
       tags: r.tags ? r.tags.split(',').sort() : [],
       latestUrl: `/uploads/${r.latest_file}`,
+      latestThumbUrl: r.latest_thumb ? `/thumbs/${r.latest_thumb}` : `/uploads/${r.latest_file}`,
       change: r.latest_change ? (({ fraction, summary }) => ({ fraction, top: summary[0]?.label || null }))(JSON.parse(r.latest_change)) : null,
       species: spotSpecies(r.id).map((t) => t.name),
       irregularities: r.latest_context
@@ -380,7 +392,7 @@ function createApp({
 
   const spotJson = (id) => {
     const spot = db.prepare(`
-      SELECT id, lat, lon, elevation, elevation_source, slope, aspect, terrain_source,
+      SELECT id, lat, lon, heading, elevation, elevation_source, slope, aspect, terrain_source,
              tpi300, tpi600, landform, landform_source
       FROM spots WHERE id = ?`).get(id);
     if (!spot) return null;
@@ -389,6 +401,7 @@ function createApp({
       id: spot.id,
       lat: spot.lat,
       lon: spot.lon,
+      heading: spot.heading,
       elevation: spot.elevation,
       elevationSource: spot.elevation_source,
       slope: spot.slope,
@@ -487,12 +500,14 @@ function createApp({
     const touchedSpots = new Set();
     for (const f of files) {
       const buf = await fsp.readFile(f.path);
-      const ext = imageExtension(buf);
+      // iPhone photos (HEIC) are stored as JPEG; their EXIF is read from the original.
+      const heic = isHeic(buf);
+      const ext = heic ? 'jpg' : imageExtension(buf);
       if (!ext) {
-        skipped.push({ name: f.originalname, reason: 'Kein unterstütztes Bildformat (JPEG, PNG, WebP)' });
+        skipped.push({ name: f.originalname, reason: 'Kein unterstütztes Bildformat (JPEG, PNG, WebP, HEIC)' });
         continue;
       }
-      const meta = await readPhotoMeta(buf, offsetMin);
+      const meta = await readPhotoMeta(heic ? heicExif(buf) || buf : buf, offsetMin);
       let takenAt = meta.takenAt !== null ? meta.takenAt + clockShiftMs : null;
       if (takenAt === null) takenAt = Number.isFinite(fallbackTime) ? fallbackTime : Date.now();
 
@@ -523,10 +538,21 @@ function createApp({
         continue;
       }
 
+      let jpeg = null;
+      if (heic) {
+        try {
+          jpeg = await heicToJpeg(buf);
+        } catch (err) {
+          skipped.push({ name: f.originalname, reason: `HEIC-Datei konnte nicht gelesen werden (${err.message})` });
+          continue;
+        }
+      }
       const file = `${crypto.randomUUID()}.${ext}`;
-      await fsp.rename(f.path, path.join(uploadDir, file));
+      if (jpeg) await fsp.writeFile(path.join(uploadDir, file), jpeg);
+      else await fsp.rename(f.path, path.join(uploadDir, file));
       const photoId = transaction(db, () => {
-        const spotId = targetSpot ? targetSpot.id : assignSpot(db, pos.lat, pos.lon, spotRadiusM);
+        const spotId = targetSpot ? targetSpot.id
+          : assignSpot(db, pos.lat, pos.lon, spotRadiusM, meta.heading, headingToleranceDeg);
         const id = Number(db.prepare(`
           INSERT INTO photos (spot_id, file, original_name, taken_at, lat, lon, heading, altitude,
                               location_source, activity, note, created_at)
@@ -538,6 +564,7 @@ function createApp({
         touchedSpots.add(spotId);
         return id;
       });
+      await thumbs.ensure(getPhoto.get(photoId));
       await safeAlign(alignPhoto(photoId, refPhotoId));
       await safeAlign(analyzeChange(photoId));
       background(analyzeContext(photoId));
@@ -572,6 +599,7 @@ function createApp({
       refreshSpot(db, photo.spot_id);
     });
     await fsp.rm(path.join(uploadDir, photo.file), { force: true });
+    await thumbs.remove(photo);
     // The spot's first photo may have gone: re-evaluate the others' change.
     const rest = db.prepare('SELECT id FROM photos WHERE spot_id = ?').all(photo.spot_id);
     background((async () => {

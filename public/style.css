@@ -853,3 +853,21 @@ summary { cursor: pointer; color: var(--muted); font-weight: 600; font-size: 0.9
   background: #fff; border: 5px solid #9aa; box-shadow: 0 0 0 3px #fff;
 }
 .shutter:active { transform: scale(0.94); }
+
+/* ---------- Viewing direction on pins, previews in tooltips ---------- */
+.pin-cone { background: none; border: none; pointer-events: none; }
+.pin-cone i { position: absolute; left: 0; top: 0; }
+.pin-cone i::before {
+  content: ''; position: absolute; left: -46px; top: -46px; width: 92px; height: 92px; border-radius: 50%;
+  /* 60° wedge centred on the heading (conic angles run clockwise from north, like compass headings). */
+  background: conic-gradient(from calc(var(--h) - 30deg), color-mix(in srgb, var(--gold) 80%, transparent) 0deg 60deg, transparent 60deg);
+  -webkit-mask: radial-gradient(circle, #000 25%, transparent 72%);
+  mask: radial-gradient(circle, #000 25%, transparent 72%);
+}
+.pin-cone i::after {
+  content: ''; position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--gold); border: 1px solid #fbf8f0;
+}
+.tip-thumb { display: block; width: 160px; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; margin-bottom: 0.3rem; }
+.siblings { margin: 0.2rem 0 0; }
+.siblings button.link { padding: 0.2rem 0.3rem; }
