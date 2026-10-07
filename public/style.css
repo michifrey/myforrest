@@ -860,3 +860,39 @@ summary { cursor: pointer; color: var(--muted); font-weight: 600; font-size: 0.9
   background: #fff; border: 5px solid #9aa; box-shadow: 0 0 0 3px #fff;
 }
 .shutter:active { transform: scale(0.94); }
+
+/* ---------- Species & neophytes map mode (hotspots.js) ---------- */
+:root { --kde-lo: #e4d4f7; --kde-hi: #3f1a78; }
+@media (prefers-color-scheme: dark) {
+  :root { --kde-lo: #3a2462; --kde-hi: #ead9ff; }
+}
+.species-btn svg { stroke: var(--neo); fill: none; }
+.species-btn svg path:first-child { fill: color-mix(in srgb, var(--neo) 25%, transparent); }
+.species-btn[aria-expanded="true"] svg path:first-child { fill: none; }
+.kde-canvas { pointer-events: none; }
+.sp-tabs { display: flex; gap: 0.3rem; margin-top: 0.9rem; padding: 0.25rem; background: var(--surface-2); border-radius: 999px; border: 1px solid var(--border); }
+.sp-tabs button { flex: 1; border: none; background: transparent; padding: 0.45rem 0.6rem; font-size: 0.85rem; }
+.sp-tabs button[aria-selected="true"] { background: var(--surface); box-shadow: var(--shadow); color: var(--text); }
+.sp-row { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.8rem; }
+.sp-row select { flex: 1; min-width: 0; }
+.sp-score { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.sp-score input { width: 4.2rem; }
+.sp-out { font: 500 1.05rem/1 var(--font-display); min-width: 3.6rem; text-align: right; font-variant-numeric: tabular-nums; }
+#sp-bw, #sp-year { accent-color: var(--neo); }
+.sp-legend { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.7rem; color: var(--muted); }
+.sp-ramp { flex: 1; height: 10px; border-radius: 999px; border: 1px solid var(--border); }
+.sp-empty { grid-column: 1 / -1; margin: 0; }
+.sp-rate { display: flex; flex-direction: column; gap: 0.2rem; margin: 0.9rem 0 0; }
+.sp-rate b { font: 500 1.3rem/1.25 var(--font-display); }
+.sp-years table { width: 100%; border-collapse: collapse; margin-top: 0.7rem; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.sp-years th { text-align: right; color: var(--muted); font-weight: 600; font-size: 0.72rem; padding: 0.2rem 0.35rem; }
+.sp-years td { text-align: right; padding: 0.3rem 0.35rem; border-top: 1px solid var(--border); }
+.sp-years th:nth-child(-n+2), .sp-years td:nth-child(-n+2) { text-align: left; }
+.sp-years tbody tr { cursor: pointer; }
+.sp-years tr.current td { font-weight: 700; background: color-mix(in srgb, var(--neo) 10%, transparent); }
+.sp-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; }
+.sp-checks { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.6rem; font-size: 0.88rem; }
+.sp-dates { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.6rem; font-size: 0.85rem; }
+.sp-dates label { display: inline-flex; align-items: center; gap: 0.3rem; }
+.sp-downloads { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.4rem; }
+.leaflet-interactive.sp-point { filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.35)); }

@@ -839,6 +839,8 @@ function createApp({
     }
   });
 
+  require('./routes/species')(app, { db, spotRadiusM });
+
   app.use('/api', (req, res) => res.status(404).json({ error: 'Nicht gefunden' }));
 
   // eslint-disable-next-line no-unused-vars

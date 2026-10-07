@@ -95,6 +95,10 @@
         <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.6"/><path d="M10 1.5v2.4M10 16.1v2.4M1.5 10h2.4M16.1 10h2.4M4 4l1.7 1.7M14.3 14.3 16 16M4 16l1.7-1.7M14.3 5.7 16 4"/></svg>
         Sonne &amp; Wetter
       </button>
+      <button type="button" id="species-toggle" class="pill-btn species-btn" aria-expanded="false" aria-controls="speciespanel">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16C4 9 8 4.5 16 4c.4 7.5-4.2 12-12 12zM4 16l7-7"/></svg>
+        Arten &amp; Neophyten
+      </button>
       <div class="legend">
         <span><i class="dot ok"></i>Spot</span>
         <span><i class="dot damage"></i>Schäden</span>
@@ -128,6 +132,7 @@
       <div id="sun-charts"></div>
       <p id="sun-source" class="wx-source"></p>
     </section>
+    <section id="speciespanel" class="sunpanel sppanel" hidden aria-labelledby="sp-title"></section>
 
     <div id="pick-hint" class="pick-hint" hidden>Klicke auf die Karte, um den Standort zu wählen · <button id="pick-cancel" class="link">Abbrechen</button></div>
 
@@ -395,6 +400,7 @@
   <script src="sun.js"></script>
   <script src="forest.js"></script>
   <script src="app.js"></script>
+  <script src="hotspots.js"></script>
   <script src="sunmap.js"></script>
 </body>
 </html>
