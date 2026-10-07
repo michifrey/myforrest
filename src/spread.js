@@ -4,9 +4,13 @@
  * Spread fronts (Ausbreitungsfronten) of one species.
  *
  * Occupied area per year: all findings up to and including that year
- * (cumulative), each widened by a buffer (default 25 m, about the spot radius),
- * enclosed by their convex hull. Hulls of consecutive years are therefore
- * nested and show how the occupied area grows.
+ * (cumulative), each widened by a buffer (default 25 m, about the spot radius).
+ * The outline is an alpha shape (alphashape.js): concave, split into
+ * separate patches where findings lie more than 2α apart, with holes where
+ * nothing grows. α defaults to 2.5 times the 90th percentile of the
+ * distances between neighbouring findings; `alpha: null` gives the convex hull instead. All
+ * years share one raster frame and α, so their shapes are nested and show
+ * how the occupied area grows.
  *
  * Spread rate (method, also returned as text):
  *  1. Origin O = centroid of the findings of the first year.
@@ -26,6 +30,7 @@ const M_PER_DEG_LAT = 110540;
 const M_PER_DEG_LON = 111320;
 const COMPASS8 = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'];
 const BUFFER_SAMPLES = 16;
+const { alphaShape, createFrame, autoAlpha } = require('./alphashape');
 
 function projection(points) {
   const lat0 = points.reduce((s, p) => s + p.lat, 0) / points.length;
@@ -102,9 +107,9 @@ const roundRate = (v) => (v < 100 ? Math.round(v / 5) * 5 : Math.round(v / 10) *
  * Spread analysis for a list of occurrences of one species
  * ({ lat, lon, takenAt } each). Returns per-year hulls and the rate estimate.
  */
-function spreadFronts(occurrences, { buffer = 25 } = {}) {
+function spreadFronts(occurrences, { buffer = 25, alpha = 'auto' } = {}) {
   const pts = occurrences.filter((o) => Number.isFinite(o.lat) && Number.isFinite(o.lon) && Number.isFinite(o.takenAt));
-  if (!pts.length) return { years: [], rate: null, origin: null, method: METHOD };
+  if (!pts.length) return { years: [], rate: null, origin: null, shape: alpha === null ? 'convex' : 'alpha', method: methodText(alpha === null) };
   const proj = projection(pts);
   const yearOf = (o) => new Date(o.takenAt).getUTCFullYear();
   const yearList = [...new Set(pts.map(yearOf))].sort((a, b) => a - b);
@@ -113,6 +118,10 @@ function spreadFronts(occurrences, { buffer = 25 } = {}) {
   const firstXY = pts.filter((o) => yearOf(o) === yearList[0]).map((o) => xyOf.get(o));
   const origin = [firstXY.reduce((s, p) => s + p[0], 0) / firstXY.length, firstXY.reduce((s, p) => s + p[1], 0) / firstXY.length];
   const dist = ([x, y]) => Math.hypot(x - origin[0], y - origin[1]);
+  const allXY = pts.map((o) => xyOf.get(o));
+  const alphaM = alpha === null ? null : (alpha === 'auto' ? autoAlpha(allXY, buffer) : alpha);
+  const frame = alphaM === null ? null : createFrame(allXY, { alpha: alphaM, buffer });
+  const toLatLon = (p) => proj.toLatLon(p).map((v) => Math.round(v * 1e6) / 1e6);
 
   const years = [];
   const pushVectors = [];
@@ -121,6 +130,7 @@ function spreadFronts(occurrences, { buffer = 25 } = {}) {
     const cumulative = pts.filter((o) => yearOf(o) <= year).map((o) => xyOf.get(o));
     const fresh = pts.filter((o) => yearOf(o) === year);
     const hull = bufferedHull(cumulative, buffer);
+    const shape = frame ? alphaShape(cumulative, frame) : null;
     const radius = Math.max(...cumulative.map(dist));
     if (prevRadius !== null) {
       for (const o of fresh) {
@@ -133,9 +143,13 @@ function spreadFronts(occurrences, { buffer = 25 } = {}) {
       year,
       count: fresh.length,
       cumulativeCount: cumulative.length,
-      areaM2: Math.round(polygonArea(hull)),
+      areaM2: shape ? shape.areaM2 : Math.round(polygonArea(hull)),
+      convexAreaM2: Math.round(polygonArea(hull)),
+      patches: shape ? shape.patches : 1,
       frontRadiusM: Math.round(radius),
-      hull: hull.map((p) => proj.toLatLon(p).map((v) => Math.round(v * 1e6) / 1e6)),
+      hull: hull.map(toLatLon),
+      // Polygons as [outer, ...holes] (Leaflet's multipolygon nesting); the convex hull when α is off.
+      polygons: shape ? shape.polygons.map((poly) => poly.map((ring) => ring.map(toLatLon))) : [[hull.map(toLatLon)]],
     });
     prevRadius = radius;
   }
@@ -173,14 +187,20 @@ function spreadFronts(occurrences, { buffer = 25 } = {}) {
   return {
     origin: proj.toLatLon(origin).map((v) => Math.round(v * 1e6) / 1e6),
     bufferM: buffer,
+    shape: frame ? 'alpha' : 'convex',
+    alphaM,
     years,
     rate: rate && { ...rate, areaM2PerYear: areaGrowth },
     text: rate ? rate.text : `Funde aus nur einem Jahr (${yearList[0]}) – Ausbreitung noch nicht abschätzbar`,
-    method: METHOD,
+    method: methodText(!frame),
   };
 }
 
-const METHOD = 'Fläche je Jahr: konvexe Hülle aller Funde bis zu diesem Jahr, jeder Fund um den Puffer erweitert. '
+const methodText = (convex) => (convex
+  ? 'Fläche je Jahr: konvexe Hülle aller Funde bis zu diesem Jahr, jeder Fund um den Puffer erweitert. '
+  : 'Fläche je Jahr: Alpha-Shape aller Funde bis zu diesem Jahr (alles, was kein fundfreier Kreis mit Radius α '
+    + 'erreicht), jeder Fund um den Puffer erweitert; Funde, die mehr als 2α auseinanderliegen, bilden eigene '
+    + 'Teilbestände, fundfreie Flächen breiter als 2α bleiben Lücken. ')
   + 'Rate: Steigung (kleinste Quadrate) des Abstands vom Schwerpunkt der Erstfunde zum jeweils entferntesten Fund. '
   + 'Richtung: gewichtetes Mittel der Funde, die die Front nach aussen geschoben haben.';
 

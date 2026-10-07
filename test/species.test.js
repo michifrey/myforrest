@@ -196,3 +196,62 @@ test('spread and CSV helpers', () => {
   assert.equal(csvField('-x'), "'-x");
   assert.equal(csvField('a,b'), '"a,b"');
 });
+
+test('alpha shapes: separate patches, holes, nesting, and the convex limit', () => {
+  const { alphaShape, createFrame, autoAlpha, distanceTransform } = require('../src/alphashape');
+  // Exact distance transform on a tiny grid.
+  const f = new Uint8Array(25); f[12] = 1;
+  const d = distanceTransform(f, 5, 5);
+  assert.deepEqual([d[12], d[13], d[18], d[0]], [0, 1, 2, 8]);
+
+  // Two clusters 2 km apart stay two patches; together they are far smaller than their convex hull.
+  const line = (x0) => Array.from({ length: 20 }, (_, i) => [x0 + i * 10, 0]);
+  const two = [...line(0), ...line(2000)];
+  const s = alphaShape(two, createFrame(two, { alpha: 60, buffer: 25 }));
+  assert.equal(s.patches, 2);
+  const expected = 2 * (190 * 50 + Math.PI * 25 * 25);
+  assert.ok(Math.abs(s.areaM2 - expected) / expected < 0.25, `area ${s.areaM2} vs ${Math.round(expected)}`);
+
+  // Findings around a pond: a ring with a hole, unless α is wider than the pond.
+  const ring = Array.from({ length: 72 }, (_, k) => [500 * Math.cos((k * Math.PI) / 36), 500 * Math.sin((k * Math.PI) / 36)]);
+  const r = alphaShape(ring, createFrame(ring, { alpha: 80, buffer: 25 }));
+  assert.deepEqual([r.patches, r.polygons[0].length], [1, 2], 'outer ring plus one hole');
+  const annulus = Math.PI * (525 ** 2 - 475 ** 2);
+  assert.ok(Math.abs(r.areaM2 - annulus) / annulus < 0.1, `annulus ${r.areaM2} vs ${Math.round(annulus)}`);
+  const full = alphaShape(ring, createFrame(ring, { alpha: 5000, buffer: 25 }));
+  assert.deepEqual([full.patches, full.polygons[0].length], [1, 1], 'large α closes the hole');
+  assert.ok(Math.abs(full.areaM2 - Math.PI * 525 ** 2) / (Math.PI * 525 ** 2) < 0.05);
+
+  // Shapes in one frame grow with the point set (nesting), outer rings run counter-clockwise.
+  const frame = createFrame(two, { alpha: 60, buffer: 25 });
+  assert.ok(alphaShape(line(0), frame).areaM2 < s.areaM2);
+  const outer = s.polygons[0][0];
+  let a2 = 0;
+  for (let i = 0; i < outer.length; i++) a2 += outer[i][0] * outer[(i + 1) % outer.length][1] - outer[(i + 1) % outer.length][0] * outer[i][1];
+  assert.ok(a2 > 0);
+
+  // Automatic α: 2.5 times the 90th percentile of neighbour distances, at least twice the buffer.
+  assert.equal(autoAlpha(line(0), 25), 50);
+  assert.equal(autoAlpha(Array.from({ length: 10 }, (_, i) => [i * 40, 0]), 25), 100);
+});
+
+test('spread fronts use alpha shapes by default, the convex hull on request', async () => {
+  await withServer(async (base, db) => {
+    seed(db);
+    const alpha = await (await fetch(`${base}/api/spread?species=Impatiens%20glandulifera`)).json();
+    assert.equal(alpha.shape, 'alpha');
+    assert.ok(alpha.alphaM >= 50);
+    for (const y of alpha.years) {
+      assert.ok(y.areaM2 <= y.convexAreaM2 * 1.1, `${y.year}: alpha ${y.areaM2} vs convex ${y.convexAreaM2}`);
+      assert.ok(y.polygons.length === y.patches && y.patches >= 1);
+      assert.ok(y.polygons[0][0].length >= 3 && y.polygons[0][0][0].length === 2);
+    }
+    const tight = await (await fetch(`${base}/api/spread?species=Impatiens%20glandulifera&alpha=30`)).json();
+    assert.ok(tight.years.at(-1).patches > 1, 'a small α splits the findings into patches');
+    const convex = await (await fetch(`${base}/api/spread?species=Impatiens%20glandulifera&shape=convex`)).json();
+    assert.equal(convex.shape, 'convex');
+    assert.deepEqual(convex.years.map((y) => y.areaM2), convex.years.map((y) => y.convexAreaM2));
+    assert.match(convex.method, /konvexe Hülle/);
+    assert.equal((await fetch(`${base}/api/spread?species=Impatiens%20glandulifera&alpha=2`)).status, 400);
+  });
+});
