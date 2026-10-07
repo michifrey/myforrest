@@ -535,6 +535,12 @@ input[type="checkbox"] { accent-color: var(--accent); width: 1.05rem; height: 1.
 .ident li { margin: 0.2rem 0; }
 .ident .neo { color: var(--neo); font-weight: 700; }
 
+/* ---------- Spot elevation ---------- */
+.elev { display: flex; align-items: center; flex-wrap: wrap; gap: 0.2rem 0.5rem; margin-top: 0.35rem; font-size: 0.85rem; color: var(--muted); }
+.elev svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; vertical-align: -2px; margin-right: 0.3rem; }
+.elev-form { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; width: 100%; }
+.elev-form input { width: 7rem; }
+
 /* ---------- Tree species ---------- */
 .species { margin-top: 0.9rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
 .species summary {

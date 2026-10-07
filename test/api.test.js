@@ -311,3 +311,44 @@ test('tree species are recorded per spot, manually or from plant identification'
     assert.deepEqual(spot.species.map((s) => s.name), ['Fichte']);
   });
 });
+
+test('spot elevation comes from the terrain model, GPS altitude or by hand', async () => {
+  const blob = (name) => new Blob([fs.readFileSync(path.join(__dirname, 'fixtures', name))], { type: 'image/jpeg' });
+  const calls = [];
+  const dem = async (url) => {
+    calls.push(url);
+    if (url.includes('/v1/elevation')) return new Response(JSON.stringify({ elevation: [1012.4] }));
+    return new Response('offline', { status: 503 });
+  };
+  await withServer({ weatherFetch: dem }, async (base) => {
+    const p = (await (await upload(base, [['gps.jpg', fixture('gps.jpg')]])).json()).created[0];
+    await fetch(`${base}/api/photos/${p.id}/context`);
+    let spot = await (await fetch(`${base}/api/spots/${p.spotId}`)).json();
+    assert.deepEqual([spot.elevation, spot.elevationSource, spot.colourShiftDays], [1012, 'dem', -15]);
+    assert.ok(calls.some((u) => u.includes('latitude=47.3750')));
+
+    await fetch(`${base}/api/spots/${p.spotId}/species`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scientificName: 'Fagus sylvatica' }),
+    });
+    spot = await (await fetch(`${base}/api/spots/${p.spotId}`)).json();
+    assert.equal(spot.species[0].colourDoy - spot.species[0].colourDoyHere, 15);
+
+    let res = await fetch(`${base}/api/spots/${p.spotId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ elevation: 640 }),
+    });
+    spot = await res.json();
+    assert.deepEqual([spot.elevation, spot.elevationSource], [640, 'manual']);
+    res = await fetch(`${base}/api/spots/${p.spotId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ elevation: 'hoch' }),
+    });
+    assert.equal(res.status, 400);
+  });
+
+  // Without the terrain service the photos' GPS altitude is used.
+  await withServer({}, async (base) => {
+    const p = (await (await upload(base, [['alt.jpg', blob('gps-alt.jpg')]])).json()).created[0];
+    await fetch(`${base}/api/photos/${p.id}/context`);
+    const spot = await (await fetch(`${base}/api/spots/${p.spotId}`)).json();
+    assert.deepEqual([spot.elevation, spot.elevationSource], [949, 'gps']);
+  });
+});

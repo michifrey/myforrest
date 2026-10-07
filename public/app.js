@@ -276,6 +276,7 @@ async function openSpot(id, photoId) {
   updateSpotChange(state.spot);
   renderChronicle(state.spot);
   renderSpecies(state.spot);
+  renderElevation(state.spot);
   map.setView([state.spot.lat, state.spot.lon], Math.max(map.getZoom(), 15));
 }
 
@@ -335,6 +336,57 @@ const TREE_ICONS = {
 const DROUGHT = { hoch: 'hoch', mittel: 'mittel', gering: 'gering' };
 const fmtDoy = (d) => new Date(Date.UTC(2023, 0, 1 + d)).toLocaleDateString('de-CH', { day: '2-digit', month: 'long', timeZone: 'UTC' });
 
+function colourText(t, spot) {
+  const lowland = `~${fmtDoy(t.colourDoy)}`;
+  if (t.colourDoyHere === null || t.colourDoyHere === t.colourDoy) return `Färbung typisch ab ${lowland} (Flachland)`;
+  return `Färbung hier (${Math.round(spot.elevation)} m) typisch ab ~${fmtDoy(t.colourDoyHere)}; im Flachland ab ${lowland}`;
+}
+
+const ELEV_SOURCE = { dem: 'Höhenmodell', gps: 'GPS der Fotos', manual: 'manuell' };
+const MOUNTAIN_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 14 6 5l3 5 2-3 4 7z"/></svg>';
+
+function renderElevation(spot) {
+  const text = $('spot-elev-text');
+  text.innerHTML = MOUNTAIN_ICON;
+  if (spot.elevation === null) {
+    text.append('Höhe unbekannt – Herbstfärbung wird für das Flachland bewertet');
+  } else {
+    const shift = spot.colourShiftDays;
+    text.append(`${Math.round(spot.elevation)} m ü. M. (${ELEV_SOURCE[spot.elevationSource] || 'unbekannt'})` +
+      (shift ? ` · Herbstfärbung ~${Math.abs(shift)} ${Math.abs(shift) === 1 ? 'Tag' : 'Tage'} ${shift < 0 ? 'früher' : 'später'} als im Flachland` : ''));
+  }
+  $('spot-elev-form').hidden = true;
+  $('spot-elev-edit').hidden = false;
+  $('spot-elev-input').value = spot.elevation ?? '';
+}
+
+async function saveElevation(elevation) {
+  const current = state.spot.photos[state.index].id;
+  await api(`/api/spots/${state.spot.id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ elevation }),
+  });
+  await Promise.all([openSpot(state.spot.id, current), loadSpots()]);
+}
+
+$('spot-elev-edit').addEventListener('click', () => {
+  $('spot-elev-form').hidden = false;
+  $('spot-elev-edit').hidden = true;
+  $('spot-elev-input').focus();
+});
+$('spot-elev-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const value = Number($('spot-elev-input').value);
+  if ($('spot-elev-input').value === '' || !Number.isFinite(value)) return;
+  try {
+    await saveElevation(value);
+  } catch (err) {
+    alert(err.message);
+  }
+});
+$('spot-elev-auto').addEventListener('click', () => saveElevation(null).catch((err) => alert(err.message)));
+
 function treeChip(t) {
   const chip = el('span', { class: `tree-chip ${t.group}${t.invasive ? ' invasive' : ''}`, title: t.scientificName });
   chip.innerHTML = TREE_ICONS[t.group];
@@ -357,7 +409,7 @@ function renderSpecies(spot) {
     ]),
     el('dl', {}, [
       el('dt', { text: 'Herbst' }),
-      el('dd', { text: t.evergreen ? 'immergrün – Verfärbung ist ein Warnsignal' : `Färbung typisch ab ~${fmtDoy(t.colourDoy)} (Flachland)` }),
+      el('dd', { text: t.evergreen ? 'immergrün – Verfärbung ist ein Warnsignal' : colourText(t, spot) }),
       el('dt', { text: 'Trockenheit' }),
       el('dd', { text: `Empfindlichkeit ${DROUGHT[t.drought]}` }),
       ...(t.threats.length ? [el('dt', { text: 'Achten auf' }), el('dd', { text: t.threats.join(', ') })] : []),
@@ -640,6 +692,15 @@ async function renderContext(photo) {
   if (token !== contextToken || !state.spot) return;
   photo.context = ctx;
   renderChronicle(state.spot);
+  if (state.spot.elevation === null) {
+    // The first context lookup also determines the spot's elevation.
+    const fresh = await api(`/api/spots/${state.spot.id}`).catch(() => null);
+    if (fresh && fresh.elevation !== null && state.spot?.id === fresh.id) {
+      Object.assign(state.spot, { elevation: fresh.elevation, elevationSource: fresh.elevationSource, colourShiftDays: fresh.colourShiftDays, species: fresh.species });
+      renderElevation(state.spot);
+      renderSpecies(state.spot);
+    }
+  }
 
   const parts = [];
   const w = ctx.weather?.last90;

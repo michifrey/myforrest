@@ -27,8 +27,10 @@ function doy(t) {
 /** Weather grid cell (~10 km): nearby spots share cached data. */
 const cell = (lat, lon) => `${lat.toFixed(1)},${lon.toFixed(1)}`;
 
-async function fetchDaily(lat, lon, start, end, fetchImpl) {
+async function fetchDaily(lat, lon, start, end, fetchImpl, elevation = null) {
+  // With `elevation`, Open-Meteo downscales temperatures to the spot's altitude.
   const url = `${ARCHIVE}?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}` +
+    (Number.isFinite(elevation) ? `&elevation=${Math.round(elevation)}` : '') +
     `&start_date=${start}&end_date=${end}&daily=${DAILY}&timezone=UTC`;
   const res = await fetchImpl(url, { signal: AbortSignal.timeout(30000) });
   if (!res.ok) throw new Error(`Open-Meteo antwortete mit HTTP ${res.status}`);
@@ -65,22 +67,24 @@ function createWeather({ db, fetchImpl = fetch, now = () => Date.now() }) {
     return value;
   }
 
-  const normals = (lat, lon) => cached(`normal:${cell(lat, lon)}`, Infinity, async () =>
-    climatology(await fetchDaily(lat, lon, `${NORMAL_FROM}-01-01`, `${NORMAL_TO}-12-31`, fetchImpl)));
+  // Spots in one grid cell share data unless their altitude differs by more than ~100 m.
+  const place = (lat, lon, elevation) => `${cell(lat, lon)}${Number.isFinite(elevation) ? `@${Math.round(elevation / 100) * 100}` : ''}`;
+  const normals = (lat, lon, elevation) => cached(`normal:${place(lat, lon, elevation)}`, Infinity, async () =>
+    climatology(await fetchDaily(lat, lon, `${NORMAL_FROM}-01-01`, `${NORMAL_TO}-12-31`, fetchImpl, elevation)));
 
   /**
    * Weather before `date` at (lat, lon): last 90 days, year to date and the
    * last 12 months by month, each against the 1991–2020 normal.
    */
-  async function context(lat, lon, date) {
+  async function context(lat, lon, date, { elevation = null } = {}) {
     // Whole days in UTC: the archive's daily values start at midnight.
     const end = Math.floor(Math.min(date, now() - ARCHIVE_DELAY_DAYS * DAY) / DAY) * DAY;
     const start = end - 364 * DAY;
     const fresh = now() - end < 30 * DAY; // recent data may still be revised
     const [norm, days] = await Promise.all([
-      normals(lat, lon),
-      cached(`obs:${cell(lat, lon)}:${isoDay(start)}:${isoDay(end)}`, fresh ? DAY : Infinity,
-        () => fetchDaily(lat, lon, isoDay(start), isoDay(end), fetchImpl)),
+      normals(lat, lon, elevation),
+      cached(`obs:${place(lat, lon, elevation)}:${isoDay(start)}:${isoDay(end)}`, fresh ? DAY : Infinity,
+        () => fetchDaily(lat, lon, isoDay(start), isoDay(end), fetchImpl, elevation)),
     ]);
     if (!days.length) throw new Error('Keine Wetterdaten für diesen Zeitraum');
 
@@ -113,6 +117,7 @@ function createWeather({ db, fetchImpl = fetch, now = () => Date.now() }) {
     const yearStart = Date.UTC(new Date(end).getUTCFullYear(), 0, 1);
     return {
       cell: cell(lat, lon),
+      elevation: Number.isFinite(elevation) ? Math.round(elevation) : null,
       until: isoDay(end),
       last90: window(end - 89 * DAY),
       yearToDate: window(yearStart),

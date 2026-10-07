@@ -8,6 +8,7 @@
  */
 
 const { doy } = require('./weather');
+const { altitudeShift, expectedColourDoy } = require('./phenology');
 
 // Natural autumn colouring of beech, oak and maple in the Central European
 // lowlands usually starts in the second half of September.
@@ -28,7 +29,7 @@ const names = (list) => list.map((t) => t.de).join(', ');
  * they set the expected start of autumn colouring and add species-specific
  * risks (bark beetle on drought-stressed spruce, ash dieback, ...).
  */
-function assess({ takenAt, tags = [], change = null, weather = null, species = [] }) {
+function assess({ takenAt, tags = [], change = null, weather = null, species = [], elevation = null }) {
   const out = [];
   const w = weather?.last90;
   const colouredRegion = (change?.summary || []).find((s) => s.class === 'verfaerbung' && s.area >= 0.02);
@@ -97,17 +98,24 @@ function assess({ takenAt, tags = [], change = null, weather = null, species = [
     });
   }
 
-  const autumnStart = deciduous.length ? Math.min(...deciduous.map((t) => t.colourDoy)) : AUTUMN_START_DOY;
+  // Expected start of colouring at this spot: earliest colouring species, shifted for altitude.
+  const shift = altitudeShift(elevation);
+  const autumnStart = deciduous.length
+    ? Math.min(...deciduous.map((t) => expectedColourDoy(t.colourDoy, elevation)))
+    : AUTUMN_START_DOY + shift;
   const veryEarly = autumnStart - (AUTUMN_START_DOY - VERY_EARLY_DOY);
   const deciduousCanColour = !species.length || deciduous.length;
   if ((coloured || taggedColouring) && deciduousCanColour && day >= SEASON_START_DOY && day < autumnStart) {
     const source = coloured
       ? `Auf ${pct(coloured.area)} der Ansicht hat sich das Laub gegenüber dem ersten Foto gelb oder braun verfärbt`
       : 'Laubverfärbung beobachtet';
-    const first = deciduous.find((t) => t.colourDoy === autumnStart);
+    const first = deciduous.find((t) => expectedColourDoy(t.colourDoy, elevation) === autumnStart);
+    const where = Number.isFinite(elevation) && shift !== 0
+      ? `auf ${Math.round(elevation)} m ü. M. (${Math.abs(shift)} ${Math.abs(shift) === 1 ? 'Tag' : 'Tage'} ${shift < 0 ? 'früher' : 'später'} als im Flachland)`
+      : 'im Flachland';
     const reference = first
-      ? `Bei ${first.de} beginnt die Herbstfärbung im Flachland typischerweise um den ${fmtDoy(autumnStart)}.`
-      : 'Die natürliche Herbstfärbung beginnt im Flachland meist erst in der zweiten Septemberhälfte.';
+      ? `Bei ${first.de} beginnt die Herbstfärbung ${where} typischerweise um den ${fmtDoy(autumnStart)}`
+      : `Die natürliche Herbstfärbung beginnt ${where} meist erst um den ${fmtDoy(autumnStart)}`; // date ends with ".
     let cause;
     if (dry || hot) {
       const reasons = [dry && `Trockenheit (${pct(w.precipRatio)} Niederschlag in 90 Tagen)`, hot && `Wärme (${signed(w.tempAnomaly)})`].filter(Boolean);

@@ -64,6 +64,9 @@ const MIGRATIONS = [
   ['photos', 'align_inliers', 'INTEGER'],
   ['photos', 'change_json', 'TEXT'], // classified change against the spot's first aligned photo
   ['photos', 'context_json', 'TEXT'], // weather context and irregularities at capture time
+  ['photos', 'altitude', 'REAL'], // GPS altitude from EXIF (m)
+  ['spots', 'elevation', 'REAL'], // terrain elevation (m a.s.l.)
+  ['spots', 'elevation_source', 'TEXT'], // 'dem' | 'gps' | 'manual'
 ];
 
 function openDb(file) {

@@ -138,6 +138,11 @@ den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen und eine Notiz.
   - Verfärbte immergrüne Nadelbäume gelten immer als Warnsignal.
   - Fichte bei Trockenheit oder Hitze löst eine Borkenkäfer-Warnung mit Prüfhinweisen aus.
   - Bei Esche mit Auflichtung oder Verfärbung erscheint ein Hinweis auf das Eschentriebsterben.
+- **Höhenlage**: Jeder Spot erhält seine Höhe über Meer. Sie kommt aus dem Copernicus-Höhenmodell (über
+  Open-Meteo), ersatzweise aus der GPS-Höhe der Fotos, oder wird von Hand eingetragen. Pro 100 m über dem
+  Flachland (~400 m) beginnt die Herbstfärbung rund 2,5 Tage früher; die Bewertung „frühe Verfärbung“ und die
+  Steckbriefe rechnen damit. Bei Rotbuche auf 1000 m ist das etwa der 15. statt der 30. September.
+  Auch die Wetterdaten werden auf die Höhe des Spots heruntergerechnet.
 - **Drei Wege, Fotos zu verorten**:
   1. **GPS aus dem Foto** (EXIF), wie bei normalen Handyfotos.
   2. **Automatisch über einen GPX-Track**: Eine Action-Cam im Intervallmodus (z. B. alle 5 s) beim
@@ -190,6 +195,8 @@ src/classify.js      Einordnung der veränderten Regionen
 src/weather.js       Wetterdaten und Mittel 1991–2020 von Open-Meteo (mit Cache)
 src/irregularities.js  Auffälligkeiten (Trockenheit, Wärme, frühe Laubverfärbung …)
 src/trees.js         Waldbaumarten mit Phänologie, Trockenheitsempfindlichkeit und Gefahren
+src/phenology.js     Höhenkorrektur für den Beginn der Herbstfärbung
+src/elevation.js     Geländehöhe eines Spots (Copernicus-DEM über Open-Meteo, mit Cache)
 src/exif.js          Aufnahmezeit, GPS und Blickrichtung aus den Bilddaten
 src/gpx.js           GPX-Parser
 src/geo.js           Distanzen und Interpolation auf dem Track
@@ -211,6 +218,7 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
 | `GET`    | `/api/photos/:id/change?to=` | Veränderte Fläche zwischen zwei ausgerichteten Fotos, mit eingeordneten Regionen |
 | `GET`    | `/api/photos/:id/change.png?to=` | Heatmap der Veränderung (PNG, in der Ansicht des ersten Fotos) |
 | `GET`    | `/api/trees`                 | Liste der unterstützten Baumarten mit Steckbrief         |
+| `PATCH`  | `/api/spots/:id`             | Höhe von Hand setzen (`{ elevation: 950 }`) oder mit `null` neu ermitteln |
 | `POST`   | `/api/spots/:id/species`     | Baumart einem Spot zuordnen (`{ scientificName }`)       |
 | `DELETE` | `/api/spots/:id/species?name=` | Baumart vom Spot entfernen                             |
 | `GET`    | `/api/photos/:id/context`    | Wetter-Kontext und Auffälligkeiten (wird beim ersten Abruf berechnet und gespeichert) |
@@ -234,7 +242,8 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
 - Einordnung lernen statt Regeln: aus den bestätigten Tags ein Modell trainieren; Baumarten auch ohne
   Pl@ntNet direkt im Bild erkennen (z. B. Nadel-/Laubholzanteil pro Region) und Verfärbungen der
   richtigen Art zuordnen.
-- Phänologie nach Höhenlage korrigieren (Herbstfärbung beginnt pro 100 m Höhe etwa 2–3 Tage früher).
+- Phänologie verfeinern: Exposition (Süd-/Nordhang) und regionale Beobachtungsreihen (MeteoSchweiz/DWD)
+  statt eines pauschalen Höhengradienten.
 - Sturmereignisse aus Winddaten (Böen) mit Windwurf-Funden verknüpfen; Phänologie-Daten
   (z. B. MeteoSchweiz/DWD) als Referenz für den Beginn der Herbstfärbung pro Region und Höhenlage.
 - Vegetationsdichte: Grünanteil und Kronendach-Deckung aus den Bildern schätzen und als Zeitreihe
@@ -250,7 +259,7 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
   Kameramodell). Vor einem öffentlichen Betrieb sollten Metadaten entfernt und Personen sowie
   Kennzeichen automatisch verpixelt werden.
 - Wetterdaten von [Open-Meteo.com](https://open-meteo.com) (ERA5-Reanalyse, CC BY 4.0). Der Server braucht
-  dafür Internetzugang zu `archive-api.open-meteo.com`. Die Daten werden pro ~10-km-Zelle gecacht; die
+  dafür Internetzugang zu `archive-api.open-meteo.com` und, für die Geländehöhe, zu `api.open-meteo.com`. Die Daten werden pro ~10-km-Zelle gecacht; die
   Normalwerte 1991–2020 werden nur einmal pro Zelle geladen.
 - Kartendaten © OpenStreetMap-Mitwirkende. Bei stärkerer Nutzung braucht es einen eigenen
   Tile-Anbieter (siehe Tile Usage Policy).

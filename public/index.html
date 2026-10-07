@@ -117,6 +117,17 @@
           <p class="eyebrow">Spot</p>
           <h2 id="spot-title"></h2>
           <p id="spot-meta" class="muted"></p>
+          <div class="elev" id="spot-elev">
+            <span id="spot-elev-text"></span>
+            <button type="button" id="spot-elev-edit" class="link small">ändern</button>
+            <form id="spot-elev-form" class="elev-form" hidden>
+              <label class="sr-only" for="spot-elev-input">Höhe in Metern über Meer</label>
+              <input id="spot-elev-input" type="number" min="-400" max="4800" step="1" inputmode="numeric" placeholder="z. B. 950">
+              <span class="muted small">m ü. M.</span>
+              <button type="submit" class="secondary">Speichern</button>
+              <button type="button" id="spot-elev-auto" class="link small">automatisch</button>
+            </form>
+          </div>
           <p id="spot-change" class="change-badge" hidden></p>
           <div id="spot-tags" class="chips"></div>
           <details class="species" id="species-box">

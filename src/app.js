@@ -21,6 +21,8 @@ const { classifyChange } = require('./classify');
 const { createWeather } = require('./weather');
 const { assess } = require('./irregularities');
 const { TREES, treeInfo, treeJson } = require('./trees');
+const { createElevation } = require('./elevation');
+const { altitudeShift, expectedColourDoy } = require('./phenology');
 
 const ACTIVITIES = ['joggen', 'wandern', 'biken', 'sonstiges'];
 const NEOPHYTE_MIN_SCORE = 0.3;
@@ -39,6 +41,7 @@ function createApp({
   fs.mkdirSync(tmpDir, { recursive: true });
   const db = openDb(path.join(dataDir, 'myforrest.db'));
   const weather = createWeather({ db, fetchImpl: weatherFetch });
+  const elevationService = createElevation({ db, fetchImpl: weatherFetch });
 
   const upload = multer({
     dest: tmpDir,
@@ -186,10 +189,17 @@ function createApp({
   /** Tree species known at a spot, merged across sources (manual and Pl@ntNet). */
   function spotSpecies(spotId) {
     const merged = new Map();
+    const { elevation } = db.prepare('SELECT elevation FROM spots WHERE id = ?').get(spotId) || {};
     for (const r of speciesRows.all(spotId)) {
       const t = treeInfo(r.scientific_name);
       if (!t) continue;
-      const e = merged.get(t.sci) || { ...treeJson(t), sources: [], score: null };
+      const e = merged.get(t.sci) || {
+        ...treeJson(t),
+        // Expected start of colouring at this spot's altitude.
+        colourDoyHere: expectedColourDoy(t.colourDoy, elevation),
+        sources: [],
+        score: null,
+      };
       e.sources.push(r.source);
       if (r.score !== null) e.score = Math.max(e.score ?? 0, r.score);
       merged.set(t.sci, e);
@@ -204,12 +214,41 @@ function createApp({
     DO UPDATE SET score = MAX(COALESCE(score, 0), COALESCE(excluded.score, 0)), photo_id = excluded.photo_id
   `);
 
+  const spotElevation = (spotId) => db.prepare('SELECT elevation FROM spots WHERE id = ?').get(spotId)?.elevation ?? null;
+
+  /**
+   * Makes sure a spot has an elevation: terrain model first, otherwise the
+   * median GPS altitude of its photos. A manual value is never overwritten.
+   */
+  async function ensureElevation(spotId) {
+    const spot = db.prepare('SELECT lat, lon, elevation FROM spots WHERE id = ?').get(spotId);
+    if (!spot || spot.elevation !== null) return spot?.elevation ?? null;
+    let value = null;
+    let source = null;
+    try {
+      value = await elevationService.lookup(spot.lat, spot.lon);
+      source = 'dem';
+    } catch {
+      const alts = db.prepare('SELECT altitude FROM photos WHERE spot_id = ? AND altitude IS NOT NULL ORDER BY altitude')
+        .all(spotId).map((r) => r.altitude);
+      if (alts.length) {
+        value = Math.round(alts[Math.floor(alts.length / 2)]);
+        source = 'gps';
+      }
+    }
+    if (value !== null) {
+      db.prepare('UPDATE spots SET elevation = ?, elevation_source = ? WHERE id = ? AND elevation IS NULL').run(value, source, spotId);
+    }
+    return spotElevation(spotId);
+  }
+
   const irregularitiesOf = (photo, weatherCtx) => assess({
     takenAt: photo.taken_at,
     tags: tagsOf.all(photo.id).map((t) => t.tag),
     change: photo.change_json ? JSON.parse(photo.change_json) : null,
     weather: weatherCtx,
     species: spotTrees(photo.spot_id),
+    elevation: spotElevation(photo.spot_id),
   });
 
   /** Species changed: re-evaluate every photo of the spot. */
@@ -224,7 +263,8 @@ function createApp({
     let weatherCtx = null;
     let weatherError = null;
     try {
-      weatherCtx = await weather.context(photo.lat, photo.lon, photo.taken_at);
+      const elevation = await ensureElevation(photo.spot_id);
+      weatherCtx = await weather.context(photo.lat, photo.lon, photo.taken_at, { elevation });
     } catch (err) {
       weatherError = err.message;
     }
@@ -274,7 +314,7 @@ function createApp({
   app.get('/api/spots', (req, res) => {
     const tag = req.query.tag ? String(req.query.tag) : null;
     const rows = db.prepare(`
-      SELECT s.id, s.lat, s.lon,
+      SELECT s.id, s.lat, s.lon, s.elevation,
              COUNT(DISTINCT p.id) AS photo_count,
              MIN(p.taken_at) AS first_taken,
              MAX(p.taken_at) AS last_taken,
@@ -293,6 +333,7 @@ function createApp({
       id: r.id,
       lat: r.lat,
       lon: r.lon,
+      elevation: r.elevation,
       photoCount: r.photo_count,
       firstTaken: new Date(r.first_taken).toISOString(),
       lastTaken: new Date(r.last_taken).toISOString(),
@@ -307,10 +348,19 @@ function createApp({
   });
 
   const spotJson = (id) => {
-    const spot = db.prepare('SELECT id, lat, lon FROM spots WHERE id = ?').get(id);
+    const spot = db.prepare('SELECT id, lat, lon, elevation, elevation_source FROM spots WHERE id = ?').get(id);
     if (!spot) return null;
     const photos = db.prepare('SELECT * FROM photos WHERE spot_id = ? ORDER BY taken_at, id').all(id);
-    return { ...spot, species: spotSpecies(id), photos: photos.map(photoJson) };
+    return {
+      id: spot.id,
+      lat: spot.lat,
+      lon: spot.lon,
+      elevation: spot.elevation,
+      elevationSource: spot.elevation_source,
+      colourShiftDays: spot.elevation === null ? null : altitudeShift(spot.elevation),
+      species: spotSpecies(id),
+      photos: photos.map(photoJson),
+    };
   };
 
   app.get('/api/spots/:id', (req, res) => {
@@ -429,10 +479,10 @@ function createApp({
       const photoId = transaction(db, () => {
         const spotId = targetSpot ? targetSpot.id : assignSpot(db, pos.lat, pos.lon, spotRadiusM);
         const id = Number(db.prepare(`
-          INSERT INTO photos (spot_id, file, original_name, taken_at, lat, lon, heading,
+          INSERT INTO photos (spot_id, file, original_name, taken_at, lat, lon, heading, altitude,
                               location_source, activity, note, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(spotId, file, f.originalname.slice(0, 255), takenAt, pos.lat, pos.lon, meta.heading,
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(spotId, file, f.originalname.slice(0, 255), takenAt, pos.lat, pos.lon, meta.heading, meta.altitude,
           source, activity, note, Date.now()).lastInsertRowid);
         setTags(id, tags);
         refreshSpot(db, spotId);
@@ -486,6 +536,30 @@ function createApp({
 
   app.get('/api/trees', (req, res) => {
     res.json(TREES.map(treeJson).sort((a, b) => a.name.localeCompare(b.name, 'de')));
+  });
+
+  /** Sets the spot's elevation by hand (`{ elevation: 950 }`), or `null` to determine it again. */
+  app.patch('/api/spots/:id', async (req, res, next) => {
+    const id = idParam(req, res);
+    if (id === null) return;
+    if (!db.prepare('SELECT 1 FROM spots WHERE id = ?').get(id)) return res.status(404).json({ error: 'Spot nicht gefunden' });
+    const value = req.body?.elevation;
+    if (value !== null && !(Number.isFinite(value) && value > -500 && value < 5000)) {
+      return res.status(400).json({ error: 'Höhe muss eine Zahl zwischen -500 und 5000 m sein' });
+    }
+    try {
+      db.prepare('UPDATE spots SET elevation = ?, elevation_source = ? WHERE id = ?')
+        .run(value === null ? null : Math.round(value), value === null ? null : 'manual', id);
+      if (value === null) await ensureElevation(id);
+      reassessSpot(id);
+      // Weather is downscaled to the altitude: refresh the spot's contexts in the background.
+      for (const { id: photoId } of db.prepare('SELECT id FROM photos WHERE spot_id = ? AND context_json IS NOT NULL').all(id)) {
+        background(analyzeContext(photoId));
+      }
+      res.json(spotJson(id));
+    } catch (err) {
+      next(err);
+    }
   });
 
   app.post('/api/spots/:id/species', (req, res) => {

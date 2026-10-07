@@ -117,3 +117,27 @@ test('ash at a spot with canopy loss hints at ash dieback', () => {
   const found = assess({ takenAt: Date.UTC(2026, 6, 1), change, species: [tree('Gemeine Esche')] });
   assert.deepEqual(found.map((i) => i.type), ['eschentriebsterben']);
 });
+
+const { altitudeShift, expectedColourDoy } = require('../src/phenology');
+
+test('autumn colouring starts ~2.5 days earlier per 100 m above the lowlands', () => {
+  assert.equal(altitudeShift(400), 0);
+  assert.equal(altitudeShift(1000), -15);
+  assert.equal(altitudeShift(3000), -35, 'capped');
+  assert.equal(altitudeShift(0), 7, 'lowlands below the reference: slightly later, capped');
+  assert.equal(altitudeShift(null), 0);
+  assert.equal(expectedColourDoy(272, 1000), 257);
+  assert.equal(expectedColourDoy(null, 1000), null);
+});
+
+test('colouring that is early in the lowlands can be on time in the mountains', () => {
+  const change = { summary: [{ class: 'verfaerbung', area: 0.1 }] };
+  const sept18 = Date.UTC(2026, 8, 18);
+  const beech = [tree('Rotbuche')]; // lowland start ~30 Sept
+  assert.ok(assess({ takenAt: sept18, change, species: beech, elevation: 420 }).some((i) => i.type === 'fruehe_verfaerbung'));
+  assert.ok(!assess({ takenAt: sept18, change, species: beech, elevation: 1100 }).some((i) => i.type === 'fruehe_verfaerbung'),
+    'at 1100 m beech starts ~12 Sept');
+  const aug25 = assess({ takenAt: Date.UTC(2026, 7, 25), change, species: beech, elevation: 1100 });
+  const early = aug25.find((i) => i.type === 'fruehe_verfaerbung');
+  assert.match(early.text, /1100 m ü\. M\. \(17 Tage früher als im Flachland\) typischerweise um den 13\.09\. /);
+});
