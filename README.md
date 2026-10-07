@@ -166,6 +166,26 @@ den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen und eine Notiz.
 
   Der Tagesverlauf lässt sich mit dem Schieberegler, im Diagramm oder per Abspielen durchgehen. Der
   Sonnenstand wird lokal berechnet (NOAA-Algorithmus) und funktioniert für jedes Datum.
+- **Arten & Neophyten auf der Karte**: Der Kartenmodus *Arten & Neophyten* wertet die Pl@ntNet-Bestimmungen
+  als **Funde** aus (pro Foto die wahrscheinlichste Art, ab einem wählbaren Mindest-Score, Standard 0,2).
+  - **Hotspots**: Eine Kerndichte-Karte (Gauss-Kern, Radius 30–1000 m einstellbar) zeigt, wo sich Funde aller
+    Neophyten, aller Arten oder einer gewählten Art häufen, mit Legende in Funden pro km². Die Spot-Marker
+    weichen solange den einzelnen Funden; ein Klick auf einen Fund öffnet sein Foto.
+  - **Ausbreitungsfronten**: Pro Art die besiedelte Fläche Jahr für Jahr als ineinanderliegende Umrisse
+    (konvexe Hülle aller Funde bis zu diesem Jahr, jeder Fund um 25 m gepuffert), eingefärbt nach Jahr, mit
+    Zeitregler und Abspielen. Dazu eine Schätzung wie „Ausbreitung ~120 m/Jahr nach NO“: Die Rate ist die
+    Steigung (kleinste Quadrate) des Abstands vom Schwerpunkt der Erstfunde zum jeweils entferntesten Fund,
+    die Richtung das gewichtete Mittel der Funde, die die Front nach aussen geschoben haben. Zeigen diese in
+    alle Richtungen, steht „in alle Richtungen“. Die Schätzung hängt stark davon ab, wo gesucht wurde, und ist
+    als Hinweis gedacht, nicht als Messung.
+  - **Export zu Info Flora, GBIF und iNaturalist**: Funde lassen sich als **Darwin-Core-CSV** (das
+    Austauschformat von GBIF und Info Flora: `scientificName`, `eventDate`, `decimalLatitude/Longitude`,
+    `coordinateUncertaintyInMeters` je nach Verortung, `basisOfRecord=HumanObservation`, Pl@ntNet-Score in
+    `identificationRemarks`, Foto-URL in `associatedMedia`, Lizenz pro Foto, sobald es dafür eine Spalte gibt)
+    und im **CSV-Importformat von iNaturalist** herunterladen. Filter: Art, nur Neophyten, Mindest-Score,
+    Kartenausschnitt, Zeitraum. Direkt zu iNaturalist oder Info Flora hochladen geht nicht, dafür bräuchte es dort
+    ein Konto und eine OAuth-Anmeldung. iNaturalist übernimmt beim CSV-Import keine Fotos, deshalb steht der
+    Foto-Link in der Beschreibung. Alle Bestimmungen sind automatisch und als `unverified` markiert.
 - **Drei Wege, Fotos zu verorten**:
   1. **GPS aus dem Foto** (EXIF), wie bei normalen Handyfotos.
   2. **Automatisch über einen GPX-Track**: Eine Action-Cam im Intervallmodus (z. B. alle 5 s) beim
@@ -203,6 +223,7 @@ Konfiguration über Umgebungsvariablen:
 | `DATA_DIR`         | `./data` | SQLite-Datenbank und hochgeladene Bilder       |
 | `SPOT_RADIUS_M`    | `25`     | Radius, in dem Fotos zum selben Spot gehören   |
 | `PLANTNET_API_KEY` | –        | Aktiviert die Pflanzenbestimmung               |
+| `PUBLIC_URL`       | –        | Öffentliche Adresse für Foto-Links im Export (sonst aus der Anfrage) |
 
 ## Aufbau
 
@@ -225,9 +246,14 @@ src/gpx.js           GPX-Parser
 src/geo.js           Distanzen und Interpolation auf dem Track
 src/plantnet.js      Anbindung an die Pl@ntNet-API
 src/neophytes.js     Liste invasiver Neophyten (Schwarze Liste CH / BfN)
+src/occurrences.js   Funde aus den Pl@ntNet-Bestimmungen, Filter und Artenübersicht
+src/spread.js        Ausbreitungsfronten: Umrisse pro Jahr, Rate und Richtung
+src/export.js        CSV-Export nach Darwin Core und im iNaturalist-Importformat
+src/routes/species.js  API-Routen für Arten, Funde, Ausbreitung und Export
 docs/screenshots/    Bilder für dieses README
 public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet die Waldszene,
-                     sun.js berechnet Sonnenstand und Einstrahlung, sunmap.js den Kartenmodus „Sonne & Wetter“)
+                     sun.js berechnet Sonnenstand und Einstrahlung, sunmap.js den Kartenmodus „Sonne & Wetter“,
+                     hotspots.js den Kartenmodus „Arten & Neophyten“)
 ```
 
 ### API
@@ -252,6 +278,11 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
 | `PATCH`  | `/api/photos/:id`            | Tags und Notiz ändern                                    |
 | `DELETE` | `/api/photos/:id`            | Foto löschen                                             |
 | `POST`   | `/api/photos/:id/identify`   | Pflanzen bestimmen (Pl@ntNet)                            |
+| `GET`    | `/api/species`               | Arten mit Funden: Anzahl, Spots, Jahre, Neophyt ja/nein  |
+| `GET`    | `/api/occurrences`           | Funde (bestes Pl@ntNet-Ergebnis pro Foto). Filter für diese und die folgenden Routen: `species`, `neophytes=1`, `minScore` (Standard 0,2), `bbox=west,süd,ost,nord`, `from`/`to` (Datum) |
+| `GET`    | `/api/spread?species=`       | Ausbreitungsfronten einer Art: Umriss, Fläche und Frontabstand pro Jahr, Rate und Richtung (`buffer` in m, Standard 25) |
+| `GET`    | `/api/export/dwc.csv`        | Funde als Darwin-Core-Occurrence-CSV (Info Flora, GBIF)  |
+| `GET`    | `/api/export/inaturalist.csv` | Funde im CSV-Importformat von iNaturalist               |
 
 ## Roadmap
 
@@ -274,7 +305,10 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
   (z. B. MeteoSchweiz/DWD) als Referenz für den Beginn der Herbstfärbung pro Region und Höhenlage.
 - Vegetationsdichte: Grünanteil und Kronendach-Deckung aus den Bildern schätzen und als Zeitreihe
   zeigen.
-- Arten und Neophyten: Hotspot-Karten und Ausbreitungsfronten, Export zu Info Flora / iNaturalist.
+- Arten und Neophyten: Hotspot-Karten, Ausbreitungsfronten und Datei-Export zu Info Flora / iNaturalist
+  sind umgesetzt. Offen: direkter Upload über die APIs (OAuth-Konto bei iNaturalist bzw. Info Flora),
+  Bestätigung der automatischen Bestimmungen durch Menschen vor dem Export, Alpha-Shapes statt konvexer
+  Hüllen für zerstückelte Bestände und eine Korrektur für ungleich verteilten Suchaufwand.
 - Kontext aus Satellitendaten (Sentinel-2-NDVI) und Sturmereignissen (z. B. MeteoSchweiz/DWD).
 
 ## Hinweise
