@@ -9,6 +9,8 @@
 
 const { doy } = require('./weather');
 const { terrainShift, expectedColourDoy, aspectLabel, sunnySlope } = require('./phenology');
+const { attributeChange } = require('./foliage');
+const { treeInfo: treeInfoOf } = require('./trees');
 
 // Species whose fresh leaves and shoots are particularly frost-tender.
 const FROST_TENDER = ['Fagus sylvatica', 'Fraxinus excelsior', 'Quercus robur', 'Quercus petraea', 'Juglans regia', 'Castanea sativa', 'Abies alba'];
@@ -93,16 +95,26 @@ function assess({
   const taggedColouring = tags.includes('fruehverfaerbung') || tags.includes('trockenschaden');
   const coloured = colouredRegion;
 
+  // Which species the discolouration most plausibly concerns (foliage.js: needle share + inventory; heuristic).
+  const attribution = colouredRegion ? attributeChange(change, { species, takenAt, terrain }) : null;
+  const sure = attribution && attribution.sci && attribution.probability >= 0.5 ? treeInfoOf(attribution.sci) : null;
+  const attributionText = attribution
+    ? ` Nach Farbe und Textur der Region vor der Verfärbung (Nadelholzanteil ≈ ${pct(attribution.needleShare)}, Heuristik) ` +
+      `betrifft sie vermutlich ${attribution.sci ? `${attribution.name} (${pct(attribution.probability)})` : attribution.name}.`
+    : '';
+
   // Needles of spruce, fir, pine and Douglas fir do not colour in autumn.
   if (colouredRegion && evergreen.length) {
-    const onlyConifers = evergreen.length === species.length;
+    const onlyConifers = evergreen.length === species.length || Boolean(sure?.evergreen);
     out.push({
       type: 'nadelverfaerbung',
       severity: onlyConifers ? 'stark' : 'hinweis',
-      title: onlyConifers ? 'Verfärbung im Nadelwald' : 'Verfärbung – Nadelbäume prüfen',
-      text: `${onlyConifers ? 'An diesem Spot stehen nur immergrüne Nadelbäume' : `An diesem Spot stehen auch ${names(evergreen)}`}` +
+      title: sure?.evergreen && evergreen.length !== species.length ? `Verfärbung vermutlich an ${sure.de}`
+        : onlyConifers ? 'Verfärbung im Nadelwald' : 'Verfärbung – Nadelbäume prüfen',
+      text: `${evergreen.length === species.length ? 'An diesem Spot stehen nur immergrüne Nadelbäume' : `An diesem Spot stehen auch ${names(evergreen)}`}` +
         ` – sie verfärben sich nicht im Herbst. ${onlyConifers ? 'Gelbe, rote oder braune Kronen' : 'Betrifft die Verfärbung Nadelbäume, ist das'}` +
-        ` ${onlyConifers ? 'deuten' : 'ein Warnsignal und deutet'} auf Borkenkäferbefall, Trockenschäden oder Pilzbefall hin.`,
+        ` ${onlyConifers ? 'deuten' : 'ein Warnsignal und deutet'} auf Borkenkäferbefall, Trockenschäden oder Pilzbefall hin.${attributionText}`,
+      attribution: attribution || undefined,
       suggestedTag: onlyConifers ? 'borkenkaefer' : undefined,
     });
   }
@@ -117,16 +129,19 @@ function assess({
   // Brown young leaves in early summer after cold nights in a hollow: frost damage, not autumn colouring.
   const frostDamage = frostRisk && (colouredRegion || taggedColouring) && day >= SEASON_START_DOY && day <= 200;
 
-  const autumnStart = deciduous.length
-    ? Math.min(...deciduous.map((t) => expectedColourDoy(t.colourDoy, terrain)))
-    : AUTUMN_START_DOY + shift;
+  // Species-specific: when the colouring is attributed to one deciduous species, its own date counts.
+  const own = sure && !sure.evergreen && sure.colourDoy ? sure : null;
+  const autumnStart = own ? expectedColourDoy(own.colourDoy, terrain)
+    : deciduous.length
+      ? Math.min(...deciduous.map((t) => expectedColourDoy(t.colourDoy, terrain)))
+      : AUTUMN_START_DOY + shift;
   const veryEarly = autumnStart - (AUTUMN_START_DOY - VERY_EARLY_DOY);
-  const deciduousCanColour = !species.length || deciduous.length;
+  const deciduousCanColour = (!species.length || deciduous.length) && !sure?.evergreen;
   if ((coloured || taggedColouring) && deciduousCanColour && !frostDamage && day >= SEASON_START_DOY && day < autumnStart) {
     const source = coloured
       ? `Auf ${pct(coloured.area)} der Ansicht hat sich das Laub gegenüber dem ersten Foto gelb oder braun verfärbt`
       : 'Laubverfärbung beobachtet';
-    const first = deciduous.find((t) => expectedColourDoy(t.colourDoy, terrain) === autumnStart);
+    const first = own || deciduous.find((t) => expectedColourDoy(t.colourDoy, terrain) === autumnStart);
     const place = [
       Number.isFinite(elevation) ? `auf ${Math.round(elevation)} m ü. M.` : null,
       landform === 'senke' ? 'in einer Senke mit Kaltluftsee' : null,
@@ -151,8 +166,9 @@ function assess({
       type: 'fruehe_verfaerbung',
       severity: day < veryEarly ? 'stark' : 'auffällig',
       title: 'Frühe Laubverfärbung',
-      text: `${source}, am ${fmtDay(takenAt)}. ${reference}${cause}`,
+      text: `${source}, am ${fmtDay(takenAt)}. ${reference}${coloured ? attributionText : ''}${cause}`,
       suggestedTag: 'fruehverfaerbung',
+      attribution: attribution || undefined,
     });
   }
 
