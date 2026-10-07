@@ -120,6 +120,38 @@ den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen und eine Notiz.
   Kantenrichtung und Form. Im Vergleich erscheinen sie als beschriftete Rahmen und lassen sich mit
   einem Klick als Beobachtung (Tag) übernehmen. Auf der Karte erscheinen Spots mit starker Veränderung
   im Tooltip, und es gibt einen Filter dafür.
+- **Einordnung lernt aus Bestätigungen**: Im Vorher/Nachher-Vergleich lässt sich jede Region mit *Stimmt*
+  bestätigen oder einer anderen Klasse zuordnen. Diese Bestätigungen, übernommene Beobachtungen (ein Foto mit
+  dem Tag *Sturmschaden* bestätigt die als *Windwurf* vorgeschlagene Region) und bestätigte Objekterkennungen
+  werden zu Trainingsbeispielen. Daraus lernt die App im Hintergrund ein kleines Modell (multinomiale
+  logistische Regression auf denselben Merkmalen wie die Regeln, in reinem JavaScript, Gewichte in der
+  Datenbank). Sobald mindestens zwei Klassen je 5 Beispiele haben, wird es mit den Regeln gemischt; sein
+  Gewicht wächst mit der Zahl der Beispiele (höchstens 85 %). Jede Region zeigt, wer entschieden hat
+  („Regel“, „gelernt aus 42 bestätigten Beispielen“ oder beides), mit welcher Sicherheit und was die Regel
+  allein gesagt hätte. Die Kreuzvalidierung des Modells wird mit angezeigt. Klassen mit zu wenigen
+  Beispielen entscheiden weiter die Regeln.
+- **Nadel-/Laubholzanteil und Arten im Bild** (Heuristik): Für jedes Foto und jede veränderte Region
+  schätzt die App den Anteil von Nadel- und Laubholz aus Farbe und Textur der Vegetation. Nadeln sind
+  dunkler, bläulicher und feinkörniger, Laub ist heller, gelbgrüner und gröber. Ein kleines Raster zeigt die
+  Verteilung im Bild. Eine Verfärbung wird anhand des Anteils *vor* der Verfärbung und des Artenbestands am
+  Spot der plausibelsten Art zugeordnet, also „Verfärbung vermutlich Rotbuche (79 %)“. Dabei zählt auch,
+  ob die Art zu diesem Datum schon färben dürfte. Die Auffälligkeiten nutzen das: Bei einer Fichte im
+  Mischbestand wird aus dem Hinweis eine Warnung (Borkenkäfer). Bei einer Lärche gilt deren eigener
+  Färbebeginn statt dem der am frühesten färbenden Art am Spot. Verfärbte immergrüne Nadeln gelten nicht als
+  „frühe Laubverfärbung“. Das ist ein Richtwert und keine Artbestimmung: Licht, Weissabgleich, Abstand und
+  Jahreszeit verschieben die Merkmale.
+- **Objekterkennung** (experimentell): Jedes Foto wird nach liegenden Stämmen und Holzpoltern durchsucht.
+  Die Treffer erscheinen als Rahmen im Foto, auch stabilisiert, und lassen sich mit *Stimmt* oder *Falsch*
+  bewerten. Ein bestätigter Treffer kann als Beobachtung übernommen werden und ist ein Trainingsbeispiel für
+  die Region, die er überdeckt. Eingebaut sind zwei Heuristiken:
+  - **Liegende Stämme**: Eine Hough-Transformation sucht lange, gerade, fast waagrechte Kanten (±25°). Zwei
+    parallele Kanten mit entgegengesetztem Kontrast, eine Stammbreite auseinander und mit rindenartiger
+    Fläche dazwischen (nicht grün, wenig gesättigt) ergeben einen Stamm.
+  - **Holzpolter**: viele ähnlich grosse, runde, hellbraune Flecken (Schnittflächen) dicht beieinander.
+
+  Wurzelteller, Totholz allgemein und Rückegassen erkennen die Heuristiken nicht. Dafür gibt es eine
+  Schnittstelle für einen externen Detektor (z. B. ein feinjustiertes YOLO-Modell, siehe
+  [Externer Detektor](#externer-detektor)).
 - **Wetter-Kontext und Auffälligkeiten**: Zu jedem Foto werden die Wetterdaten am Standort geladen
   (Open-Meteo, ERA5): Niederschlag, Temperatur, Hitzetage und längste Trockenphase der 90 Tage vor
   der Aufnahme sowie der Niederschlag der letzten 12 Monate, jeweils gegenüber dem Mittel 1991–2020.
@@ -203,18 +235,50 @@ Konfiguration über Umgebungsvariablen:
 | `DATA_DIR`         | `./data` | SQLite-Datenbank und hochgeladene Bilder       |
 | `SPOT_RADIUS_M`    | `25`     | Radius, in dem Fotos zum selben Spot gehören   |
 | `PLANTNET_API_KEY` | –        | Aktiviert die Pflanzenbestimmung               |
+| `DETECTOR_URL`     | –        | Externer Objektdetektor (siehe unten); ohne ihn laufen die eingebauten Heuristiken |
+
+### Externer Detektor
+
+Mit `DETECTOR_URL` schickt die App jedes Foto beim ersten Abruf seiner Erkennungen an diesen Dienst:
+
+```
+POST $DETECTOR_URL
+Content-Type: image/jpeg | image/png | image/webp
+<Bilddaten>
+```
+
+Antwort (JSON; ein reines Array der Erkennungen geht auch):
+
+```json
+{
+  "model": "yolo-forest-v3",
+  "detections": [
+    { "label": "liegender_stamm", "score": 0.87, "box": [0.12, 0.55, 0.81, 0.70] }
+  ]
+}
+```
+
+`box` ist `[x0, y0, x1, y1]`, normiert auf 0–1 im (nach EXIF gedrehten) Bild. Pixelwerte (ein Wert > 1,5)
+werden mit der Bildgrösse umgerechnet. Labels: `liegender_stamm`, `wurzelteller`, `totholz`, `holzpolter`,
+`rueckegasse`. Gängige englische Namen (`fallen_tree`, `root_plate`, `deadwood`, `log_pile`,
+`skid_trail` …) werden übersetzt, unbekannte Labels bleiben, wie sie sind. Ist der Dienst nicht
+erreichbar, fallen die Heuristiken ein, und die Antwort enthält einen Hinweis.
 
 ## Aufbau
 
 ```
 server.js            Einstiegspunkt
 src/app.js           Express-App und REST-API
-src/db.js            SQLite-Schema (spots, photos, photo_tags, identifications)
+src/db.js            SQLite-Schema (spots, photos, photo_tags, identifications, region_labels, detections …)
 src/spots.js         Gruppierung von Fotos zu Spots
 src/align.js         Bildregistrierung (ORB-Merkmale, Matching, RANSAC)
 src/homography.js    3×3-Homographien: Verkettung, Inverse
 src/change.js        Veränderungserkennung und Heatmap
-src/classify.js      Einordnung der veränderten Regionen
+src/classify.js      Einordnung der veränderten Regionen (Regeln, gemischt mit dem gelernten Modell)
+src/learn.js         Lernen der Einordnung aus Bestätigungen (Softmax-Regression, Hintergrund-Training)
+src/foliage.js       Nadel-/Laubholzanteil (Heuristik) und Zuordnung von Verfärbungen zu Arten
+src/detect.js        Objekterkennung: externer Detektor oder Heuristiken (liegende Stämme, Holzpolter)
+src/routes/analysis.js  API der automatischen Auswertung
 src/weather.js       Wetterdaten und Mittel 1991–2020 von Open-Meteo (mit Cache)
 src/irregularities.js  Auffälligkeiten (Trockenheit, Wärme, frühe Laubverfärbung …)
 src/trees.js         Waldbaumarten mit Phänologie, Trockenheitsempfindlichkeit und Gefahren
@@ -252,6 +316,14 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
 | `PATCH`  | `/api/photos/:id`            | Tags und Notiz ändern                                    |
 | `DELETE` | `/api/photos/:id`            | Foto löschen                                             |
 | `POST`   | `/api/photos/:id/identify`   | Pflanzen bestimmen (Pl@ntNet)                            |
+| `GET`    | `/api/photos/:id/regions?to=` | Veränderte Regionen mit entscheidender Quelle (Regel/gelernt), Sicherheit, Nadelholzanteil, vermuteter Art und eigener Bestätigung |
+| `POST`   | `/api/photos/:id/region-labels` | Region bestätigen oder korrigieren (`{ to, index, class }`, `class: null` entfernt die Bestätigung) |
+| `GET`    | `/api/analysis/status`       | Stand des Lernmodells (Beispiele pro Klasse, Genauigkeit) und des Detektors (Bestätigungsquote pro Label) |
+| `POST`   | `/api/analysis/retrain`      | Modell sofort neu trainieren (läuft sonst nach neuen Bestätigungen im Hintergrund) |
+| `GET`    | `/api/photos/:id/foliage`    | Nadel-/Laubholzanteil des Fotos mit 4×3-Raster (Heuristik) |
+| `GET`    | `/api/photos/:id/detections` | Erkannte Objekte (beim ersten Abruf berechnet und gespeichert) |
+| `POST`   | `/api/photos/:id/detections` | Erkennung neu laufen lassen; bestätigte und abgelehnte Treffer bleiben |
+| `PATCH`  | `/api/detections/:id`        | Treffer bewerten (`{ status: 'bestaetigt' \| 'abgelehnt' \| 'offen' }`) |
 
 ## Roadmap
 
@@ -263,11 +335,16 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
 - Benutzerkonten, Moderation, Lizenz pro Foto (z. B. CC BY-SA).
 
 **Phase 3: Automatische Auswertung**
-- Objekterkennung: umgestürzte Bäume, Wurzelteller, Totholz, Holzpolter und Rückegassen,
-  z. B. mit einem feinjustierten YOLO- oder Segmentierungsmodell.
-- Einordnung lernen statt Regeln: aus den bestätigten Tags ein Modell trainieren; Baumarten auch ohne
-  Pl@ntNet direkt im Bild erkennen (z. B. Nadel-/Laubholzanteil pro Region) und Verfärbungen der
-  richtigen Art zuordnen.
+- Objekterkennung: ein feinjustiertes YOLO- oder Segmentierungsmodell für umgestürzte Bäume,
+  Wurzelteller, Totholz, Holzpolter und Rückegassen als Dienst hinter `DETECTOR_URL` betreiben. Die
+  Schnittstelle, die Speicherung und die Bewertung der Treffer stehen bereits; die eingebauten Heuristiken
+  decken nur liegende Stämme und Holzpolter ab. Die bestätigten und abgelehnten Treffer sind ein Datensatz
+  zum Feinjustieren.
+- Einordnung lernen: Das Modell nutzt bisher die Merkmale der Regeln. Als Nächstes Bildmerkmale direkt
+  lernen (z. B. Embeddings eines vortrainierten Netzes pro Region) und abgelehnte Vorschläge als negative
+  Beispiele gewichten.
+- Nadel-/Laubholzanteil mit Referenzfotos pro Art kalibrieren und Arten direkt im Bild erkennen, auch
+  ohne Pl@ntNet.
 - Phänologie verfeinern: regionale Beobachtungsreihen (MeteoSchweiz/DWD) statt pauschaler Gradienten
   für Höhe, Exposition und Kaltluft; nächtliche Abkühlung in Senken aus Wind und Bewölkung abschätzen.
 - Sturmereignisse aus Winddaten (Böen) mit Windwurf-Funden verknüpfen; Phänologie-Daten

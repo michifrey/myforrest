@@ -236,6 +236,7 @@
             <span class="heat-legend" aria-hidden="true"><i></i>wenig<b></b>stark</span>
           </div>
           <div id="cmp-regions" class="regions"></div>
+          <div id="ai-regions" class="ai-regions" aria-live="polite"></div>
         </div>
 
         <div class="photo-details">
@@ -260,6 +261,11 @@
           </div>
           <div id="identify-results"></div>
         </div>
+
+        <section class="ai-photo" aria-labelledby="ai-photo-title">
+          <h3 class="label" id="ai-photo-title">Automatische Auswertung</h3>
+          <div id="ai-photo-body" aria-live="polite"></div>
+        </section>
 
         <section class="context" aria-labelledby="context-title">
           <h3 class="label" id="context-title">Kontext zur Aufnahme</h3>
@@ -395,6 +401,7 @@
   <script src="sun.js"></script>
   <script src="forest.js"></script>
   <script src="app.js"></script>
+  <script src="analysis.js"></script>
   <script src="sunmap.js"></script>
 </body>
 </html>
