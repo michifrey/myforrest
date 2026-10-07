@@ -7,6 +7,92 @@ Lichtungen oder sich ausbreitende Neophyten auf. MyForrest sammelt Fotos solcher
 sie zeitlich übereinander. So wird sichtbar, wie sich der Wald an einem Ort über Monate und Jahre
 verändert.
 
+![Startseite von MyForrest](docs/screenshots/hero.jpg)
+
+## Die App im Überblick
+
+Die Idee ist einfach: Wer regelmässig dieselben Wege läuft, kommt immer wieder an denselben Stellen
+vorbei. Ein Foto pro Besuch genügt. MyForrest ordnet die Fotos einem Ort zu, richtet sie
+deckungsgleich aus und zeigt, was sich verändert hat. So entsteht für jeden Ort eine Zeitreihe, ähnlich
+wie bei Street View, nur mit der Zeit als zusätzlicher Achse.
+
+Der Ablauf hat drei Schritte:
+
+1. **Unterwegs fotografieren**: Ein Handyfoto mit GPS oder eine Action-Cam im Intervallmodus mit
+   GPX-Track von Uhr, Strava oder Komoot. Die App findet den Ort automatisch.
+2. **Am selben Ort wiederkommen**: Beim nächsten Besuch liegt das alte Foto als Overlay über dem
+   Kamerabild, damit derselbe Ausschnitt gelingt.
+3. **Veränderung sichtbar machen**: Die Fotos werden automatisch ausgerichtet. Zeitraffer,
+   Vorher/Nachher-Regler und Heatmap zeigen, was passiert ist.
+
+> Die Screenshots zeigen generierte Demo-Bilder eines fiktiven Waldstücks und eine vereinfachte
+> Platzhalter-Karte. Im Betrieb zeigt die App echte Fotos und OpenStreetMap-Kacheln.
+
+### 1. Karte mit Spots
+
+![Karte mit Spots und Übersicht](docs/screenshots/map.jpg)
+
+Jeder Marker ist ein **Spot**, also ein Ort, an dem über die Zeit Fotos entstanden sind. Fotos, die
+weniger als 25 m auseinander liegen, landen automatisch im selben Spot. Die Zahl im Marker nennt die
+Anzahl Fotos, die Farbe den Befund: grün für unauffällig, orange für Schäden (Sturm, Borkenkäfer,
+Trockenheit, Holzschlag, Erosion) und violett für Neophyten. Oben links lässt sich die Karte nach
+Beobachtungen filtern. Rechts stehen Kennzahlen und die zuletzt fotografierten Spots.
+
+### 2. Zeitreise an einem Spot
+
+![Spot mit Zeitleiste](docs/screenshots/spot.jpg)
+
+Ein Klick auf einen Spot öffnet seine Geschichte: Koordinaten, Zeitraum, alle Beobachtungen und ein
+Hinweis, wie viel sich seit dem ersten Foto verändert hat. Mit dem Zeitregler oder den Vorschaubildern
+blättert man durch die Aufnahmen. Ist *Stabilisiert* aktiv, liegen alle Fotos deckungsgleich
+übereinander, auch wenn sie bei jedem Besuch etwas anders aufgenommen wurden. Das Ergebnis wirkt wie
+ein Zeitraffer:
+
+<p align="center"><img src="docs/screenshots/timelapse.gif" width="480" alt="Zeitraffer eines Spots: Windwurf 2022, danach Totholz und Verjüngung"></p>
+
+Im Beispiel: Sommer 2021 noch intakt, im Februar 2022 wirft ein Sturm zwei Buchen um, ab 2023 wachsen
+in der Lücke junge Bäume nach.
+
+Unter dem Bild lassen sich pro Foto Beobachtungen taggen und eine Notiz erfassen. Mit einem
+Pl@ntNet-Key bestimmt *Pflanze bestimmen* die Arten auf dem Foto und erkennt invasive Neophyten.
+
+### 3. Vorher / Nachher mit Veränderungs-Heatmap
+
+<p>
+  <img src="docs/screenshots/compare.jpg" width="49%" alt="Vorher/Nachher-Vergleich mit Heatmap">
+  <img src="docs/screenshots/compare-swipe.jpg" width="49%" alt="Vorher/Nachher-Vergleich mit Wischregler">
+</p>
+
+*Vorher / Nachher vergleichen* legt zwei beliebige Aufnahmen übereinander. Mit dem Wischregler
+schiebt man die Grenze zwischen den beiden Bildern hin und her. *Automatisch ausrichten* korrigiert
+Unterschiede in Standort, Zoom und Neigung. *Veränderungen hervorheben* blendet eine Heatmap ein
+(gelb = wenig, rot = stark) und nennt den Anteil der veränderten Bildfläche. Hier sind die
+umgestürzten Bäume, die Lücke im Kronendach und der neue Jungwuchs gut zu erkennen. Unterschiede im
+Licht werden dabei ausgeglichen.
+
+### 4. Wiederholungsfoto mit Overlay
+
+<p>
+  <img src="docs/screenshots/mobile-spot.jpg" width="32%" alt="Spot auf dem Handy">
+  <img src="docs/screenshots/mobile-camera.jpg" width="32%" alt="Kamera mit überblendetem Referenzfoto">
+  <img src="docs/screenshots/mobile-camera-edges.jpg" width="32%" alt="Kamera mit Konturen des Referenzfotos">
+</p>
+
+Auf dem Handy öffnet *Wiederholungsfoto aufnehmen* die Kamera. Das aktuell gewählte Foto dient als
+Referenz und liegt entweder halbtransparent (*Überblenden*) oder als gelbe Linien (*Konturen*) über dem
+Livebild. Man bewegt sich, bis Bild und Overlay übereinstimmen, und löst aus. Oben stehen die Entfernung
+zum Spot und, falls nötig, der Hinweis, das Handy wie beim Referenzfoto zu drehen. Das neue Foto gehört
+automatisch zu diesem Spot und öffnet sich gleich im Vorher/Nachher-Vergleich.
+
+### 5. Fotos hochladen
+
+<p align="center"><img src="docs/screenshots/upload.png" width="480" alt="Upload-Dialog"></p>
+
+*Foto beitragen* nimmt beliebig viele Fotos auf einmal entgegen. Ort und Zeit kommen aus den
+EXIF-Daten. Fotos ohne GPS lassen sich über einen GPX-Track verorten (dafür gibt es unter
+*Zeitabgleich für GPX* Zeitzone und Korrektur für die Kamera-Uhr) oder von Hand auf der Karte bzw. über
+den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen und eine Notiz.
+
 ## Was der Prototyp heute kann
 
 - **Karte mit Spots**: Fotos, die innerhalb von 25 m aufgenommen wurden, werden automatisch zu
@@ -81,6 +167,7 @@ src/gpx.js           GPX-Parser
 src/geo.js           Distanzen und Interpolation auf dem Track
 src/plantnet.js      Anbindung an die Pl@ntNet-API
 src/neophytes.js     Liste invasiver Neophyten (Schwarze Liste CH / BfN)
+docs/screenshots/    Bilder für dieses README
 public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet die Waldszene)
 ```
 
