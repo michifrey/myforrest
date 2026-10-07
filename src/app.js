@@ -541,6 +541,7 @@ function createApp({
       await safeAlign(alignPhoto(photoId, refPhotoId));
       await safeAlign(analyzeChange(photoId));
       background(analyzeContext(photoId));
+      vegetation.backfill(null, [photoId]);
       created.push(photoJson(getPhoto.get(photoId)));
     }
     return [created.length ? 201 : 422, { created, skipped, spots: [...touchedSpots] }];
@@ -826,6 +827,8 @@ function createApp({
       next(err);
     }
   });
+
+  const vegetation = require('./routes/vegetation')(app, { db, uploadDir, background, fetchImpl: weatherFetch });
 
   app.use('/api', (req, res) => res.status(404).json({ error: 'Nicht gefunden' }));
 
