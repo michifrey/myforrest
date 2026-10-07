@@ -154,6 +154,7 @@
           <p class="eyebrow">Spot</p>
           <h2 id="spot-title"></h2>
           <p id="spot-meta" class="muted"></p>
+          <p id="spot-siblings" class="siblings small" hidden></p>
           <div class="elev" id="spot-elev">
             <span id="spot-elev-text"></span>
             <button type="button" id="spot-elev-edit" class="link small">ändern</button>
@@ -326,10 +327,10 @@
         <h2>Fotos aus dem Wald</h2>
       </div>
       <label class="dropzone">
-        <input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple required>
+        <input type="file" name="photos" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" multiple required>
         <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="10" width="36" height="28" rx="5"/><path d="M6 32l10-10 8 8 6-6 12 12"/><circle cx="32" cy="19" r="3"/></svg>
         <strong data-empty="Fotos hierher ziehen oder auswählen">Fotos hierher ziehen oder auswählen</strong>
-        <span class="muted small">JPEG, PNG oder WebP · Ort und Zeit werden aus den Bilddaten gelesen</span>
+        <span class="muted small">JPEG, PNG, WebP oder HEIC · Ort und Zeit werden aus den Bilddaten gelesen</span>
       </label>
       <label class="dropzone compact">
         <input type="file" name="gpx" accept=".gpx,application/gpx+xml">

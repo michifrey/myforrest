@@ -74,6 +74,9 @@ const MIGRATIONS = [
   ['spots', 'tpi600', 'REAL'], // … within 600 m
   ['spots', 'landform', 'TEXT'], // 'senke' | 'hang' | 'kuppe' | 'ebene'
   ['spots', 'landform_source', 'TEXT'], // 'dem' | 'manual'
+  ['spots', 'heading', 'REAL'], // viewing direction (° from north): circular mean of the photos' headings
+  ['photos', 'thumb_file', 'TEXT'], // 320 px WebP preview in data/thumbs
+  ['photos', 'large_file', 'TEXT'], // 1280 px WebP preview in data/thumbs
 ];
 
 function openDb(file) {
