@@ -1,0 +1,34 @@
+# Betrieb, Datenschutz und Datenquellen
+
+## Vor einem öffentlichen Betrieb
+
+- Ohne `REQUIRE_LOGIN=1` lassen sich anonym hochgeladene Fotos von allen bearbeiten und löschen, wie bisher
+  im Prototyp. Für einen öffentlichen Betrieb `REQUIRE_LOGIN=1` setzen und hinter HTTPS betreiben (das
+  Sitzungs-Cookie erhält `Secure`, wenn die Anfrage über HTTPS bzw. `X-Forwarded-Proto: https` kommt).
+- Bilder werden unverändert gespeichert und ausgeliefert, **inklusive EXIF-Daten** (GPS,
+  Kameramodell). Ausnahmen sind die Vorschaubilder und die aus HEIC umgewandelten JPEGs, die keine
+  EXIF-Daten enthalten. Vor einem öffentlichen Betrieb sollten Metadaten entfernt und Personen sowie
+  Kennzeichen automatisch verpixelt werden.
+- Ausgeblendete Fotos werden nicht mehr ausgeliefert, können aber noch bis zu 7 Tage im Browser-Cache von
+  Personen liegen, die sie vorher gesehen haben.
+- Kartendaten © OpenStreetMap-Mitwirkende. Bei stärkerer Nutzung braucht es einen eigenen
+  Tile-Anbieter (siehe Tile Usage Policy).
+
+## Service Worker
+
+Der Service Worker braucht HTTPS (oder `localhost`). Nach Änderungen an der Liste vorgehaltener Dateien
+in `public/sw.js` `SHELL_VERSION` erhöhen; alte Caches werden beim Aktivieren gelöscht. App-Code
+(HTML, JS, CSS) wird immer zuerst aus dem Netz geladen, ein Deployment ist also sofort sichtbar.
+
+## Externe Datenquellen und Netzzugang
+
+| Quelle | Wofür | Hosts, die der Server erreichen muss |
+|--------|-------|--------------------------------------|
+| [Open-Meteo.com](https://open-meteo.com) (ERA5-Reanalyse, CC BY 4.0) | Wetter, Normalwerte, Böen, Geländehöhe | `archive-api.open-meteo.com`, `api.open-meteo.com` |
+| Copernicus Sentinel-2 über [Earth Search](https://earth-search.aws.element84.com/v1) (Element 84, AWS Open Data) | NDVI-Satellitenkontext | `earth-search.aws.element84.com`, `sentinel-cogs.s3.us-west-2.amazonaws.com` |
+| Deutscher Wetterdienst, Open Data | Phänologie-Referenzdaten ([laden](installation.md#phänologie-referenzdaten-laden)) | `opendata.dwd.de` |
+| [Pl@ntNet](https://my.plantnet.org) (optional, API-Key) | Pflanzenbestimmung | `my-api.plantnet.org` |
+| OpenStreetMap | Kartenkacheln (im Browser) | – |
+
+Die Wetterdaten werden pro ~10-km-Zelle gecacht; die Normalwerte 1991–2020 werden nur einmal pro Zelle
+geladen. Die Satellitendaten enthalten modifizierte Copernicus-Sentinel-Daten.
