@@ -1,7 +1,7 @@
 'use strict';
 
 const $ = (id) => document.getElementById(id);
-const DAMAGE_TAGS = ['sturmschaden', 'borkenkaefer', 'trockenschaden', 'holzschlag', 'fruehverfaerbung'];
+const DAMAGE_TAGS = ['sturmschaden', 'borkenkaefer', 'trockenschaden', 'holzschlag', 'fruehverfaerbung', 'frostschaden'];
 
 const state = {
   config: { tags: {}, plantnet: false },
@@ -340,7 +340,8 @@ function colourText(t, spot) {
   const lowland = `~${fmtDoy(t.colourDoy)}`;
   if (t.colourDoyHere === null || t.colourDoyHere === t.colourDoy) return `Färbung typisch ab ${lowland} (Flachland)`;
   const here = [spot.elevation !== null ? `${Math.round(spot.elevation)} m` : null,
-    spot.exposition && spot.exposition !== 'eben' ? spot.exposition : null].filter(Boolean).join(', ');
+    spot.landform === 'senke' ? 'Senke' : null,
+    spot.landform !== 'senke' && spot.exposition && spot.exposition !== 'eben' ? spot.exposition : null].filter(Boolean).join(', ');
   return `Färbung hier (${here}) typisch ab ~${fmtDoy(t.colourDoyHere)}; im Flachland ab ${lowland}`;
 }
 
@@ -356,18 +357,26 @@ function renderElevation(spot) {
   const parts = [];
   parts.push(spot.elevation === null ? 'Höhe unbekannt'
     : `${Math.round(spot.elevation)} m ü. M. (${ELEV_SOURCE[spot.elevationSource] || 'unbekannt'})`);
-  if (spot.exposition) {
+  // "eben" adds nothing once the landform (hollow, plain, …) is known.
+  if (spot.exposition && !(spot.exposition === 'eben' && spot.landform)) {
     parts.push(spot.exposition === 'eben' ? 'eben'
       : `${spot.exposition}${spot.terrainSource === 'dem' ? `, ${Math.round(spot.slope)}° steil` : ''} (${ELEV_SOURCE[spot.terrainSource]})`);
   }
+  if (spot.landform && spot.landform !== 'hang' && spot.landform !== 'ebene') {
+    const depth = Number.isFinite(spot.tpi600) && spot.tpi600 !== 0
+      ? `, ${Math.abs(Math.round(spot.tpi600))} m ${spot.tpi600 < 0 ? 'tiefer' : 'höher'} als die Umgebung`
+      : '';
+    parts.push(`${spot.landformLabel}${depth} (${ELEV_SOURCE[spot.landformSource]})`);
+  }
   const shift = spot.colourShiftDays;
   if (shift) {
-    const { altitude, exposition } = spot.colourShift;
-    const detail = altitude && exposition
-      ? ` (Höhe ${altitude > 0 ? '+' : '−'}${Math.abs(altitude)}, Exposition ${exposition > 0 ? '+' : '−'}${Math.abs(exposition)})`
+    const labels = { altitude: 'Höhe', exposition: 'Exposition', coldPool: 'Kaltluft' };
+    const contributions = Object.entries(spot.colourShift).filter(([, v]) => v);
+    const detail = contributions.length > 1
+      ? ` (${contributions.map(([k, v]) => `${labels[k]} ${v > 0 ? '+' : '−'}${Math.abs(v)}`).join(', ')})`
       : '';
     parts.push(`Herbstfärbung ~${days(shift)} ${shift < 0 ? 'früher' : 'später'} als im Flachland${detail}`);
-  } else if (spot.elevation === null && !spot.exposition) {
+  } else if (spot.elevation === null && !spot.exposition && !spot.landform) {
     parts.push('Herbstfärbung wird für das Flachland bewertet');
   }
   text.append(parts.join(' · '));
@@ -377,6 +386,7 @@ function renderElevation(spot) {
   $('spot-expo-select').value = spot.terrainSource === 'manual'
     ? (spot.exposition === 'eben' ? 'eben' : COMPASS_CODES[spot.aspect] || '')
     : '';
+  $('spot-landform-select').value = spot.landformSource === 'manual' ? spot.landform : '';
 }
 
 async function saveTerrain(body) {
@@ -402,6 +412,8 @@ $('spot-elev-form').addEventListener('submit', async (e) => {
   const expo = $('spot-expo-select').value || null;
   const currentManual = state.spot.terrainSource === 'manual';
   if (expo || currentManual) body.exposition = expo;
+  const form = $('spot-landform-select').value || null;
+  if (form || state.spot.landformSource === 'manual') body.landform = form;
   if (!Object.keys(body).length) return renderElevation(state.spot);
   try {
     await saveTerrain(body);
@@ -409,7 +421,7 @@ $('spot-elev-form').addEventListener('submit', async (e) => {
     alert(err.message);
   }
 });
-$('spot-elev-auto').addEventListener('click', () => saveTerrain({ elevation: null, exposition: null }).catch((err) => alert(err.message)));
+$('spot-elev-auto').addEventListener('click', () => saveTerrain({ elevation: null, exposition: null, landform: null }).catch((err) => alert(err.message)));
 
 function treeChip(t) {
   const chip = el('span', { class: `tree-chip ${t.group}${t.invasive ? ' invasive' : ''}`, title: t.scientificName });
@@ -720,7 +732,8 @@ async function renderContext(photo) {
     // The first context lookup also determines the spot's elevation.
     const fresh = await api(`/api/spots/${state.spot.id}`).catch(() => null);
     if (fresh && fresh.elevation !== null && state.spot?.id === fresh.id) {
-      for (const k of ['elevation', 'elevationSource', 'slope', 'aspect', 'exposition', 'terrainSource', 'colourShift', 'colourShiftDays', 'species']) {
+      for (const k of ['elevation', 'elevationSource', 'slope', 'aspect', 'exposition', 'terrainSource', 'landform',
+        'landformLabel', 'landformSource', 'tpi300', 'tpi600', 'colourShift', 'colourShiftDays', 'species']) {
         state.spot[k] = fresh[k];
       }
       renderElevation(state.spot);

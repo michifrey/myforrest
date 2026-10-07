@@ -30,25 +30,35 @@ function createElevation({ db, fetchImpl = fetch }) {
   }
 
   /**
-   * Terrain at a spot from a 3×3 grid of DEM samples 90 m apart: elevation,
-   * slope (°) and aspect (° clockwise from north, the direction the slope
-   * faces), using Horn's method as in common GIS tools.
+   * Terrain at a spot from DEM samples fetched in one request: a 3×3 grid
+   * 90 m apart for elevation, slope (°) and aspect (° clockwise from north,
+   * the direction the slope faces, Horn's method), plus rings of 8 points at
+   * 300 m and 600 m for the topographic position index (TPI: elevation minus
+   * the mean of the ring). Strongly negative TPI marks hollows and valley
+   * floors where cold air collects; positive TPI marks knolls and ridges.
    */
   async function terrain(lat, lon) {
-    const key = `terrain:${lat.toFixed(4)},${lon.toFixed(4)}`;
+    const key = `terrain2:${lat.toFixed(4)},${lon.toFixed(4)}`;
     const row = get.get(key);
     if (row) return JSON.parse(row.json);
-    const dLat = SPACING / 111320;
-    const dLon = SPACING / (111320 * Math.cos((lat * Math.PI) / 180));
+    const mLat = 1 / 111320;
+    const mLon = 1 / (111320 * Math.cos((lat * Math.PI) / 180));
     const pts = [];
-    for (const r of [1, 0, -1]) for (const c of [-1, 0, 1]) pts.push([lat + r * dLat, lon + c * dLon]);
+    for (const r of [1, 0, -1]) for (const c of [-1, 0, 1]) pts.push([lat + r * SPACING * mLat, lon + c * SPACING * mLon]);
+    for (const radius of RINGS) {
+      for (let k = 0; k < 8; k++) {
+        const a = (k * Math.PI) / 4;
+        pts.push([lat + Math.cos(a) * radius * mLat, lon + Math.sin(a) * radius * mLon]);
+      }
+    }
     const url = `${ENDPOINT}?latitude=${pts.map((p) => p[0].toFixed(5)).join(',')}` +
       `&longitude=${pts.map((p) => p[1].toFixed(5)).join(',')}`;
     const res = await fetchImpl(url, { signal: AbortSignal.timeout(15000) });
     if (!res.ok) throw new Error(`Höhendienst antwortete mit HTTP ${res.status}`);
     const z = (await res.json()).elevation;
-    if (!Array.isArray(z) || z.length !== 9 || !z.every(Number.isFinite)) throw new Error('Höhendienst lieferte kein Raster');
-    const value = { elevation: Math.round(z[4]), ...slopeAspect(z, SPACING) };
+    if (!Array.isArray(z) || z.length !== pts.length || !z.every(Number.isFinite)) throw new Error('Höhendienst lieferte kein Raster');
+    const tpi = (from) => Math.round((z[4] - z.slice(from, from + 8).reduce((a, b) => a + b, 0) / 8) * 10) / 10;
+    const value = { elevation: Math.round(z[4]), ...slopeAspect(z.slice(0, 9), SPACING), tpi300: tpi(9), tpi600: tpi(17) };
     set.run(key, JSON.stringify(value), Date.now());
     return value;
   }
@@ -57,6 +67,7 @@ function createElevation({ db, fetchImpl = fetch }) {
 }
 
 const SPACING = 90; // m, the DEM's resolution
+const RINGS = [300, 600]; // m, radii for the topographic position index
 
 /**
  * Slope and aspect from a 3×3 grid in row-major order, north row first,

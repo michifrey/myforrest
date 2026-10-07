@@ -22,7 +22,9 @@ const { createWeather } = require('./weather');
 const { assess } = require('./irregularities');
 const { TREES, treeInfo, treeJson } = require('./trees');
 const { createElevation } = require('./elevation');
-const { altitudeShift, aspectShift, expectedColourDoy, aspectLabel, aspectFromCompass, COMPASS } = require('./phenology');
+const {
+  altitudeShift, aspectShift, coldPoolShift, expectedColourDoy, aspectLabel, aspectFromCompass, COMPASS, LANDFORMS, landform,
+} = require('./phenology');
 
 const ACTIVITIES = ['joggen', 'wandern', 'biken', 'sonstiges'];
 const NEOPHYTE_MIN_SCORE = 0.3;
@@ -216,8 +218,14 @@ function createApp({
 
   /** Elevation, slope and aspect of a spot (each may be null). */
   function terrainOf(spotId) {
-    const t = db.prepare('SELECT elevation, slope, aspect FROM spots WHERE id = ?').get(spotId) || {};
-    return { elevation: t.elevation ?? null, slope: t.slope ?? null, aspect: t.aspect ?? null };
+    const t = db.prepare('SELECT elevation, slope, aspect, landform, tpi600 FROM spots WHERE id = ?').get(spotId) || {};
+    return {
+      elevation: t.elevation ?? null,
+      slope: t.slope ?? null,
+      aspect: t.aspect ?? null,
+      landform: t.landform ?? null,
+      tpi600: t.tpi600 ?? null,
+    };
   }
 
   /**
@@ -226,13 +234,19 @@ function createApp({
    * photos stands in for the elevation. Manual values are never overwritten.
    */
   async function ensureElevation(spotId) {
-    const spot = db.prepare('SELECT lat, lon, elevation, elevation_source, terrain_source FROM spots WHERE id = ?').get(spotId);
+    const spot = db.prepare(
+      'SELECT lat, lon, elevation, elevation_source, terrain_source, landform_source, tpi600 FROM spots WHERE id = ?',
+    ).get(spotId);
     if (!spot) return null;
-    if (spot.terrain_source === null) {
+    // Also refetch spots analysed before the landform existed.
+    if (spot.terrain_source === null || (spot.landform_source === null && spot.tpi600 === null)) {
       try {
         const t = await elevationService.terrain(spot.lat, spot.lon);
-        db.prepare('UPDATE spots SET slope = ?, aspect = ?, terrain_source = ? WHERE id = ? AND terrain_source IS NULL')
-          .run(t.slope, t.aspect, 'dem', spotId);
+        db.prepare("UPDATE spots SET slope = ?, aspect = ?, terrain_source = 'dem' WHERE id = ? AND (terrain_source IS NULL OR terrain_source = 'dem')")
+          .run(t.slope, t.aspect, spotId);
+        const slope = db.prepare('SELECT slope FROM spots WHERE id = ?').get(spotId).slope;
+        db.prepare("UPDATE spots SET tpi300 = ?, tpi600 = ?, landform = ?, landform_source = 'dem' WHERE id = ? AND (landform_source IS NULL OR landform_source = 'dem')")
+          .run(t.tpi300, t.tpi600, landform({ tpi300: t.tpi300, tpi600: t.tpi600, slope }), spotId);
         db.prepare("UPDATE spots SET elevation = ?, elevation_source = 'dem' WHERE id = ? AND (elevation IS NULL OR elevation_source = 'gps')")
           .run(t.elevation, spotId);
       } catch {
@@ -365,7 +379,10 @@ function createApp({
   });
 
   const spotJson = (id) => {
-    const spot = db.prepare('SELECT id, lat, lon, elevation, elevation_source, slope, aspect, terrain_source FROM spots WHERE id = ?').get(id);
+    const spot = db.prepare(`
+      SELECT id, lat, lon, elevation, elevation_source, slope, aspect, terrain_source,
+             tpi300, tpi600, landform, landform_source
+      FROM spots WHERE id = ?`).get(id);
     if (!spot) return null;
     const photos = db.prepare('SELECT * FROM photos WHERE spot_id = ? ORDER BY taken_at, id').all(id);
     return {
@@ -378,12 +395,18 @@ function createApp({
       aspect: spot.aspect,
       exposition: spot.terrain_source ? aspectLabel(spot.aspect, spot.slope ?? 0) : null,
       terrainSource: spot.terrain_source,
+      landform: spot.landform,
+      landformLabel: spot.landform ? LANDFORMS[spot.landform] : null,
+      landformSource: spot.landform_source,
+      tpi300: spot.tpi300,
+      tpi600: spot.tpi600,
       colourShift: {
         altitude: spot.elevation === null ? 0 : altitudeShift(spot.elevation),
         exposition: aspectShift(spot.aspect, spot.slope),
+        coldPool: coldPoolShift(spot.landform, spot.tpi600),
       },
-      colourShiftDays: spot.elevation === null && spot.terrain_source === null ? null
-        : altitudeShift(spot.elevation) + aspectShift(spot.aspect, spot.slope),
+      colourShiftDays: spot.elevation === null && spot.terrain_source === null && spot.landform === null ? null
+        : altitudeShift(spot.elevation) + aspectShift(spot.aspect, spot.slope) + coldPoolShift(spot.landform, spot.tpi600),
       species: spotSpecies(id),
       photos: photos.map(photoJson),
     };
@@ -580,7 +603,14 @@ function createApp({
     if (hasExposition && expo !== null && expo !== 'eben' && !COMPASS.includes(expo)) {
       return res.status(400).json({ error: `Exposition muss eben, ${COMPASS.join(', ')} oder null sein` });
     }
-    if (!hasElevation && !hasExposition) return res.status(400).json({ error: 'elevation oder exposition angeben' });
+    const hasLandform = Object.prototype.hasOwnProperty.call(body, 'landform');
+    const form = body.landform;
+    if (hasLandform && form !== null && !Object.hasOwn(LANDFORMS, form)) {
+      return res.status(400).json({ error: `Geländeform muss ${Object.keys(LANDFORMS).join(', ')} oder null sein` });
+    }
+    if (!hasElevation && !hasExposition && !hasLandform) {
+      return res.status(400).json({ error: 'elevation, exposition oder landform angeben' });
+    }
     try {
       if (hasElevation) {
         db.prepare('UPDATE spots SET elevation = ?, elevation_source = ? WHERE id = ?')
@@ -592,7 +622,12 @@ function createApp({
         else db.prepare("UPDATE spots SET slope = ?, aspect = ?, terrain_source = 'manual' WHERE id = ?")
           .run(expo === 'eben' ? 0 : 20, expo === 'eben' ? null : aspectFromCompass(expo), id);
       }
-      if (value === null || expo === null) await ensureElevation(id);
+      if (hasLandform) {
+        // A hand-set landform has no measured TPI; the cold-pool shift then uses a typical value.
+        if (form === null) db.prepare('UPDATE spots SET tpi300 = NULL, tpi600 = NULL, landform = NULL, landform_source = NULL WHERE id = ?').run(id);
+        else db.prepare("UPDATE spots SET landform = ?, landform_source = 'manual', tpi600 = NULL, tpi300 = NULL WHERE id = ?").run(form, id);
+      }
+      if (value === null || expo === null || form === null) await ensureElevation(id);
       reassessSpot(id);
       // Weather is downscaled to the altitude: refresh the spot's contexts in the background.
       for (const { id: photoId } of db.prepare('SELECT id FROM photos WHERE spot_id = ? AND context_json IS NOT NULL').all(id)) {

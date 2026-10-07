@@ -359,7 +359,8 @@ test('slope and aspect come from the terrain model and can be set by hand', asyn
   const dem = async (url) => {
     if (url.includes('/v1/elevation')) {
       const n = new URL(url).searchParams.get('latitude').split(',').length;
-      return new Response(JSON.stringify({ elevation: n === 9 ? grid : [1020] }));
+      // 3×3 grid plus two rings of 8 at the centre's height: an even slope, TPI 0.
+      return new Response(JSON.stringify({ elevation: n === 25 ? [...grid, ...Array(16).fill(1020)] : [1020] }));
     }
     return new Response('offline', { status: 503 });
   };
@@ -372,8 +373,9 @@ test('slope and aspect come from the terrain model and can be set by hand', asyn
     assert.equal(spot.exposition, 'Südhang');
     assert.equal(spot.terrainSource, 'dem');
     // 1020 m: −15.5 → −15 days; 12.5° south slope: +2.5 → +3 days (Math.round rounds halves up).
-    assert.deepEqual(spot.colourShift, { altitude: -15, exposition: 3 });
+    assert.deepEqual(spot.colourShift, { altitude: -15, exposition: 3, coldPool: 0 });
     assert.equal(spot.colourShiftDays, -12);
+    assert.deepEqual([spot.landform, spot.tpi600], ['hang', 0]);
 
     const patch = (body) => fetch(`${base}/api/spots/${p.spotId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -385,5 +387,32 @@ test('slope and aspect come from the terrain model and can be set by hand', asyn
     assert.equal((await patch({ exposition: 'Süd' })).status, 400);
     spot = await (await patch({ exposition: null })).json();
     assert.deepEqual([spot.exposition, spot.terrainSource], ['Südhang', 'dem']);
+  });
+});
+
+test('hollows are recognised as cold-air pools and can be set by hand', async () => {
+  // Flat centre at 600 m, surroundings 25 m (300 m ring) and 45 m (600 m ring) higher: a hollow.
+  const dem = async (url) => {
+    if (url.includes('/v1/elevation')) {
+      return new Response(JSON.stringify({ elevation: [...Array(9).fill(600), ...Array(8).fill(625), ...Array(8).fill(645)] }));
+    }
+    return new Response('offline', { status: 503 });
+  };
+  await withServer({ weatherFetch: dem }, async (base) => {
+    const p = (await (await upload(base, [['gps.jpg', fixture('gps.jpg')]])).json()).created[0];
+    await fetch(`${base}/api/photos/${p.id}/context`);
+    let spot = await (await fetch(`${base}/api/spots/${p.spotId}`)).json();
+    assert.deepEqual([spot.landform, spot.tpi300, spot.tpi600, spot.landformSource], ['senke', -25, -45, 'dem']);
+    assert.equal(spot.landformLabel, 'Senke / Talboden (Kaltluftsee)');
+    assert.equal(spot.colourShift.coldPool, -5);
+
+    const patch = (body) => fetch(`${base}/api/spots/${p.spotId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    spot = await (await patch({ landform: 'kuppe' })).json();
+    assert.deepEqual([spot.landform, spot.landformSource, spot.colourShift.coldPool], ['kuppe', 'manual', 0]);
+    assert.equal((await patch({ landform: 'tal' })).status, 400);
+    spot = await (await patch({ landform: null })).json();
+    assert.deepEqual([spot.landform, spot.landformSource], ['senke', 'dem']);
   });
 });

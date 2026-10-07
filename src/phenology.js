@@ -44,9 +44,43 @@ const aspectFromCompass = (code) => (COMPASS.includes(code) ? COMPASS.indexOf(co
 /** South-facing (SE–SW) and at least moderately steep: dries out faster. */
 const sunnySlope = (aspect, slope) => Number.isFinite(aspect) && slope >= 10 && aspect >= 135 && aspect <= 225;
 
+/*
+ * Landform from the topographic position index. In hollows and valley
+ * floors cold air drains in on clear nights and pools: nights there are
+ * often several degrees colder than the slopes around, leaves colour earlier
+ * (up to ~5 days here) and late frosts after leaf-out are more frequent.
+ * Knolls and ridges stay out of the cold air but are exposed to wind.
+ */
+const LANDFORMS = {
+  senke: 'Senke / Talboden (Kaltluftsee)',
+  hang: 'Hanglage',
+  kuppe: 'Kuppe / Rücken',
+  ebene: 'Ebene',
+};
+const MAX_COLD_POOL_DAYS = 5;
+
+function landform({ tpi300 = null, tpi600 = null, slope = null } = {}) {
+  if (!Number.isFinite(tpi600) && !Number.isFinite(tpi300)) return null;
+  const t600 = tpi600 ?? tpi300;
+  const t300 = tpi300 ?? tpi600;
+  if ((t600 <= -15 || t300 <= -8) && (slope ?? 0) < 12) return 'senke';
+  if (t600 >= 15 || t300 >= 8) return 'kuppe';
+  if ((slope ?? 0) >= 6) return 'hang';
+  return 'ebene';
+}
+
+/** 0..1, how pronounced the cold-air pool is (a hand-set "senke" counts as clear). */
+function coldPoolStrength(form, tpi600) {
+  if (form !== 'senke') return 0;
+  if (!Number.isFinite(tpi600)) return 0.7;
+  return Math.max(0.3, Math.min(1, (-tpi600 - 5) / 35));
+}
+
+const coldPoolShift = (form, tpi600) => -Math.round(MAX_COLD_POOL_DAYS * coldPoolStrength(form, tpi600)) + 0;
+
 /** Total shift of the colouring start for a spot's terrain. */
-const terrainShift = ({ elevation = null, aspect = null, slope = null } = {}) =>
-  altitudeShift(elevation) + aspectShift(aspect, slope);
+const terrainShift = ({ elevation = null, aspect = null, slope = null, landform: form = null, tpi600 = null } = {}) =>
+  altitudeShift(elevation) + aspectShift(aspect, slope) + coldPoolShift(form, tpi600);
 
 /** Expected start of colouring (day of year) for a lowland value on the given terrain. */
 function expectedColourDoy(lowlandDoy, terrainOrElevation) {
@@ -60,4 +94,5 @@ function expectedColourDoy(lowlandDoy, terrainOrElevation) {
 module.exports = {
   REFERENCE_ELEVATION, DAYS_PER_100M, COMPASS,
   altitudeShift, aspectShift, terrainShift, expectedColourDoy, aspectLabel, aspectFromCompass, sunnySlope,
+  LANDFORMS, landform, coldPoolStrength, coldPoolShift,
 };

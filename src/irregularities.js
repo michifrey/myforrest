@@ -10,11 +10,15 @@
 const { doy } = require('./weather');
 const { terrainShift, expectedColourDoy, aspectLabel, sunnySlope } = require('./phenology');
 
+// Species whose fresh leaves and shoots are particularly frost-tender.
+const FROST_TENDER = ['Fagus sylvatica', 'Fraxinus excelsior', 'Quercus robur', 'Quercus petraea', 'Juglans regia', 'Castanea sativa', 'Abies alba'];
+
 // Natural autumn colouring of beech, oak and maple in the Central European
 // lowlands usually starts in the second half of September.
 const AUTUMN_START_DOY = 258; // ~15 September
 const VERY_EARLY_DOY = 232; // ~20 August
 const SEASON_START_DOY = 120; // ~1 May; earlier "yellow" is usually not foliage
+const LEAF_OUT_DOY = 104; // ~15 April
 
 const pct = (r) => `${Math.round(r * 100)} %`;
 const fmtDay = (t) => new Date(t).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
@@ -29,8 +33,11 @@ const names = (list) => list.map((t) => t.de).join(', ');
  * they set the expected start of autumn colouring and add species-specific
  * risks (bark beetle on drought-stressed spruce, ash dieback, ...).
  */
-function assess({ takenAt, tags = [], change = null, weather = null, species = [], elevation = null, aspect = null, slope = null }) {
-  const terrain = { elevation, aspect, slope };
+function assess({
+  takenAt, tags = [], change = null, weather = null, species = [],
+  elevation = null, aspect = null, slope = null, landform = null, tpi600 = null,
+}) {
+  const terrain = { elevation, aspect, slope, landform, tpi600 };
   const out = [];
   const w = weather?.last90;
   const colouredRegion = (change?.summary || []).find((s) => s.class === 'verfaerbung' && s.area >= 0.02);
@@ -102,19 +109,28 @@ function assess({ takenAt, tags = [], change = null, weather = null, species = [
 
   // Expected start of colouring at this spot: earliest colouring species, shifted for altitude.
   const shift = terrainShift(terrain);
+  // Cold-air pools: frost after leaf-out even when the weather model stays just above zero.
+  // This year's leaf-out lies in the year-to-date window, not necessarily in the last 90 days.
+  const season = weather?.yearToDate;
+  const cold = season?.coldNightsAfterLeafOut;
+  const frostRisk = landform === 'senke' && cold > 0 && day >= LEAF_OUT_DOY;
+  // Brown young leaves in early summer after cold nights in a hollow: frost damage, not autumn colouring.
+  const frostDamage = frostRisk && (colouredRegion || taggedColouring) && day >= SEASON_START_DOY && day <= 200;
+
   const autumnStart = deciduous.length
     ? Math.min(...deciduous.map((t) => expectedColourDoy(t.colourDoy, terrain)))
     : AUTUMN_START_DOY + shift;
   const veryEarly = autumnStart - (AUTUMN_START_DOY - VERY_EARLY_DOY);
   const deciduousCanColour = !species.length || deciduous.length;
-  if ((coloured || taggedColouring) && deciduousCanColour && day >= SEASON_START_DOY && day < autumnStart) {
+  if ((coloured || taggedColouring) && deciduousCanColour && !frostDamage && day >= SEASON_START_DOY && day < autumnStart) {
     const source = coloured
       ? `Auf ${pct(coloured.area)} der Ansicht hat sich das Laub gegenüber dem ersten Foto gelb oder braun verfärbt`
       : 'Laubverfärbung beobachtet';
     const first = deciduous.find((t) => expectedColourDoy(t.colourDoy, terrain) === autumnStart);
     const place = [
       Number.isFinite(elevation) ? `auf ${Math.round(elevation)} m ü. M.` : null,
-      aspectLabel(aspect, slope) !== 'eben' ? `am ${aspectLabel(aspect, slope)}` : null,
+      landform === 'senke' ? 'in einer Senke mit Kaltluftsee' : null,
+      landform !== 'senke' && aspectLabel(aspect, slope) !== 'eben' ? `am ${aspectLabel(aspect, slope)}` : null,
     ].filter(Boolean).join(' ');
     const where = place && shift !== 0
       ? `${place} (${Math.abs(shift)} ${Math.abs(shift) === 1 ? 'Tag' : 'Tage'} ${shift < 0 ? 'früher' : 'später'} als im Flachland)`
@@ -137,6 +153,38 @@ function assess({ takenAt, tags = [], change = null, weather = null, species = [
       title: 'Frühe Laubverfärbung',
       text: `${source}, am ${fmtDay(takenAt)}. ${reference}${cause}`,
       suggestedTag: 'fruehverfaerbung',
+    });
+  }
+
+  if (frostRisk) {
+    const damaged = frostDamage;
+    const tender = species.filter((t) => FROST_TENDER.includes(t.sci));
+    const c = season.coldestAfterLeafOut;
+    out.push({
+      type: 'spaetfrost',
+      severity: damaged ? 'auffällig' : 'hinweis',
+      title: damaged ? 'Spätfrost wahrscheinlich' : 'Spätfrost-Gefahr in der Senke',
+      text: 'Der Spot liegt in einer Senke, in der sich in klaren Nächten Kaltluft sammelt. ' +
+        `Nach dem Laubaustrieb zeigt das Wettermodell ${cold} ${cold === 1 ? 'Nacht' : 'Nächte'} unter 3 °C` +
+        (c ? ` (kälteste: ${c.tmin.toFixed(1)} °C am ${fmtDay(Date.parse(`${c.date}T00:00:00Z`))})` : '') +
+        '; in der Senke war es vermutlich mehrere Grad kälter, also Frost. ' +
+        (damaged
+          ? 'Braune, schlaffe junge Blätter und Triebe im Frühsommer sind typische Frostschäden. Die Bäume treiben meist neu aus.'
+          : 'Auf braune, welke junge Blätter und abgestorbene Triebspitzen achten.') +
+        (tender.length ? ` Besonders frostempfindlich hier: ${names(tender)}.` : ''),
+      suggestedTag: damaged ? 'frostschaden' : undefined,
+    });
+  }
+
+  const windthrow = (change?.summary || []).find((s) => s.class === 'windwurf' && s.area >= 0.02) || tags.includes('sturmschaden');
+  if (landform === 'kuppe' && windthrow) {
+    out.push({
+      type: 'windexponiert',
+      severity: 'hinweis',
+      title: 'Windexponierte Kuppenlage',
+      text: 'Der Spot liegt auf einer Kuppe oder einem Rücken und ist dem Wind stärker ausgesetzt als die Umgebung. ' +
+        'Nach Stürmen hier besonders auf Windwurf und angeschobene Bäume achten' +
+        (spruce ? '; flach wurzelnde Fichten sind besonders gefährdet.' : '.'),
     });
   }
 

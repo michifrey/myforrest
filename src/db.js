@@ -70,6 +70,10 @@ const MIGRATIONS = [
   ['spots', 'slope', 'REAL'], // terrain slope (°)
   ['spots', 'aspect', 'REAL'], // direction the slope faces (° from north), null when flat
   ['spots', 'terrain_source', 'TEXT'], // 'dem' | 'manual'
+  ['spots', 'tpi300', 'REAL'], // topographic position index (m) within 300 m
+  ['spots', 'tpi600', 'REAL'], // … within 600 m
+  ['spots', 'landform', 'TEXT'], // 'senke' | 'hang' | 'kuppe' | 'ebene'
+  ['spots', 'landform_source', 'TEXT'], // 'dem' | 'manual'
 ];
 
 function openDb(file) {

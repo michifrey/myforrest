@@ -8,7 +8,12 @@
  */
 
 const ARCHIVE = 'https://archive-api.open-meteo.com/v1/archive';
-const DAILY = 'precipitation_sum,temperature_2m_mean,temperature_2m_max';
+const DAILY = 'precipitation_sum,temperature_2m_mean,temperature_2m_max,temperature_2m_min';
+// Leaf-out to early summer (~15 April to ~14 June): fresh leaves are frost-tender.
+const LEAF_OUT_FROM = 104;
+const LEAF_OUT_TO = 164;
+// The model sees the slopes; in a cold-air pool nights are often 3–5 °C colder.
+const COLD_NIGHT = 3;
 const NORMAL_FROM = 1991;
 const NORMAL_TO = 2020;
 const ARCHIVE_DELAY_DAYS = 6; // ERA5 data trails real time by a few days
@@ -41,6 +46,7 @@ async function fetchDaily(lat, lon, start, end, fetchImpl, elevation = null) {
     p: daily.precipitation_sum[i],
     tm: daily.temperature_2m_mean[i],
     tx: daily.temperature_2m_max[i],
+    tn: daily.temperature_2m_min?.[i] ?? null,
   })).filter((d) => d.p !== null && d.tm !== null);
 }
 
@@ -98,12 +104,19 @@ function createWeather({ db, fetchImpl = fetch, now = () => Date.now() }) {
       const hotNormal = sel.reduce((a, d) => a + norm[doy(d.t)][2], 0);
       let dry = 0; let run = 0;
       for (const d of sel) { run = d.p < 1 ? run + 1 : 0; dry = Math.max(dry, run); }
+      const withMin = sel.filter((d) => Number.isFinite(d.tn));
+      const spring = withMin.filter((d) => doy(d.t) >= LEAF_OUT_FROM && doy(d.t) <= LEAF_OUT_TO);
+      const coldest = spring.reduce((m, d) => (!m || d.tn < m.tn ? d : m), null);
       const r1 = (v) => Math.round(v * 10) / 10;
       return {
         from: isoDay(sel[0].t), to: isoDay(sel[sel.length - 1].t), days: sel.length,
         precip: r1(p), precipNormal: r1(pn), precipRatio: pn > 0 ? Math.round((p / pn) * 100) / 100 : null,
         tempMean: r1(tm), tempNormal: r1(tn), tempAnomaly: r1(tm - tn),
         hotDays: hot, hotDaysNormal: r1(hotNormal), longestDrySpell: dry,
+        frostNights: withMin.length ? withMin.filter((d) => d.tn < 0).length : null,
+        // Nights after leaf-out cold enough for frost in a cold-air pool.
+        coldNightsAfterLeafOut: spring.length ? spring.filter((d) => d.tn < COLD_NIGHT).length : null,
+        coldestAfterLeafOut: coldest ? { date: isoDay(coldest.t), tmin: r1(coldest.tn) } : null,
       };
     };
 
