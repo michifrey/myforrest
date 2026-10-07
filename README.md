@@ -143,6 +143,11 @@ den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen und eine Notiz.
   Flachland (~400 m) beginnt die Herbstfärbung rund 2,5 Tage früher; die Bewertung „frühe Verfärbung“ und die
   Steckbriefe rechnen damit. Bei Rotbuche auf 1000 m ist das etwa der 15. statt der 30. September.
   Auch die Wetterdaten werden auf die Höhe des Spots heruntergerechnet.
+- **Exposition**: Aus dem Höhenmodell (3×3 Messpunkte im Abstand von 90 m, Verfahren nach Horn) werden
+  Hangneigung und -richtung des Spots berechnet; von Hand lässt sich die Exposition ebenfalls setzen. Ein
+  steiler Südhang ist wärmer und färbt sich einige Tage später, ein Nordhang früher (bis ±4 Tage, gewichtet
+  mit der Steilheit). An Südhängen weist der Trockenheitstext zudem darauf hin, dass der Boden schneller
+  austrocknet.
 - **Drei Wege, Fotos zu verorten**:
   1. **GPS aus dem Foto** (EXIF), wie bei normalen Handyfotos.
   2. **Automatisch über einen GPX-Track**: Eine Action-Cam im Intervallmodus (z. B. alle 5 s) beim
@@ -195,8 +200,8 @@ src/classify.js      Einordnung der veränderten Regionen
 src/weather.js       Wetterdaten und Mittel 1991–2020 von Open-Meteo (mit Cache)
 src/irregularities.js  Auffälligkeiten (Trockenheit, Wärme, frühe Laubverfärbung …)
 src/trees.js         Waldbaumarten mit Phänologie, Trockenheitsempfindlichkeit und Gefahren
-src/phenology.js     Höhenkorrektur für den Beginn der Herbstfärbung
-src/elevation.js     Geländehöhe eines Spots (Copernicus-DEM über Open-Meteo, mit Cache)
+src/phenology.js     Höhen- und Expositionskorrektur für den Beginn der Herbstfärbung
+src/elevation.js     Geländehöhe, Hangneigung und Exposition (Copernicus-DEM über Open-Meteo, mit Cache)
 src/exif.js          Aufnahmezeit, GPS und Blickrichtung aus den Bilddaten
 src/gpx.js           GPX-Parser
 src/geo.js           Distanzen und Interpolation auf dem Track
@@ -218,7 +223,7 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
 | `GET`    | `/api/photos/:id/change?to=` | Veränderte Fläche zwischen zwei ausgerichteten Fotos, mit eingeordneten Regionen |
 | `GET`    | `/api/photos/:id/change.png?to=` | Heatmap der Veränderung (PNG, in der Ansicht des ersten Fotos) |
 | `GET`    | `/api/trees`                 | Liste der unterstützten Baumarten mit Steckbrief         |
-| `PATCH`  | `/api/spots/:id`             | Höhe von Hand setzen (`{ elevation: 950 }`) oder mit `null` neu ermitteln |
+| `PATCH`  | `/api/spots/:id`             | Höhe (`{ elevation: 950 }`) und/oder Exposition (`{ exposition: 'S' }`, auch `'eben'`) von Hand setzen; `null` ermittelt sie neu |
 | `POST`   | `/api/spots/:id/species`     | Baumart einem Spot zuordnen (`{ scientificName }`)       |
 | `DELETE` | `/api/spots/:id/species?name=` | Baumart vom Spot entfernen                             |
 | `GET`    | `/api/photos/:id/context`    | Wetter-Kontext und Auffälligkeiten (wird beim ersten Abruf berechnet und gespeichert) |
@@ -242,8 +247,8 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
 - Einordnung lernen statt Regeln: aus den bestätigten Tags ein Modell trainieren; Baumarten auch ohne
   Pl@ntNet direkt im Bild erkennen (z. B. Nadel-/Laubholzanteil pro Region) und Verfärbungen der
   richtigen Art zuordnen.
-- Phänologie verfeinern: Exposition (Süd-/Nordhang) und regionale Beobachtungsreihen (MeteoSchweiz/DWD)
-  statt eines pauschalen Höhengradienten.
+- Phänologie verfeinern: regionale Beobachtungsreihen (MeteoSchweiz/DWD) statt pauschaler Gradienten
+  für Höhe und Exposition; Kaltluftseen in Senken berücksichtigen.
 - Sturmereignisse aus Winddaten (Böen) mit Windwurf-Funden verknüpfen; Phänologie-Daten
   (z. B. MeteoSchweiz/DWD) als Referenz für den Beginn der Herbstfärbung pro Region und Höhenlage.
 - Vegetationsdichte: Grünanteil und Kronendach-Deckung aus den Bildern schätzen und als Zeitreihe

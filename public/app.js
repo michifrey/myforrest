@@ -339,33 +339,52 @@ const fmtDoy = (d) => new Date(Date.UTC(2023, 0, 1 + d)).toLocaleDateString('de-
 function colourText(t, spot) {
   const lowland = `~${fmtDoy(t.colourDoy)}`;
   if (t.colourDoyHere === null || t.colourDoyHere === t.colourDoy) return `Färbung typisch ab ${lowland} (Flachland)`;
-  return `Färbung hier (${Math.round(spot.elevation)} m) typisch ab ~${fmtDoy(t.colourDoyHere)}; im Flachland ab ${lowland}`;
+  const here = [spot.elevation !== null ? `${Math.round(spot.elevation)} m` : null,
+    spot.exposition && spot.exposition !== 'eben' ? spot.exposition : null].filter(Boolean).join(', ');
+  return `Färbung hier (${here}) typisch ab ~${fmtDoy(t.colourDoyHere)}; im Flachland ab ${lowland}`;
 }
 
 const ELEV_SOURCE = { dem: 'Höhenmodell', gps: 'GPS der Fotos', manual: 'manuell' };
 const MOUNTAIN_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 14 6 5l3 5 2-3 4 7z"/></svg>';
 
+const COMPASS_CODES = { 0: 'N', 45: 'NO', 90: 'O', 135: 'SO', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
+const days = (n) => `${Math.abs(n)} ${Math.abs(n) === 1 ? 'Tag' : 'Tage'}`;
+
 function renderElevation(spot) {
   const text = $('spot-elev-text');
   text.innerHTML = MOUNTAIN_ICON;
-  if (spot.elevation === null) {
-    text.append('Höhe unbekannt – Herbstfärbung wird für das Flachland bewertet');
-  } else {
-    const shift = spot.colourShiftDays;
-    text.append(`${Math.round(spot.elevation)} m ü. M. (${ELEV_SOURCE[spot.elevationSource] || 'unbekannt'})` +
-      (shift ? ` · Herbstfärbung ~${Math.abs(shift)} ${Math.abs(shift) === 1 ? 'Tag' : 'Tage'} ${shift < 0 ? 'früher' : 'später'} als im Flachland` : ''));
+  const parts = [];
+  parts.push(spot.elevation === null ? 'Höhe unbekannt'
+    : `${Math.round(spot.elevation)} m ü. M. (${ELEV_SOURCE[spot.elevationSource] || 'unbekannt'})`);
+  if (spot.exposition) {
+    parts.push(spot.exposition === 'eben' ? 'eben'
+      : `${spot.exposition}${spot.terrainSource === 'dem' ? `, ${Math.round(spot.slope)}° steil` : ''} (${ELEV_SOURCE[spot.terrainSource]})`);
   }
+  const shift = spot.colourShiftDays;
+  if (shift) {
+    const { altitude, exposition } = spot.colourShift;
+    const detail = altitude && exposition
+      ? ` (Höhe ${altitude > 0 ? '+' : '−'}${Math.abs(altitude)}, Exposition ${exposition > 0 ? '+' : '−'}${Math.abs(exposition)})`
+      : '';
+    parts.push(`Herbstfärbung ~${days(shift)} ${shift < 0 ? 'früher' : 'später'} als im Flachland${detail}`);
+  } else if (spot.elevation === null && !spot.exposition) {
+    parts.push('Herbstfärbung wird für das Flachland bewertet');
+  }
+  text.append(parts.join(' · '));
   $('spot-elev-form').hidden = true;
   $('spot-elev-edit').hidden = false;
   $('spot-elev-input').value = spot.elevation ?? '';
+  $('spot-expo-select').value = spot.terrainSource === 'manual'
+    ? (spot.exposition === 'eben' ? 'eben' : COMPASS_CODES[spot.aspect] || '')
+    : '';
 }
 
-async function saveElevation(elevation) {
+async function saveTerrain(body) {
   const current = state.spot.photos[state.index].id;
   await api(`/api/spots/${state.spot.id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ elevation }),
+    body: JSON.stringify(body),
   });
   await Promise.all([openSpot(state.spot.id, current), loadSpots()]);
 }
@@ -377,15 +396,20 @@ $('spot-elev-edit').addEventListener('click', () => {
 });
 $('spot-elev-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const value = Number($('spot-elev-input').value);
-  if ($('spot-elev-input').value === '' || !Number.isFinite(value)) return;
+  const body = {};
+  const raw = $('spot-elev-input').value;
+  if (raw !== '' && Number(raw) !== state.spot.elevation) body.elevation = Number(raw);
+  const expo = $('spot-expo-select').value || null;
+  const currentManual = state.spot.terrainSource === 'manual';
+  if (expo || currentManual) body.exposition = expo;
+  if (!Object.keys(body).length) return renderElevation(state.spot);
   try {
-    await saveElevation(value);
+    await saveTerrain(body);
   } catch (err) {
     alert(err.message);
   }
 });
-$('spot-elev-auto').addEventListener('click', () => saveElevation(null).catch((err) => alert(err.message)));
+$('spot-elev-auto').addEventListener('click', () => saveTerrain({ elevation: null, exposition: null }).catch((err) => alert(err.message)));
 
 function treeChip(t) {
   const chip = el('span', { class: `tree-chip ${t.group}${t.invasive ? ' invasive' : ''}`, title: t.scientificName });
@@ -696,7 +720,9 @@ async function renderContext(photo) {
     // The first context lookup also determines the spot's elevation.
     const fresh = await api(`/api/spots/${state.spot.id}`).catch(() => null);
     if (fresh && fresh.elevation !== null && state.spot?.id === fresh.id) {
-      Object.assign(state.spot, { elevation: fresh.elevation, elevationSource: fresh.elevationSource, colourShiftDays: fresh.colourShiftDays, species: fresh.species });
+      for (const k of ['elevation', 'elevationSource', 'slope', 'aspect', 'exposition', 'terrainSource', 'colourShift', 'colourShiftDays', 'species']) {
+        state.spot[k] = fresh[k];
+      }
       renderElevation(state.spot);
       renderSpecies(state.spot);
     }

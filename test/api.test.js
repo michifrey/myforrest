@@ -352,3 +352,38 @@ test('spot elevation comes from the terrain model, GPS altitude or by hand', asy
     assert.deepEqual([spot.elevation, spot.elevationSource], [949, 'gps']);
   });
 });
+
+test('slope and aspect come from the terrain model and can be set by hand', async () => {
+  // DEM grid around the spot: rises to the north → south-facing, ~12° steep.
+  const grid = [1040, 1040, 1040, 1020, 1020, 1020, 1000, 1000, 1000];
+  const dem = async (url) => {
+    if (url.includes('/v1/elevation')) {
+      const n = new URL(url).searchParams.get('latitude').split(',').length;
+      return new Response(JSON.stringify({ elevation: n === 9 ? grid : [1020] }));
+    }
+    return new Response('offline', { status: 503 });
+  };
+  await withServer({ weatherFetch: dem }, async (base) => {
+    const p = (await (await upload(base, [['gps.jpg', fixture('gps.jpg')]])).json()).created[0];
+    await fetch(`${base}/api/photos/${p.id}/context`);
+    let spot = await (await fetch(`${base}/api/spots/${p.spotId}`)).json();
+    assert.equal(spot.elevation, 1020);
+    assert.equal(spot.aspect, 180);
+    assert.equal(spot.exposition, 'Südhang');
+    assert.equal(spot.terrainSource, 'dem');
+    // 1020 m: −15.5 → −15 days; 12.5° south slope: +2.5 → +3 days (Math.round rounds halves up).
+    assert.deepEqual(spot.colourShift, { altitude: -15, exposition: 3 });
+    assert.equal(spot.colourShiftDays, -12);
+
+    const patch = (body) => fetch(`${base}/api/spots/${p.spotId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    spot = await (await patch({ exposition: 'N' })).json();
+    assert.deepEqual([spot.exposition, spot.terrainSource, spot.colourShift.exposition, spot.elevation], ['Nordhang', 'manual', -4, 1020]);
+    spot = await (await patch({ exposition: 'eben' })).json();
+    assert.deepEqual([spot.exposition, spot.colourShift.exposition], ['eben', 0]);
+    assert.equal((await patch({ exposition: 'Süd' })).status, 400);
+    spot = await (await patch({ exposition: null })).json();
+    assert.deepEqual([spot.exposition, spot.terrainSource], ['Südhang', 'dem']);
+  });
+});

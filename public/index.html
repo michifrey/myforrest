@@ -124,6 +124,19 @@
               <label class="sr-only" for="spot-elev-input">Höhe in Metern über Meer</label>
               <input id="spot-elev-input" type="number" min="-400" max="4800" step="1" inputmode="numeric" placeholder="z. B. 950">
               <span class="muted small">m ü. M.</span>
+              <label class="sr-only" for="spot-expo-select">Exposition</label>
+              <select id="spot-expo-select" title="Exposition (Hangrichtung)">
+                <option value="">Exposition automatisch</option>
+                <option value="eben">eben</option>
+                <option value="N">Nordhang</option>
+                <option value="NO">Nordosthang</option>
+                <option value="O">Osthang</option>
+                <option value="SO">Südosthang</option>
+                <option value="S">Südhang</option>
+                <option value="SW">Südwesthang</option>
+                <option value="W">Westhang</option>
+                <option value="NW">Nordwesthang</option>
+              </select>
               <button type="submit" class="secondary">Speichern</button>
               <button type="button" id="spot-elev-auto" class="link small">automatisch</button>
             </form>

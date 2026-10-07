@@ -22,7 +22,7 @@ const { createWeather } = require('./weather');
 const { assess } = require('./irregularities');
 const { TREES, treeInfo, treeJson } = require('./trees');
 const { createElevation } = require('./elevation');
-const { altitudeShift, expectedColourDoy } = require('./phenology');
+const { altitudeShift, aspectShift, expectedColourDoy, aspectLabel, aspectFromCompass, COMPASS } = require('./phenology');
 
 const ACTIVITIES = ['joggen', 'wandern', 'biken', 'sonstiges'];
 const NEOPHYTE_MIN_SCORE = 0.3;
@@ -189,14 +189,14 @@ function createApp({
   /** Tree species known at a spot, merged across sources (manual and Pl@ntNet). */
   function spotSpecies(spotId) {
     const merged = new Map();
-    const { elevation } = db.prepare('SELECT elevation FROM spots WHERE id = ?').get(spotId) || {};
+    const terrain = terrainOf(spotId);
     for (const r of speciesRows.all(spotId)) {
       const t = treeInfo(r.scientific_name);
       if (!t) continue;
       const e = merged.get(t.sci) || {
         ...treeJson(t),
         // Expected start of colouring at this spot's altitude.
-        colourDoyHere: expectedColourDoy(t.colourDoy, elevation),
+        colourDoyHere: expectedColourDoy(t.colourDoy, terrain),
         sources: [],
         score: null,
       };
@@ -214,15 +214,32 @@ function createApp({
     DO UPDATE SET score = MAX(COALESCE(score, 0), COALESCE(excluded.score, 0)), photo_id = excluded.photo_id
   `);
 
-  const spotElevation = (spotId) => db.prepare('SELECT elevation FROM spots WHERE id = ?').get(spotId)?.elevation ?? null;
+  /** Elevation, slope and aspect of a spot (each may be null). */
+  function terrainOf(spotId) {
+    const t = db.prepare('SELECT elevation, slope, aspect FROM spots WHERE id = ?').get(spotId) || {};
+    return { elevation: t.elevation ?? null, slope: t.slope ?? null, aspect: t.aspect ?? null };
+  }
 
   /**
-   * Makes sure a spot has an elevation: terrain model first, otherwise the
-   * median GPS altitude of its photos. A manual value is never overwritten.
+   * Makes sure a spot has terrain data. The terrain model gives elevation,
+   * slope and aspect in one go; without it the median GPS altitude of the
+   * photos stands in for the elevation. Manual values are never overwritten.
    */
   async function ensureElevation(spotId) {
-    const spot = db.prepare('SELECT lat, lon, elevation FROM spots WHERE id = ?').get(spotId);
-    if (!spot || spot.elevation !== null) return spot?.elevation ?? null;
+    const spot = db.prepare('SELECT lat, lon, elevation, elevation_source, terrain_source FROM spots WHERE id = ?').get(spotId);
+    if (!spot) return null;
+    if (spot.terrain_source === null) {
+      try {
+        const t = await elevationService.terrain(spot.lat, spot.lon);
+        db.prepare('UPDATE spots SET slope = ?, aspect = ?, terrain_source = ? WHERE id = ? AND terrain_source IS NULL')
+          .run(t.slope, t.aspect, 'dem', spotId);
+        db.prepare("UPDATE spots SET elevation = ?, elevation_source = 'dem' WHERE id = ? AND (elevation IS NULL OR elevation_source = 'gps')")
+          .run(t.elevation, spotId);
+      } catch {
+        // Terrain service unavailable: fall back below and retry next time.
+      }
+    }
+    if (terrainOf(spotId).elevation !== null) return terrainOf(spotId).elevation;
     let value = null;
     let source = null;
     try {
@@ -239,7 +256,7 @@ function createApp({
     if (value !== null) {
       db.prepare('UPDATE spots SET elevation = ?, elevation_source = ? WHERE id = ? AND elevation IS NULL').run(value, source, spotId);
     }
-    return spotElevation(spotId);
+    return terrainOf(spotId).elevation;
   }
 
   const irregularitiesOf = (photo, weatherCtx) => assess({
@@ -248,7 +265,7 @@ function createApp({
     change: photo.change_json ? JSON.parse(photo.change_json) : null,
     weather: weatherCtx,
     species: spotTrees(photo.spot_id),
-    elevation: spotElevation(photo.spot_id),
+    ...terrainOf(photo.spot_id),
   });
 
   /** Species changed: re-evaluate every photo of the spot. */
@@ -348,7 +365,7 @@ function createApp({
   });
 
   const spotJson = (id) => {
-    const spot = db.prepare('SELECT id, lat, lon, elevation, elevation_source FROM spots WHERE id = ?').get(id);
+    const spot = db.prepare('SELECT id, lat, lon, elevation, elevation_source, slope, aspect, terrain_source FROM spots WHERE id = ?').get(id);
     if (!spot) return null;
     const photos = db.prepare('SELECT * FROM photos WHERE spot_id = ? ORDER BY taken_at, id').all(id);
     return {
@@ -357,7 +374,16 @@ function createApp({
       lon: spot.lon,
       elevation: spot.elevation,
       elevationSource: spot.elevation_source,
-      colourShiftDays: spot.elevation === null ? null : altitudeShift(spot.elevation),
+      slope: spot.slope,
+      aspect: spot.aspect,
+      exposition: spot.terrain_source ? aspectLabel(spot.aspect, spot.slope ?? 0) : null,
+      terrainSource: spot.terrain_source,
+      colourShift: {
+        altitude: spot.elevation === null ? 0 : altitudeShift(spot.elevation),
+        exposition: aspectShift(spot.aspect, spot.slope),
+      },
+      colourShiftDays: spot.elevation === null && spot.terrain_source === null ? null
+        : altitudeShift(spot.elevation) + aspectShift(spot.aspect, spot.slope),
       species: spotSpecies(id),
       photos: photos.map(photoJson),
     };
@@ -543,14 +569,30 @@ function createApp({
     const id = idParam(req, res);
     if (id === null) return;
     if (!db.prepare('SELECT 1 FROM spots WHERE id = ?').get(id)) return res.status(404).json({ error: 'Spot nicht gefunden' });
-    const value = req.body?.elevation;
-    if (value !== null && !(Number.isFinite(value) && value > -500 && value < 5000)) {
+    const body = req.body || {};
+    const hasElevation = Object.prototype.hasOwnProperty.call(body, 'elevation');
+    const hasExposition = Object.prototype.hasOwnProperty.call(body, 'exposition');
+    const value = body.elevation;
+    if (hasElevation && value !== null && !(Number.isFinite(value) && value > -500 && value < 5000)) {
       return res.status(400).json({ error: 'Höhe muss eine Zahl zwischen -500 und 5000 m sein' });
     }
+    const expo = body.exposition;
+    if (hasExposition && expo !== null && expo !== 'eben' && !COMPASS.includes(expo)) {
+      return res.status(400).json({ error: `Exposition muss eben, ${COMPASS.join(', ')} oder null sein` });
+    }
+    if (!hasElevation && !hasExposition) return res.status(400).json({ error: 'elevation oder exposition angeben' });
     try {
-      db.prepare('UPDATE spots SET elevation = ?, elevation_source = ? WHERE id = ?')
-        .run(value === null ? null : Math.round(value), value === null ? null : 'manual', id);
-      if (value === null) await ensureElevation(id);
+      if (hasElevation) {
+        db.prepare('UPDATE spots SET elevation = ?, elevation_source = ? WHERE id = ?')
+          .run(value === null ? null : Math.round(value), value === null ? null : 'manual', id);
+      }
+      if (hasExposition) {
+        // A chosen exposition stands for a clearly inclined slope (20°); "eben" for flat ground.
+        if (expo === null) db.prepare('UPDATE spots SET slope = NULL, aspect = NULL, terrain_source = NULL WHERE id = ?').run(id);
+        else db.prepare("UPDATE spots SET slope = ?, aspect = ?, terrain_source = 'manual' WHERE id = ?")
+          .run(expo === 'eben' ? 0 : 20, expo === 'eben' ? null : aspectFromCompass(expo), id);
+      }
+      if (value === null || expo === null) await ensureElevation(id);
       reassessSpot(id);
       // Weather is downscaled to the altitude: refresh the spot's contexts in the background.
       for (const { id: photoId } of db.prepare('SELECT id FROM photos WHERE spot_id = ? AND context_json IS NOT NULL').all(id)) {

@@ -141,3 +141,37 @@ test('colouring that is early in the lowlands can be on time in the mountains', 
   const early = aug25.find((i) => i.type === 'fruehe_verfaerbung');
   assert.match(early.text, /1100 m ü\. M\. \(17 Tage früher als im Flachland\) typischerweise um den 13\.09\. /);
 });
+
+const { slopeAspect } = require('../src/elevation');
+const { aspectShift, terrainShift, aspectLabel } = require('../src/phenology');
+
+test('slope and aspect from a 3×3 elevation grid (Horn)', () => {
+  // North row first, west column first; 90 m spacing.
+  assert.deepEqual(slopeAspect([110, 110, 110, 100, 100, 100, 90, 90, 90], 90), { slope: 6.3, aspect: 180 });
+  assert.deepEqual(slopeAspect([110, 100, 90, 110, 100, 90, 110, 100, 90], 90), { slope: 6.3, aspect: 90 });
+  assert.deepEqual(slopeAspect([100, 100, 100, 100, 100, 100, 100, 100, 100], 90), { slope: 0, aspect: null });
+  assert.equal(aspectLabel(180, 6.3), 'Südhang');
+  assert.equal(aspectLabel(315, 10), 'Nordwesthang');
+  assert.equal(aspectLabel(180, 1), 'eben');
+});
+
+test('south slopes colour a little later, north slopes earlier, scaled by steepness', () => {
+  assert.equal(aspectShift(180, 25), 4);
+  assert.equal(aspectShift(0, 25), -4);
+  assert.equal(aspectShift(180, 10), 2);
+  assert.equal(aspectShift(90, 30), 0, 'east and west are neutral');
+  assert.equal(aspectShift(180, 2), 0, 'flat ground');
+  assert.equal(terrainShift({ elevation: 1000, aspect: 0, slope: 30 }), -19);
+});
+
+test('exposition enters the early-colouring rule and the drought text', () => {
+  const change = { summary: [{ class: 'verfaerbung', area: 0.1 }] };
+  const beech = [tree('Rotbuche')];
+  // Rotbuche, lowland ~30 Sept. On a steep north slope it starts ~26 Sept: 27 Sept is on time.
+  const sept27 = Date.UTC(2026, 8, 27);
+  assert.ok(assess({ takenAt: sept27, change, species: beech }).some((i) => i.type === 'fruehe_verfaerbung'));
+  assert.ok(!assess({ takenAt: sept27, change, species: beech, aspect: 0, slope: 25 }).some((i) => i.type === 'fruehe_verfaerbung'));
+  const south = assess({ takenAt: Date.UTC(2026, 7, 20), change, species: beech, weather: drought, elevation: 1000, aspect: 190, slope: 22 });
+  assert.match(south.find((i) => i.type === 'fruehe_verfaerbung').text, /auf 1000 m ü\. M\. am Südhang \(11 Tage früher als im Flachland\)/);
+  assert.match(south.find((i) => i.type === 'trockenheit').text, /Südhang \(22° steil\) trocknet/);
+});

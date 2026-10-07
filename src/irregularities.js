@@ -8,7 +8,7 @@
  */
 
 const { doy } = require('./weather');
-const { altitudeShift, expectedColourDoy } = require('./phenology');
+const { terrainShift, expectedColourDoy, aspectLabel, sunnySlope } = require('./phenology');
 
 // Natural autumn colouring of beech, oak and maple in the Central European
 // lowlands usually starts in the second half of September.
@@ -29,7 +29,8 @@ const names = (list) => list.map((t) => t.de).join(', ');
  * they set the expected start of autumn colouring and add species-specific
  * risks (bark beetle on drought-stressed spruce, ash dieback, ...).
  */
-function assess({ takenAt, tags = [], change = null, weather = null, species = [], elevation = null }) {
+function assess({ takenAt, tags = [], change = null, weather = null, species = [], elevation = null, aspect = null, slope = null }) {
+  const terrain = { elevation, aspect, slope };
   const out = [];
   const w = weather?.last90;
   const colouredRegion = (change?.summary || []).find((s) => s.class === 'verfaerbung' && s.area >= 0.02);
@@ -49,7 +50,8 @@ function assess({ takenAt, tags = [], change = null, weather = null, species = [
       text: `In den 90 Tagen vor der Aufnahme fielen ${Math.round(w.precip)} mm Niederschlag, ` +
         `${pct(w.precipRatio)} des Mittels 1991–2020 (${Math.round(w.precipNormal)} mm). ` +
         `Längste Phase ohne nennenswerten Regen: ${w.longestDrySpell} Tage.` +
-        (sensitive.length ? ` Besonders trockenheitsempfindlich an diesem Spot: ${names(sensitive)}.` : ''),
+        (sensitive.length ? ` Besonders trockenheitsempfindlich an diesem Spot: ${names(sensitive)}.` : '') +
+        (sunnySlope(aspect, slope) ? ` Am ${aspectLabel(aspect, slope)} (${Math.round(slope)}° steil) trocknet der Boden durch die stärkere Sonneneinstrahlung zusätzlich schneller aus.` : ''),
     });
   } else if (w?.precipRatio >= 1.5) {
     out.push({
@@ -99,9 +101,9 @@ function assess({ takenAt, tags = [], change = null, weather = null, species = [
   }
 
   // Expected start of colouring at this spot: earliest colouring species, shifted for altitude.
-  const shift = altitudeShift(elevation);
+  const shift = terrainShift(terrain);
   const autumnStart = deciduous.length
-    ? Math.min(...deciduous.map((t) => expectedColourDoy(t.colourDoy, elevation)))
+    ? Math.min(...deciduous.map((t) => expectedColourDoy(t.colourDoy, terrain)))
     : AUTUMN_START_DOY + shift;
   const veryEarly = autumnStart - (AUTUMN_START_DOY - VERY_EARLY_DOY);
   const deciduousCanColour = !species.length || deciduous.length;
@@ -109,10 +111,14 @@ function assess({ takenAt, tags = [], change = null, weather = null, species = [
     const source = coloured
       ? `Auf ${pct(coloured.area)} der Ansicht hat sich das Laub gegenüber dem ersten Foto gelb oder braun verfärbt`
       : 'Laubverfärbung beobachtet';
-    const first = deciduous.find((t) => expectedColourDoy(t.colourDoy, elevation) === autumnStart);
-    const where = Number.isFinite(elevation) && shift !== 0
-      ? `auf ${Math.round(elevation)} m ü. M. (${Math.abs(shift)} ${Math.abs(shift) === 1 ? 'Tag' : 'Tage'} ${shift < 0 ? 'früher' : 'später'} als im Flachland)`
-      : 'im Flachland';
+    const first = deciduous.find((t) => expectedColourDoy(t.colourDoy, terrain) === autumnStart);
+    const place = [
+      Number.isFinite(elevation) ? `auf ${Math.round(elevation)} m ü. M.` : null,
+      aspectLabel(aspect, slope) !== 'eben' ? `am ${aspectLabel(aspect, slope)}` : null,
+    ].filter(Boolean).join(' ');
+    const where = place && shift !== 0
+      ? `${place} (${Math.abs(shift)} ${Math.abs(shift) === 1 ? 'Tag' : 'Tage'} ${shift < 0 ? 'früher' : 'später'} als im Flachland)`
+      : place || 'im Flachland';
     const reference = first
       ? `Bei ${first.de} beginnt die Herbstfärbung ${where} typischerweise um den ${fmtDoy(autumnStart)}`
       : `Die natürliche Herbstfärbung beginnt ${where} meist erst um den ${fmtDoy(autumnStart)}`; // date ends with ".

@@ -67,6 +67,9 @@ const MIGRATIONS = [
   ['photos', 'altitude', 'REAL'], // GPS altitude from EXIF (m)
   ['spots', 'elevation', 'REAL'], // terrain elevation (m a.s.l.)
   ['spots', 'elevation_source', 'TEXT'], // 'dem' | 'gps' | 'manual'
+  ['spots', 'slope', 'REAL'], // terrain slope (°)
+  ['spots', 'aspect', 'REAL'], // direction the slope faces (° from north), null when flat
+  ['spots', 'terrain_source', 'TEXT'], // 'dem' | 'manual'
 ];
 
 function openDb(file) {
