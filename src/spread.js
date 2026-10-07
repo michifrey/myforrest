@@ -104,93 +104,188 @@ function slope(xs, ys) {
 const roundRate = (v) => (v < 100 ? Math.round(v / 5) * 5 : Math.round(v / 10) * 10);
 
 /**
+ * Front radius and spread rate of findings ({ xy, year }) around the
+ * centroid of the first year's findings. `years` lists the years to
+ * evaluate (cumulative); the rate needs at least two of them.
+ */
+function frontRate(items, years) {
+  const first = items.filter((i) => i.year === years[0]);
+  const origin = [first.reduce((s, i) => s + i.xy[0], 0) / first.length, first.reduce((s, i) => s + i.xy[1], 0) / first.length];
+  const dist = ([x, y]) => Math.hypot(x - origin[0], y - origin[1]);
+  const radii = [];
+  const pushVectors = [];
+  let prevRadius = null;
+  for (const year of years) {
+    const cumulative = items.filter((i) => i.year <= year);
+    const radius = cumulative.length ? Math.max(...cumulative.map((i) => dist(i.xy))) : 0;
+    if (prevRadius !== null) {
+      for (const i of items.filter((it) => it.year === year)) {
+        const d = dist(i.xy);
+        if (d > prevRadius && d > 0) pushVectors.push({ dx: i.xy[0] - origin[0], dy: i.xy[1] - origin[1], d, w: d - prevRadius });
+      }
+    }
+    radii.push(radius);
+    prevRadius = radius;
+  }
+  if (years.length < 2) return { origin, radii, rate: null };
+  const mPerYear = Math.max(0, slope(years, radii));
+  let direction = null;
+  if (pushVectors.length) {
+    let sx = 0; let sy = 0; let sum = 0;
+    for (const v of pushVectors) {
+      sx += (v.dx / v.d) * v.w;
+      sy += (v.dy / v.d) * v.w;
+      sum += v.w;
+    }
+    if (sum > 0 && Math.hypot(sx, sy) >= 0.35 * sum) direction = Math.round(bearing(sx, sy));
+  }
+  const span = `${years[0]}–${years[years.length - 1]}`;
+  const text = mPerYear < 1
+    ? `Keine Ausbreitung erkennbar (${span})`
+    : `Ausbreitung ~${roundRate(mPerYear)} m/Jahr ${direction !== null ? `nach ${compass8(direction)}` : 'in alle Richtungen'} (${span})`;
+  return {
+    origin,
+    radii,
+    rate: { mPerYear: Math.round(mPerYear), direction, compass: direction !== null ? compass8(direction) : null, text },
+  };
+}
+
+const centroid = (xys) => [xys.reduce((s, p) => s + p[0], 0) / xys.length, xys.reduce((s, p) => s + p[1], 0) / xys.length];
+
+function pointInRing([px, py], ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * Patches (Teilbestände): the separate polygons of the newest alpha shape.
+ * Each finding belongs to the patch that contains it (or the nearest one),
+ * and every patch gets its own history: since when it exists, its area
+ * and front radius per year, its own spread rate and direction, and – if
+ * it appeared after the first year – how far it lies from the findings
+ * that existed before (a jump, e.g. seeds carried by water or machines).
+ */
+function patchesOf(items, finalShape, yearList, frame, toLatLon) {
+  const outers = finalShape.polygons.map((poly) => poly[0]);
+  const owner = items.map((i) => {
+    const k = outers.findIndex((ring) => pointInRing(i.xy, ring));
+    if (k >= 0) return k;
+    let best = 0; let bestD = Infinity;
+    outers.forEach((ring, idx) => {
+      for (const p of ring) {
+        const d = Math.hypot(p[0] - i.xy[0], p[1] - i.xy[1]);
+        if (d < bestD) { bestD = d; best = idx; }
+      }
+    });
+    return best;
+  });
+  const groups = outers.map((ring, k) => Object.assign(items.filter((_, n) => owner[n] === k), { ring }))
+    .filter((g) => g.length);
+  // Oldest patch first; among equals the one with more findings.
+  groups.sort((a, b) => Math.min(...a.map((i) => i.year)) - Math.min(...b.map((i) => i.year)) || b.length - a.length);
+  return groups.map((g, n) => {
+    const since = Math.min(...g.map((i) => i.year));
+    const years = yearList.filter((y) => y >= since);
+    const { origin, radii, rate } = frontRate(g, years);
+    const perYear = years.map((year, k) => {
+      const cumulative = g.filter((i) => i.year <= year).map((i) => i.xy);
+      return {
+        year,
+        count: g.filter((i) => i.year === year).length,
+        cumulativeCount: cumulative.length,
+        areaM2: alphaShape(cumulative, frame).areaM2,
+        frontRadiusM: Math.round(radii[k]),
+      };
+    });
+    // A patch that appeared later: distance to the nearest finding of an earlier year.
+    let jump = null;
+    if (since > yearList[0]) {
+      const earlier = items.filter((i) => i.year < since);
+      const firstOnes = g.filter((i) => i.year === since);
+      let best = Infinity; let from = null;
+      for (const a of firstOnes) {
+        for (const e of earlier) {
+          const d = Math.hypot(a.xy[0] - e.xy[0], a.xy[1] - e.xy[1]);
+          if (d < best) { best = d; from = e; }
+        }
+      }
+      if (from) {
+        const fromPatch = groups.findIndex((other) => other.includes(from)) + 1;
+        const [cx, cy] = centroid(firstOnes.map((i) => i.xy));
+        jump = { distanceM: Math.round(best), fromPatch, compass: compass8(bearing(cx - from.xy[0], cy - from.xy[1])) };
+      }
+    }
+    const areaGrowth = perYear.length >= 2 ? Math.round(slope(years, perYear.map((y) => y.areaM2))) : null;
+    const label = `Teilbestand ${n + 1}`;
+    return {
+      id: n + 1,
+      label,
+      since,
+      count: g.length,
+      areaM2: perYear[perYear.length - 1].areaM2,
+      centroid: toLatLon(centroid(g.map((i) => i.xy))),
+      outline: g.ring.map(toLatLon),
+      origin: toLatLon(origin),
+      years: perYear,
+      rate: rate && { ...rate, areaM2PerYear: areaGrowth },
+      jump,
+      text: rate ? rate.text : `Erst seit ${since} – Ausbreitung noch nicht abschätzbar`,
+    };
+  });
+}
+
+/**
  * Spread analysis for a list of occurrences of one species
- * ({ lat, lon, takenAt } each). Returns per-year hulls and the rate estimate.
+ * ({ lat, lon, takenAt } each). Returns per-year outlines, the rate estimate
+ * for the whole species and – with alpha shapes – per patch.
  */
 function spreadFronts(occurrences, { buffer = 25, alpha = 'auto' } = {}) {
   const pts = occurrences.filter((o) => Number.isFinite(o.lat) && Number.isFinite(o.lon) && Number.isFinite(o.takenAt));
-  if (!pts.length) return { years: [], rate: null, origin: null, shape: alpha === null ? 'convex' : 'alpha', method: methodText(alpha === null) };
+  if (!pts.length) return { years: [], rate: null, origin: null, patches: [], shape: alpha === null ? 'convex' : 'alpha', method: methodText(alpha === null) };
   const proj = projection(pts);
-  const yearOf = (o) => new Date(o.takenAt).getUTCFullYear();
-  const yearList = [...new Set(pts.map(yearOf))].sort((a, b) => a - b);
-  const xyOf = new Map(pts.map((o) => [o, proj.toXY(o)]));
-
-  const firstXY = pts.filter((o) => yearOf(o) === yearList[0]).map((o) => xyOf.get(o));
-  const origin = [firstXY.reduce((s, p) => s + p[0], 0) / firstXY.length, firstXY.reduce((s, p) => s + p[1], 0) / firstXY.length];
-  const dist = ([x, y]) => Math.hypot(x - origin[0], y - origin[1]);
-  const allXY = pts.map((o) => xyOf.get(o));
+  const toLatLon = (p) => proj.toLatLon(p).map((v) => Math.round(v * 1e6) / 1e6);
+  const items = pts.map((o) => ({ xy: proj.toXY(o), year: new Date(o.takenAt).getUTCFullYear() }));
+  const yearList = [...new Set(items.map((i) => i.year))].sort((a, b) => a - b);
+  const allXY = items.map((i) => i.xy);
   const alphaM = alpha === null ? null : (alpha === 'auto' ? autoAlpha(allXY, buffer) : alpha);
   const frame = alphaM === null ? null : createFrame(allXY, { alpha: alphaM, buffer });
-  const toLatLon = (p) => proj.toLatLon(p).map((v) => Math.round(v * 1e6) / 1e6);
+  const whole = frontRate(items, yearList);
 
-  const years = [];
-  const pushVectors = [];
-  let prevRadius = null;
-  for (const year of yearList) {
-    const cumulative = pts.filter((o) => yearOf(o) <= year).map((o) => xyOf.get(o));
-    const fresh = pts.filter((o) => yearOf(o) === year);
+  let lastShape = null;
+  const years = yearList.map((year, k) => {
+    const cumulative = items.filter((i) => i.year <= year).map((i) => i.xy);
     const hull = bufferedHull(cumulative, buffer);
     const shape = frame ? alphaShape(cumulative, frame) : null;
-    const radius = Math.max(...cumulative.map(dist));
-    if (prevRadius !== null) {
-      for (const o of fresh) {
-        const p = xyOf.get(o);
-        const d = dist(p);
-        if (d > prevRadius && d > 0) pushVectors.push({ dx: p[0] - origin[0], dy: p[1] - origin[1], d, w: d - prevRadius });
-      }
-    }
-    years.push({
+    lastShape = shape;
+    return {
       year,
-      count: fresh.length,
+      count: items.filter((i) => i.year === year).length,
       cumulativeCount: cumulative.length,
       areaM2: shape ? shape.areaM2 : Math.round(polygonArea(hull)),
       convexAreaM2: Math.round(polygonArea(hull)),
       patches: shape ? shape.patches : 1,
-      frontRadiusM: Math.round(radius),
+      frontRadiusM: Math.round(whole.radii[k]),
       hull: hull.map(toLatLon),
       // Polygons as [outer, ...holes] (Leaflet's multipolygon nesting); the convex hull when α is off.
       polygons: shape ? shape.polygons.map((poly) => poly.map((ring) => ring.map(toLatLon))) : [[hull.map(toLatLon)]],
-    });
-    prevRadius = radius;
-  }
+    };
+  });
 
-  let rate = null;
-  if (yearList.length >= 2) {
-    const mPerYear = Math.max(0, slope(years.map((y) => y.year), years.map((y) => y.frontRadiusM)));
-    let direction = null;
-    let directed = false;
-    if (pushVectors.length) {
-      let sx = 0; let sy = 0; let sum = 0;
-      for (const v of pushVectors) {
-        sx += (v.dx / v.d) * v.w;
-        sy += (v.dy / v.d) * v.w;
-        sum += v.w;
-      }
-      if (sum > 0 && Math.hypot(sx, sy) >= 0.35 * sum) {
-        direction = Math.round(bearing(sx, sy));
-        directed = true;
-      }
-    }
-    const span = `${yearList[0]}–${yearList[yearList.length - 1]}`;
-    let text;
-    if (mPerYear < 1) text = `Keine Ausbreitung erkennbar (${span})`;
-    else {
-      text = `Ausbreitung ~${roundRate(mPerYear)} m/Jahr ${directed ? `nach ${compass8(direction)}` : 'in alle Richtungen'} (${span})`;
-    }
-    rate = { mPerYear: Math.round(mPerYear), direction, compass: directed ? compass8(direction) : null, text };
-  }
-
-  const areaGrowth = years.length >= 2
-    ? Math.round(slope(years.map((y) => y.year), years.map((y) => y.areaM2)))
-    : null;
-
+  const areaGrowth = years.length >= 2 ? Math.round(slope(yearList, years.map((y) => y.areaM2))) : null;
+  const rate = whole.rate && { ...whole.rate, areaM2PerYear: areaGrowth };
   return {
-    origin: proj.toLatLon(origin).map((v) => Math.round(v * 1e6) / 1e6),
+    origin: toLatLon(whole.origin),
     bufferM: buffer,
     shape: frame ? 'alpha' : 'convex',
     alphaM,
     years,
-    rate: rate && { ...rate, areaM2PerYear: areaGrowth },
+    rate,
+    patches: frame ? patchesOf(items, lastShape, yearList, frame, toLatLon) : [],
     text: rate ? rate.text : `Funde aus nur einem Jahr (${yearList[0]}) – Ausbreitung noch nicht abschätzbar`,
     method: methodText(!frame),
   };
@@ -202,6 +297,8 @@ const methodText = (convex) => (convex
     + 'erreicht), jeder Fund um den Puffer erweitert; Funde, die mehr als 2α auseinanderliegen, bilden eigene '
     + 'Teilbestände, fundfreie Flächen breiter als 2α bleiben Lücken. ')
   + 'Rate: Steigung (kleinste Quadrate) des Abstands vom Schwerpunkt der Erstfunde zum jeweils entferntesten Fund. '
-  + 'Richtung: gewichtetes Mittel der Funde, die die Front nach aussen geschoben haben.';
+  + 'Richtung: gewichtetes Mittel der Funde, die die Front nach aussen geschoben haben.'
+  + (convex ? '' : ' Pro Teilbestand dasselbe, ab seinem ersten Fund und mit dessen Schwerpunkt als Ursprung; ein später '
+    + 'entstandener Teilbestand nennt den Abstand zum nächsten älteren Fund (Sprung).');
 
 module.exports = { spreadFronts, convexHull, polygonArea, compass8 };

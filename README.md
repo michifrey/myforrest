@@ -274,7 +274,15 @@ den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen und eine Notiz.
     90 % der Funde einen Nachbarn haben), lässt sich aber auch fest wählen (50 m bis 1 km) oder auf die
     konvexe Hülle umstellen. Fläche und Anzahl Teilbestände stehen pro Jahr in der Tabelle. Technisch ist es
     die α-Hülle als morphologisches Schliessen auf einem Raster (Dilatation um α, Erosion um α − Puffer, mit
-    exakten Distanztransformationen), umrandet per Marching Squares. Dazu eine Schätzung wie „Ausbreitung ~120 m/Jahr nach NO“: Die Rate ist die
+    exakten Distanztransformationen), umrandet per Marching Squares.
+  - **Ausbreitung pro Teilbestand**: Jeder Teilbestand des neusten Umrisses bekommt seine eigene Geschichte:
+    seit wann es ihn gibt, Fläche und Frontabstand pro Jahr, Flächenzuwachs pro Jahr und eine eigene Rate
+    mit Richtung (gleiche Methode wie für die ganze Art, aber ab seinem ersten Fund und mit dessen Schwerpunkt
+    als Ursprung). Ein später entstandener Teilbestand nennt den **Sprung**: den Abstand und die Richtung zum
+    nächsten älteren Fund, z. B. „Sprung: 945 m nach NO von Teilbestand 1“ – typisch für Samen, die mit
+    Wasser, Erde oder Maschinen verschleppt wurden. Die Liste im Panel hebt den Teilbestand beim Überfahren
+    auf der Karte hervor und zoomt per Klick hin; Teilbestände, die es im gewählten Jahr noch nicht gibt,
+    sind abgeblendet. Dazu eine Schätzung wie „Ausbreitung ~120 m/Jahr nach NO“: Die Rate ist die
     Steigung (kleinste Quadrate) des Abstands vom Schwerpunkt der Erstfunde zum jeweils entferntesten Fund,
     die Richtung das gewichtete Mittel der Funde, die die Front nach aussen geschoben haben. Zeigen diese in
     alle Richtungen, steht „in alle Richtungen“. Die Schätzung hängt stark davon ab, wo gesucht wurde, und ist
@@ -548,7 +556,7 @@ und `hidden`. Schreibende Anfragen mit Sitzungs-Cookie brauchen den Header `X-CS
 | `POST`   | `/api/photos/:id/identify`   | Pflanzen bestimmen (Pl@ntNet)                            |
 | `GET`    | `/api/species`               | Arten mit Funden: Anzahl, Spots, Jahre, Neophyt ja/nein  |
 | `GET`    | `/api/occurrences`           | Funde (bestes Pl@ntNet-Ergebnis pro Foto). Filter für diese und die folgenden Routen: `species`, `neophytes=1`, `minScore` (Standard 0,2), `bbox=west,süd,ost,nord`, `from`/`to` (Datum) |
-| `GET`    | `/api/spread?species=`       | Ausbreitungsfronten einer Art: Umriss (`polygons` mit Lücken), Fläche, Teilbestände und Frontabstand pro Jahr, Rate und Richtung (`buffer` in m, Standard 25; `alpha` in m, Standard automatisch; `shape=convex` für die konvexe Hülle) |
+| `GET`    | `/api/spread?species=`       | Ausbreitungsfronten einer Art: Umriss (`polygons` mit Lücken), Fläche, Teilbestände und Frontabstand pro Jahr, Rate und Richtung, dazu `patches` mit Rate, Richtung, Flächenzuwachs und Sprung pro Teilbestand (`buffer` in m, Standard 25; `alpha` in m, Standard automatisch; `shape=convex` für die konvexe Hülle) |
 | `GET`    | `/api/export/dwc.csv`        | Funde als Darwin-Core-Occurrence-CSV (Info Flora, GBIF)  |
 | `GET`    | `/api/export/inaturalist.csv` | Funde im CSV-Importformat von iNaturalist               |
 | `GET`    | `/api/spots/:id/vegetation`  | Grünanteil, Kronendach-Deckung, Lückenanteil und GCC pro Foto (`pending`: noch in Berechnung) |
@@ -600,7 +608,8 @@ und `hidden`. Schreibende Anfragen mit Sitzungs-Cookie brauchen den Header `X-CS
 - Arten und Neophyten: Hotspot-Karten, Ausbreitungsfronten und Datei-Export zu Info Flora / iNaturalist
   sind umgesetzt. Offen: direkter Upload über die APIs (OAuth-Konto bei iNaturalist bzw. Info Flora),
   Bestätigung der automatischen Bestimmungen durch Menschen vor dem Export und eine Korrektur für
-  ungleich verteilten Suchaufwand; die Ausbreitungsrate pro Teilbestand statt für die ganze Art.
+  ungleich verteilten Suchaufwand; Teilbestände über die Jahre verfolgen, auch wenn sie zusammenwachsen
+  (heute zählt die Aufteilung des neusten Jahres).
 - Satellitenkontext ausbauen: NDVI-Rückgänge auch ohne Fotos melden (Frühwarnung für Spots), weitere
   Indizes (z. B. NDMI für Trockenstress, Sentinel-2 B11), Landsat für die Zeit vor 2017; Sturmereignisse
   (z. B. MeteoSchweiz/DWD) als Kontext.

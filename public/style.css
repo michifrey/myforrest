@@ -890,6 +890,22 @@ summary { cursor: pointer; color: var(--muted); font-weight: 600; font-size: 0.9
 .sp-years th:nth-child(-n+2), .sp-years td:nth-child(-n+2) { text-align: left; }
 .sp-years tbody tr { cursor: pointer; }
 .sp-years tr.current td { font-weight: 700; background: color-mix(in srgb, var(--neo) 10%, transparent); }
+.sp-patches h4 { margin: 1rem 0 0.4rem; font: 700 0.8rem/1.3 var(--font-body); }
+.sp-patches ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.sp-patch {
+  display: flex; gap: 0.6rem; align-items: flex-start; justify-content: flex-start; width: 100%; text-align: left; font: inherit; color: inherit;
+  padding: 0.5rem 0.6rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); cursor: pointer;
+}
+.sp-patch:hover, .sp-patch:focus-visible { border-color: var(--neo); }
+.sp-patch.future { opacity: 0.5; }
+.sp-patch-text { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem; min-width: 0; }
+.sp-patch-text b { font-weight: 700; font-size: 0.9rem; }
+.patch-label {
+  display: inline-grid; place-items: center; flex: none; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--surface); color: var(--text); border: 2px solid var(--neo); font: 700 0.7rem/1 var(--font-body);
+  box-shadow: var(--shadow);
+}
+.patch-label.active { background: var(--neo); color: #fff; }
 .sp-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; }
 .sp-checks { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.6rem; font-size: 0.88rem; }
 .sp-dates { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.6rem; font-size: 0.85rem; }

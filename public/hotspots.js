@@ -23,6 +23,7 @@
     occ: [],
     spread: null,
     outline: 'auto', // alpha shape with automatic α, a fixed α in metres, or 'convex'
+    hoverPatch: null, // id of the patch highlighted from the list
     yearIndex: 0,
     playing: null,
     token: 0,
@@ -261,6 +262,19 @@
     if (hs.spread.origin) {
       L.circleMarker(hs.spread.origin, { radius: 3, weight: 2, color: cssToken('--text', '#1b2a1f'), fill: false, interactive: false }).addTo(frontLayer);
     }
+    // Patches (Teilbestände) that exist by the chosen year: number at their centre, the hovered one outlined.
+    const year = ys[hs.yearIndex].year;
+    for (const p of hs.spread.patches || []) {
+      if (p.since > year) continue;
+      if (hs.hoverPatch === p.id) {
+        L.polygon(p.outline, { color: cssToken('--text', '#1b2a1f'), weight: 2.5, dashArray: '6 4', fill: false, interactive: false }).addTo(frontLayer);
+      }
+      L.marker(p.centroid, {
+        icon: L.divIcon({ className: '', html: `<span class="patch-label${hs.hoverPatch === p.id ? ' active' : ''}">${p.id}</span>`, iconSize: null, iconAnchor: [10, 10] }),
+        keyboard: false,
+        zIndexOffset: 600,
+      }).bindTooltip(`${p.label}: ${p.text}`).addTo(frontLayer);
+    }
   }
 
   /* ---------- Panel ---------- */
@@ -314,6 +328,7 @@
           el('output', { id: 'sp-year-out', for: 'sp-year', class: 'sp-out' }),
         ]),
         el('div', { id: 'sp-years', class: 'sp-years' }),
+        el('div', { id: 'sp-patches', class: 'sp-patches' }),
         el('p', { id: 'sp-method', class: 'wx-source' }),
       ]),
       el('div', { id: 'sp-export', role: 'tabpanel', hidden: '' }, [
@@ -396,11 +411,40 @@
         el('td', { text: `${fmt(y.frontRadiusM)} m` }),
       ]))),
     ])] : []));
+    renderPatches();
     const auto = s?.shape === 'alpha' && hs.outline === 'auto' ? ' (automatisch: 2,5-mal der Abstand, innerhalb dessen 90 % der Funde einen Nachbarn haben)' : '';
     $('sp-outline').options[0].textContent = s?.shape === 'alpha' && hs.outline === 'auto' ? `Alpha-Shape, α automatisch (${fmt(s.alphaM)} m)` : 'Alpha-Shape, α automatisch';
     $('sp-method').textContent = s
       ? `Methode: ${s.method}${s.shape === 'alpha' ? ` α = ${fmt(s.alphaM)} m${auto}.` : ''} Puffer ${s.bufferM} m um jeden Fund. Die Schätzung hängt stark davon ab, wo gesucht wurde.`
       : '';
+  }
+
+  /** Spread per patch: since when, how large, how fast and where to; later patches with their jump. */
+  function renderPatches() {
+    const s = hs.spread;
+    const patches = s?.patches || [];
+    if (!s || s.shape !== 'alpha' || patches.length < 2) { $('sp-patches').replaceChildren(); return; }
+    const year = s.years[hs.yearIndex]?.year;
+    const ha = (m2) => `${fmt(m2 / 10000, 2)} ha`;
+    $('sp-patches').replaceChildren(
+      el('h4', { text: `Ausbreitung pro Teilbestand (${patches.length})` }),
+      el('ol', {}, patches.map((p) => {
+        const growth = p.rate?.areaM2PerYear ? ` (${p.rate.areaM2PerYear > 0 ? '+' : '−'}${ha(Math.abs(p.rate.areaM2PerYear))}/Jahr)` : '';
+        return el('li', {}, el('button', {
+          type: 'button',
+          class: `sp-patch${p.since > year ? ' future' : ''}`,
+          'data-id': String(p.id),
+          title: p.since > year ? `entsteht erst ${p.since}` : '',
+        }, [
+          el('span', { class: 'patch-label', text: String(p.id) }),
+          el('span', { class: 'sp-patch-text' }, [
+            el('span', { class: 'small muted', text: `seit ${p.since} · ${fmt(p.count)} ${p.count === 1 ? 'Fund' : 'Funde'} · ${ha(p.areaM2)}${growth}` }),
+            el('b', { text: p.text.replace(/^Ausbreitung /, '') }),
+            p.jump ? el('span', { class: 'small', text: `Sprung: ${p.jump.distanceM >= 1000 ? `${fmt(p.jump.distanceM / 1000, 1)} km` : `${fmt(p.jump.distanceM)} m`} nach ${p.jump.compass} von Teilbestand ${p.jump.fromPatch}` }) : '',
+          ]),
+        ]));
+      })),
+    );
   }
 
   function exportQuery() {
@@ -529,6 +573,16 @@
   });
   $('sp-outline').addEventListener('change', (e) => { hs.outline = e.target.value; hs.keepView = true; loadSpread(); });
   $('sp-year').addEventListener('input', (e) => { stopPlay(); setYear(Number(e.target.value)); });
+  const patchOf = (e) => hs.spread?.patches?.find((p) => String(p.id) === e.target.closest('.sp-patch')?.dataset.id);
+  const hoverPatch = (id) => { if (hs.hoverPatch !== id) { hs.hoverPatch = id; drawFronts(); } };
+  $('sp-patches').addEventListener('pointerover', (e) => hoverPatch(patchOf(e)?.id ?? null));
+  $('sp-patches').addEventListener('pointerleave', () => hoverPatch(null));
+  $('sp-patches').addEventListener('focusin', (e) => hoverPatch(patchOf(e)?.id ?? null));
+  $('sp-patches').addEventListener('focusout', () => hoverPatch(null));
+  $('sp-patches').addEventListener('click', (e) => {
+    const p = patchOf(e);
+    if (p) map.fitBounds(L.latLngBounds(p.outline), { padding: [80, 80], maxZoom: 18 });
+  });
   $('sp-years').addEventListener('click', (e) => {
     const row = e.target.closest('tr[data-i]');
     if (row) { stopPlay(); setYear(Number(row.dataset.i)); }
