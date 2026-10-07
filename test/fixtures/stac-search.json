@@ -1,0 +1,76 @@
+{
+  "_comment": "Two result pages of an Earth Search STAC search (sentinel-2-l2a), trimmed to the fields MyForrest reads. Coordinates in UTM 32N.",
+  "pages": [
+    {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "stac_version": "1.0.0",
+          "id": "S2A_32TMT_20230612_0_L2A",
+          "collection": "sentinel-2-l2a",
+          "geometry": { "type": "Polygon", "coordinates": [[[7.6, 46.8], [9.1, 46.8], [9.1, 47.8], [7.6, 47.8], [7.6, 46.8]]] },
+          "properties": {
+            "datetime": "2023-06-12T10:27:41.123000Z",
+            "eo:cloud_cover": 4.2,
+            "proj:epsg": 32632,
+            "s2:processing_baseline": "05.09",
+            "earthsearch:boa_offset_applied": true
+          },
+          "assets": {
+            "red": { "href": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/32/T/MT/2023/6/S2A_32TMT_20230612_0_L2A/B04.tif", "type": "image/tiff; application=geotiff; profile=cloud-optimized", "raster:bands": [{ "nodata": 0, "data_type": "uint16", "scale": 0.0001, "offset": -0.1 }] },
+            "nir": { "href": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/32/T/MT/2023/6/S2A_32TMT_20230612_0_L2A/B08.tif", "type": "image/tiff; application=geotiff; profile=cloud-optimized", "raster:bands": [{ "nodata": 0, "data_type": "uint16", "scale": 0.0001, "offset": -0.1 }] },
+            "scl": { "href": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/32/T/MT/2023/6/S2A_32TMT_20230612_0_L2A/SCL.tif", "type": "image/tiff; application=geotiff; profile=cloud-optimized" },
+            "thumbnail": { "href": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/32/T/MT/2023/6/S2A_32TMT_20230612_0_L2A/thumbnail.jpg", "type": "image/jpeg" }
+          }
+        },
+        {
+          "type": "Feature",
+          "stac_version": "1.0.0",
+          "id": "S2B_32TMT_20230717_0_L2A",
+          "collection": "sentinel-2-l2a",
+          "geometry": { "type": "Polygon", "coordinates": [[[7.6, 46.8], [9.1, 46.8], [9.1, 47.8], [7.6, 47.8], [7.6, 46.8]]] },
+          "properties": {
+            "datetime": "2023-07-17T10:27:39.000000Z",
+            "eo:cloud_cover": 35.0,
+            "proj:epsg": 32632,
+            "s2:processing_baseline": "05.09",
+            "earthsearch:boa_offset_applied": true
+          },
+          "assets": {
+            "red": { "href": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/32/T/MT/2023/7/S2B_32TMT_20230717_0_L2A/B04.tif", "raster:bands": [{ "nodata": 0, "scale": 0.0001, "offset": -0.1 }] },
+            "nir": { "href": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/32/T/MT/2023/7/S2B_32TMT_20230717_0_L2A/B08.tif", "raster:bands": [{ "nodata": 0, "scale": 0.0001, "offset": -0.1 }] },
+            "scl": { "href": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/32/T/MT/2023/7/S2B_32TMT_20230717_0_L2A/SCL.tif" }
+          }
+        }
+      ],
+      "links": [
+        { "rel": "next", "href": "https://earth-search.aws.element84.com/v1/search?page=2", "method": "GET", "type": "application/geo+json" }
+      ]
+    },
+    {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "stac_version": "1.0.0",
+          "id": "S2A_32TMT_20240616_0_L2A",
+          "collection": "sentinel-2-l2a",
+          "geometry": { "type": "Polygon", "coordinates": [[[7.6, 46.8], [9.1, 46.8], [9.1, 47.8], [7.6, 47.8], [7.6, 46.8]]] },
+          "properties": {
+            "datetime": "2024-06-16T10:27:40.500000Z",
+            "eo:cloud_cover": 2.0,
+            "proj:code": "EPSG:32632",
+            "s2:processing_baseline": "05.10"
+          },
+          "assets": {
+            "red": { "href": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/32/T/MT/2024/6/S2A_32TMT_20240616_0_L2A/B04.tif", "raster:bands": [{ "nodata": 0, "scale": 0.0001, "offset": -0.1 }] },
+            "nir": { "href": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/32/T/MT/2024/6/S2A_32TMT_20240616_0_L2A/B08.tif", "raster:bands": [{ "nodata": 0, "scale": 0.0001, "offset": -0.1 }] },
+            "scl": { "href": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/32/T/MT/2024/6/S2A_32TMT_20240616_0_L2A/SCL.tif" }
+          }
+        }
+      ],
+      "links": []
+    }
+  ]
+}

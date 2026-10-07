@@ -37,6 +37,12 @@ async function api(url, options) {
   return body;
 }
 
+/** Posts an upload. offline-queue.js (if loaded) parks it on the device when there is no connection. */
+function postPhotos(fd) {
+  const send = () => api('/api/photos', { method: 'POST', body: fd });
+  return window.offlineQueue ? window.offlineQueue.post(fd, send) : send();
+}
+
 function tagClass(tag) {
   if (tag === 'neophyt') return 'chip neo';
   if (DAMAGE_TAGS.includes(tag)) return 'chip damage';
@@ -110,10 +116,11 @@ function applyWarp(img) {
 async function showFramed(stage, img, photo, frame, setAspect = true) {
   const token = (img.dataset.token = String(Number(img.dataset.token || 0) + 1));
   const rel = frame ? relativeAlignment(photo, frame) : null;
-  const size = await imageSize((rel ? frame : photo).url);
+  // The 1280 px preview has the original's aspect ratio, so alignments apply unchanged.
+  const size = await imageSize(viewUrl(rel ? frame : photo));
   if (img.dataset.token !== token) return Boolean(rel);
   if (setAspect) stage.style.setProperty('--ar', String(size.w / size.h));
-  img.src = photo.url;
+  img.src = viewUrl(photo);
   warps.set(img, rel);
   applyWarp(img);
   return Boolean(rel);
@@ -145,30 +152,78 @@ const pinKind = (spot) => {
 };
 const pins = new Map();
 
+/* ---------- Viewing direction and previews ---------- */
+
+const COMPASS_DE = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'];
+const compassLabel = (deg) => COMPASS_DE[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
+const headingText = (deg) => `Blick nach ${compassLabel(deg)} (${Math.round(deg)}°)`;
+const thumbUrl = (p) => p.thumbUrl || p.url;
+const viewUrl = (p) => p.largeUrl || p.url;
+
+/** Other spots at (about) the same place, e.g. the same clearing seen in another direction. */
+function siblingSpots(spot) {
+  const radius = state.config.spotRadiusM || 25;
+  return state.spots.filter((o) => o.id !== spot.id && distanceM(o, spot) <= radius);
+}
+
+const hasHeading = (s) => s.heading !== null && s.heading !== undefined;
+
+/**
+ * Pin anchor: spots sharing a place are pushed apart along their viewing
+ * direction (far enough for neighbouring directions not to overlap), so each
+ * stays clickable; the cone below them marks the actual place.
+ */
+function pinAnchor(s, size) {
+  const others = hasHeading(s) ? siblingSpots(s) : [];
+  if (!others.length) return [size / 2, size * 1.2];
+  const minDiff = Math.min(180, ...others.filter(hasHeading).map((o) => {
+    const d = Math.abs((((s.heading - o.heading) % 360) + 360) % 360);
+    return d > 180 ? 360 - d : d;
+  }));
+  const shift = Math.min(60, Math.max(30, (size + 6) / (2 * Math.sin(Math.max(minDiff, 1) * Math.PI / 360))));
+  const rad = (s.heading * Math.PI) / 180;
+  return [size / 2 - Math.sin(rad) * shift, size * 1.2 + Math.cos(rad) * shift];
+}
+
+/** View cone of a spot, drawn in the shadow pane below all pins. */
+function coneMarker(s) {
+  return L.marker([s.lat, s.lon], {
+    pane: 'shadowPane',
+    interactive: false,
+    keyboard: false,
+    icon: L.divIcon({ className: 'pin-cone', html: `<i style="--h:${Number(s.heading)}deg"></i>`, iconSize: [0, 0], iconAnchor: [0, 0] }),
+  });
+}
+
 function renderMarkers() {
   state.markers.clearLayers();
   pins.clear();
   for (const s of state.spots) {
     const size = Math.round(28 + Math.min(Math.log2(s.photoCount) * 5, 16));
+    const anchor = pinAnchor(s, size);
     const icon = L.divIcon({
       className: 'pin-icon',
-      html: `<div class="pin ${pinKind(s)}${state.spot?.id === s.id ? ' active' : ''}"><b>${s.photoCount}</b>${s.irregularities.length ? '<i class="flag">!</i>' : ''}</div>`,
+      html: `<div class="pin ${pinKind(s)}${state.spot?.id === s.id ? ' active' : ''}"><b>${s.photoCount}</b>${s.irregularities.length ? '<i class="flag">!</i>' : ''}${s.storm ? `<i class="storm-flag" title="Sturm">${WIND_ICON}</i>` : ''}</div>`,
       iconSize: [size, size],
-      iconAnchor: [size / 2, size * 1.2],
-      tooltipAnchor: [0, -size * 1.1],
+      iconAnchor: anchor,
+      tooltipAnchor: [size / 2 - anchor[0], -size * 1.1 + (size * 1.2 - anchor[1])],
     });
     const m = L.marker([s.lat, s.lon], { icon, title: `Spot ${s.id}`, riseOnHover: true });
     const extra = [
       s.change?.fraction >= 0.05 ? `≈ ${Math.round(s.change.fraction * 100)} % verändert${s.change.top ? ` (${s.change.top})` : ''}` : '',
       ...s.irregularities,
+      s.storm ? `${s.storm.max.text}${s.storm.count > 1 ? ` (stärkstes von ${s.storm.count} Sturmereignissen)` : ''}` : '',
       s.species.length ? `Baumarten: ${s.species.join(', ')}` : '',
+      hasHeading(s) ? headingText(s.heading) : '',
     ].filter(Boolean);
     const tip = el('div', {}, [
+      el('img', { class: 'tip-thumb', src: s.latestThumbUrl || s.latestUrl, alt: '' }),
       el('div', { text: `Spot ${s.id} · ${s.photoCount} Foto${s.photoCount === 1 ? '' : 's'} · ${fmtDate(s.firstTaken)}–${fmtDate(s.lastTaken)}` }),
       ...extra.map((t) => el('div', { class: 'muted', text: t })),
     ]);
     m.bindTooltip(tip, { direction: 'top' });
     m.on('click', () => openSpot(s.id));
+    if (hasHeading(s)) state.markers.addLayer(coneMarker(s));
     state.markers.addLayer(m);
     pins.set(s.id, m);
   }
@@ -182,9 +237,14 @@ async function loadSpots({ fit = false } = {}) {
   const filter = $('tag-filter').value;
   const special = filter.startsWith('@') ? filter : null;
   const tag = special ? '' : filter;
-  const spots = await api(`/api/spots${tag ? `?tag=${encodeURIComponent(tag)}` : ''}`);
+  const [spots, storms] = await Promise.all([
+    api(`/api/spots${tag ? `?tag=${encodeURIComponent(tag)}` : ''}`),
+    api('/api/storms/spots').catch(() => []),
+  ]);
+  for (const s of spots) s.storm = storms.find((x) => x.spotId === s.id) || null;
   state.spots = special === '@change' ? spots.filter((s) => s.change?.fraction >= 0.05)
     : special === '@irregular' ? spots.filter((s) => s.irregularities.length)
+    : special === '@storm' ? spots.filter((s) => s.storm)
       : spots;
   renderMarkers();
   renderStats(!filter);
@@ -228,7 +288,7 @@ function renderStats(updateHero = true) {
   const recent = [...state.spots].sort((a, b) => Date.parse(b.lastTaken) - Date.parse(a.lastTaken)).slice(0, 4);
   $('recent').replaceChildren(...(recent.length
     ? recent.map((s) => el('button', { type: 'button', onclick: () => openSpot(s.id) }, [
-      el('img', { src: s.latestUrl, alt: '', loading: 'lazy' }),
+      el('img', { src: s.latestThumbUrl || s.latestUrl, alt: '', loading: 'lazy' }),
       el('div', {}, [
         el('strong', { text: `Spot ${s.id}` }),
         el('span', { text: `${s.photoCount} Foto${s.photoCount === 1 ? '' : 's'} · zuletzt ${fmtDate(s.lastTaken)}` }),
@@ -258,7 +318,9 @@ async function openSpot(id, photoId) {
   const years = new Set(photos.map((p) => new Date(p.takenAt).getFullYear()));
   $('spot-meta').textContent =
     `${state.spot.lat.toFixed(5)}, ${state.spot.lon.toFixed(5)} · ${photos.length} Foto${photos.length === 1 ? '' : 's'} · ` +
-    `${fmtDate(photos[0].takenAt)} – ${fmtDate(photos[photos.length - 1].takenAt)} (${years.size} Jahr${years.size === 1 ? '' : 'e'})`;
+    `${fmtDate(photos[0].takenAt)} – ${fmtDate(photos[photos.length - 1].takenAt)} (${years.size} Jahr${years.size === 1 ? '' : 'e'})` +
+    (hasHeading(state.spot) ? ` · ${headingText(state.spot.heading)}` : '');
+  renderSiblings(state.spot);
   const allTags = [...new Set(photos.flatMap((p) => p.tags))].sort();
   $('spot-tags').replaceChildren(...allTags.map(tagChip));
 
@@ -269,15 +331,31 @@ async function openSpot(id, photoId) {
   $('t-last').textContent = fmtDate(photos[photos.length - 1].takenAt);
   $('thumbs').replaceChildren(...photos.map((p, i) =>
     el('button', { type: 'button', title: fmtDateTime(p.takenAt), onclick: () => showPhoto(i) },
-      el('img', { src: p.url, alt: `Foto vom ${fmtDate(p.takenAt)}`, loading: 'lazy' }))));
+      el('img', { src: thumbUrl(p), alt: `Foto vom ${fmtDate(p.takenAt)}`, loading: 'lazy' }))));
 
   fillCompareSelects();
   showPhoto(state.index);
   updateSpotChange(state.spot);
   renderChronicle(state.spot);
+  loadSpotStorms(state.spot);
   renderSpecies(state.spot);
   renderElevation(state.spot);
   map.setView([state.spot.lat, state.spot.lon], Math.max(map.getZoom(), 15));
+}
+
+/** Links to spots at the same place that look in another direction. */
+function renderSiblings(spot) {
+  const others = siblingSpots(spot);
+  $('spot-siblings').hidden = !others.length;
+  $('spot-siblings').replaceChildren(...(others.length ? [
+    el('span', { class: 'muted', text: 'Am selben Ort: ' }),
+    ...others.map((o) => el('button', {
+      type: 'button',
+      class: 'link small',
+      onclick: () => openSpot(o.id),
+      text: `Spot ${o.id}${hasHeading(o) ? ` (${compassLabel(o.heading)})` : ''}`,
+    })),
+  ] : []));
 }
 
 function showPhoto(i) {
@@ -310,6 +388,8 @@ function showPhoto(i) {
   renderContext(p);
   $('identify-group').hidden = !state.config.plantnet;
   renderIdentifications(p);
+  window.Account?.photoShown(p); // credit, licence, report/moderation (account.js)
+  document.dispatchEvent(new CustomEvent('myforrest:photo', { detail: p })); // analysis.js
 }
 
 function renderIdentifications(p) {
@@ -338,10 +418,11 @@ const fmtDoy = (d) => new Date(Date.UTC(2023, 0, 1 + d)).toLocaleDateString('de-
 
 function colourText(t, spot) {
   const lowland = `~${fmtDoy(t.colourDoy)}`;
-  if (t.colourDoyHere === null || t.colourDoyHere === t.colourDoy) return `Färbung typisch ab ${lowland} (Flachland)`;
+  if (t.colourDoyHere === null || (t.colourDoyHere === t.colourDoy && !t.colourRef)) return `Färbung typisch ab ${lowland} (Flachland)`;
   const here = [spot.elevation !== null ? `${Math.round(spot.elevation)} m` : null,
     spot.landform === 'senke' ? 'Senke' : null,
     spot.landform !== 'senke' && spot.exposition && spot.exposition !== 'eben' ? spot.exposition : null].filter(Boolean).join(', ');
+  if (t.colourRef) return `Färbung hier${here ? ` (${here})` : ''} typisch ab ~${fmtDoy(t.colourDoyHere)} · ${t.colourRef}`;
   return `Färbung hier (${here}) typisch ab ~${fmtDoy(t.colourDoyHere)}; im Flachland ab ${lowland}`;
 }
 
@@ -557,6 +638,7 @@ async function updateCompare() {
   heat.hidden = true;
   $('cmp-boxes').replaceChildren();
   $('cmp-regions').replaceChildren();
+  document.dispatchEvent(new CustomEvent('myforrest:compare', { detail: { a, b, change: null } })); // analysis.js
   await showFramed($('swipe'), $('cmp-img-a'), a, null);
   const aligned = await showFramed($('swipe'), $('cmp-img-b'), b, alignOn ? a : null, false);
   const canCompare = alignOn && aligned && a.id !== b.id;
@@ -581,6 +663,8 @@ async function updateCompare() {
       }));
     }
     renderRegions(change, b);
+    stormNote(a, b, change, () => token === compareToken);
+    document.dispatchEvent(new CustomEvent('myforrest:compare', { detail: { a, b, change } })); // analysis.js
   } catch {
     // Change detection is an extra; the aligned comparison still works without it.
   }
@@ -776,6 +860,7 @@ async function renderContext(photo) {
   } else if (w) {
     parts.push(el('p', { class: 'calm-note', text: 'Keine Auffälligkeiten gegenüber dem langjährigen Mittel.' }));
   }
+  parts.push(...climateExtras(ctx));
   if (ctx.weather) parts.push(el('p', { class: 'wx-source', text: `Wetterdaten: ${ctx.weather.source}` }));
   body.replaceChildren(...parts);
 }
@@ -783,12 +868,14 @@ async function renderContext(photo) {
 /** All recorded irregularities of a spot, oldest first: the spot's record over the years. */
 function renderChronicle(spot) {
   const items = spot.photos.flatMap((p, index) => (p.context?.irregularities || [])
-    .map((irr) => ({ p, index, irr })));
+    .map((irr) => ({ t: Date.parse(p.takenAt), node: el('li', { 'data-severity': irr.severity }, [
+      el('time', { datetime: p.takenAt, text: fmtDate(p.takenAt) }),
+      el('button', { type: 'button', text: irr.title, onclick: () => showPhoto(index) }),
+    ]) })));
+  items.push(...stormChronicleItems(spot)); // storm events between the visits
+  items.sort((a, b) => a.t - b.t);
   $('chronicle-wrap').hidden = !items.length;
-  $('chronicle').replaceChildren(...items.map(({ p, index, irr }) => el('li', { 'data-severity': irr.severity }, [
-    el('time', { datetime: p.takenAt, text: fmtDate(p.takenAt) }),
-    el('button', { type: 'button', text: irr.title, onclick: () => showPhoto(index) }),
-  ])));
+  $('chronicle').replaceChildren(...items.map((i) => i.node));
 }
 
 function updateSwipe() {
@@ -908,6 +995,7 @@ form.addEventListener('submit', async (e) => {
   const created = [];
   const skipped = [];
   const touched = new Set();
+  let queued = 0;
   const BATCH = 10;
   try {
     for (let i = 0; i < files.length; i += BATCH) {
@@ -920,11 +1008,12 @@ form.addEventListener('submit', async (e) => {
         fd.append('lon', String(state.picked.lng));
       }
       if (form.takenAtLocal.value) fd.append('takenAt', new Date(form.takenAtLocal.value).toISOString());
-      for (const name of ['activity', 'note', 'utcOffsetMinutes', 'clockShiftSeconds']) fd.append(name, form[name].value);
+      for (const name of ['activity', 'note', 'utcOffsetMinutes', 'clockShiftSeconds', 'license']) fd.append(name, form[name].value);
       const tags = [...$('upload-tags').querySelectorAll('input:checked')].map((c) => c.value);
       fd.append('tags', tags.join(','));
 
-      const res = await api('/api/photos', { method: 'POST', body: fd });
+      const res = await postPhotos(fd);
+      queued += res.queued || 0;
       created.push(...res.created);
       skipped.push(...res.skipped);
       res.spots.forEach((s) => touched.add(s));
@@ -937,6 +1026,7 @@ form.addEventListener('submit', async (e) => {
   }
 
   const result = [el('p', { text: `${created.length} Foto${created.length === 1 ? '' : 's'} gespeichert, ${touched.size} Spot${touched.size === 1 ? '' : 's'} aktualisiert.` })];
+  if (queued) result.push(el('p', { class: 'queued', text: `${queued} Foto${queued === 1 ? ' wartet' : 's warten'} auf Verbindung und ${queued === 1 ? 'wird' : 'werden'} automatisch gesendet.` }));
   if (skipped.length) {
     result.push(el('ul', { class: 'err' }, skipped.map((s) => el('li', { text: `${s.name}: ${s.reason}` }))));
   }
@@ -1055,7 +1145,7 @@ async function openCamera() {
   }
   const photo = state.spot.photos[state.index];
   cam.ref = $('cam-ref');
-  cam.ref.src = photo.url;
+  cam.ref.src = viewUrl(photo);
   await cam.ref.decode().catch(() => {});
   try {
     cam.stream = await navigator.mediaDevices.getUserMedia({
@@ -1136,7 +1226,8 @@ async function uploadRephoto(file, name, position) {
     fd.append('lat', String(position.lat));
     fd.append('lon', String(position.lon));
   }
-  const res = await api('/api/photos', { method: 'POST', body: fd });
+  const res = await postPhotos(fd);
+  if (res.queued) return;
   if (!res.created.length) throw new Error(res.skipped.map((s) => s.reason).join(', ') || 'Upload fehlgeschlagen');
   const created = res.created[0];
   await Promise.all([loadSpots(), openSpot(spotId, created.id)]);
@@ -1186,6 +1277,74 @@ $('rephoto-file').addEventListener('change', async (e) => {
   }
 });
 
+/* ---------- Storms, frost nights in hollows (routes/climate.js) ---------- */
+
+const WIND_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 5.5h8.5a2 2 0 1 0-2-2M1 8.5h12a2 2 0 1 1-2 2M1 11.5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+const fmtTemp = (v) => `${v.toFixed(1).replace('-', '−')} °C`;
+
+/** Loads the storm events of a spot and adds them to the chronicle. */
+async function loadSpotStorms(spot) {
+  const data = await api(`/api/spots/${spot.id}/storms`).catch(() => null);
+  if (!data || state.spot !== spot) return;
+  spot.storms = data.events;
+  renderChronicle(spot);
+}
+
+function stormChronicleItems(spot) {
+  return (spot.storms || []).map((e) => {
+    const t = Date.parse(`${e.date}T12:00:00Z`);
+    // Jump to the windthrow photo, or else to the first photo after the storm.
+    const target = e.windthrowPhotos.length
+      ? spot.photos.findIndex((p) => p.id === e.windthrowPhotos[0])
+      : spot.photos.findIndex((p) => Date.parse(p.takenAt) > t);
+    const label = `${e.bft >= 12 ? 'Orkan' : 'Sturm'}: Böen ${e.gust} km/h${e.from16 ? ` aus ${e.from16}` : ''}` +
+      (e.windthrowPhotos.length ? ' · vermutlich Ursache des Windwurfs' : '');
+    return {
+      t,
+      node: el('li', { class: 'storm', 'data-severity': e.bft >= 11 ? 'stark' : 'auffällig', title: `${e.class}, Beaufort ${e.bft}` }, [
+        el('time', { datetime: e.date, text: fmtDate(t) }),
+        target >= 0 ? el('button', { type: 'button', text: label, onclick: () => showPhoto(target) }) : el('span', { text: label }),
+      ]),
+    };
+  });
+}
+
+/** Frost nights with the estimated minimum in the hollow. */
+function climateExtras(ctx) {
+  const out = [];
+  const nf = ctx.nightFrost;
+  if (nf?.frostNights?.length && nf.strength > 0) {
+    out.push(el('div', { class: 'frost-nights' }, [
+      el('h4', { text: 'Frostnächte in der Senke nach dem Laubaustrieb (geschätzt)' }),
+      el('table', { class: 'frost-table' }, [
+        el('tr', {}, ['Nacht auf', 'Modell', 'Senke', 'Wind', 'Wolken'].map((h) => el('th', { text: h }))),
+        ...nf.frostNights.map((n) => el('tr', {}, [
+          el('td', { text: fmtDate(`${n.date}T12:00:00Z`) }),
+          el('td', { text: fmtTemp(n.tmin) }),
+          el('td', { class: 'est', text: fmtTemp(n.est) }),
+          el('td', { text: `${n.wind.toFixed(1)} m/s` }),
+          el('td', { text: `${n.cloud} %` }),
+        ])),
+      ]),
+      el('p', { class: 'hint', text: 'Windstille, klare Nächte kühlen Senken stärker ab als das Wettermodell zeigt; Schätzung aus Wind, Bewölkung und Geländeform.' }),
+    ]));
+  }
+  return out;
+}
+
+/** In the before/after view: the most likely storm when windthrow shows up. */
+async function stormNote(a, b, change, current) {
+  if (!change.summary.some((s) => s.class === 'windwurf') && !b.tags.includes('sturmschaden')) return;
+  const res = await api(`/api/photos/${a.id}/storm?to=${b.id}`).catch(() => null);
+  if (!res || !current()) return;
+  $('cmp-regions').append(el('p', {
+    class: `storm-note${res.storm ? '' : ' none'}`,
+    text: res.storm
+      ? `Windwurf: ${res.text} (${res.storm.class}).`
+      : `Kein Sturm (Böen ab 75 km/h) zwischen ${fmtDate(res.from)} und ${fmtDate(res.to)} im Wettermodell.`,
+  }));
+}
+
 /* ---------- Init ---------- */
 
 (async function init() {
@@ -1193,6 +1352,7 @@ $('rephoto-file').addEventListener('change', async (e) => {
   $('tag-filter').append(
     el('option', { value: '@change', text: 'Starke Veränderung (≥ 5 %)' }),
     el('option', { value: '@irregular', text: 'Auffälligkeiten' }),
+    el('option', { value: '@storm', text: 'Von Sturm betroffen' }),
   );
   for (const [key, label] of Object.entries(state.config.tags)) {
     $('tag-filter').append(el('option', { value: key, text: label }));

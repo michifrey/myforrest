@@ -11,7 +11,9 @@ const { openDb, transaction } = require('./db');
 const { distanceM, isValidCoord, positionAt } = require('./geo');
 const { parseGpx } = require('./gpx');
 const { readPhotoMeta, imageExtension } = require('./exif');
-const { assignSpot, refreshSpot } = require('./spots');
+const { assignSpot, refreshSpot, backfillSpotHeadings, HEADING_TOLERANCE_DEG } = require('./spots');
+const { isHeic, heicExif, heicToJpeg } = require('./heic');
+const { createThumbnails } = require('./thumbs');
 const { TAGS, parseTags } = require('./tags');
 const { identifyPlant } = require('./plantnet');
 const { alignImages, extractFeatures } = require('./align');
@@ -22,6 +24,7 @@ const { createWeather } = require('./weather');
 const { assess } = require('./irregularities');
 const { TREES, treeInfo, treeJson } = require('./trees');
 const { createElevation } = require('./elevation');
+const registerAccounts = require('./routes/accounts');
 const {
   altitudeShift, aspectShift, coldPoolShift, expectedColourDoy, aspectLabel, aspectFromCompass, COMPASS, LANDFORMS, landform,
 } = require('./phenology');
@@ -33,15 +36,22 @@ const TREE_MIN_SCORE = 0.25;
 function createApp({
   dataDir = path.join(__dirname, '..', 'data'),
   spotRadiusM = 25,
+  headingToleranceDeg = HEADING_TOLERANCE_DEG,
   plantnetKey = process.env.PLANTNET_API_KEY,
   fetchImpl = fetch,
   weatherFetch = fetch,
+  requireLogin = process.env.REQUIRE_LOGIN === '1',
+  adminEmail = process.env.ADMIN_EMAIL || null,
+  rateLimits,
+  detectorUrl = process.env.DETECTOR_URL || null, detectorFetch = fetch,
 } = {}) {
   const uploadDir = path.join(dataDir, 'uploads');
   const tmpDir = path.join(dataDir, 'tmp');
   fs.mkdirSync(uploadDir, { recursive: true });
   fs.mkdirSync(tmpDir, { recursive: true });
   const db = openDb(path.join(dataDir, 'myforrest.db'));
+  backfillSpotHeadings(db);
+  const thumbs = createThumbnails({ db, uploadDir, thumbDir: path.join(dataDir, 'thumbs') });
   const weather = createWeather({ db, fetchImpl: weatherFetch });
   const elevationService = createElevation({ db, fetchImpl: weatherFetch });
 
@@ -53,6 +63,14 @@ function createApp({
   const app = express();
   app.locals.db = db;
   app.use(express.json({ limit: '100kb' }));
+  // Accounts, CSRF, moderation (src/routes/accounts.js); must precede the routes below and /uploads.
+  const accountsCtx = { db, requireLogin, adminEmail, rateLimits };
+  const accounts = registerAccounts(app, accountsCtx);
+  // The service worker must never be served stale from the HTTP cache, or app updates would stall.
+  app.get('/sw.js', (req, res) => {
+    res.set({ 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/' });
+    res.sendFile(path.join(__dirname, '..', 'public', 'sw.js'));
+  });
   app.use(express.static(path.join(__dirname, '..', 'public')));
   app.use('/vendor/leaflet', express.static(path.dirname(require.resolve('leaflet/dist/leaflet.js'))));
   for (const font of ['fraunces', 'manrope']) {
@@ -60,6 +78,7 @@ function createApp({
     app.use(`/vendor/fonts/${font}`, express.static(dir, { maxAge: '30d' }));
   }
   app.use('/uploads', express.static(uploadDir, { maxAge: '7d', immutable: true }));
+  app.use('/thumbs', express.static(path.join(dataDir, 'thumbs'), { maxAge: '7d', immutable: true }));
 
   const tagsOf = db.prepare('SELECT tag FROM photo_tags WHERE photo_id = ? ORDER BY tag');
   const idsOf = db.prepare(
@@ -71,18 +90,22 @@ function createApp({
     id: p.id,
     spotId: p.spot_id,
     url: `/uploads/${p.file}`,
+    ...thumbs.urls(p),
     originalName: p.original_name,
     takenAt: new Date(p.taken_at).toISOString(),
     lat: p.lat,
     lon: p.lon,
     heading: p.heading,
     locationSource: p.location_source,
+    panorama: Boolean(p.panorama),
+    videoTime: p.video_time ?? null,
     activity: p.activity,
     note: p.note,
     tags: tagsOf.all(p.id).map((r) => r.tag),
     alignment: p.align_h ? { h: JSON.parse(p.align_h), inliers: p.align_inliers } : null,
     change: p.change_json ? JSON.parse(p.change_json) : null,
     context: p.context_json ? JSON.parse(p.context_json) : null,
+    ...accounts.photoExtras(p), // uploader, license, hidden
     identifications: idsOf.all(p.id).map((r) => {
       const tree = treeInfo(r.scientific_name);
       return {
@@ -94,6 +117,7 @@ function createApp({
       };
     }),
   });
+  accountsCtx.photoJson = photoJson;
 
   const setTags = (photoId, tags) => {
     db.prepare('DELETE FROM photo_tags WHERE photo_id = ?').run(photoId);
@@ -197,8 +221,8 @@ function createApp({
       if (!t) continue;
       const e = merged.get(t.sci) || {
         ...treeJson(t),
-        // Expected start of colouring at this spot's altitude.
-        colourDoyHere: expectedColourDoy(t.colourDoy, terrain),
+        // Expected start of colouring at this spot: regional reference series if loaded, else gradients.
+        ...((here) => ({ colourDoyHere: here?.doy ?? expectedColourDoy(t.colourDoy, terrain), colourRef: here?.ref.label ?? null }))(climate.colourHere(spotId, t, terrain)),
         sources: [],
         score: null,
       };
@@ -273,14 +297,22 @@ function createApp({
     return terrainOf(spotId).elevation;
   }
 
-  const irregularitiesOf = (photo, weatherCtx) => assess({
-    takenAt: photo.taken_at,
-    tags: tagsOf.all(photo.id).map((t) => t.tag),
-    change: photo.change_json ? JSON.parse(photo.change_json) : null,
-    weather: weatherCtx,
-    species: spotTrees(photo.spot_id),
-    ...terrainOf(photo.spot_id),
-  });
+  const irregularitiesOf = (photo, ctx) => {
+    const species = spotTrees(photo.spot_id);
+    const terrain = terrainOf(photo.spot_id);
+    // Storm link, frost nights in hollows and phenology references (routes/climate.js).
+    const extra = climate.decorate(photo, ctx, terrain, species);
+    return [...assess({
+      takenAt: photo.taken_at,
+      tags: tagsOf.all(photo.id).map((t) => t.tag),
+      change: photo.change_json ? JSON.parse(photo.change_json) : null,
+      weather: ctx.weather,
+      species,
+      ...terrain,
+      nightFrost: extra.nightFrost,
+      phenoRef: extra.phenoRef,
+    }), ...extra.irregularities];
+  };
 
   /** Species changed: re-evaluate every photo of the spot. */
   function reassessSpot(spotId) {
@@ -303,8 +335,9 @@ function createApp({
       computedAt: new Date().toISOString(),
       weather: weatherCtx,
       weatherError,
-      irregularities: irregularitiesOf(photo, weatherCtx),
     };
+    await climate.enrich(photo, ctx, { elevation: terrainOf(photo.spot_id).elevation });
+    ctx.irregularities = irregularitiesOf(photo, ctx);
     setContext.run(JSON.stringify(ctx), photoId);
     return ctx;
   }
@@ -314,7 +347,7 @@ function createApp({
     const photo = getPhoto.get(photoId);
     if (!photo?.context_json) return;
     const ctx = JSON.parse(photo.context_json);
-    ctx.irregularities = irregularitiesOf(photo, ctx.weather);
+    ctx.irregularities = irregularitiesOf(photo, ctx);
     setContext.run(JSON.stringify(ctx), photoId);
   }
 
@@ -326,6 +359,8 @@ function createApp({
     pending.add(p);
   };
   app.locals.idle = () => Promise.all([...pending]);
+  // Previews for photos uploaded before they existed.
+  background(thumbs.backfill());
 
   const safeAlign = (fn) => fn.catch((err) => console.error('Ausrichtung fehlgeschlagen:', err.message));
 
@@ -338,23 +373,27 @@ function createApp({
     return id;
   };
 
+  const climate = require('./routes/climate')(app, { db, weatherFetch, getPhoto, terrainOf, background, reassessSpot });
+
   app.get('/api/config', (req, res) => {
     res.json({ tags: TAGS, activities: ACTIVITIES, plantnet: Boolean(plantnetKey), spotRadiusM });
   });
 
   app.get('/api/spots', (req, res) => {
     const tag = req.query.tag ? String(req.query.tag) : null;
+    const vis = (alias) => accounts.visibleSql(req, alias); // hidden photos: moderators only
     const rows = db.prepare(`
-      SELECT s.id, s.lat, s.lon, s.elevation,
+      SELECT s.id, s.lat, s.lon, s.elevation, s.heading,
              COUNT(DISTINCT p.id) AS photo_count,
              MIN(p.taken_at) AS first_taken,
              MAX(p.taken_at) AS last_taken,
              GROUP_CONCAT(DISTINCT t.tag) AS tags,
-             (SELECT file FROM photos WHERE spot_id = s.id ORDER BY taken_at DESC LIMIT 1) AS latest_file,
-             (SELECT change_json FROM photos WHERE spot_id = s.id ORDER BY taken_at DESC LIMIT 1) AS latest_change,
-             (SELECT context_json FROM photos WHERE spot_id = s.id ORDER BY taken_at DESC LIMIT 1) AS latest_context
+             (SELECT file FROM photos WHERE spot_id = s.id AND ${vis('photos')} ORDER BY taken_at DESC LIMIT 1) AS latest_file,
+             (SELECT thumb_file FROM photos WHERE spot_id = s.id AND ${vis('photos')} ORDER BY taken_at DESC LIMIT 1) AS latest_thumb,
+             (SELECT change_json FROM photos WHERE spot_id = s.id AND ${vis('photos')} ORDER BY taken_at DESC LIMIT 1) AS latest_change,
+             (SELECT context_json FROM photos WHERE spot_id = s.id AND ${vis('photos')} ORDER BY taken_at DESC LIMIT 1) AS latest_context
       FROM spots s
-      JOIN photos p ON p.spot_id = s.id
+      JOIN photos p ON p.spot_id = s.id AND ${vis('p')}
       LEFT JOIN photo_tags t ON t.photo_id = p.id
       GROUP BY s.id
       HAVING ? IS NULL OR SUM(t.tag = ?) > 0
@@ -365,11 +404,13 @@ function createApp({
       lat: r.lat,
       lon: r.lon,
       elevation: r.elevation,
+      heading: r.heading,
       photoCount: r.photo_count,
       firstTaken: new Date(r.first_taken).toISOString(),
       lastTaken: new Date(r.last_taken).toISOString(),
       tags: r.tags ? r.tags.split(',').sort() : [],
       latestUrl: `/uploads/${r.latest_file}`,
+      latestThumbUrl: r.latest_thumb ? `/thumbs/${r.latest_thumb}` : `/uploads/${r.latest_file}`,
       change: r.latest_change ? (({ fraction, summary }) => ({ fraction, top: summary[0]?.label || null }))(JSON.parse(r.latest_change)) : null,
       species: spotSpecies(r.id).map((t) => t.name),
       irregularities: r.latest_context
@@ -378,17 +419,18 @@ function createApp({
     })));
   });
 
-  const spotJson = (id) => {
+  const spotJson = (id, showHidden = false) => {
     const spot = db.prepare(`
-      SELECT id, lat, lon, elevation, elevation_source, slope, aspect, terrain_source,
+      SELECT id, lat, lon, heading, elevation, elevation_source, slope, aspect, terrain_source,
              tpi300, tpi600, landform, landform_source
       FROM spots WHERE id = ?`).get(id);
     if (!spot) return null;
-    const photos = db.prepare('SELECT * FROM photos WHERE spot_id = ? ORDER BY taken_at, id').all(id);
+    const photos = db.prepare(`SELECT * FROM photos p WHERE spot_id = ? AND ${showHidden ? '1 = 1' : accounts.publicSql('p')} ORDER BY taken_at, id`).all(id);
     return {
       id: spot.id,
       lat: spot.lat,
       lon: spot.lon,
+      heading: spot.heading,
       elevation: spot.elevation,
       elevationSource: spot.elevation_source,
       slope: spot.slope,
@@ -415,7 +457,7 @@ function createApp({
   app.get('/api/spots/:id', (req, res) => {
     const id = idParam(req, res);
     if (id === null) return;
-    const spot = spotJson(id);
+    const spot = spotJson(id, accounts.canSeeHidden(req));
     if (!spot) return res.status(404).json({ error: 'Spot nicht gefunden' });
     res.json(spot);
   });
@@ -445,7 +487,7 @@ function createApp({
     let status;
     let body;
     try {
-      [status, body] = await processUpload(files, gpxFile, req.body || {});
+      [status, body] = await processUpload(files, gpxFile, req.body || {}, req);
     } finally {
       // Temp files of skipped photos (and the GPX) are removed before answering.
       await Promise.all([...files, ...(gpxFile ? [gpxFile] : [])].map((f) => fsp.rm(f.path, { force: true })));
@@ -453,8 +495,10 @@ function createApp({
     res.status(status).json(body);
   }
 
-  async function processUpload(files, gpxFile, b) {
+  async function processUpload(files, gpxFile, b, req) {
     if (!files.length) return [400, { error: 'Keine Fotos übermittelt' }];
+    const owner = accounts.uploadOwner(req); // uploader and licence
+    if (owner.error) return [400, { error: owner.error }];
 
     const offsetMin = Number.isFinite(Number(b.utcOffsetMinutes)) ? Number(b.utcOffsetMinutes) : 0;
     const clockShiftMs = (Number(b.clockShiftSeconds) || 0) * 1000;
@@ -487,12 +531,14 @@ function createApp({
     const touchedSpots = new Set();
     for (const f of files) {
       const buf = await fsp.readFile(f.path);
-      const ext = imageExtension(buf);
+      // iPhone photos (HEIC) are stored as JPEG; their EXIF is read from the original.
+      const heic = isHeic(buf);
+      const ext = heic ? 'jpg' : imageExtension(buf);
       if (!ext) {
-        skipped.push({ name: f.originalname, reason: 'Kein unterstütztes Bildformat (JPEG, PNG, WebP)' });
+        skipped.push({ name: f.originalname, reason: 'Kein unterstütztes Bildformat (JPEG, PNG, WebP, HEIC)' });
         continue;
       }
-      const meta = await readPhotoMeta(buf, offsetMin);
+      const meta = await readPhotoMeta(heic ? heicExif(buf) || buf : buf, offsetMin);
       let takenAt = meta.takenAt !== null ? meta.takenAt + clockShiftMs : null;
       if (takenAt === null) takenAt = Number.isFinite(fallbackTime) ? fallbackTime : Date.now();
 
@@ -523,10 +569,21 @@ function createApp({
         continue;
       }
 
+      let jpeg = null;
+      if (heic) {
+        try {
+          jpeg = await heicToJpeg(buf);
+        } catch (err) {
+          skipped.push({ name: f.originalname, reason: `HEIC-Datei konnte nicht gelesen werden (${err.message})` });
+          continue;
+        }
+      }
       const file = `${crypto.randomUUID()}.${ext}`;
-      await fsp.rename(f.path, path.join(uploadDir, file));
+      if (jpeg) await fsp.writeFile(path.join(uploadDir, file), jpeg);
+      else await fsp.rename(f.path, path.join(uploadDir, file));
       const photoId = transaction(db, () => {
-        const spotId = targetSpot ? targetSpot.id : assignSpot(db, pos.lat, pos.lon, spotRadiusM);
+        const spotId = targetSpot ? targetSpot.id
+          : assignSpot(db, pos.lat, pos.lon, spotRadiusM, meta.heading, headingToleranceDeg);
         const id = Number(db.prepare(`
           INSERT INTO photos (spot_id, file, original_name, taken_at, lat, lon, heading, altitude,
                               location_source, activity, note, created_at)
@@ -534,13 +591,16 @@ function createApp({
         `).run(spotId, file, f.originalname.slice(0, 255), takenAt, pos.lat, pos.lon, meta.heading, meta.altitude,
           source, activity, note, Date.now()).lastInsertRowid);
         setTags(id, tags);
+        accounts.stampPhoto(id, owner);
         refreshSpot(db, spotId);
         touchedSpots.add(spotId);
         return id;
       });
+      await thumbs.ensure(getPhoto.get(photoId));
       await safeAlign(alignPhoto(photoId, refPhotoId));
       await safeAlign(analyzeChange(photoId));
       background(analyzeContext(photoId));
+      vegetation.backfill(null, [photoId]);
       created.push(photoJson(getPhoto.get(photoId)));
     }
     return [created.length ? 201 : 422, { created, skipped, spots: [...touchedSpots] }];
@@ -572,6 +632,7 @@ function createApp({
       refreshSpot(db, photo.spot_id);
     });
     await fsp.rm(path.join(uploadDir, photo.file), { force: true });
+    await thumbs.remove(photo);
     // The spot's first photo may have gone: re-evaluate the others' change.
     const rest = db.prepare('SELECT id FROM photos WHERE spot_id = ?').all(photo.spot_id);
     background((async () => {
@@ -604,7 +665,7 @@ function createApp({
   app.get('/api/weather/day/spots', async (req, res) => {
     const date = parseDate(req.query.date);
     if (!date) return res.status(400).json({ error: 'date (JJJJ-MM-TT) angeben' });
-    const spots = db.prepare('SELECT id, lat, lon FROM spots').all();
+    const spots = db.prepare(`SELECT id, lat, lon FROM spots s WHERE EXISTS (SELECT 1 FROM photos p WHERE p.spot_id = s.id AND ${accounts.publicSql('p')})`).all();
     const byCell = new Map();
     for (const s of spots) {
       const key = `${s.lat.toFixed(1)},${s.lon.toFixed(1)}`;
@@ -752,7 +813,7 @@ function createApp({
     if (!a || !b) return { status: 404, error: 'Foto nicht gefunden' };
     if (a.spot_id !== b.spot_id) return { status: 422, error: 'Fotos gehören zu verschiedenen Spots' };
     if (!a.align_h || !b.align_h) return { status: 422, error: 'Mindestens eines der Fotos ist nicht ausgerichtet' };
-    const key = `${a.id}:${b.id}:${a.align_h}:${b.align_h}`;
+    const key = `${a.id}:${b.id}:${a.align_h}:${b.align_h}:${app.locals.learner?.version() ?? ''}`;
     if (!changeCache.has(key)) {
       const hAinv = invert(JSON.parse(a.align_h));
       const job = (async () => {
@@ -766,7 +827,7 @@ function createApp({
         return {
           changedFraction: result.changedFraction,
           coverage: result.coverage,
-          ...classifyChange(result),
+          ...classifyChange(result, { model: app.locals.learner?.current() }),
           png: await renderHeatmap(result),
         };
       })();
@@ -837,6 +898,13 @@ function createApp({
     } catch (err) {
       next(err);
     }
+  });
+
+  require('./routes/species')(app, { db, spotRadiusM });
+  require('./routes/video')(app, { db, uploadDir, tmpDir, spotRadiusM, activities: ACTIVITIES, photoJson, getPhoto, setTags, alignPhoto, analyzeChange, analyzeContext, background, safeAlign });
+  const vegetation = require('./routes/vegetation')(app, { db, uploadDir, background, fetchImpl: weatherFetch });
+  require('./routes/analysis')(app, {
+    db, uploadDir, getPhoto, idParam, background, changeBetween, spotTrees, terrainOf, refreshIrregularities, detectorUrl, detectorFetch,
   });
 
   app.use('/api', (req, res) => res.status(404).json({ error: 'Nicht gefunden' }));

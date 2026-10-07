@@ -1,0 +1,6 @@
+Stations_id; Stationsname; geograph.Breite; geograph.Laenge; Stationshoehe; Naturraumgruppe_Code; Naturraumgruppe; Naturraum_Code; Naturraum; Datum Stationsaufloesung; Bundesland; eor;
+       101; Freiburg-Süd; 47.9800; 7.8400; 280; 20; Oberrheinisches Tiefland; 2000; Freiburger Bucht; ; Baden-Württemberg; eor;
+       102; Schauinsland; 47.9100; 7.9000; 1000; 15; Schwarzwald; 1550; Hochschwarzwald; ; Baden-Württemberg; eor;
+       103; Hinterzarten; 47.9000; 8.1000; 880; 15; Schwarzwald; 1550; Hochschwarzwald; ; Baden-Württemberg; eor;
+       104; Stuttgart; 48.7800; 9.1800; 250; 10; Neckarland; 1060; Stuttgarter Bucht; ; Baden-Württemberg; eor;
+       105; Kirchzarten; 47.9600; 7.9500; 400; 15; Schwarzwald; 1550; Hochschwarzwald; 31.12.2018; Baden-Württemberg; eor;

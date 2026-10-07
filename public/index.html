@@ -7,11 +7,16 @@
   <meta name="description" content="Fotos vom Joggen, Wandern und Biken dokumentieren, wie sich der Wald über die Zeit verändert.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2316301f' d='M12 2 5 12h4l-4 6h6v4h2v-4h6l-4-6h4z'/%3E%3C/svg%3E">
   <meta name="theme-color" content="#16301f">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="MyForrest">
   <link rel="stylesheet" href="vendor/fonts/fraunces/full.css">
   <link rel="stylesheet" href="vendor/fonts/fraunces/full-italic.css">
   <link rel="stylesheet" href="vendor/fonts/manrope/index.css">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="video.css">
 </head>
 <body>
   <header class="nav" id="nav">
@@ -27,6 +32,7 @@
       <a href="#how">So geht's</a>
       <a href="#explore">Karte</a>
     </nav>
+    <div id="pwa-status" class="pwa-status" aria-live="polite"></div>
     <button id="open-upload" class="btn primary">Foto beitragen</button>
   </header>
 
@@ -95,6 +101,10 @@
         <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.6"/><path d="M10 1.5v2.4M10 16.1v2.4M1.5 10h2.4M16.1 10h2.4M4 4l1.7 1.7M14.3 14.3 16 16M4 16l1.7-1.7M14.3 5.7 16 4"/></svg>
         Sonne &amp; Wetter
       </button>
+      <button type="button" id="species-toggle" class="pill-btn species-btn" aria-expanded="false" aria-controls="speciespanel">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16C4 9 8 4.5 16 4c.4 7.5-4.2 12-12 12zM4 16l7-7"/></svg>
+        Arten &amp; Neophyten
+      </button>
       <div class="legend">
         <span><i class="dot ok"></i>Spot</span>
         <span><i class="dot damage"></i>Schäden</span>
@@ -128,6 +138,7 @@
       <div id="sun-charts"></div>
       <p id="sun-source" class="wx-source"></p>
     </section>
+    <section id="speciespanel" class="sunpanel sppanel" hidden aria-labelledby="sp-title"></section>
 
     <div id="pick-hint" class="pick-hint" hidden>Klicke auf die Karte, um den Standort zu wählen · <button id="pick-cancel" class="link">Abbrechen</button></div>
 
@@ -149,6 +160,7 @@
           <p class="eyebrow">Spot</p>
           <h2 id="spot-title"></h2>
           <p id="spot-meta" class="muted"></p>
+          <p id="spot-siblings" class="siblings small" hidden></p>
           <div class="elev" id="spot-elev">
             <span id="spot-elev-text"></span>
             <button type="button" id="spot-elev-edit" class="link small">ändern</button>
@@ -236,6 +248,7 @@
             <span class="heat-legend" aria-hidden="true"><i></i>wenig<b></b>stark</span>
           </div>
           <div id="cmp-regions" class="regions"></div>
+          <div id="ai-regions" class="ai-regions" aria-live="polite"></div>
         </div>
 
         <div class="photo-details">
@@ -261,6 +274,11 @@
           <div id="identify-results"></div>
         </div>
 
+        <section class="ai-photo" aria-labelledby="ai-photo-title">
+          <h3 class="label" id="ai-photo-title">Automatische Auswertung</h3>
+          <div id="ai-photo-body" aria-live="polite"></div>
+        </section>
+
         <section class="context" aria-labelledby="context-title">
           <h3 class="label" id="context-title">Kontext zur Aufnahme</h3>
           <div id="context-body" aria-live="polite"></div>
@@ -269,6 +287,11 @@
         <section id="chronicle-wrap" class="chronicle-wrap" hidden>
           <h3 class="label">Auffälligkeiten-Chronik</h3>
           <ol id="chronicle" class="chronicle"></ol>
+        </section>
+
+        <section id="vegetation-wrap" class="vegetation" aria-labelledby="vegetation-title" hidden>
+          <h3 class="label" id="vegetation-title">Vegetation im Zeitverlauf</h3>
+          <div id="vegetation-body" aria-live="polite"></div>
         </section>
       </section>
     </aside>
@@ -321,10 +344,10 @@
         <h2>Fotos aus dem Wald</h2>
       </div>
       <label class="dropzone">
-        <input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple required>
+        <input type="file" name="photos" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,video/mp4,video/quicktime,.mp4,.mov,.insv,.360" multiple required>
         <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="10" width="36" height="28" rx="5"/><path d="M6 32l10-10 8 8 6-6 12 12"/><circle cx="32" cy="19" r="3"/></svg>
-        <strong data-empty="Fotos hierher ziehen oder auswählen">Fotos hierher ziehen oder auswählen</strong>
-        <span class="muted small">JPEG, PNG oder WebP · Ort und Zeit werden aus den Bilddaten gelesen</span>
+        <strong data-empty="Fotos oder Videos hierher ziehen oder auswählen">Fotos oder Videos hierher ziehen oder auswählen</strong>
+        <span class="muted small">JPEG, PNG, WebP, HEIC oder Video (GoPro, 360°-MP4) · Ort und Zeit werden aus den Bild- und Telemetriedaten gelesen</span>
       </label>
       <label class="dropzone compact">
         <input type="file" name="gpx" accept=".gpx,application/gpx+xml">
@@ -367,6 +390,13 @@
         <span>Notiz</span>
         <textarea name="note" rows="2"></textarea>
       </label>
+      <label class="field">
+        <span>Lizenz</span>
+        <select name="license" id="upload-license">
+          <option value="cc-by-sa-4.0">CC BY-SA 4.0</option>
+        </select>
+        <span id="upload-license-hint" class="muted small license-hint"></span>
+      </label>
 
       <details>
         <summary>Zeitabgleich für GPX</summary>
@@ -395,6 +425,13 @@
   <script src="sun.js"></script>
   <script src="forest.js"></script>
   <script src="app.js"></script>
+  <script src="hotspots.js"></script>
+  <script src="video.js"></script>
+  <script src="vegetation.js"></script>
+  <script src="account.js"></script>
+  <script src="analysis.js"></script>
   <script src="sunmap.js"></script>
+  <script src="offline-queue.js"></script>
+  <script src="pwa.js"></script>
 </body>
 </html>

@@ -82,6 +82,10 @@ const coldPoolShift = (form, tpi600) => -Math.round(MAX_COLD_POOL_DAYS * coldPoo
 const terrainShift = ({ elevation = null, aspect = null, slope = null, landform: form = null, tpi600 = null } = {}) =>
   altitudeShift(elevation) + aspectShift(aspect, slope) + coldPoolShift(form, tpi600);
 
+/** Shift for the spot's microsite only (exposure, cold air): added to regional reference series that already cover altitude. */
+const microShift = ({ aspect = null, slope = null, landform: form = null, tpi600 = null } = {}) =>
+  aspectShift(aspect, slope) + coldPoolShift(form, tpi600);
+
 /** Expected start of colouring (day of year) for a lowland value on the given terrain. */
 function expectedColourDoy(lowlandDoy, terrainOrElevation) {
   if (lowlandDoy == null) return null;
@@ -94,5 +98,5 @@ function expectedColourDoy(lowlandDoy, terrainOrElevation) {
 module.exports = {
   REFERENCE_ELEVATION, DAYS_PER_100M, COMPASS,
   altitudeShift, aspectShift, terrainShift, expectedColourDoy, aspectLabel, aspectFromCompass, sunnySlope,
-  LANDFORMS, landform, coldPoolStrength, coldPoolShift,
+  LANDFORMS, landform, coldPoolStrength, coldPoolShift, microShift,
 };

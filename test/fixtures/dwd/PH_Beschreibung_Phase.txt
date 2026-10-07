@@ -1,0 +1,4 @@
+Phase_id;Phase;Phase_englisch;eor;
+     4;Blattentfaltung;beginning of leaf unfolding;eor;
+    31;Blattverfärbung;autumn colouring of leaves;eor;
+    32;Blattfall;autumn leaf fall;eor;

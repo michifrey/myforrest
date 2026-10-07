@@ -1,0 +1,4 @@
+Objekt_id;Objekt;Objekt_englisch;Objekt_latein;eor;
+   310;Rotbuche;common beech;Fagus sylvatica;eor;
+   132;Stiel-Eiche;pedunculate oak;Quercus robur;eor;
+   215;Huflattich;coltsfoot;Tussilago farfara;eor;

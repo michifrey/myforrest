@@ -10,6 +10,7 @@
  */
 
 const { CHANGED } = require('./change');
+const { needleMap, shareOver } = require('./foliage');
 
 const CLASSES = {
   windwurf: { label: 'Windwurf / liegende Stämme', tag: 'sturmschaden', color: '#c2611d' },
@@ -143,36 +144,123 @@ function scores(f) {
   };
 }
 
+const RULE_THRESHOLD = 0.35;
+const round = (v, k = 1000) => Math.round(v * k) / k;
+const CLASS_KEYS = Object.keys(CLASSES);
+
+/**
+ * Rule scores as a distribution over all classes: 'sonstiges' gets the
+ * rule threshold as its score, so the arg max equals the rule decision.
+ */
+function ruleDistribution(s) {
+  const raw = { ...s, sonstiges: RULE_THRESHOLD };
+  const total = CLASS_KEYS.reduce((acc, k) => acc + (raw[k] || 0), 0) || 1;
+  return Object.fromEntries(CLASS_KEYS.map((k) => [k, (raw[k] || 0) / total]));
+}
+
+/**
+ * Decides a region's class from its rule scores and, when a learned model
+ * is given (see learn.js), blends both: p = (1 − α)·rules + α·model on the
+ * classes the model knows well enough (α grows with the number of confirmed
+ * examples). Records which source decided and with what confidence.
+ * `model.predict(region)` returns { probs, classes, examples, alpha } or null.
+ */
+function decide(region, model = null) {
+  const s = region.ruleScores;
+  const [best, conf] = Object.entries(s).sort((a, b) => b[1] - a[1])[0];
+  const ruleClass = conf >= RULE_THRESHOLD ? best : 'sonstiges';
+  const ruleConfidence = round(ruleClass === 'sonstiges' ? 1 - conf : conf, 100);
+  const learned = model ? model.predict(region) : null;
+  let cls = ruleClass;
+  let confidence = ruleConfidence;
+  let decidedBy = 'regel';
+  let learnedInfo = null;
+  if (learned) {
+    const rule = ruleDistribution(s);
+    const active = new Set(learned.classes);
+    const mass = learned.classes.reduce((acc, k) => acc + rule[k], 0);
+    const p = Object.fromEntries(CLASS_KEYS.map((k) => [k,
+      active.has(k) ? (1 - learned.alpha) * rule[k] + learned.alpha * mass * (learned.probs[k] || 0) : rule[k]]));
+    const [top, pTop] = Object.entries(p).sort((a, b) => b[1] - a[1])[0];
+    const learnedTop = Object.entries(learned.probs).sort((a, b) => b[1] - a[1])[0][0];
+    cls = top;
+    confidence = round(pTop, 100);
+    decidedBy = top === learnedTop ? (top === ruleClass ? 'regel+gelernt' : 'gelernt') : 'regel';
+    learnedInfo = {
+      class: learnedTop,
+      probability: round(learned.probs[learnedTop], 100),
+      examples: learned.examples,
+      alpha: round(learned.alpha, 100),
+    };
+  }
+  return {
+    ...region,
+    class: cls,
+    label: CLASSES[cls].label,
+    confidence,
+    ruleClass,
+    decidedBy,
+    learned: learnedInfo,
+  };
+}
+
+/** Area per class, largest first. */
+function summarize(found) {
+  const byClass = new Map();
+  for (const g of found) byClass.set(g.class, (byClass.get(g.class) || 0) + g.area);
+  return [...byClass].map(([cls, area]) => ({
+    class: cls, label: CLASSES[cls].label, area: round(area), tag: CLASSES[cls].tag,
+  })).sort((a, b) => b.area - a.area);
+}
+
 /**
  * Turns a change result into classified regions (largest first) and a
  * per-class summary. Bounding boxes are normalised to the "before" view.
+ * Each region keeps its feature vector, rule scores and foliage (needle
+ * share before/after, see foliage.js) so it can be re-decided later when
+ * the learned model changes, without recomputing the images.
  */
-function classifyChange(r) {
+function classifyChange(r, { model = null } = {}) {
   if (!r.before || !r.changedFraction) return { regions: [], summary: [] };
   let valid = 0;
   for (let i = 0; i < r.valid.length; i++) valid += r.valid[i];
   const minArea = Math.max(40, Math.round(valid * 0.004));
+  const needleBefore = needleMap(r.before, r.width, r.height, r.grayBefore);
+  const needleAfter = needleMap(r.after, r.width, r.height, r.grayAfter);
   const found = regions(r.score, r.width, r.height, minArea).map((px) => {
     const f = describe(px, r);
     const s = scores(f);
-    const [best, conf] = Object.entries(s).sort((a, b) => b[1] - a[1])[0];
-    const cls = conf >= 0.35 ? best : 'sonstiges';
+    const fb = shareOver(needleBefore, px);
+    const fa = shareOver(needleAfter, px);
     const [x0, y0, x1, y1] = f.bbox;
-    return {
-      class: cls,
-      label: CLASSES[cls].label,
-      confidence: Math.round((cls === 'sonstiges' ? 1 - conf : conf) * 100) / 100,
-      area: Math.round((f.n / valid) * 1000) / 1000,
-      bbox: [x0 / r.width, y0 / r.height, x1 / r.width, y1 / r.height].map((v) => Math.round(v * 1000) / 1000),
-    };
+    return decide({
+      area: round(f.n / valid),
+      bbox: [x0 / r.width, y0 / r.height, x1 / r.width, y1 / r.height].map((v) => round(v)),
+      ruleScores: Object.fromEntries(Object.entries(s).map(([k, v]) => [k, round(v)])),
+      features: {
+        greenDelta: round(f.greenDelta, 1e4),
+        greenBefore: round(f.greenBefore, 1e4),
+        brightDelta: round(f.brightDelta, 1e4),
+        textureRatio: round(f.textureRatio, 1e4),
+        horizontalShift: round(f.horizontalShift, 1e4),
+        elongation: round(f.elongation, 1e3),
+        angle: round(f.angle, 10),
+      },
+      foliage: {
+        needleBefore: fb.needleShare,
+        needleAfter: fa.needleShare,
+        vegBefore: fb.vegetation,
+        vegAfter: fa.vegetation,
+      },
+    }, model);
   }).sort((a, b) => b.area - a.area);
-
-  const byClass = new Map();
-  for (const g of found) byClass.set(g.class, (byClass.get(g.class) || 0) + g.area);
-  const summary = [...byClass].map(([cls, area]) => ({
-    class: cls, label: CLASSES[cls].label, area: Math.round(area * 1000) / 1000, tag: CLASSES[cls].tag,
-  })).sort((a, b) => b.area - a.area);
-  return { regions: found, summary };
+  return { regions: found, summary: summarize(found) };
 }
 
-module.exports = { classifyChange, CLASSES };
+/** Re-decides stored regions (those with rule scores) with another model. */
+function reclassify(regionsIn, model = null) {
+  const found = (regionsIn || []).map((g) => (g.ruleScores ? decide(g, model) : g));
+  return { regions: found, summary: summarize(found) };
+}
+
+module.exports = { classifyChange, reclassify, summarize, CLASSES };
