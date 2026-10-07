@@ -343,14 +343,18 @@ als **Funde** aus (pro Foto die wahrscheinlichste Art, ab einem wählbaren Minde
   konvexe Hülle umstellen. Fläche und Anzahl Teilbestände stehen pro Jahr in der Tabelle. Technisch ist es
   die α-Hülle als morphologisches Schliessen auf einem Raster (Dilatation um α, Erosion um α − Puffer, mit
   exakten Distanztransformationen), umrandet per Marching Squares.
-- **Ausbreitung pro Teilbestand**: Jeder Teilbestand des neusten Umrisses bekommt seine eigene Geschichte:
+- **Ausbreitung pro Teilbestand**: Teilbestände werden Jahr für Jahr verfolgt. Weil die Umrisse der Jahre
+  ineinanderliegen, führt jeder Teilbestand entweder einen des Vorjahrs fort, ist neu oder entsteht aus
+  mehreren, die zusammengewachsen sind; dann behält der älteste seine Nummer, die anderen enden dort
+  („2025 mit Teilbestand 1 zusammengewachsen“). Jeder Teilbestand bekommt seine eigene Geschichte:
   seit wann es ihn gibt, Fläche und Frontabstand pro Jahr, Flächenzuwachs pro Jahr und eine eigene Rate
   mit Richtung (gleiche Methode wie für die ganze Art, aber ab seinem ersten Fund und mit dessen Schwerpunkt
-  als Ursprung). Ein später entstandener Teilbestand nennt den **Sprung**: den Abstand und die Richtung zum
+  als Ursprung; gezählt werden nur seine eigenen Funde, nicht die der aufgenommenen Teilbestände). Ein
+  später entstandener Teilbestand nennt den **Sprung**: den Abstand und die Richtung zum
   nächsten älteren Fund, z. B. „Sprung: 945 m nach NO von Teilbestand 1“ – typisch für Samen, die mit
   Wasser, Erde oder Maschinen verschleppt wurden. Die Liste im Panel hebt den Teilbestand beim Überfahren
-  auf der Karte hervor und zoomt per Klick hin; Teilbestände, die es im gewählten Jahr noch nicht gibt,
-  sind abgeblendet. Dazu eine Schätzung wie „Ausbreitung ~120 m/Jahr nach NO“: Die Rate ist die
+  auf der Karte hervor und zoomt per Klick hin; Nummer und Umriss folgen dem gewählten Jahr, und
+  Teilbestände, die es da noch nicht oder nicht mehr eigenständig gibt, sind abgeblendet. Dazu eine Schätzung wie „Ausbreitung ~120 m/Jahr nach NO“: Die Rate ist die
   Steigung (kleinste Quadrate) des Abstands vom Schwerpunkt der Erstfunde zum jeweils entferntesten Fund,
   die Richtung das gewichtete Mittel der Funde, die die Front nach aussen geschoben haben. Zeigen diese in
   alle Richtungen, steht „in alle Richtungen“. Die Schätzung hängt stark davon ab, wo gesucht wurde, und ist
@@ -363,6 +367,33 @@ als **Funde** aus (pro Foto die wahrscheinlichste Art, ab einem wählbaren Minde
   Kartenausschnitt, Zeitraum. Direkt zu iNaturalist oder Info Flora hochladen geht nicht, dafür bräuchte es dort
   ein Konto und eine OAuth-Anmeldung. iNaturalist übernimmt beim CSV-Import keine Fotos, deshalb steht der
   Foto-Link in der Beschreibung. Alle Bestimmungen sind automatisch und als `unverified` markiert.
+
+## Offene Geodaten für GIS und Geoportale
+
+MyForrest ist selbst ein Geodienst nach **OGC API – Features** (`/ogc`; Teil 1 Core und GeoJSON, Teil 2
+Koordinatensysteme). So lassen sich die Daten wie die Karten von swisstopo in QGIS, ArcGIS oder Geoportale
+einbinden.
+
+- **Collections**: `spots` (Orte mit Anzahl Fotos, Zeitraum, Tags, Blickrichtung, Höhe), `photos` (mit Tags,
+  Lizenz und Urheber), `findings` (Pflanzenfunde, Neophyten markiert) und `spread_fronts` (besiedelte
+  Fläche pro Art und Jahr als Multipolygon mit Lücken).
+- **Koordinatensysteme**: WGS84 (CRS84) oder die Schweizer Landeskoordinaten **LV95 (EPSG:2056)**, gewählt
+  mit `crs`. Umgerechnet wird mit den Näherungsformeln von swisstopo (Genauigkeit ~1 m, geprüft am
+  Referenzpunkt von swisstopo).
+- **Filter**: Ausschnitt (`bbox`, auch in LV95 mit `bbox-crs`), Zeit (`datetime`, Zeitpunkt oder Intervall)
+  und Seiten (`limit`/`offset` mit `next`-Link).
+- **Einbinden**: In QGIS über *Layer → Layer hinzufügen → WFS / OGC API – Features* mit der Adresse
+  `https://<server>/ogc`, in GDAL als `OAPIF:https://<server>/ogc`. Die Antworten erlauben CORS, damit
+  Webkarten auf anderen Domains sie laden können.
+- **GeoPackage**: `/api/export/myforrest.gpkg` liefert alle Collections als eine Datei (LV95, mit
+  `?crs=4326` in WGS84), ohne GDAL direkt mit SQLite geschrieben. Die Fusszeile der App verlinkt beides.
+- **QGIS Server**: Für WMS, WMTS und WFS mit eigener Gestaltung, wie sie Geoportale wie map.geo.admin.ch
+  einbinden, liegt unter [`deploy/qgis-server`](../deploy/qgis-server/README.md) ein fertiges QGIS-Projekt
+  mit Stilen in den Farben der App (Ausbreitungsfronten nach Jahr, Spots nach Befund mit Pfeil in
+  Blickrichtung, Neophyten hervorgehoben) und eine Docker-Compose-Vorlage: MyForrest, QGIS Server und
+  nginx, dazu ein Dienst, der das GeoPackage alle 15 Minuten neu exportiert.
+
+Ausgeblendete (moderierte) Fotos erscheinen in keinem Dienst.
 
 ## Pflanzen und Baumarten
 

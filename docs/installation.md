@@ -82,6 +82,13 @@ Andere Quellen wie MeteoSchweiz lassen sich als generisches CSV importieren (`fo
 Spalten `source;station_id;station_name;lat;lon;elevation;species;year;doy` (lateinischer Artname, Tag im
 Jahr der beginnenden Blattverfärbung).
 
+## Mit Docker und QGIS Server
+
+`Dockerfile` baut MyForrest samt ffmpeg. Für Karten als WMS/WMTS/WFS (z. B. für map.geo.admin.ch) gibt es
+unter [`deploy/qgis-server`](../deploy/qgis-server/README.md) eine Vorlage mit Docker Compose: MyForrest,
+QGIS Server, nginx und ein Dienst, der das GeoPackage alle 15 Minuten neu exportiert. Das QGIS-Projekt
+mit den Stilen liegt bei und wird mit `build-project.py` (PyQGIS) neu erzeugt.
+
 ## Weiter
 
 - [Betrieb, Datenschutz und Datenquellen](betrieb.md): was vor einem öffentlichen Betrieb zu beachten ist

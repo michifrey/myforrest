@@ -48,9 +48,15 @@ src/spread.js        Ausbreitungsfronten: Umrisse pro Jahr, Rate und Richtung
 src/alphashape.js    Alpha-Shapes: Distanztransformation, Schliessen, Marching Squares, Teilbestände und Lücken
 src/export.js        CSV-Export nach Darwin Core und im iNaturalist-Importformat
 src/routes/species.js  API-Routen für Arten, Funde, Ausbreitung und Export
+src/lv95.js          Schweizer Landeskoordinaten LV95 ↔ WGS84 (Näherungsformeln von swisstopo)
+src/geodata.js       Daten als GIS-Collections (Spots, Fotos, Funde, Ausbreitungsfronten)
+src/gpkg.js          GeoPackage-Schreiber (OGC GeoPackage 1.3) ohne GDAL
+src/routes/ogc.js    OGC API – Features und GeoPackage-Export
 src/auth.js          Konten, Passwort-Hashing (scrypt), Sitzungen, Rate-Limit
 src/moderation.js    Lizenzen, Meldungen, Ausblenden und Protokoll
 src/routes/accounts.js  Routen für Konten und Moderation, CSRF-Schutz, Rechte auf Fotos
+deploy/qgis-server/  Vorlage: MyForrest + QGIS Server (WMS/WMTS/WFS) + nginx per Docker Compose
+Dockerfile           Container für MyForrest (mit ffmpeg)
 docs/                Dokumentation; docs/screenshots/ enthält die Bilder für das README
 public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet die Waldszene,
                      sun.js berechnet Sonnenstand und Einstrahlung, sunmap.js den Kartenmodus „Sonne & Wetter“,

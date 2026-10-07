@@ -114,6 +114,9 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   Geländehorizont sowie Hotspots und Ausbreitungsfronten von Neophyten.
 - **[Pflanzen und Baumarten](docs/funktionen.md#pflanzen-und-baumarten)**: Pflanzenbestimmung mit Pl@ntNet,
   Erkennung invasiver Neophyten, Artenbestand pro Spot und Export zu Info Flora, GBIF und iNaturalist.
+- **[Offene Geodaten](docs/funktionen.md#offene-geodaten-für-gis-und-geoportale)**: alle Daten als
+  OGC API – Features und GeoPackage, in WGS84 oder den Schweizer Landeskoordinaten LV95 wie bei swisstopo,
+  dazu eine Vorlage für QGIS Server (WMS/WMTS/WFS) für Geoportale wie map.geo.admin.ch.
 - **[Konten und Moderation](docs/funktionen.md#konten-moderation-und-lizenzen)**: Konten mit Rollen,
   Lizenz pro Foto, Melden und Moderieren.
 

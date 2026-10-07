@@ -19,6 +19,10 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/weather/day?lat=&lon=&date=` | Stundenwerte eines Tages (Einstrahlung, Regen, Bewölkung, Temperatur): Messung oder Prognose |
 | `GET`    | `/api/weather/day/spots?date=` | Tagesniederschlag an allen Spots                       |
 | `GET`    | `/api/horizon?lat=&lon=`       | Geländehorizont (36 Richtungen) und Himmelssicht       |
+| `GET`    | `/ogc`                         | OGC API – Features: Landing Page, `/ogc/conformance`, `/ogc/api` (OpenAPI) |
+| `GET`    | `/ogc/collections[/:id]`       | Collections `spots`, `photos`, `findings`, `spread_fronts` mit Ausdehnung und Koordinatensystemen |
+| `GET`    | `/ogc/collections/:id/items[/:fid]` | GeoJSON; `crs` (CRS84 oder `http://www.opengis.net/def/crs/EPSG/0/2056`), `bbox`, `bbox-crs`, `datetime`, `limit`, `offset` |
+| `GET`    | `/api/export/myforrest.gpkg`   | Alle Collections als GeoPackage (LV95, `?crs=4326` für WGS84) |
 | `GET`    | `/api/trees`                 | Liste der unterstützten Baumarten mit Steckbrief         |
 | `GET`    | `/api/spots/:id/storms`      | Sturmereignisse am Spot (ab 12 Monate vor dem ersten Foto), mit verknüpften Windwurf-Fotos |
 | `GET`    | `/api/photos/:id/storm?to=`  | Wahrscheinlichster Sturm zwischen zwei Fotos             |
@@ -50,7 +54,7 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `POST`   | `/api/photos/:id/identify`   | Pflanzen bestimmen (Pl@ntNet)                            |
 | `GET`    | `/api/species`               | Arten mit Funden: Anzahl, Spots, Jahre, Neophyt ja/nein  |
 | `GET`    | `/api/occurrences`           | Funde (bestes Pl@ntNet-Ergebnis pro Foto). Filter für diese und die folgenden Routen: `species`, `neophytes=1`, `minScore` (Standard 0,2), `bbox=west,süd,ost,nord`, `from`/`to` (Datum) |
-| `GET`    | `/api/spread?species=`       | Ausbreitungsfronten einer Art: Umriss (`polygons` mit Lücken), Fläche, Teilbestände und Frontabstand pro Jahr, Rate und Richtung, dazu `patches` mit Rate, Richtung, Flächenzuwachs und Sprung pro Teilbestand (`buffer` in m, Standard 25; `alpha` in m, Standard automatisch; `shape=convex` für die konvexe Hülle) |
+| `GET`    | `/api/spread?species=`       | Ausbreitungsfronten einer Art: Umriss (`polygons` mit Lücken), Fläche, Teilbestände und Frontabstand pro Jahr, Rate und Richtung, dazu `patches` mit Rate, Richtung, Flächenzuwachs, Sprung und Zusammenwachsen (`until`, `mergedInto`, `absorbed`) pro Teilbestand, Umriss pro Jahr (`buffer` in m, Standard 25; `alpha` in m, Standard automatisch; `shape=convex` für die konvexe Hülle) |
 | `GET`    | `/api/export/dwc.csv`        | Funde als Darwin-Core-Occurrence-CSV (Info Flora, GBIF)  |
 | `GET`    | `/api/export/inaturalist.csv` | Funde im CSV-Importformat von iNaturalist               |
 | `GET`    | `/api/spots/:id/vegetation`  | Grünanteil, Kronendach-Deckung, Lückenanteil und GCC pro Foto (`pending`: noch in Berechnung) |
