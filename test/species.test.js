@@ -255,3 +255,37 @@ test('spread fronts use alpha shapes by default, the convex hull on request', as
     assert.equal((await fetch(`${base}/api/spread?species=Impatiens%20glandulifera&alpha=2`)).status, 400);
   });
 });
+
+test('spread rate per patch: own origin, rate and direction; later patches report their jump', () => {
+  const base = { lat: 47, lon: 8 };
+  const at = (x, y, year) => ({ lat: base.lat + dLat(y), lon: base.lon + dLon(x), takenAt: Date.parse(`${year}-07-01T10:00:00Z`) });
+  const occ = [];
+  // Patch A grows 100 m per year to the east from the origin.
+  for (let year = 2020; year <= 2024; year++) {
+    for (let k = 0; k <= (year - 2020) * 4; k++) occ.push(at(k * 25, (k % 2) * 10, year));
+  }
+  // Patch B appears in 2022, 1.5 km north, and grows 50 m per year to the north.
+  for (let year = 2022; year <= 2024; year++) {
+    for (let k = 0; k <= (year - 2022) * 2; k++) occ.push(at(0, 1500 + k * 25, year));
+  }
+  const s = spreadFronts(occ, { alpha: 60 });
+  assert.equal(s.patches.length, 2);
+  const [a, b] = s.patches;
+  assert.deepEqual([a.label, a.since, b.label, b.since], ['Teilbestand 1', 2020, 'Teilbestand 2', 2022]);
+  assert.ok(a.rate.mPerYear >= 90 && a.rate.mPerYear <= 110, `A ${a.rate.mPerYear}`);
+  assert.equal(a.rate.compass, 'O');
+  assert.ok(b.rate.mPerYear >= 40 && b.rate.mPerYear <= 60, `B ${b.rate.mPerYear}`);
+  assert.equal(b.rate.compass, 'N');
+  assert.equal(a.jump, null);
+  assert.deepEqual([b.jump.fromPatch, b.jump.compass], [1, 'N']);
+  assert.ok(Math.abs(b.jump.distanceM - 1500) < 30, `jump ${b.jump.distanceM}`);
+  assert.deepEqual(b.years.map((y) => y.year), [2022, 2023, 2024]);
+  assert.ok(b.years.every((y, i) => i === 0 || y.areaM2 > b.years[i - 1].areaM2));
+  assert.ok(a.outline.length >= 3 && a.centroid.length === 2);
+  // A patch with findings from one year only cannot have a rate yet.
+  const late = spreadFronts([...occ, at(3000, -3000, 2024)], { alpha: 60 }).patches.at(-1);
+  assert.deepEqual([late.since, late.rate], [2024, null]);
+  assert.match(late.text, /^Erst seit 2024/);
+  // The convex hull has no patches.
+  assert.deepEqual(spreadFronts(occ, { alpha: null }).patches, []);
+});
