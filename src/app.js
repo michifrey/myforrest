@@ -627,6 +627,18 @@ function createApp({
     res.json({ date, source, spots: out });
   });
 
+  /** Terrain horizon (36 directions) and sky view factor around a place; `{ angles: null, error }` when unavailable. */
+  app.get('/api/horizon', async (req, res) => {
+    const lat = Number(req.query.lat);
+    const lon = Number(req.query.lon);
+    if (!isValidCoord(lat, lon)) return res.status(400).json({ error: 'lat und lon angeben' });
+    try {
+      res.json({ source: 'dem', ...(await elevationService.horizon(lat, lon)) });
+    } catch (err) {
+      res.json({ source: null, angles: null, error: err.message });
+    }
+  });
+
   app.get('/api/trees', (req, res) => {
     res.json(TREES.map(treeJson).sort((a, b) => a.name.localeCompare(b.name, 'de')));
   });

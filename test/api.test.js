@@ -440,3 +440,22 @@ test('day weather endpoints for the map', async () => {
     assert.deepEqual(spots.spots.map((s) => s.precip), [12]);
   });
 });
+
+test('terrain horizon endpoint', async () => {
+  const fake = async (url) => {
+    const n = new URL(url).searchParams.get('latitude').split(',').length;
+    return new Response(JSON.stringify({ elevation: Array.from({ length: n }, (_, i) => (i === 0 ? 400 : 450)) }));
+  };
+  await withServer({ weatherFetch: fake }, async (base) => {
+    const h = await (await fetch(`${base}/api/horizon?lat=47.1&lon=8.2`)).json();
+    assert.equal(h.source, 'dem');
+    assert.equal(h.angles.length, 36);
+    assert.ok(h.angles.every((a) => a > 0) && h.svf < 1);
+    assert.equal((await fetch(`${base}/api/horizon?lat=x&lon=8`)).status, 400);
+  });
+  await withServer({}, async (base) => {
+    const h = await (await fetch(`${base}/api/horizon?lat=47.1&lon=8.2`)).json();
+    assert.deepEqual([h.source, h.angles], [null, null]);
+    assert.ok(h.error);
+  });
+});

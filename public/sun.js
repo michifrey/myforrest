@@ -5,7 +5,9 @@
  * Position: NOAA's low-precision solar coordinates (≈0.01° until 2050) with
  * atmospheric refraction. Irradiance: clear-sky model with Kasten–Young air
  * mass and Meinel's beam attenuation, plus an isotropic diffuse part; on a
- * slope the beam uses the angle of incidence. No clouds, no terrain horizon.
+ * slope the beam uses the angle of incidence. No clouds. Optionally with a
+ * terrain horizon (elevation angle per direction): behind the terrain the
+ * beam is blocked, and diffuse light is scaled by the sky view factor.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -77,30 +79,104 @@
     return irr.dni * Math.max(0, cosInc) + irr.dhi * (1 + Math.cos(beta)) / 2;
   }
 
+  /** Terrain horizon angle (°) towards an azimuth, interpolated between the profile's directions. */
+  function horizonAt(horizon, azimuth) {
+    if (!horizon || !Array.isArray(horizon.angles) || !horizon.angles.length) return 0;
+    const n = horizon.angles.length;
+    const step = horizon.step || 360 / n;
+    const x = mod(azimuth, 360) / step;
+    const i = Math.floor(x) % n;
+    const f = x - Math.floor(x);
+    return horizon.angles[i] * (1 - f) + horizon.angles[(i + 1) % n] * f;
+  }
+
+  /** Whether the sun's upper limb is above the terrain (and the astronomical) horizon. */
+  const aboveTerrain = (sun, horizon) => sun.altitude + 0.27 > Math.max(0, horizonAt(horizon, sun.azimuth));
+
+  /**
+   * Periods of the 24 h from `dayStart` in which the sun stands above the
+   * terrain horizon, in 1-minute steps: [{ from, to }] (ms). A peak can
+   * interrupt the sunshine, so there may be several.
+   */
+  function sunPeriods(dayStart, lat, lon, horizon) {
+    const step = 60000;
+    const periods = [];
+    let open = null;
+    for (let t = dayStart; t <= dayStart + 86400000; t += step) {
+      const up = aboveTerrain(position(t, lat, lon), horizon);
+      if (up && open === null) open = t;
+      if (!up && open !== null) { periods.push({ from: open, to: t }); open = null; }
+    }
+    if (open !== null) periods.push({ from: open, to: dayStart + 86400000 });
+    return periods;
+  }
+
   const dayOfYear = (t) => {
     const d = new Date(t);
     return Math.floor((Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - Date.UTC(d.getUTCFullYear(), 0, 1)) / 86400000) + 1;
   };
 
   /**
+   * Sun and clear-sky irradiance at one moment: open horizon (`ghi`,
+   * `slope`) and with the terrain horizon (`ghiTerrain`, `slopeTerrain`,
+   * `behind` = the sun is up but hidden by the terrain).
+   */
+  function at(t, lat, lon, { elevation = 0, slope = 0, aspect = 180, horizon = null, doy = dayOfYear(t) } = {}) {
+    const sun = position(t, lat, lon);
+    const irr = clearSky(sun.altitude, doy, elevation);
+    const svf = horizon && Number.isFinite(horizon.svf) ? horizon.svf : 1;
+    const skyTilt = (1 + Math.cos((slope || 0) * RAD)) / 2;
+    const tiltedOpen = onSlope(sun, irr, slope, aspect);
+    const behind = sun.altitude > 0 && !aboveTerrain(sun, horizon);
+    return {
+      t,
+      altitude: sun.altitude,
+      azimuth: sun.azimuth,
+      ghi: irr.ghi,
+      slope: tiltedOpen,
+      behind,
+      ghiTerrain: (behind ? 0 : irr.dni * Math.sin(Math.max(0, sun.altitude) * RAD)) + irr.dhi * svf,
+      slopeTerrain: (behind ? 0 : Math.max(0, tiltedOpen - irr.dhi * skyTilt)) + irr.dhi * Math.min(svf, skyTilt),
+    };
+  }
+
+  /**
    * Course of a day in `stepMin` steps from `dayStart`: sun position and
    * clear-sky irradiance on flat ground and on the given slope, plus daily
-   * totals in kWh/m².
+   * totals in kWh/m². With a terrain `horizon` ({ angles, step, svf }) each
+   * sample also carries the values with terrain shading (`ghiTerrain`,
+   * `slopeTerrain`, `behind`), and the result the sunshine periods above
+   * the terrain; without one these equal the open-horizon values.
    */
-  function day(dayStart, lat, lon, { elevation = 0, slope = 0, aspect = 180, stepMin = 10 } = {}) {
+  function day(dayStart, lat, lon, { elevation = 0, slope = 0, aspect = 180, stepMin = 10, horizon = null } = {}) {
     const doy = dayOfYear(dayStart + 43200000);
+    const svf = horizon && Number.isFinite(horizon.svf) ? horizon.svf : 1;
     const samples = [];
-    let flat = 0; let tilted = 0;
+    const sum = { flat: 0, tilted: 0, flatT: 0, tiltedT: 0 };
     for (let m = 0; m <= 1440; m += stepMin) {
-      const t = dayStart + m * 60000;
-      const sun = position(t, lat, lon);
-      const irr = clearSky(sun.altitude, doy, elevation);
-      const s = { t, minute: m, altitude: sun.altitude, azimuth: sun.azimuth, ghi: irr.ghi, slope: onSlope(sun, irr, slope, aspect) };
+      const s = { minute: m, ...at(dayStart + m * 60000, lat, lon, { elevation, slope, aspect, horizon, doy }) };
       samples.push(s);
-      if (m < 1440) { flat += s.ghi; tilted += s.slope; }
+      if (m < 1440) { sum.flat += s.ghi; sum.tilted += s.slope; sum.flatT += s.ghiTerrain; sum.tiltedT += s.slopeTerrain; }
     }
-    const kwh = (sum) => Math.round((sum * stepMin) / 60 / 10) / 100; // W·h → kWh, 2 decimals
-    return { samples, totalFlat: kwh(flat), totalSlope: kwh(tilted), ...times(dayStart, lat, lon) };
+    const kwh = (v) => Math.round((v * stepMin) / 60 / 10) / 100; // W·h → kWh, 2 decimals
+    const astro = times(dayStart, lat, lon);
+    const periods = horizon ? sunPeriods(dayStart, lat, lon, horizon) : (astro.sunrise !== null || astro.sunset !== null
+      ? [{ from: astro.sunrise ?? dayStart, to: astro.sunset ?? dayStart + 86400000 }]
+      : (astro.maxAltitude > 0 ? [{ from: dayStart, to: dayStart + 86400000 }] : []));
+    const minutes = (list) => Math.round(list.reduce((a, p) => a + (p.to - p.from), 0) / 60000);
+    return {
+      samples,
+      totalFlat: kwh(sum.flat),
+      totalSlope: kwh(sum.tilted),
+      totalFlatTerrain: kwh(sum.flatT),
+      totalSlopeTerrain: kwh(sum.tiltedT),
+      periods,
+      sunMinutes: minutes(periods),
+      terrainRise: periods.length ? periods[0].from : null,
+      terrainSet: periods.length ? periods[periods.length - 1].to : null,
+      svf,
+      ...astro,
+    };
   }
 
   /** Destination point (lat, lon) at `distance` metres and `bearing` ° from a start point. */
@@ -118,5 +194,5 @@
   const COMPASS = ['N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
   const compass = (az) => COMPASS[Math.round(mod(az, 360) / 22.5) % 16];
 
-  return { position, times, clearSky, onSlope, day, destination, compass, dayOfYear };
+  return { position, times, clearSky, onSlope, at, day, horizonAt, sunPeriods, destination, compass, dayOfYear };
 }));
