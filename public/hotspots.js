@@ -492,9 +492,10 @@
   renderLegend();
   $('species-toggle').addEventListener('click', () => toggle(!hs.open));
   $('sp-close').addEventListener('click', () => toggle(false));
-  $('sun-toggle')?.addEventListener('click', () => {
+  // Checked after sunmap.js has handled the same click, whatever the script order.
+  $('sun-toggle')?.addEventListener('click', () => setTimeout(() => {
     if (hs.open && $('sun-toggle').getAttribute('aria-expanded') === 'true') toggle(false);
-  });
+  }));
   for (const b of document.querySelectorAll('#speciespanel [role="tab"]')) b.addEventListener('click', () => setTab(b.dataset.tab));
   $('sp-species').addEventListener('change', (e) => { hs.selected = e.target.value; refresh(); });
   $('sp-minscore').addEventListener('change', async (e) => {
