@@ -166,6 +166,14 @@ den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen und eine Notiz.
 
   Der Tagesverlauf lässt sich mit dem Schieberegler, im Diagramm oder per Abspielen durchgehen. Der
   Sonnenstand wird lokal berechnet (NOAA-Algorithmus) und funktioniert für jedes Datum.
+- **Horizontabschattung**: Der Geländehorizont (Copernicus-Höhenmodell über Open-Meteo, 36 Richtungen,
+  12 Distanzen von 120 m bis 20 km, mit Erdkrümmung und Refraktion) blockiert die direkte Sonne hinter
+  Hügeln und Bergen. Der Anteil des offenen Himmels (Himmelssicht) dämpft das diffuse Licht. Im Kartenmodus
+  zeigt das Sonnenbahn-Diagramm die Geländesilhouette, die Bahn ist hinter dem Gelände gestrichelt, und
+  Auf- und Untergang werden zu „Sonne ab / Sonne bis“ über dem Grat. Das Panel nennt die Sonnenstunden
+  samt Verlust durch das Gelände, die Einstrahlung mit und ohne Gelände, den höchsten Grat und markiert im
+  Diagramm die Zeiten, in denen die Sonne hinter dem Gelände steht. Bäume und Gebäude kennt das
+  Höhenmodell nicht.
 - **Drei Wege, Fotos zu verorten**:
   1. **GPS aus dem Foto** (EXIF), wie bei normalen Handyfotos.
   2. **Automatisch über einen GPX-Track**: Eine Action-Cam im Intervallmodus (z. B. alle 5 s) beim
@@ -243,6 +251,7 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
 | `GET`    | `/api/photos/:id/change.png?to=` | Heatmap der Veränderung (PNG, in der Ansicht des ersten Fotos) |
 | `GET`    | `/api/weather/day?lat=&lon=&date=` | Stundenwerte eines Tages (Einstrahlung, Regen, Bewölkung, Temperatur): Messung oder Prognose |
 | `GET`    | `/api/weather/day/spots?date=` | Tagesniederschlag an allen Spots                       |
+| `GET`    | `/api/horizon?lat=&lon=`       | Geländehorizont (36 Richtungen) und Himmelssicht       |
 | `GET`    | `/api/trees`                 | Liste der unterstützten Baumarten mit Steckbrief         |
 | `PATCH`  | `/api/spots/:id`             | Höhe (`{ elevation: 950 }`), Exposition (`{ exposition: 'S' }`, auch `'eben'`) und/oder Geländeform (`{ landform: 'senke' }`) von Hand setzen; `null` ermittelt den Wert neu |
 | `POST`   | `/api/spots/:id/species`     | Baumart einem Spot zuordnen (`{ scientificName }`)       |

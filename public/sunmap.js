@@ -5,6 +5,8 @@
  * the selected spot (or the map centre) for any date and time, clear-sky
  * irradiance on flat ground and on the spot's slope, and – for past days
  * and the coming ~16 days – measured or forecast radiation and rain.
+ * The terrain horizon (from the elevation model) blocks the sun behind
+ * hills and mountains and narrows the sky for diffuse light.
  * Relies on globals from app.js (map, state, api, el, $) and sun.js (Sun).
  */
 (function sunMode() {
@@ -18,6 +20,8 @@
     minute: 720,
     day: null, // Sun.day(...) for place and date
     weather: null, // /api/weather/day
+    horizon: null, // /api/horizon for the place, null while loading or unavailable
+    horizonError: null,
     playing: null,
     loadToken: 0,
   };
@@ -49,6 +53,32 @@
     return (40075016.686 * Math.cos((lat * Math.PI) / 180)) / 2 ** (map.getZoom() + 8);
   }
 
+  /* ---------- Terrain horizon ---------- */
+
+  const horizonCache = new Map();
+  /** Horizon of a place; the map centre is rounded to ~100 m so panning reuses it. */
+  async function fetchHorizon(p) {
+    const key = `${p.lat.toFixed(p.label === 'Kartenmitte' ? 3 : 4)},${p.lon.toFixed(p.label === 'Kartenmitte' ? 3 : 4)}`;
+    if (!horizonCache.has(key)) {
+      const [lat, lon] = key.split(',');
+      horizonCache.set(key, api(`/api/horizon?lat=${lat}&lon=${lon}`).catch((err) => ({ angles: null, error: err.message })));
+    }
+    const h = await horizonCache.get(key);
+    if (!h.angles) horizonCache.delete(key); // try again next time
+    return h;
+  }
+
+  const behindAt = (sun) => sun.altitude > 0 && sun.altitude + 0.27 <= Math.max(0, Sun.horizonAt(sm.horizon, sun.azimuth));
+
+  /** Highest ridge of the horizon: angle, direction, distance. */
+  function ridge() {
+    const h = sm.horizon;
+    if (!h?.angles) return null;
+    let k = 0;
+    h.angles.forEach((a, i) => { if (a > h.angles[k]) k = i; });
+    return { angle: h.angles[k], azimuth: k * h.step, distance: h.distances?.[k] ?? null };
+  }
+
   /* ---------- Map overlay ---------- */
 
   function drawMap() {
@@ -60,12 +90,43 @@
     const css = getComputedStyle(document.documentElement);
     const gold = css.getPropertyValue('--sun').trim() || '#a8780c';
 
+    const terrainColour = css.getPropertyValue('--terrain').trim() || '#6e5a3c';
+
     // Horizon ring and the sun's path projected onto it (zenith in the centre).
     L.circle([p.lat, p.lon], { radius: R, color: gold, weight: 1, dashArray: '3 5', fill: true, fillOpacity: 0.05, interactive: false }).addTo(sunLayer);
-    const path = sm.day.samples.filter((s) => s.altitude > 0).map((s) => at(s.azimuth, R * (1 - s.altitude / 90)));
-    if (path.length) L.polyline(path, { color: gold, weight: 2.5, opacity: 0.85, interactive: false }).addTo(sunLayer);
+    if (sm.horizon?.angles) {
+      // Terrain silhouette: everything between the horizon ring and the terrain line is hidden sky.
+      const outer = []; const inner = [];
+      for (let az = 0; az < 360; az += 5) {
+        outer.push(at(az, R));
+        inner.push(at(az, R * (1 - Math.max(0, Sun.horizonAt(sm.horizon, az)) / 90)));
+      }
+      L.polygon([outer, inner], { stroke: false, fillColor: terrainColour, fillOpacity: 0.32, interactive: false }).addTo(sunLayer);
+      L.polygon(inner, { color: terrainColour, weight: 1.5, fill: false, interactive: false }).addTo(sunLayer);
+    }
+    // Sun path: solid where the sun shines on the place, dashed where the terrain hides it.
+    let run = []; let runBehind = null;
+    const flush = () => {
+      if (run.length > 1) {
+        L.polyline(run, runBehind
+          ? { color: gold, weight: 2, opacity: 0.55, dashArray: '2 6', interactive: false }
+          : { color: gold, weight: 2.5, opacity: 0.85, interactive: false }).addTo(sunLayer);
+      }
+    };
+    for (const s of sm.day.samples) {
+      if (s.altitude <= 0) { flush(); run = []; runBehind = null; continue; }
+      const pt = at(s.azimuth, R * (1 - s.altitude / 90));
+      if (runBehind !== null && s.behind !== runBehind) { run.push(pt); flush(); run = [run[run.length - 1]]; }
+      runBehind = s.behind;
+      run.push(pt);
+    }
+    flush();
 
-    for (const [t, name] of [[sm.day.sunrise, 'Aufgang'], [sm.day.sunset, 'Untergang']]) {
+    const terrain = Boolean(sm.horizon?.angles);
+    const edges = terrain
+      ? [[sm.day.terrainRise, 'Sonne ab'], [sm.day.terrainSet, 'Sonne bis']]
+      : [[sm.day.sunrise, 'Aufgang'], [sm.day.sunset, 'Untergang']];
+    for (const [t, name] of edges) {
       if (t === null) continue;
       const az = Sun.position(t, p.lat, p.lon).azimuth;
       L.polyline([[p.lat, p.lon], at(az, R)], { color: '#e07b28', weight: 2, dashArray: '6 5', interactive: false }).addTo(sunLayer);
@@ -78,13 +139,16 @@
     const t = dayStart(sm.date) + sm.minute * 60000;
     const sun = Sun.position(t, p.lat, p.lon);
     if (sun.altitude > 0) {
+      const behind = behindAt(sun);
       const pos = at(sun.azimuth, R * (1 - sun.altitude / 90));
-      L.polyline([[p.lat, p.lon], pos], { color: gold, weight: 2, opacity: 0.6, interactive: false }).addTo(sunLayer);
+      L.polyline([[p.lat, p.lon], pos], { color: gold, weight: 2, opacity: behind ? 0.3 : 0.6, interactive: false }).addTo(sunLayer);
       L.marker(pos, {
-        icon: L.divIcon({ className: '', html: '<div class="sun-marker"></div>', iconSize: [22, 22], iconAnchor: [11, 11] }),
+        icon: L.divIcon({ className: '', html: `<div class="sun-marker${behind ? ' behind' : ''}"></div>`, iconSize: [22, 22], iconAnchor: [11, 11] }),
         interactive: false,
         zIndexOffset: 1000, // above pins and rain badges
       }).addTo(sunLayer);
+    }
+    if (sun.altitude > 0 && !behindAt(sun)) {
       // Shadow of a tree at the place, in real metres on the map.
       const shadow = Math.min(TREE_HEIGHT / Math.tan((sun.altitude * Math.PI) / 180), 2000);
       L.polyline([[p.lat, p.lon], at((sun.azimuth + 180) % 360, shadow)], { color: '#1b2a1f', weight: 5, opacity: 0.55, lineCap: 'round', interactive: false }).addTo(sunLayer);
@@ -140,21 +204,32 @@
     $('sun-place').textContent = `${p.label} · ${p.lat.toFixed(4)}, ${p.lon.toFixed(4)}` +
       (p.exposition && p.exposition !== 'eben' ? ` · ${p.exposition}, ${Math.round(p.slope)}°` : '');
     const sun = Sun.position(t, p.lat, p.lon);
-    const irr = Sun.clearSky(sun.altitude, Sun.dayOfYear(t), p.elevation || 0);
-    const onSlope = Number.isFinite(p.slope) && p.slope >= 3 ? Sun.onSlope(sun, irr, p.slope, p.aspect ?? 180) : null;
+    const slopeOk = Number.isFinite(p.slope) && p.slope >= 3;
+    const behind = behindAt(sun);
+    const horizonHere = Math.max(0, Sun.horizonAt(sm.horizon, sun.azimuth));
+    // Clear-sky values at this minute, with terrain when the horizon is known.
+    const cur = Sun.at(t, p.lat, p.lon, { elevation: p.elevation || 0, slope: p.slope || 0, aspect: p.aspect ?? 180, horizon: sm.horizon });
     const wx = weatherAt(t);
-    const shadow = sun.altitude > 0 ? TREE_HEIGHT / Math.tan((sun.altitude * Math.PI) / 180) : null;
+    const shadow = sun.altitude > 0 && !behind ? TREE_HEIGHT / Math.tan((sun.altitude * Math.PI) / 180) : null;
+    const rg = ridge();
 
+    const irrSub = [];
+    if (slopeOk) irrSub.push(`am Hang ${Math.round(cur.slopeTerrain)} W/m²`);
+    if (sm.horizon?.angles && Math.round(cur.ghi) !== Math.round(cur.ghiTerrain)) irrSub.push(`ohne Gelände ${Math.round(cur.ghi)}`);
     $('sun-tiles').replaceChildren(
       tile('Sonnenstand', sun.altitude > 0 ? `${fmtNum(sun.altitude, 1)}° hoch` : 'unter dem Horizont',
-        `Richtung ${Math.round(sun.azimuth)}° (${Sun.compass(sun.azimuth)})`),
-      tile('Einstrahlung klar', `${Math.round(irr.ghi)} W/m²`,
-        onSlope !== null ? `am Hang ${Math.round(onSlope)} W/m²` : 'auf ebenem Boden'),
+        `Richtung ${Math.round(sun.azimuth)}° (${Sun.compass(sun.azimuth)})${behind ? ` · hinter dem Gelände (${fmtNum(horizonHere, 0)}°)` : ''}`),
+      tile('Einstrahlung klar', `${Math.round(cur.ghiTerrain)} W/m²`, irrSub.length ? irrSub.join(' · ') : 'auf ebenem Boden'),
       tile(sm.weather?.source === 'forecast' ? 'Prognose' : 'Gemessen',
         wx && Number.isFinite(wx.radiation) ? `${Math.round(wx.radiation)} W/m²` : '–',
         wx ? `${Number.isFinite(wx.precip) ? `${fmtNum(wx.precip, 1)} mm Regen` : ''}${Number.isFinite(wx.cloud) ? ` · ${wx.cloud} % bewölkt` : ''}` : 'keine Wetterdaten für diesen Tag'),
-      tile(`Schatten ${TREE_HEIGHT}-m-Baum`, shadow !== null ? (shadow > 999 ? '> 1 km' : `${Math.round(shadow)} m`) : '–',
-        shadow !== null ? `nach ${Sun.compass((sun.azimuth + 180) % 360)}` : ''),
+      behind
+        ? tile(`Schatten ${TREE_HEIGHT}-m-Baum`, 'Geländeschatten', 'der ganze Ort liegt im Schatten')
+        : tile(`Schatten ${TREE_HEIGHT}-m-Baum`, shadow !== null ? (shadow > 999 ? '> 1 km' : `${Math.round(shadow)} m`) : '–',
+          shadow !== null ? `nach ${Sun.compass((sun.azimuth + 180) % 360)}` : ''),
+      tile('Himmelssicht', rg ? `${fmtNum(sm.horizon.svf * 100, 0)} %` : (sm.horizonError ? 'nicht verfügbar' : 'wird berechnet …'),
+        rg ? (rg.angle >= 1 ? `höchster Grat ${fmtNum(rg.angle, 0)}° im ${Sun.compass(rg.azimuth)}${rg.distance ? `, ${rg.distance >= 1000 ? `${fmtNum(rg.distance / 1000, 1)} km` : `${rg.distance} m`}` : ''}` : 'freier Horizont')
+          : 'ohne Geländeschatten gerechnet'),
     );
 
     const d = sm.day;
@@ -164,16 +239,26 @@
     if (d.sunset !== null) parts.push(['Untergang', clock(d.sunset)]);
     if (len !== null) parts.push(['Tageslänge', `${Math.floor(len / 60)} h ${pad(Math.round(len % 60))} min`]);
     parts.push(['Höchststand', `${fmtNum(d.maxAltitude, 1)}°`]);
-    parts.push(['Tagessumme klar', `${fmtNum(d.totalFlat, 1)} kWh/m²${Number.isFinite(p.slope) && p.slope >= 3 ? ` (Hang ${fmtNum(d.totalSlope, 1)})` : ''}`]);
+    const hm = (min) => (min < 60 ? `${Math.round(min)} min` : `${Math.floor(min / 60)} h ${pad(Math.round(min % 60))} min`);
+    if (sm.horizon?.angles) {
+      parts.push(['Sonne über Gelände', d.periods.length ? d.periods.map((q) => `${clock(q.from)}–${clock(q.to)}`).join(', ') : 'gar nicht']);
+      const lost = (len ?? 0) - d.sunMinutes;
+      parts.push(['Sonnenstunden', `${hm(d.sunMinutes)}${lost > 2 ? ` (−${hm(lost)} durch Gelände)` : ''}`]);
+    }
+    parts.push(['Tagessumme klar', `${fmtNum(d.totalFlatTerrain, 1)} kWh/m²${slopeOk ? ` (Hang ${fmtNum(d.totalSlopeTerrain, 1)})` : ''}` +
+      (sm.horizon?.angles && fmtNum(d.totalFlat, 1) !== fmtNum(d.totalFlatTerrain, 1) ? `, ohne Gelände ${fmtNum(d.totalFlat, 1)}` : '')]);
     const tot = sm.weather?.totals;
     if (tot?.radiationKwh != null) parts.push([sm.weather.source === 'forecast' ? 'Prognose' : 'Gemessen', `${fmtNum(tot.radiationKwh, 1)} kWh/m²`]);
     if (tot?.precip != null) parts.push(['Regen', `${fmtNum(tot.precip, 1)} mm`]);
     if (tot?.tmin != null) parts.push(['Temperatur', `${fmtNum(tot.tmin, 0)}–${fmtNum(tot.tmax, 0)} °C`]);
     $('sun-dayline').replaceChildren(...parts.flatMap(([k, v], i) => [i ? ' · ' : '', `${k} `, el('b', { text: v })]));
 
-    $('sun-source').textContent = sm.weather?.source
+    const horizonNote = sm.horizon?.angles
+      ? ' · Horizont aus dem Copernicus-Höhenmodell (36 Richtungen bis 20 km, ohne Bäume und Gebäude)'
+      : (sm.horizonError ? ` · Horizont nicht verfügbar (${sm.horizonError}), ohne Geländeschatten gerechnet` : '');
+    $('sun-source').textContent = (sm.weather?.source
       ? `Sonnenstand berechnet; ${sm.weather.source === 'archive' ? 'Messdaten (ERA5-Reanalyse)' : 'Prognose'}: Open-Meteo.com`
-      : `Sonnenstand und Einstrahlung bei klarem Himmel berechnet${sm.weather?.error ? ` · Wetterdaten nicht verfügbar (${sm.weather.error})` : ' · für diesen Tag gibt es keine Wetterdaten'}`;
+      : `Sonnenstand und Einstrahlung bei klarem Himmel berechnet${sm.weather?.error ? ` · Wetterdaten nicht verfügbar (${sm.weather.error})` : ' · für diesen Tag gibt es keine Wetterdaten'}`) + horizonNote;
   }
 
   /* ---------- Charts: irradiance (W/m²) and rain (mm/h), same time axis ---------- */
@@ -210,18 +295,32 @@
     const slopeOk = Number.isFinite(p.slope) && p.slope >= 3;
     const hourly = (sm.weather?.hourly || []).map((h) => ({ ...h, minute: (h.t - dayStart(sm.date)) / 60000 }))
       .filter((h) => h.minute >= 0 && h.minute < 1440);
-    const maxRad = Math.max(200, ...d.samples.map((s) => Math.max(s.ghi, slopeOk ? s.slope : 0)), ...hourly.map((h) => h.radiation || 0));
+    const terrain = Boolean(sm.horizon?.angles);
+    const maxRad = Math.max(200, ...d.samples.map((s) => Math.max(s.ghi, slopeOk ? s.slopeTerrain : 0)), ...hourly.map((h) => h.radiation || 0));
     const niceRad = Math.ceil(maxRad / 200) * 200;
+    const anyBehind = terrain && d.samples.some((s) => s.behind);
 
-    const legend = [el('span', {}, [el('i', { style: 'background: var(--sun)' }), 'klarer Himmel'])];
+    const legend = [el('span', {}, [el('i', { style: 'background: var(--sun)' }), terrain ? 'klarer Himmel mit Gelände' : 'klarer Himmel'])];
+    if (anyBehind) {
+      legend.push(el('span', {}, [el('i', { class: 'dot' }), 'ohne Gelände']));
+      legend.push(el('span', {}, [el('i', { class: 'behind' }), 'Sonne hinter Gelände']));
+    }
     if (slopeOk) legend.push(el('span', {}, [el('i', { class: 'dash' }), `klar am Hang (${p.exposition})`]));
     if (hourly.some((h) => Number.isFinite(h.radiation))) {
       legend.push(el('span', {}, [el('i', { style: 'background: var(--measured)' }), sm.weather.source === 'forecast' ? 'Prognose' : 'gemessen']));
     }
     const rad = chartFrame('Sonneneinstrahlung', legend, 150, niceRad, 'W/m²');
     const pts = (key) => d.samples.map((s) => `${xOf(s.minute).toFixed(1)},${rad.y(s[key]).toFixed(1)}`).join(' ');
-    rad.nodes.push(sv('polygon', { class: 'clear', points: `${xOf(0)},${rad.y(0)} ${pts('ghi')} ${xOf(1440)},${rad.y(0)}` }));
-    if (slopeOk) rad.nodes.push(sv('polyline', { class: 'clear-slope', points: pts('slope') }));
+    if (anyBehind) {
+      // Bands where the sun is up but behind the terrain.
+      for (const s of d.samples) {
+        if (!s.behind || s.minute >= 1440) continue;
+        rad.nodes.push(sv('rect', { class: 'behind', x: xOf(s.minute).toFixed(1), y: 4, width: (xOf(s.minute + 10) - xOf(s.minute) + 0.4).toFixed(1), height: (rad.y(0) - 4).toFixed(1) }));
+      }
+    }
+    rad.nodes.push(sv('polygon', { class: 'clear', points: `${xOf(0)},${rad.y(0)} ${pts('ghiTerrain')} ${xOf(1440)},${rad.y(0)}` }));
+    if (anyBehind) rad.nodes.push(sv('polyline', { class: 'clear-open', points: pts('ghi') }));
+    if (slopeOk) rad.nodes.push(sv('polyline', { class: 'clear-slope', points: pts('slopeTerrain') }));
     const measured = hourly.filter((h) => Number.isFinite(h.radiation));
     if (measured.length) {
       // Hourly means are drawn at the middle of their hour.
@@ -258,9 +357,9 @@
         cross.setAttribute('x1', xOf(minute)); cross.setAttribute('x2', xOf(minute)); cross.setAttribute('visibility', 'visible');
         const t = dayStart(sm.date) + minute * 60000;
         const s = Sun.position(t, p.lat, p.lon);
-        const irr = Sun.clearSky(s.altitude, Sun.dayOfYear(t), p.elevation || 0);
+        const cur = Sun.at(t, p.lat, p.lon, { elevation: p.elevation || 0, horizon: sm.horizon });
         const w = weatherAt(t);
-        const lines = [`Sonne ${s.altitude > 0 ? `${fmtNum(s.altitude, 0)}°` : 'unter Horizont'} · klar ${Math.round(irr.ghi)} W/m²`];
+        const lines = [`Sonne ${s.altitude > 0 ? `${fmtNum(s.altitude, 0)}°${cur.behind ? ' hinter Gelände' : ''}` : 'unter Horizont'} · klar ${Math.round(cur.ghiTerrain)} W/m²`];
         if (w && Number.isFinite(w.radiation)) lines.push(`${sm.weather.source === 'forecast' ? 'Prognose' : 'gemessen'} ${Math.round(w.radiation)} W/m²`);
         if (w && Number.isFinite(w.precip)) lines.push(`Regen ${fmtNum(w.precip, 1)} mm/h`);
         c.tip.replaceChildren(el('strong', { text: clock(t) }), ...lines.flatMap((l, i) => (i ? [el('br'), l] : [l])));
@@ -285,11 +384,11 @@
     // Screen-reader table with the hourly values.
     const table = el('div', { class: 'sr-only' }, el('table', {}, [
       el('caption', { text: `Stundenwerte am ${sm.date}` }),
-      el('tr', {}, ['Stunde', 'klar (W/m²)', 'gemessen (W/m²)', 'Regen (mm)'].map((h) => el('th', { text: h }))),
+      el('tr', {}, ['Stunde', 'klar ohne Gelände (W/m²)', 'klar mit Gelände (W/m²)', 'gemessen (W/m²)', 'Regen (mm)'].map((h) => el('th', { text: h }))),
       ...Array.from({ length: 24 }, (_, hr) => {
         const s = d.samples.find((x) => x.minute === hr * 60 + 30) || d.samples[hr * 6];
         const w = hourly.find((h) => Math.round(h.minute / 60) === hr);
-        return el('tr', {}, [String(hr), String(Math.round(s.ghi)), w?.radiation ?? '–', w?.precip ?? '–'].map((v) => el('td', { text: String(v) })));
+        return el('tr', {}, [String(hr), String(Math.round(s.ghi)), String(Math.round(s.ghiTerrain)), w?.radiation ?? '–', w?.precip ?? '–'].map((v) => el('td', { text: String(v) })));
       }),
     ]));
     $('sun-charts').replaceChildren(...charts.map((c) => c.wrap), table);
@@ -312,12 +411,29 @@
     if (!sm.open) return;
     const p = place();
     const token = ++sm.loadToken;
-    sm.day = Sun.day(dayStart(sm.date), p.lat, p.lon, { elevation: p.elevation || 0, slope: p.slope || 0, aspect: p.aspect ?? 180, stepMin: 10 });
+    const computeDay = () => {
+      sm.day = Sun.day(dayStart(sm.date), p.lat, p.lon, { elevation: p.elevation || 0, slope: p.slope || 0, aspect: p.aspect ?? 180, stepMin: 10, horizon: sm.horizon });
+    };
+    const placeKeyNow = `${p.lat.toFixed(3)},${p.lon.toFixed(3)}`;
+    if (sm.horizonFor !== placeKeyNow) { sm.horizon = null; sm.horizonError = null; }
+    computeDay();
     sm.weather = null;
     renderPanel();
     renderCharts();
     drawMap();
     drawRain();
+    if (sm.horizonFor !== placeKeyNow) {
+      fetchHorizon(p).then((h) => {
+        if (token !== sm.loadToken) return;
+        sm.horizonFor = placeKeyNow;
+        sm.horizon = h.angles ? h : null;
+        sm.horizonError = h.angles ? null : (h.error || 'unbekannter Fehler');
+        computeDay();
+        renderPanel();
+        renderCharts();
+        drawMap();
+      });
+    }
     try {
       const q = `lat=${p.lat.toFixed(4)}&lon=${p.lon.toFixed(4)}&date=${sm.date}${Number.isFinite(p.elevation) ? `&elevation=${Math.round(p.elevation)}` : ''}`;
       const wx = await api(`/api/weather/day?${q}`);

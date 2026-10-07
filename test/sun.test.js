@@ -43,3 +43,35 @@ test('destination and compass helpers', () => {
   assert.equal(Sun.compass(0), 'N');
   assert.equal(Sun.compass(200), 'SSW');
 });
+
+test('terrain horizon: interpolation, delayed sunrise, valley in winter, interrupted sunshine', () => {
+  const flat = { step: 10, angles: Array(36).fill(0), svf: 1 };
+  const east = { step: 10, angles: Array.from({ length: 36 }, (_, k) => (k >= 3 && k <= 15 ? 10 : 0)), svf: 0.98 };
+  assert.equal(Sun.horizonAt(east, 95), 10);
+  assert.equal(Sun.horizonAt(east, 25), 5, 'halfway between 20° (0) and 30° (10)');
+  assert.equal(Sun.horizonAt({ step: 10, angles: [4, ...Array(34).fill(0), 2] }, 355), 3, 'wraps around north');
+  assert.equal(Sun.horizonAt(null, 90), 0);
+
+  const june = Date.UTC(2026, 5, 20, 22);
+  const open = Sun.day(june, ...ZRH);
+  const withFlat = Sun.day(june, ...ZRH, { horizon: flat });
+  near(withFlat.terrainRise, open.sunrise, 60000, 'flat horizon rises with the astronomical sun');
+  assert.equal(withFlat.totalFlatTerrain, open.totalFlat);
+  const hill = Sun.day(june, ...ZRH, { horizon: east });
+  assert.ok(hill.terrainRise - open.sunrise > 45 * 60000, `a 10° hill in the east delays sunrise by ${(hill.terrainRise - open.sunrise) / 60000} min`);
+  near(hill.terrainSet, open.sunset, 60000, 'west stays open');
+  assert.ok(hill.totalFlatTerrain < open.totalFlat && hill.samples.some((s) => s.behind));
+
+  // A deep valley: 25° ridge to the south keeps the December sun (max ~19°) away all day.
+  const dec = Date.UTC(2026, 11, 20, 23);
+  const valley = { step: 10, angles: Array.from({ length: 36 }, (_, k) => (k >= 9 && k <= 27 ? 25 : 5)), svf: 0.85 };
+  const v = Sun.day(dec, ...ZRH, { horizon: valley });
+  assert.deepEqual([v.periods.length, v.sunMinutes, v.terrainRise], [0, 0, null]);
+  assert.ok(v.totalFlatTerrain > 0 && v.totalFlatTerrain < 0.35 * v.totalFlat, 'only diffuse light reaches the valley floor');
+
+  // A single peak due south at noon interrupts the sunshine.
+  const peak = { step: 10, angles: Array.from({ length: 36 }, (_, k) => (k === 18 ? 30 : 0)), svf: 0.99 };
+  const p = Sun.day(dec, ...ZRH, { horizon: peak });
+  assert.equal(p.periods.length, 2, 'sun before and after the peak');
+  assert.ok(p.sunMinutes < (open.sunset - open.sunrise) / 60000);
+});
