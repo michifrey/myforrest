@@ -901,6 +901,7 @@ function createApp({
   });
 
   require('./routes/species')(app, { db, spotRadiusM });
+  require('./routes/ogc')(app, { db, spotRadiusM });
   require('./routes/video')(app, { db, uploadDir, tmpDir, spotRadiusM, activities: ACTIVITIES, photoJson, getPhoto, setTags, alignPhoto, analyzeChange, analyzeContext, background, safeAlign });
   const vegetation = require('./routes/vegetation')(app, { db, uploadDir, background, fetchImpl: weatherFetch });
   require('./routes/analysis')(app, {

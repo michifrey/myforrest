@@ -350,6 +350,16 @@ den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen und eine Notiz.
   Fotos zeigen (*Windwurf*, *Auflichtung* oder passende Beobachtungen), als unabhängige Bestätigung. Wegen
   der 10-m-Pixel umfasst der Satellitenwert mehr als den Bildausschnitt. Ohne Internetzugang bleibt der
   Bereich leer und wird später erneut versucht.
+- **Offene Geodaten für GIS und Geoportale**: MyForrest ist selbst ein Geodienst nach
+  **OGC API – Features** (`/ogc`, Teil 1 Core und GeoJSON, Teil 2 Koordinatensysteme). Die Collections
+  `spots`, `photos`, `findings` (Pflanzenfunde) und `spread_fronts` (Ausbreitungsfronten pro Art und Jahr)
+  gibt es in WGS84 oder in den Schweizer Landeskoordinaten **LV95 (EPSG:2056)** wie bei swisstopo, mit
+  Filtern nach Ausschnitt (`bbox`, auch in LV95), Zeit (`datetime`) und Seiten (`limit`/`offset`). QGIS
+  bindet das als „WFS / OGC API – Features“ ein, GDAL als `OAPIF:`. Dazu exportiert
+  `/api/export/myforrest.gpkg` alles als **GeoPackage** (LV95, oder `?crs=4326`), aus dem **QGIS Server**
+  WMS/WMTS/WFS publiziert; die Vorlage dafür liegt in [`deploy/qgis-server`](deploy/qgis-server/README.md)
+  (Docker Compose mit MyForrest, QGIS Server und nginx). Ausgeblendete Fotos erscheinen nirgends; Fotos
+  und Funde tragen Lizenz und Urheber mit.
 - **Drei Wege, Fotos zu verorten**:
   1. **GPS aus dem Foto** (EXIF), wie bei normalen Handyfotos.
   2. **Automatisch über einen GPX-Track**: Eine Action-Cam im Intervallmodus (z. B. alle 5 s) beim
@@ -492,6 +502,11 @@ src/spread.js        Ausbreitungsfronten: Umrisse pro Jahr, Rate und Richtung
 src/alphashape.js    Alpha-Shapes: Distanztransformation, Schliessen, Marching Squares, Teilbestände und Lücken
 src/export.js        CSV-Export nach Darwin Core und im iNaturalist-Importformat
 src/routes/species.js  API-Routen für Arten, Funde, Ausbreitung und Export
+src/lv95.js          Schweizer Landeskoordinaten LV95 ↔ WGS84 (Näherungsformeln von swisstopo)
+src/geodata.js       Daten als GIS-Collections (Spots, Fotos, Funde, Ausbreitungsfronten)
+src/gpkg.js          GeoPackage-Schreiber (OGC GeoPackage 1.3) ohne GDAL
+src/routes/ogc.js    OGC API – Features und GeoPackage-Export
+deploy/qgis-server/  Vorlage: MyForrest + QGIS Server (WMS/WMTS/WFS) + nginx per Docker Compose
 src/auth.js          Konten, Passwort-Hashing (scrypt), Sitzungen, Rate-Limit
 src/moderation.js    Lizenzen, Meldungen, Ausblenden und Protokoll
 src/routes/accounts.js  Routen für Konten und Moderation, CSRF-Schutz, Rechte auf Fotos
@@ -527,6 +542,10 @@ scripts/generate-icons.js  Erzeugt die App-Icons aus dem Logo (`node scripts/gen
 | `GET`    | `/api/weather/day?lat=&lon=&date=` | Stundenwerte eines Tages (Einstrahlung, Regen, Bewölkung, Temperatur): Messung oder Prognose |
 | `GET`    | `/api/weather/day/spots?date=` | Tagesniederschlag an allen Spots                       |
 | `GET`    | `/api/horizon?lat=&lon=`       | Geländehorizont (36 Richtungen) und Himmelssicht       |
+| `GET`    | `/ogc`                         | OGC API – Features: Landing Page, `/ogc/conformance`, `/ogc/api` (OpenAPI) |
+| `GET`    | `/ogc/collections[/:id]`       | Collections `spots`, `photos`, `findings`, `spread_fronts` mit Ausdehnung und Koordinatensystemen |
+| `GET`    | `/ogc/collections/:id/items[/:fid]` | GeoJSON; `crs` (CRS84 oder `http://www.opengis.net/def/crs/EPSG/0/2056`), `bbox`, `bbox-crs`, `datetime`, `limit`, `offset` |
+| `GET`    | `/api/export/myforrest.gpkg`   | Alle Collections als GeoPackage (LV95, `?crs=4326` für WGS84) |
 | `GET`    | `/api/trees`                 | Liste der unterstützten Baumarten mit Steckbrief         |
 | `GET`    | `/api/spots/:id/storms`      | Sturmereignisse am Spot (ab 12 Monate vor dem ersten Foto), mit verknüpften Windwurf-Fotos |
 | `GET`    | `/api/photos/:id/storm?to=`  | Wahrscheinlichster Sturm zwischen zwei Fotos             |
