@@ -37,6 +37,12 @@ async function api(url, options) {
   return body;
 }
 
+/** Posts an upload. offline-queue.js (if loaded) parks it on the device when there is no connection. */
+function postPhotos(fd) {
+  const send = () => api('/api/photos', { method: 'POST', body: fd });
+  return window.offlineQueue ? window.offlineQueue.post(fd, send) : send();
+}
+
 function tagClass(tag) {
   if (tag === 'neophyt') return 'chip neo';
   if (DAMAGE_TAGS.includes(tag)) return 'chip damage';
@@ -908,6 +914,7 @@ form.addEventListener('submit', async (e) => {
   const created = [];
   const skipped = [];
   const touched = new Set();
+  let queued = 0;
   const BATCH = 10;
   try {
     for (let i = 0; i < files.length; i += BATCH) {
@@ -924,7 +931,8 @@ form.addEventListener('submit', async (e) => {
       const tags = [...$('upload-tags').querySelectorAll('input:checked')].map((c) => c.value);
       fd.append('tags', tags.join(','));
 
-      const res = await api('/api/photos', { method: 'POST', body: fd });
+      const res = await postPhotos(fd);
+      queued += res.queued || 0;
       created.push(...res.created);
       skipped.push(...res.skipped);
       res.spots.forEach((s) => touched.add(s));
@@ -937,6 +945,7 @@ form.addEventListener('submit', async (e) => {
   }
 
   const result = [el('p', { text: `${created.length} Foto${created.length === 1 ? '' : 's'} gespeichert, ${touched.size} Spot${touched.size === 1 ? '' : 's'} aktualisiert.` })];
+  if (queued) result.push(el('p', { class: 'queued', text: `${queued} Foto${queued === 1 ? ' wartet' : 's warten'} auf Verbindung und ${queued === 1 ? 'wird' : 'werden'} automatisch gesendet.` }));
   if (skipped.length) {
     result.push(el('ul', { class: 'err' }, skipped.map((s) => el('li', { text: `${s.name}: ${s.reason}` }))));
   }
@@ -1136,7 +1145,8 @@ async function uploadRephoto(file, name, position) {
     fd.append('lat', String(position.lat));
     fd.append('lon', String(position.lon));
   }
-  const res = await api('/api/photos', { method: 'POST', body: fd });
+  const res = await postPhotos(fd);
+  if (res.queued) return;
   if (!res.created.length) throw new Error(res.skipped.map((s) => s.reason).join(', ') || 'Upload fehlgeschlagen');
   const created = res.created[0];
   await Promise.all([loadSpots(), openSpot(spotId, created.id)]);

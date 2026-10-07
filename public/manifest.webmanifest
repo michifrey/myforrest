@@ -1,0 +1,29 @@
+{
+  "id": "./",
+  "name": "MyForrest – Wald im Wandel",
+  "short_name": "MyForrest",
+  "description": "Fotos vom Joggen, Wandern und Biken dokumentieren, wie sich der Wald über die Zeit verändert.",
+  "lang": "de",
+  "dir": "ltr",
+  "start_url": "./?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f0e4",
+  "theme_color": "#16301f",
+  "categories": ["education", "lifestyle", "photo"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Foto beitragen",
+      "short_name": "Beitragen",
+      "url": "./?action=upload",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
+}

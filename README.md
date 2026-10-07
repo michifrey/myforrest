@@ -166,6 +166,19 @@ den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen und eine Notiz.
 
   Der Tagesverlauf lässt sich mit dem Schieberegler, im Diagramm oder per Abspielen durchgehen. Der
   Sonnenstand wird lokal berechnet (NOAA-Algorithmus) und funktioniert für jedes Datum.
+- **Installierbare App mit Offline-Upload**: MyForrest lässt sich als App auf den Startbildschirm legen
+  (dezenter Knopf *App installieren* in der Navigation; auf iPhone/iPad erklärt er den Weg über
+  *Teilen → Zum Home-Bildschirm*). Ein Service Worker hält die App-Oberfläche, Leaflet und die Schriften
+  vor, sodass die App auch ohne Netz startet. Zuletzt geladene Spots, Fotos und Kartenkacheln bleiben
+  offline sichtbar (Kacheln bis ca. 800, Fotos bis 400, jeweils die ältesten werden verdrängt).
+  Wer im Wald ohne Empfang fotografiert, verliert nichts: Uploads und Wiederholungsfotos ohne Verbindung
+  landen samt Fotos, GPX und Angaben in einer Warteschlange auf dem Gerät (IndexedDB). In der Navigation
+  steht dann z. B. „3 Fotos warten auf Verbindung“; ein Klick zeigt die wartenden Uploads, die sich
+  einzeln oder alle verwerfen lassen. Sobald wieder Netz da ist, werden sie automatisch gesendet: per
+  Background Sync auch bei geschlossener App (Chrome/Android), sonst beim nächsten Öffnen oder sobald
+  das Gerät wieder online ist. Auf dem Handy nimmt *Mit Kamera aufnehmen* im Upload-Dialog direkt ein Foto
+  auf und setzt den aktuellen Standort, falls das Foto kein GPS hat. Ohne Service Worker (z. B. über
+  http auf einer fremden IP) funktioniert die App wie bisher, nur ohne Offline-Modus.
 - **Drei Wege, Fotos zu verorten**:
   1. **GPS aus dem Foto** (EXIF), wie bei normalen Handyfotos.
   2. **Automatisch über einen GPX-Track**: Eine Action-Cam im Intervallmodus (z. B. alle 5 s) beim
@@ -228,6 +241,11 @@ src/neophytes.js     Liste invasiver Neophyten (Schwarze Liste CH / BfN)
 docs/screenshots/    Bilder für dieses README
 public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet die Waldszene,
                      sun.js berechnet Sonnenstand und Einstrahlung, sunmap.js den Kartenmodus „Sonne & Wetter“)
+public/sw.js         Service Worker: App-Shell vorhalten, Laufzeit-Caches, Background Sync
+public/offline-queue.js  Warteschlange für Uploads ohne Verbindung (IndexedDB, von Seite und Service Worker genutzt)
+public/pwa.js        Registrierung, Warteschlangen-Anzeige, Installieren-Knopf, Kamera-Aufnahme im Upload
+public/manifest.webmanifest, public/icons/  Web-App-Manifest und App-Icons
+scripts/generate-icons.js  Erzeugt die App-Icons aus dem Logo (`node scripts/generate-icons.js`)
 ```
 
 ### API
@@ -259,7 +277,9 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
 - Video statt Einzelbilder: Frames aus GoPro- und Insta360-Videos extrahieren und die eingebettete
   GPS-Telemetrie (GPMF) direkt nutzen. 360°-Aufnahmen machen es dann wirklich zu Street View.
 - Blickrichtung berücksichtigen: Spots zusätzlich nach Himmelsrichtung trennen.
-- Vorschaubilder, HEIC-Unterstützung, installierbare PWA mit Offline-Upload.
+- Vorschaubilder, HEIC-Unterstützung.
+- ~~Installierbare PWA mit Offline-Upload~~ (umgesetzt). Offen: Kartenausschnitt einer geplanten Route
+  gezielt für offline vorladen; Push-Benachrichtigung, wenn ein Upload aus der Warteschlange abgelehnt wurde.
 - Benutzerkonten, Moderation, Lizenz pro Foto (z. B. CC BY-SA).
 
 **Phase 3: Automatische Auswertung**
@@ -289,3 +309,6 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
   Normalwerte 1991–2020 werden nur einmal pro Zelle geladen.
 - Kartendaten © OpenStreetMap-Mitwirkende. Bei stärkerer Nutzung braucht es einen eigenen
   Tile-Anbieter (siehe Tile Usage Policy).
+- Der Service Worker braucht HTTPS (oder `localhost`). Nach Änderungen an der Liste vorgehaltener Dateien
+  in `public/sw.js` `SHELL_VERSION` erhöhen; alte Caches werden beim Aktivieren gelöscht. App-Code
+  (HTML, JS, CSS) wird immer zuerst aus dem Netz geladen, ein Deployment ist also sofort sichtbar.
