@@ -79,6 +79,11 @@ const MIGRATIONS = [
   ['photos', 'large_file', 'TEXT'], // 1280 px WebP preview in data/thumbs
   ['photos', 'panorama', 'INTEGER'], // 1 = equirectangular 360° image
   ['photos', 'video_time', 'REAL'], // position (s) in the source video for frames taken from a video
+  // Accounts, moderation and licences (src/auth.js, src/moderation.js)
+  ['photos', 'uploader_id', 'INTEGER'], // users.id, null for anonymous and older photos
+  ['photos', 'license', "TEXT NOT NULL DEFAULT 'cc-by-sa-4.0'"], // key of LICENSES in src/moderation.js
+  ['photos', 'hidden_at', 'INTEGER'], // set when a moderator hides the photo
+  ['photos', 'hidden_reason', 'TEXT'],
 ];
 
 function openDb(file) {

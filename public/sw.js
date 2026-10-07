@@ -17,7 +17,7 @@
 
 importScripts('offline-queue.js');
 
-const SHELL_VERSION = 'v3';
+const SHELL_VERSION = 'v4';
 const DATA_VERSION = 'v1';
 const CACHE = {
   shell: `myforrest-shell-${SHELL_VERSION}`,
@@ -45,6 +45,7 @@ const PRECACHE = [
   'video.js',
   'video.css',
   'vegetation.js',
+  'account.js',
   'offline-queue.js',
   'pwa.js',
   'manifest.webmanifest',

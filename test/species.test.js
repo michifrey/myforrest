@@ -155,7 +155,7 @@ test('Darwin Core and iNaturalist CSV exports', async () => {
     assert.equal(col('establishmentMeans'), 'introduced');
     assert.equal(col('identificationRemarks'), 'Automatisch bestimmt mit Pl@ntNet, Score 0.82');
     assert.match(col('associatedMedia'), new RegExp(`^${base}/uploads/f\\d+-\\w+\\.jpg$`));
-    assert.equal(col('license'), '');
+    assert.equal(col('license'), 'https://creativecommons.org/licenses/by-sa/4.0/', 'default licence as CC URI');
     // Note with quotes and a formula prefix is quoted and defused.
     assert.ok(dwc[4].includes('"\'=SUM(A1) ""Bestand"" am Bach"'));
     assert.ok(dwc[5].includes(',25,'), 'GPX-located photo has 25 m uncertainty');
@@ -168,13 +168,17 @@ test('Darwin Core and iNaturalist CSV exports', async () => {
   });
 });
 
-test('export includes a per-photo licence when the column exists', async () => {
+test('export uses each photo\'s licence and leaves out hidden photos', async () => {
   await withServer(async (base, db) => {
     seed(db);
-    db.exec('ALTER TABLE photos ADD COLUMN license TEXT');
-    db.exec("UPDATE photos SET license = 'CC-BY-SA-4.0'");
+    db.exec("UPDATE photos SET license = 'cc0-1.0'");
     const dwc = (await (await fetch(`${base}/api/export/dwc.csv?species=Fagus%20sylvatica`)).text()).trim().split('\r\n');
-    assert.ok(dwc[1].endsWith(',CC-BY-SA-4.0'));
+    assert.ok(dwc[1].endsWith(',https://creativecommons.org/publicdomain/zero/1.0/'));
+    const all = (await (await fetch(`${base}/api/occurrences`)).json());
+    const count = (all.occurrences || all).length;
+    db.exec(`UPDATE photos SET hidden_at = ${Date.now()} WHERE id = (SELECT MIN(id) FROM photos)`);
+    const after = (await (await fetch(`${base}/api/occurrences`)).json());
+    assert.equal((after.occurrences || after).length, count - 1);
   });
 });
 

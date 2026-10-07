@@ -279,6 +279,29 @@ den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen und eine Notiz.
   3. **Manuell**: Standort auf der Karte anklicken oder den aktuellen Standort verwenden.
 - **Beobachtungen taggen**: Sturmschaden/Windwurf, Borkenkäfer, Trockenschaden, Totholz,
   Holzschlag, Verjüngung, Neophyt, Weg/Erosion, dazu eine Notiz. Die Karte lässt sich danach filtern.
+- **Benutzerkonten, Moderation und Lizenz pro Foto**:
+  - *Konten*: Registrieren und Anmelden mit E-Mail (oder Name) und Passwort über das Konto-Menü oben rechts.
+    Passwörter werden mit scrypt und eigenem Salt pro Konto gespeichert. Die Sitzung liegt in einem
+    httpOnly-Cookie (SameSite=Lax, 30 Tage); in der Datenbank steht nur ihr SHA-256-Hash. Fehlversuche beim
+    Anmelden werden begrenzt (5 pro Konto und IP, 30 pro IP in 15 Minuten).
+  - *CSRF-Schutz*: Jede schreibende Anfrage mit Sitzungs-Cookie muss das Token der Sitzung im Header
+    `X-CSRF-Token` mitschicken (das Frontend erledigt das automatisch). Einen eigenen Header kann eine fremde
+    Seite ohne CORS-Freigabe nicht setzen. Zusätzlich wird ein fremder `Origin` abgewiesen, und Anmeldung
+    und Registrierung nehmen nur JSON an.
+  - *Rollen*: Mitglied, Moderation, Administration. Das erste Konto wird Admin, oder das Konto mit der
+    Adresse aus `ADMIN_EMAIL`. Admins vergeben Rollen unter *Konten & Rollen*.
+  - *Anonym oder mit Konto*: Standardmässig sind Uploads ohne Konto weiterhin möglich. Mit `REQUIRE_LOGIN=1`
+    braucht es für Uploads und alle Änderungen ein Konto; Lesen und Melden bleiben offen. Fotos mit Konto
+    können nur ihre Urheber bearbeiten und löschen (und die Moderation).
+  - *Lizenz pro Foto*: Beim Hochladen wählbar: CC BY-SA 4.0 (Standard), CC BY 4.0, CC0, CC BY-NC-SA 4.0 oder
+    alle Rechte vorbehalten. Die zuletzt gewählte Lizenz wird zum Standard des Kontos, auch für
+    Wiederholungsfotos. Unter jedem Foto stehen Urheber („Anonym“ ohne Konto) und Lizenz mit Link; wer das
+    Foto hochgeladen hat, kann die Lizenz dort ändern. Ältere Fotos gelten als CC BY-SA 4.0.
+  - *Melden und Moderation*: Jede und jeder kann ein Foto melden (z. B. „Personen oder Kennzeichen erkennbar“).
+    Die Moderation sieht die Meldungen in einer Warteschlange und kann Fotos ausblenden, wieder einblenden,
+    Meldungen verwerfen oder Fotos löschen. Ausgeblendete Fotos verschwinden aus Karte, Spots, Vergleichen und
+    `/uploads`, bleiben für die Moderation aber sichtbar (grau markiert). Alle Moderationsschritte landen in
+    einem Protokoll.
 - **Pflanzenbestimmung (optional)**: Mit einem kostenlosen [Pl@ntNet](https://my.plantnet.org)-API-Key
   werden Pflanzen auf einem Foto bestimmt. Bekannte invasive Neophyten wie Drüsiges Springkraut,
   Japanischer Staudenknöterich, Goldruten oder Götterbaum werden erkannt, und das Foto erhält
@@ -313,6 +336,8 @@ Konfiguration über Umgebungsvariablen:
 | `FFMPEG_PATH`      | `ffmpeg` | ffmpeg für die Bilder aus Videos               |
 | `VIDEO_MAX_MB`     | `4096`   | Maximale Grösse eines Videos                   |
 | `SENTINEL_STAC_URL`| Earth Search | STAC-API für Sentinel-2 L2A; leer = Satellitenkontext aus |
+| `REQUIRE_LOGIN`    | –        | `1`: Uploads und Änderungen nur mit Konto      |
+| `ADMIN_EMAIL`      | –        | Dieses Konto wird Admin (sonst das erste Konto) |
 
 ## Aufbau
 
@@ -349,12 +374,16 @@ src/occurrences.js   Funde aus den Pl@ntNet-Bestimmungen, Filter und Artenübers
 src/spread.js        Ausbreitungsfronten: Umrisse pro Jahr, Rate und Richtung
 src/export.js        CSV-Export nach Darwin Core und im iNaturalist-Importformat
 src/routes/species.js  API-Routen für Arten, Funde, Ausbreitung und Export
+src/auth.js          Konten, Passwort-Hashing (scrypt), Sitzungen, Rate-Limit
+src/moderation.js    Lizenzen, Meldungen, Ausblenden und Protokoll
+src/routes/accounts.js  Routen für Konten und Moderation, CSRF-Schutz, Rechte auf Fotos
 docs/screenshots/    Bilder für dieses README
 public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet die Waldszene,
                      sun.js berechnet Sonnenstand und Einstrahlung, sunmap.js den Kartenmodus „Sonne & Wetter“,
                      hotspots.js den Kartenmodus „Arten & Neophyten“,
                      video.js den Video-Upload und die 360°-Ansicht,
-                     vegetation.js die Diagramme zu Vegetationsdichte und NDVI)
+                     vegetation.js die Diagramme zu Vegetationsdichte und NDVI,
+                     account.js Konto-Menü, Lizenz, Melden und Moderation)
 public/sw.js         Service Worker: App-Shell vorhalten, Laufzeit-Caches, Background Sync
 public/offline-queue.js  Warteschlange für Uploads ohne Verbindung (IndexedDB, von Seite und Service Worker genutzt)
 public/pwa.js        Registrierung, Warteschlangen-Anzeige, Installieren-Knopf, Kamera-Aufnahme im Upload
@@ -370,7 +399,7 @@ scripts/generate-icons.js  Erzeugt die App-Icons aus dem Logo (`node scripts/gen
 | `GET`    | `/api/spots?tag=…`           | Alle Spots mit Anzahl Fotos, Zeitraum, Tags, Blickrichtung (`heading`) und Vorschaubild (`latestThumbUrl`) |
 | `GET`    | `/api/spots/:id`             | Ein Spot mit Blickrichtung und allen Fotos chronologisch (jedes Foto mit `url`, `thumbUrl` und `largeUrl`) |
 | `GET`    | `/thumbs/:datei`             | Vorschaubilder (WebP)                                    |
-| `POST`   | `/api/photos`                | Upload (multipart: `photos[]` als JPEG, PNG, WebP oder HEIC, optional `spotId` und `refPhotoId` für Wiederholungsfotos, `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `utcOffsetMinutes`, `clockShiftSeconds`) |
+| `POST`   | `/api/photos`                | Upload (multipart: `photos[]` als JPEG, PNG, WebP oder HEIC, optional `spotId` und `refPhotoId` für Wiederholungsfotos, `license`, `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `utcOffsetMinutes`, `clockShiftSeconds`) |
 | `POST`   | `/api/videos`                | Video-Upload (multipart: `video`, optional `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `clockShiftSeconds`, `frameDistanceM`, `frameIntervalS`, `panorama` = `auto`/`1`/`0`, `async=1` für Hintergrundverarbeitung) |
 | `GET`    | `/api/videos/jobs/:id`       | Fortschritt und Ergebnis eines Video-Uploads mit `async=1` |
 | `GET`    | `/api/videos/config`         | ffmpeg verfügbar? Standardabstand und -intervall         |
@@ -386,8 +415,23 @@ scripts/generate-icons.js  Erzeugt die App-Icons aus dem Logo (`node scripts/gen
 | `DELETE` | `/api/spots/:id/species?name=` | Baumart vom Spot entfernen                             |
 | `GET`    | `/api/photos/:id/context`    | Wetter-Kontext und Auffälligkeiten (wird beim ersten Abruf berechnet und gespeichert) |
 | `POST`   | `/api/photos/:id/context`    | Wetter-Kontext neu laden                                 |
-| `PATCH`  | `/api/photos/:id`            | Tags und Notiz ändern                                    |
-| `DELETE` | `/api/photos/:id`            | Foto löschen                                             |
+| `PATCH`  | `/api/photos/:id`            | Tags und Notiz ändern; `license` nur durch den Urheber   |
+| `DELETE` | `/api/photos/:id`            | Foto löschen (Urheber oder Moderation; anonyme Fotos ohne `REQUIRE_LOGIN` frei) |
+| `GET`    | `/api/auth/me`               | Angemeldetes Konto, CSRF-Token, Lizenzen, Meldegründe, `requireLogin` |
+| `POST`   | `/api/auth/register`         | Konto anlegen (JSON: `email`, `name`, `password`) und anmelden |
+| `POST`   | `/api/auth/login`            | Anmelden (JSON: `login` = E-Mail oder Name, `password`)  |
+| `POST`   | `/api/auth/logout`           | Abmelden                                                 |
+| `POST`   | `/api/photos/:id/report`     | Foto melden (`{ reason, note }`), auch ohne Konto        |
+| `GET`    | `/api/moderation/queue`      | Moderation: offene Meldungen pro Foto und ausgeblendete Fotos |
+| `POST`   | `/api/moderation/photos/:id/hide` | Foto ausblenden (`{ reason }`), erledigt seine Meldungen |
+| `POST`   | `/api/moderation/photos/:id/unhide` | Foto wieder einblenden                           |
+| `POST`   | `/api/moderation/photos/:id/dismiss` | Meldungen zu einem Foto verwerfen               |
+| `GET`    | `/api/moderation/log`        | Protokoll der Moderation                                 |
+| `GET`    | `/api/users`                 | Admin: Konten mit Rolle und Anzahl Fotos                 |
+| `PATCH`  | `/api/users/:id`             | Admin: Rolle setzen (`{ role: 'user' \| 'moderator' \| 'admin' }`) |
+
+Fotos enthalten im JSON zusätzlich `uploader` (`{ id, name }` oder `null`), `license` (`{ id, label, url }`)
+und `hidden`. Schreibende Anfragen mit Sitzungs-Cookie brauchen den Header `X-CSRF-Token`.
 | `POST`   | `/api/photos/:id/identify`   | Pflanzen bestimmen (Pl@ntNet)                            |
 | `GET`    | `/api/species`               | Arten mit Funden: Anzahl, Spots, Jahre, Neophyt ja/nein  |
 | `GET`    | `/api/occurrences`           | Funde (bestes Pl@ntNet-Ergebnis pro Foto). Filter für diese und die folgenden Routen: `species`, `neophytes=1`, `minScore` (Standard 0,2), `bbox=west,süd,ost,nord`, `from`/`to` (Datum) |
@@ -409,7 +453,8 @@ scripts/generate-icons.js  Erzeugt die App-Icons aus dem Logo (`node scripts/gen
   nach Richtung getrennt).
 - PWA: Kartenausschnitt einer geplanten Route gezielt für offline vorladen; Push-Benachrichtigung,
   wenn ein Upload aus der Warteschlange abgelehnt wurde.
-- Benutzerkonten, Moderation, Lizenz pro Foto (z. B. CC BY-SA).
+- Konten ausbauen: Passwort zurücksetzen und E-Mail bestätigen, Profilseite mit eigenen Fotos,
+  Konto löschen; Rate-Limits dauerhaft speichern statt im Arbeitsspeicher.
 
 **Phase 3: Automatische Auswertung**
 - Objekterkennung: umgestürzte Bäume, Wurzelteller, Totholz, Holzpolter und Rückegassen,
@@ -434,8 +479,11 @@ scripts/generate-icons.js  Erzeugt die App-Icons aus dem Logo (`node scripts/gen
 
 ## Hinweise
 
-- Der Prototyp hat **keine Authentifizierung**. Er sollte nur lokal oder in einem vertrauenswürdigen
-  Netz laufen, bis Benutzerkonten umgesetzt sind.
+- Ohne `REQUIRE_LOGIN=1` lassen sich anonym hochgeladene Fotos von allen bearbeiten und löschen, wie bisher
+  im Prototyp. Für einen öffentlichen Betrieb `REQUIRE_LOGIN=1` setzen und hinter HTTPS betreiben (das
+  Sitzungs-Cookie erhält `Secure`, wenn die Anfrage über HTTPS bzw. `X-Forwarded-Proto: https` kommt).
+- Ausgeblendete Fotos werden nicht mehr ausgeliefert, können aber noch bis zu 7 Tage im Browser-Cache von
+  Personen liegen, die sie vorher gesehen haben.
 - Bilder werden unverändert gespeichert und ausgeliefert, **inklusive EXIF-Daten** (GPS,
   Kameramodell). Ausnahmen sind die Vorschaubilder und die aus HEIC umgewandelten JPEGs, die keine
   EXIF-Daten enthalten. Vor einem öffentlichen Betrieb sollten Metadaten entfernt und Personen sowie

@@ -23,9 +23,15 @@ const UNCERTAINTY_M = { exif: 15, gpx: 25, manual: 50 };
 const normalizeName = (name) => String(name || '').toLowerCase().replace(/\s+/g, ' ').trim();
 const binomial = (name) => normalizeName(name).split(' ').slice(0, 2).join(' ');
 
-/** True when the database has the per-photo `license` column (added by another feature). */
-function hasLicenseColumn(db) {
-  return db.prepare('PRAGMA table_info(photos)').all().some((c) => c.name === 'license');
+const { LICENSES } = require('./moderation');
+
+const columnsOf = (db) => new Set(db.prepare('PRAGMA table_info(photos)').all().map((c) => c.name));
+
+/** Licence for export: the Creative Commons URI (as Darwin Core recommends), or the label without one. */
+function licenseForExport(key) {
+  const lic = key && LICENSES[key];
+  if (!lic) return key || null;
+  return lic.url ? lic.url.replace(/deed\.de$/, '') : lic.label;
 }
 
 /**
@@ -67,8 +73,11 @@ function parseFilters(q = {}) {
  */
 function listOccurrences(db, filters = {}) {
   const f = { minScore: DEFAULT_MIN_SCORE, ...filters };
-  const license = hasLicenseColumn(db) ? 'p.license' : 'NULL';
+  const cols = columnsOf(db);
+  const license = cols.has('license') ? 'p.license' : 'NULL';
   const where = ['i.score >= ?'];
+  // Photos hidden by moderators are never exported or mapped.
+  if (cols.has('hidden_at')) where.push('p.hidden_at IS NULL');
   const args = [f.minScore];
   if (f.from !== null && f.from !== undefined) { where.push('p.taken_at >= ?'); args.push(f.from); }
   if (f.to !== null && f.to !== undefined) { where.push('p.taken_at <= ?'); args.push(f.to); }
@@ -111,7 +120,7 @@ function listOccurrences(db, filters = {}) {
       locationSource: r.location_source,
       uncertaintyM: r.location_source === 'spot' ? (f.spotRadiusM ?? 25) : (UNCERTAINTY_M[r.location_source] ?? null),
       note: r.note,
-      license: r.license || null,
+      license: licenseForExport(r.license),
       scientificName: r.scientific_name,
       commonName: r.common_name,
       score: r.score,
@@ -152,4 +161,4 @@ function speciesSummary(db, filters = {}) {
     .sort((a, b) => Boolean(b.neophyte) - Boolean(a.neophyte) || b.count - a.count || a.scientificName.localeCompare(b.scientificName));
 }
 
-module.exports = { listOccurrences, speciesSummary, parseFilters, hasLicenseColumn, binomial, DEFAULT_MIN_SCORE, UNCERTAINTY_M };
+module.exports = { listOccurrences, speciesSummary, parseFilters, licenseForExport, binomial, DEFAULT_MIN_SCORE, UNCERTAINTY_M };

@@ -18,7 +18,8 @@
   const LOCK = 'myforrest-upload-queue';
   const ENDPOINT = 'api/photos';
   // HTTP statuses where trying again later can help; anything else is final.
-  const RETRY_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+  // 401/403: logged out or the session changed (CSRF token) – keep the upload until the user logs in again.
+  const RETRY_STATUS = new Set([401, 403, 408, 425, 429, 500, 502, 503, 504]);
 
   const channel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('myforrest-queue') : null;
   const listeners = new Set();
@@ -114,6 +115,8 @@
       gpx: entries.find((e) => e.name === 'gpx' && e.blob)?.filename || null,
       spotId: field('spotId') ? Number(field('spotId')) : null,
       note: field('note'),
+      // The session's CSRF token (account.js), so the service worker can send it too.
+      csrf: (typeof self !== 'undefined' && self.Account && self.Account.csrf) || null,
       attempts: 0,
       lastError: null,
       failed: null,
@@ -151,7 +154,9 @@
   async function sendItem(item, summary) {
     let res;
     try {
-      res = await fetch(new URL(ENDPOINT, baseUrl()), { method: 'POST', body: deserialize(item.entries), credentials: 'same-origin' });
+      // In the page, account.js's fetch wrapper sets the current token; the service worker uses the stored one.
+      const headers = item.csrf ? { 'X-CSRF-Token': item.csrf } : {};
+      res = await fetch(new URL(ENDPOINT, baseUrl()), { method: 'POST', body: deserialize(item.entries), credentials: 'same-origin', headers });
     } catch (err) {
       item.lastError = 'Keine Verbindung';
       await put(item);

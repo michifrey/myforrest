@@ -24,6 +24,7 @@ const { createWeather } = require('./weather');
 const { assess } = require('./irregularities');
 const { TREES, treeInfo, treeJson } = require('./trees');
 const { createElevation } = require('./elevation');
+const registerAccounts = require('./routes/accounts');
 const {
   altitudeShift, aspectShift, coldPoolShift, expectedColourDoy, aspectLabel, aspectFromCompass, COMPASS, LANDFORMS, landform,
 } = require('./phenology');
@@ -39,6 +40,9 @@ function createApp({
   plantnetKey = process.env.PLANTNET_API_KEY,
   fetchImpl = fetch,
   weatherFetch = fetch,
+  requireLogin = process.env.REQUIRE_LOGIN === '1',
+  adminEmail = process.env.ADMIN_EMAIL || null,
+  rateLimits,
 } = {}) {
   const uploadDir = path.join(dataDir, 'uploads');
   const tmpDir = path.join(dataDir, 'tmp');
@@ -58,6 +62,9 @@ function createApp({
   const app = express();
   app.locals.db = db;
   app.use(express.json({ limit: '100kb' }));
+  // Accounts, CSRF, moderation (src/routes/accounts.js); must precede the routes below and /uploads.
+  const accountsCtx = { db, requireLogin, adminEmail, rateLimits };
+  const accounts = registerAccounts(app, accountsCtx);
   // The service worker must never be served stale from the HTTP cache, or app updates would stall.
   app.get('/sw.js', (req, res) => {
     res.set({ 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/' });
@@ -97,6 +104,7 @@ function createApp({
     alignment: p.align_h ? { h: JSON.parse(p.align_h), inliers: p.align_inliers } : null,
     change: p.change_json ? JSON.parse(p.change_json) : null,
     context: p.context_json ? JSON.parse(p.context_json) : null,
+    ...accounts.photoExtras(p), // uploader, license, hidden
     identifications: idsOf.all(p.id).map((r) => {
       const tree = treeInfo(r.scientific_name);
       return {
@@ -108,6 +116,7 @@ function createApp({
       };
     }),
   });
+  accountsCtx.photoJson = photoJson;
 
   const setTags = (photoId, tags) => {
     db.prepare('DELETE FROM photo_tags WHERE photo_id = ?').run(photoId);
@@ -360,18 +369,19 @@ function createApp({
 
   app.get('/api/spots', (req, res) => {
     const tag = req.query.tag ? String(req.query.tag) : null;
+    const vis = (alias) => accounts.visibleSql(req, alias); // hidden photos: moderators only
     const rows = db.prepare(`
       SELECT s.id, s.lat, s.lon, s.elevation, s.heading,
              COUNT(DISTINCT p.id) AS photo_count,
              MIN(p.taken_at) AS first_taken,
              MAX(p.taken_at) AS last_taken,
              GROUP_CONCAT(DISTINCT t.tag) AS tags,
-             (SELECT file FROM photos WHERE spot_id = s.id ORDER BY taken_at DESC LIMIT 1) AS latest_file,
-             (SELECT thumb_file FROM photos WHERE spot_id = s.id ORDER BY taken_at DESC LIMIT 1) AS latest_thumb,
-             (SELECT change_json FROM photos WHERE spot_id = s.id ORDER BY taken_at DESC LIMIT 1) AS latest_change,
-             (SELECT context_json FROM photos WHERE spot_id = s.id ORDER BY taken_at DESC LIMIT 1) AS latest_context
+             (SELECT file FROM photos WHERE spot_id = s.id AND ${vis('photos')} ORDER BY taken_at DESC LIMIT 1) AS latest_file,
+             (SELECT thumb_file FROM photos WHERE spot_id = s.id AND ${vis('photos')} ORDER BY taken_at DESC LIMIT 1) AS latest_thumb,
+             (SELECT change_json FROM photos WHERE spot_id = s.id AND ${vis('photos')} ORDER BY taken_at DESC LIMIT 1) AS latest_change,
+             (SELECT context_json FROM photos WHERE spot_id = s.id AND ${vis('photos')} ORDER BY taken_at DESC LIMIT 1) AS latest_context
       FROM spots s
-      JOIN photos p ON p.spot_id = s.id
+      JOIN photos p ON p.spot_id = s.id AND ${vis('p')}
       LEFT JOIN photo_tags t ON t.photo_id = p.id
       GROUP BY s.id
       HAVING ? IS NULL OR SUM(t.tag = ?) > 0
@@ -397,13 +407,13 @@ function createApp({
     })));
   });
 
-  const spotJson = (id) => {
+  const spotJson = (id, showHidden = false) => {
     const spot = db.prepare(`
       SELECT id, lat, lon, heading, elevation, elevation_source, slope, aspect, terrain_source,
              tpi300, tpi600, landform, landform_source
       FROM spots WHERE id = ?`).get(id);
     if (!spot) return null;
-    const photos = db.prepare('SELECT * FROM photos WHERE spot_id = ? ORDER BY taken_at, id').all(id);
+    const photos = db.prepare(`SELECT * FROM photos p WHERE spot_id = ? AND ${showHidden ? '1 = 1' : accounts.publicSql('p')} ORDER BY taken_at, id`).all(id);
     return {
       id: spot.id,
       lat: spot.lat,
@@ -435,7 +445,7 @@ function createApp({
   app.get('/api/spots/:id', (req, res) => {
     const id = idParam(req, res);
     if (id === null) return;
-    const spot = spotJson(id);
+    const spot = spotJson(id, accounts.canSeeHidden(req));
     if (!spot) return res.status(404).json({ error: 'Spot nicht gefunden' });
     res.json(spot);
   });
@@ -465,7 +475,7 @@ function createApp({
     let status;
     let body;
     try {
-      [status, body] = await processUpload(files, gpxFile, req.body || {});
+      [status, body] = await processUpload(files, gpxFile, req.body || {}, req);
     } finally {
       // Temp files of skipped photos (and the GPX) are removed before answering.
       await Promise.all([...files, ...(gpxFile ? [gpxFile] : [])].map((f) => fsp.rm(f.path, { force: true })));
@@ -473,8 +483,10 @@ function createApp({
     res.status(status).json(body);
   }
 
-  async function processUpload(files, gpxFile, b) {
+  async function processUpload(files, gpxFile, b, req) {
     if (!files.length) return [400, { error: 'Keine Fotos übermittelt' }];
+    const owner = accounts.uploadOwner(req); // uploader and licence
+    if (owner.error) return [400, { error: owner.error }];
 
     const offsetMin = Number.isFinite(Number(b.utcOffsetMinutes)) ? Number(b.utcOffsetMinutes) : 0;
     const clockShiftMs = (Number(b.clockShiftSeconds) || 0) * 1000;
@@ -567,6 +579,7 @@ function createApp({
         `).run(spotId, file, f.originalname.slice(0, 255), takenAt, pos.lat, pos.lon, meta.heading, meta.altitude,
           source, activity, note, Date.now()).lastInsertRowid);
         setTags(id, tags);
+        accounts.stampPhoto(id, owner);
         refreshSpot(db, spotId);
         touchedSpots.add(spotId);
         return id;
@@ -640,7 +653,7 @@ function createApp({
   app.get('/api/weather/day/spots', async (req, res) => {
     const date = parseDate(req.query.date);
     if (!date) return res.status(400).json({ error: 'date (JJJJ-MM-TT) angeben' });
-    const spots = db.prepare('SELECT id, lat, lon FROM spots').all();
+    const spots = db.prepare(`SELECT id, lat, lon FROM spots s WHERE EXISTS (SELECT 1 FROM photos p WHERE p.spot_id = s.id AND ${accounts.publicSql('p')})`).all();
     const byCell = new Map();
     for (const s of spots) {
       const key = `${s.lat.toFixed(1)},${s.lon.toFixed(1)}`;

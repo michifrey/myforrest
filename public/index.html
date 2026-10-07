@@ -384,6 +384,13 @@
         <span>Notiz</span>
         <textarea name="note" rows="2"></textarea>
       </label>
+      <label class="field">
+        <span>Lizenz</span>
+        <select name="license" id="upload-license">
+          <option value="cc-by-sa-4.0">CC BY-SA 4.0</option>
+        </select>
+        <span id="upload-license-hint" class="muted small license-hint"></span>
+      </label>
 
       <details>
         <summary>Zeitabgleich für GPX</summary>
@@ -415,6 +422,7 @@
   <script src="hotspots.js"></script>
   <script src="video.js"></script>
   <script src="vegetation.js"></script>
+  <script src="account.js"></script>
   <script src="sunmap.js"></script>
   <script src="offline-queue.js"></script>
   <script src="pwa.js"></script>
