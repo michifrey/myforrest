@@ -43,6 +43,7 @@ function createApp({
   requireLogin = process.env.REQUIRE_LOGIN === '1',
   adminEmail = process.env.ADMIN_EMAIL || null,
   rateLimits,
+  detectorUrl = process.env.DETECTOR_URL || null, detectorFetch = fetch,
 } = {}) {
   const uploadDir = path.join(dataDir, 'uploads');
   const tmpDir = path.join(dataDir, 'tmp');
@@ -812,7 +813,7 @@ function createApp({
     if (!a || !b) return { status: 404, error: 'Foto nicht gefunden' };
     if (a.spot_id !== b.spot_id) return { status: 422, error: 'Fotos gehören zu verschiedenen Spots' };
     if (!a.align_h || !b.align_h) return { status: 422, error: 'Mindestens eines der Fotos ist nicht ausgerichtet' };
-    const key = `${a.id}:${b.id}:${a.align_h}:${b.align_h}`;
+    const key = `${a.id}:${b.id}:${a.align_h}:${b.align_h}:${app.locals.learner?.version() ?? ''}`;
     if (!changeCache.has(key)) {
       const hAinv = invert(JSON.parse(a.align_h));
       const job = (async () => {
@@ -826,7 +827,7 @@ function createApp({
         return {
           changedFraction: result.changedFraction,
           coverage: result.coverage,
-          ...classifyChange(result),
+          ...classifyChange(result, { model: app.locals.learner?.current() }),
           png: await renderHeatmap(result),
         };
       })();
@@ -902,6 +903,9 @@ function createApp({
   require('./routes/species')(app, { db, spotRadiusM });
   require('./routes/video')(app, { db, uploadDir, tmpDir, spotRadiusM, activities: ACTIVITIES, photoJson, getPhoto, setTags, alignPhoto, analyzeChange, analyzeContext, background, safeAlign });
   const vegetation = require('./routes/vegetation')(app, { db, uploadDir, background, fetchImpl: weatherFetch });
+  require('./routes/analysis')(app, {
+    db, uploadDir, getPhoto, idParam, background, changeBetween, spotTrees, terrainOf, refreshIrregularities, detectorUrl, detectorFetch,
+  });
 
   app.use('/api', (req, res) => res.status(404).json({ error: 'Nicht gefunden' }));
 

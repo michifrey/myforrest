@@ -389,6 +389,7 @@ function showPhoto(i) {
   $('identify-group').hidden = !state.config.plantnet;
   renderIdentifications(p);
   window.Account?.photoShown(p); // credit, licence, report/moderation (account.js)
+  document.dispatchEvent(new CustomEvent('myforrest:photo', { detail: p })); // analysis.js
 }
 
 function renderIdentifications(p) {
@@ -637,6 +638,7 @@ async function updateCompare() {
   heat.hidden = true;
   $('cmp-boxes').replaceChildren();
   $('cmp-regions').replaceChildren();
+  document.dispatchEvent(new CustomEvent('myforrest:compare', { detail: { a, b, change: null } })); // analysis.js
   await showFramed($('swipe'), $('cmp-img-a'), a, null);
   const aligned = await showFramed($('swipe'), $('cmp-img-b'), b, alignOn ? a : null, false);
   const canCompare = alignOn && aligned && a.id !== b.id;
@@ -662,6 +664,7 @@ async function updateCompare() {
     }
     renderRegions(change, b);
     stormNote(a, b, change, () => token === compareToken);
+    document.dispatchEvent(new CustomEvent('myforrest:compare', { detail: { a, b, change } })); // analysis.js
   } catch {
     // Change detection is an extra; the aligned comparison still works without it.
   }
