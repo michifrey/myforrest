@@ -535,6 +535,43 @@ input[type="checkbox"] { accent-color: var(--accent); width: 1.05rem; height: 1.
 .ident li { margin: 0.2rem 0; }
 .ident .neo { color: var(--neo); font-weight: 700; }
 
+/* ---------- Tree species ---------- */
+.species { margin-top: 0.9rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.species summary {
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+  padding: 0.65rem 2.2rem 0.65rem 0.9rem; list-style: none; color: var(--text); position: relative; cursor: pointer;
+}
+.species summary::-webkit-details-marker { display: none; }
+.species summary::after { content: '▾'; position: absolute; right: 0.9rem; top: 0.6rem; color: var(--muted); transition: transform 0.2s; }
+.species[open] summary::after { transform: rotate(180deg); }
+.label-inline { font: 700 0.75rem/1 var(--font-body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.species-summary { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.species-summary .empty { font-size: 0.82rem; }
+.tree-chip {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font: 600 0.78rem/1.2 var(--font-body); padding: 0.25rem 0.6rem 0.25rem 0.45rem; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent);
+}
+.tree-chip svg { width: 14px; height: 14px; fill: currentColor; flex: none; }
+.tree-chip.nadel { background: color-mix(in srgb, var(--wet) 14%, transparent); color: var(--text); }
+.tree-chip.nadel svg { fill: var(--wet); }
+.tree-chip.invasive { background: color-mix(in srgb, var(--neo) 14%, transparent); color: var(--neo); }
+.species-list { list-style: none; margin: 0; padding: 0 0.9rem; display: grid; gap: 0.5rem; }
+.species-list li { border-top: 1px solid var(--border); padding-top: 0.6rem; font-size: 0.84rem; }
+.species-list li header { display: flex; align-items: center; gap: 0.5rem; }
+.species-list i { color: var(--muted); font-size: 0.8rem; }
+.species-list .src { margin-left: auto; font-size: 0.72rem; color: var(--muted); font-weight: 600; }
+.species-list dl { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.7rem; margin: 0.45rem 0 0; color: var(--muted); }
+.species-list dt { font-weight: 700; color: var(--text); }
+.species-list dd { margin: 0; }
+.species-list .remove { font-size: 0.75rem; padding: 0.1rem 0.3rem; }
+.species-add { padding: 0.6rem 0.9rem 0; }
+.species-add select { flex: 1; min-width: 0; }
+.species .hint { padding: 0 0.9rem 0.8rem; }
+.identify-group { display: inline-flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+.identify-group select { padding: 0.45rem 0.5rem; font-size: 0.85rem; }
+.ident .tree-note { color: var(--accent); font-weight: 700; }
+
 /* ---------- Change classes ---------- */
 .windwurf { --cc: var(--c-windwurf); }
 .auflichtung { --cc: var(--c-auflichtung); }

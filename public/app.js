@@ -6,6 +6,7 @@ const DAMAGE_TAGS = ['sturmschaden', 'borkenkaefer', 'trockenschaden', 'holzschl
 const state = {
   config: { tags: {}, plantnet: false },
   spots: [],
+  trees: [],
   spot: null,
   index: 0,
   picked: null,
@@ -160,6 +161,7 @@ function renderMarkers() {
     const extra = [
       s.change?.fraction >= 0.05 ? `≈ ${Math.round(s.change.fraction * 100)} % verändert${s.change.top ? ` (${s.change.top})` : ''}` : '',
       ...s.irregularities,
+      s.species.length ? `Baumarten: ${s.species.join(', ')}` : '',
     ].filter(Boolean);
     const tip = el('div', {}, [
       el('div', { text: `Spot ${s.id} · ${s.photoCount} Foto${s.photoCount === 1 ? '' : 's'} · ${fmtDate(s.firstTaken)}–${fmtDate(s.lastTaken)}` }),
@@ -273,6 +275,7 @@ async function openSpot(id, photoId) {
   showPhoto(state.index);
   updateSpotChange(state.spot);
   renderChronicle(state.spot);
+  renderSpecies(state.spot);
   map.setView([state.spot.lat, state.spot.lon], Math.max(map.getZoom(), 15));
 }
 
@@ -304,7 +307,7 @@ function showPhoto(i) {
     })));
   $('photo-note').value = p.note || '';
   renderContext(p);
-  $('identify').hidden = !state.config.plantnet;
+  $('identify-group').hidden = !state.config.plantnet;
   renderIdentifications(p);
 }
 
@@ -318,9 +321,82 @@ function renderIdentifications(p) {
       r.commonName ? ` – ${r.commonName}` : '',
       ` (${Math.round(r.score * 100)} %)`,
       r.neophyte ? el('span', { class: 'neo', text: ` · Neophyt: ${r.neophyte}` }) : '',
+      r.tree && r.score >= 0.25 ? el('span', { class: 'tree-note', text: ` · Baum: ${r.tree.name}, beim Spot erfasst` }) : '',
     ]))),
   ]));
 }
+
+/* ---------- Tree species of a spot ---------- */
+
+const TREE_ICONS = {
+  nadel: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1 3.5 8H6l-3 4.5h4V15h2v-2.5h4L10 8h2.5z"/></svg>',
+  laub: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a5 5 0 0 0-4.6 7A4 4 0 0 0 7 14h.2v1.5h1.6V14H9a4 4 0 0 0 3.6-5.5A5 5 0 0 0 8 1.5z"/></svg>',
+};
+const DROUGHT = { hoch: 'hoch', mittel: 'mittel', gering: 'gering' };
+const fmtDoy = (d) => new Date(Date.UTC(2023, 0, 1 + d)).toLocaleDateString('de-CH', { day: '2-digit', month: 'long', timeZone: 'UTC' });
+
+function treeChip(t) {
+  const chip = el('span', { class: `tree-chip ${t.group}${t.invasive ? ' invasive' : ''}`, title: t.scientificName });
+  chip.innerHTML = TREE_ICONS[t.group];
+  chip.append(t.name);
+  return chip;
+}
+
+function renderSpecies(spot) {
+  const species = spot.species || [];
+  const conifers = species.filter((t) => t.group === 'nadel').length;
+  $('species-summary').replaceChildren(...(species.length
+    ? [...species.map(treeChip), el('span', { class: 'muted small', text: `${species.length - conifers} Laub · ${conifers} Nadel` })]
+    : [el('span', { class: 'empty muted', text: 'noch keine erfasst' })]));
+  $('species-list').replaceChildren(...species.map((t) => el('li', {}, [
+    el('header', {}, [
+      treeChip(t),
+      el('i', { text: t.scientificName }),
+      el('span', { class: 'src', text: t.sources.includes('plantnet') ? `Pl@ntNet${t.score ? ` ${Math.round(t.score * 100)} %` : ''}` : 'manuell' }),
+      el('button', { type: 'button', class: 'link remove', 'aria-label': `${t.name} entfernen`, text: 'entfernen', onclick: () => removeSpecies(t) }),
+    ]),
+    el('dl', {}, [
+      el('dt', { text: 'Herbst' }),
+      el('dd', { text: t.evergreen ? 'immergrün – Verfärbung ist ein Warnsignal' : `Färbung typisch ab ~${fmtDoy(t.colourDoy)} (Flachland)` }),
+      el('dt', { text: 'Trockenheit' }),
+      el('dd', { text: `Empfindlichkeit ${DROUGHT[t.drought]}` }),
+      ...(t.threats.length ? [el('dt', { text: 'Achten auf' }), el('dd', { text: t.threats.join(', ') })] : []),
+      ...(t.invasive ? [el('dt', { text: 'Hinweis' }), el('dd', { text: 'invasiver Neophyt' })] : []),
+    ]),
+  ])));
+  const known = new Set(species.map((t) => t.scientificName));
+  const options = (group, label) => el('optgroup', { label }, state.trees
+    .filter((t) => t.group === group && !known.has(t.scientificName))
+    .map((t) => el('option', { value: t.scientificName, text: `${t.name} (${t.scientificName})` })));
+  $('species-select').replaceChildren(
+    el('option', { value: '', text: 'Baumart wählen …' }),
+    options('laub', 'Laubbäume'),
+    options('nadel', 'Nadelbäume'),
+  );
+}
+
+async function refreshAfterSpecies() {
+  const current = state.spot.photos[state.index].id;
+  const open = $('species-box').open;
+  await Promise.all([openSpot(state.spot.id, current), loadSpots()]);
+  $('species-box').open = open;
+}
+
+async function removeSpecies(t) {
+  await api(`/api/spots/${state.spot.id}/species?name=${encodeURIComponent(t.scientificName)}`, { method: 'DELETE' });
+  await refreshAfterSpecies();
+}
+
+$('species-add').addEventListener('click', async () => {
+  const scientificName = $('species-select').value;
+  if (!scientificName) return;
+  await api(`/api/spots/${state.spot.id}/species`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scientificName }),
+  });
+  await refreshAfterSpecies();
+});
 
 $('time-slider').addEventListener('input', (e) => showPhoto(Number(e.target.value)));
 $('close-spot').addEventListener('click', () => {
@@ -355,13 +431,17 @@ $('identify').addEventListener('click', async (e) => {
   e.target.disabled = true;
   e.target.textContent = 'Bestimme …';
   try {
-    await api(`/api/photos/${p.id}/identify`, { method: 'POST' });
+    await api(`/api/photos/${p.id}/identify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ organ: $('identify-organ').value }),
+    });
     await Promise.all([openSpot(state.spot.id, p.id), loadSpots()]);
   } catch (err) {
     alert(err.message);
   } finally {
     e.target.disabled = false;
-    e.target.textContent = 'Pflanze bestimmen';
+    e.target.textContent = 'Art bestimmen';
   }
 });
 
@@ -1009,7 +1089,7 @@ $('rephoto-file').addEventListener('change', async (e) => {
 /* ---------- Init ---------- */
 
 (async function init() {
-  state.config = await api('/api/config');
+  [state.config, state.trees] = await Promise.all([api('/api/config'), api('/api/trees')]);
   $('tag-filter').append(
     el('option', { value: '@change', text: 'Starke Veränderung (≥ 5 %)' }),
     el('option', { value: '@irregular', text: 'Auffälligkeiten' }),

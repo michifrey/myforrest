@@ -20,9 +20,11 @@ const { computeChange, renderHeatmap } = require('./change');
 const { classifyChange } = require('./classify');
 const { createWeather } = require('./weather');
 const { assess } = require('./irregularities');
+const { TREES, treeInfo, treeJson } = require('./trees');
 
 const ACTIVITIES = ['joggen', 'wandern', 'biken', 'sonstiges'];
 const NEOPHYTE_MIN_SCORE = 0.3;
+const TREE_MIN_SCORE = 0.25;
 
 function createApp({
   dataDir = path.join(__dirname, '..', 'data'),
@@ -76,12 +78,16 @@ function createApp({
     alignment: p.align_h ? { h: JSON.parse(p.align_h), inliers: p.align_inliers } : null,
     change: p.change_json ? JSON.parse(p.change_json) : null,
     context: p.context_json ? JSON.parse(p.context_json) : null,
-    identifications: idsOf.all(p.id).map((r) => ({
-      scientificName: r.scientific_name,
-      commonName: r.common_name,
-      score: r.score,
-      neophyte: r.neophyte,
-    })),
+    identifications: idsOf.all(p.id).map((r) => {
+      const tree = treeInfo(r.scientific_name);
+      return {
+        scientificName: r.scientific_name,
+        commonName: r.common_name,
+        score: r.score,
+        neophyte: r.neophyte,
+        tree: tree ? treeJson(tree) : null,
+      };
+    }),
   });
 
   const setTags = (photoId, tags) => {
@@ -172,12 +178,44 @@ function createApp({
     }), photoId);
   }
 
+  /* ---------- Tree species per spot ---------- */
+
+  const speciesRows = db.prepare(
+    'SELECT scientific_name, source, score, photo_id FROM spot_species WHERE spot_id = ? ORDER BY created_at, id',
+  );
+  /** Tree species known at a spot, merged across sources (manual and Pl@ntNet). */
+  function spotSpecies(spotId) {
+    const merged = new Map();
+    for (const r of speciesRows.all(spotId)) {
+      const t = treeInfo(r.scientific_name);
+      if (!t) continue;
+      const e = merged.get(t.sci) || { ...treeJson(t), sources: [], score: null };
+      e.sources.push(r.source);
+      if (r.score !== null) e.score = Math.max(e.score ?? 0, r.score);
+      merged.set(t.sci, e);
+    }
+    return [...merged.values()];
+  }
+  const spotTrees = (spotId) => spotSpecies(spotId).map((s) => treeInfo(s.scientificName));
+  const addSpecies = db.prepare(`
+    INSERT INTO spot_species (spot_id, scientific_name, source, photo_id, score, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT (spot_id, scientific_name, source)
+    DO UPDATE SET score = MAX(COALESCE(score, 0), COALESCE(excluded.score, 0)), photo_id = excluded.photo_id
+  `);
+
   const irregularitiesOf = (photo, weatherCtx) => assess({
     takenAt: photo.taken_at,
     tags: tagsOf.all(photo.id).map((t) => t.tag),
     change: photo.change_json ? JSON.parse(photo.change_json) : null,
     weather: weatherCtx,
+    species: spotTrees(photo.spot_id),
   });
+
+  /** Species changed: re-evaluate every photo of the spot. */
+  function reassessSpot(spotId) {
+    for (const { id } of db.prepare('SELECT id FROM photos WHERE spot_id = ?').all(spotId)) refreshIrregularities(id);
+  }
 
   /** Fetches weather for the photo's place and date and records the irregularities. */
   async function analyzeContext(photoId) {
@@ -261,6 +299,7 @@ function createApp({
       tags: r.tags ? r.tags.split(',').sort() : [],
       latestUrl: `/uploads/${r.latest_file}`,
       change: r.latest_change ? (({ fraction, summary }) => ({ fraction, top: summary[0]?.label || null }))(JSON.parse(r.latest_change)) : null,
+      species: spotSpecies(r.id).map((t) => t.name),
       irregularities: r.latest_context
         ? JSON.parse(r.latest_context).irregularities.filter((i) => i.severity !== 'hinweis').map((i) => i.title)
         : [],
@@ -271,7 +310,7 @@ function createApp({
     const spot = db.prepare('SELECT id, lat, lon FROM spots WHERE id = ?').get(id);
     if (!spot) return null;
     const photos = db.prepare('SELECT * FROM photos WHERE spot_id = ? ORDER BY taken_at, id').all(id);
-    return { ...spot, photos: photos.map(photoJson) };
+    return { ...spot, species: spotSpecies(id), photos: photos.map(photoJson) };
   };
 
   app.get('/api/spots/:id', (req, res) => {
@@ -445,6 +484,31 @@ function createApp({
     res.status(204).end();
   });
 
+  app.get('/api/trees', (req, res) => {
+    res.json(TREES.map(treeJson).sort((a, b) => a.name.localeCompare(b.name, 'de')));
+  });
+
+  app.post('/api/spots/:id/species', (req, res) => {
+    const id = idParam(req, res);
+    if (id === null) return;
+    if (!db.prepare('SELECT 1 FROM spots WHERE id = ?').get(id)) return res.status(404).json({ error: 'Spot nicht gefunden' });
+    const tree = treeInfo(req.body?.scientificName);
+    if (!tree) return res.status(400).json({ error: 'Unbekannte Baumart' });
+    addSpecies.run(id, tree.sci, 'manual', null, null, Date.now());
+    reassessSpot(id);
+    res.status(201).json(spotSpecies(id));
+  });
+
+  app.delete('/api/spots/:id/species', (req, res) => {
+    const id = idParam(req, res);
+    if (id === null) return;
+    const tree = treeInfo(req.query.name);
+    if (!tree) return res.status(400).json({ error: 'Unbekannte Baumart' });
+    db.prepare('DELETE FROM spot_species WHERE spot_id = ? AND scientific_name = ?').run(id, tree.sci);
+    reassessSpot(id);
+    res.json(spotSpecies(id));
+  });
+
   app.get('/api/photos/:id/context', async (req, res, next) => {
     const id = idParam(req, res);
     if (id === null) return;
@@ -543,7 +607,7 @@ function createApp({
     const photo = getPhoto.get(id);
     if (!photo) return res.status(404).json({ error: 'Foto nicht gefunden' });
     try {
-      const organ = ['leaf', 'flower', 'fruit', 'bark', 'auto'].includes(req.body?.organ) ? req.body.organ : 'auto';
+      const organ = ['leaf', 'flower', 'fruit', 'bark', 'habit', 'auto'].includes(req.body?.organ) ? req.body.organ : 'auto';
       const results = await identifyPlant(path.join(uploadDir, photo.file), { apiKey: plantnetKey, organ, fetchImpl });
       transaction(db, () => {
         db.prepare('DELETE FROM identifications WHERE photo_id = ?').run(id);
@@ -555,7 +619,13 @@ function createApp({
         if (results.some((r) => r.neophyte && r.score >= NEOPHYTE_MIN_SCORE)) {
           db.prepare('INSERT OR IGNORE INTO photo_tags (photo_id, tag) VALUES (?, ?)').run(id, 'neophyt');
         }
+        // Confidently recognised trees join the spot's species inventory.
+        for (const r of results) {
+          const tree = treeInfo(r.scientificName);
+          if (tree && r.score >= TREE_MIN_SCORE) addSpecies.run(photo.spot_id, tree.sci, 'plantnet', id, r.score, Date.now());
+        }
       });
+      reassessSpot(photo.spot_id);
       res.json(photoJson(getPhoto.get(id)));
     } catch (err) {
       next(err);

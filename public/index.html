@@ -119,6 +119,20 @@
           <p id="spot-meta" class="muted"></p>
           <p id="spot-change" class="change-badge" hidden></p>
           <div id="spot-tags" class="chips"></div>
+          <details class="species" id="species-box">
+            <summary>
+              <span class="label-inline">Baumarten</span>
+              <span id="species-summary" class="species-summary"></span>
+            </summary>
+            <ul id="species-list" class="species-list"></ul>
+            <div class="row species-add">
+              <label class="sr-only" for="species-select">Baumart hinzufügen</label>
+              <select id="species-select"></select>
+              <button type="button" id="species-add" class="secondary">Hinzufügen</button>
+            </div>
+            <p class="hint" id="species-hint">Die Arten bestimmen, ab wann eine Verfärbung als früh gilt, und welche Gefahren
+              (z. B. Borkenkäfer bei Fichte) bei Trockenheit gemeldet werden.</p>
+          </details>
         </div>
 
         <div class="viewer">
@@ -166,7 +180,18 @@
           <textarea id="photo-note" rows="2" placeholder="Notiz, z. B. «3 Fichten umgestürzt nach Sturm»"></textarea>
           <div class="row">
             <button id="save-photo" class="secondary">Speichern</button>
-            <button id="identify" class="secondary" hidden>Pflanze bestimmen</button>
+            <span class="identify-group" id="identify-group" hidden>
+              <label class="sr-only" for="identify-organ">Was zeigt das Foto?</label>
+              <select id="identify-organ" title="Was zeigt das Foto?">
+                <option value="auto">Automatisch</option>
+                <option value="leaf">Blatt / Nadeln</option>
+                <option value="bark">Rinde</option>
+                <option value="habit">Ganzer Baum</option>
+                <option value="flower">Blüte</option>
+                <option value="fruit">Frucht / Zapfen</option>
+              </select>
+              <button id="identify" class="secondary">Art bestimmen</button>
+            </span>
             <button id="delete-photo" class="danger link">Foto löschen</button>
           </div>
           <div id="identify-results"></div>

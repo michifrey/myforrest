@@ -276,3 +276,38 @@ test('weather outages are recorded without failing the upload', async () => {
     assert.match(ctx.weatherError, /503/);
   });
 });
+
+test('tree species are recorded per spot, manually or from plant identification', async () => {
+  const plantnet = async () => new Response(JSON.stringify({ results: [
+    { score: 0.71, species: { scientificNameWithoutAuthor: 'Picea abies', commonNames: ['Gemeine Fichte'] } },
+    { score: 0.12, species: { scientificNameWithoutAuthor: 'Abies alba', commonNames: [] } },
+  ] }));
+  await withServer({ plantnetKey: 'test', fetchImpl: plantnet }, async (base) => {
+    const p = (await (await upload(base, [['gps.jpg', fixture('gps.jpg')]])).json()).created[0];
+    const trees = await (await fetch(`${base}/api/trees`)).json();
+    assert.ok(trees.some((t) => t.name === 'Rotbuche' && t.group === 'laub'));
+
+    let res = await fetch(`${base}/api/spots/${p.spotId}/species`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scientificName: 'Fagus sylvatica' }),
+    });
+    assert.equal(res.status, 201);
+    res = await fetch(`${base}/api/spots/${p.spotId}/species`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scientificName: 'Bellis perennis' }),
+    });
+    assert.equal(res.status, 400);
+
+    const identified = await (await fetch(`${base}/api/photos/${p.id}/identify`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ organ: 'bark' }),
+    })).json();
+    assert.equal(identified.identifications[0].tree.name, 'Fichte');
+
+    let spot = await (await fetch(`${base}/api/spots/${p.spotId}`)).json();
+    assert.deepEqual(spot.species.map((s) => [s.name, s.sources.join()]), [['Rotbuche', 'manual'], ['Fichte', 'plantnet']]);
+    const spots = await (await fetch(`${base}/api/spots`)).json();
+    assert.deepEqual(spots[0].species, ['Rotbuche', 'Fichte']);
+
+    await fetch(`${base}/api/spots/${p.spotId}/species?name=${encodeURIComponent('Fagus sylvatica')}`, { method: 'DELETE' });
+    spot = await (await fetch(`${base}/api/spots/${p.spotId}`)).json();
+    assert.deepEqual(spot.species.map((s) => s.name), ['Fichte']);
+  });
+});

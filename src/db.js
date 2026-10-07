@@ -36,6 +36,17 @@ const SCHEMA = `
     PRIMARY KEY (photo_id, tag)
   );
 
+  CREATE TABLE IF NOT EXISTS spot_species (
+    id              INTEGER PRIMARY KEY,
+    spot_id         INTEGER NOT NULL REFERENCES spots (id) ON DELETE CASCADE,
+    scientific_name TEXT NOT NULL,
+    source          TEXT NOT NULL CHECK (source IN ('plantnet', 'manual')),
+    photo_id        INTEGER REFERENCES photos (id) ON DELETE CASCADE,
+    score           REAL,
+    created_at      INTEGER NOT NULL,
+    UNIQUE (spot_id, scientific_name, source)
+  );
+
   CREATE TABLE IF NOT EXISTS identifications (
     id              INTEGER PRIMARY KEY,
     photo_id        INTEGER NOT NULL REFERENCES photos (id) ON DELETE CASCADE,

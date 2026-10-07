@@ -128,6 +128,16 @@ den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen und eine Notiz.
   bei 20 % des üblichen Niederschlags, das deutet auf Trockenstress hin. Bei unauffälligem Wetter
   verweist der Text auf andere Ursachen wie Schädlinge. Jeder Spot hat eine Auffälligkeiten-Chronik
   über die Jahre, und auf der Karte sind betroffene Spots mit „!“ markiert.
+- **Baumarten**: Jeder Spot führt einen Artenbestand. Arten kommen automatisch aus der Pl@ntNet-Bestimmung
+  (Organ wählbar: Blatt/Nadeln, Rinde, ganzer Baum, Blüte, Frucht) oder werden von Hand aus einer
+  Liste von gut 30 mitteleuropäischen Waldbaumarten gewählt. Zu jeder Art gibt es einen Steckbrief: Nadel/Laub,
+  typischer Beginn der Herbstfärbung, Trockenheitsempfindlichkeit, worauf zu achten ist. Die Arten machen die
+  Auffälligkeiten genauer:
+  - „Frühe Verfärbung“ richtet sich nach der am frühesten färbenden Art am Spot (Birke Mitte September,
+    Eiche Mitte Oktober).
+  - Verfärbte immergrüne Nadelbäume gelten immer als Warnsignal.
+  - Fichte bei Trockenheit oder Hitze löst eine Borkenkäfer-Warnung mit Prüfhinweisen aus.
+  - Bei Esche mit Auflichtung oder Verfärbung erscheint ein Hinweis auf das Eschentriebsterben.
 - **Drei Wege, Fotos zu verorten**:
   1. **GPS aus dem Foto** (EXIF), wie bei normalen Handyfotos.
   2. **Automatisch über einen GPX-Track**: Eine Action-Cam im Intervallmodus (z. B. alle 5 s) beim
@@ -179,6 +189,7 @@ src/change.js        Veränderungserkennung und Heatmap
 src/classify.js      Einordnung der veränderten Regionen
 src/weather.js       Wetterdaten und Mittel 1991–2020 von Open-Meteo (mit Cache)
 src/irregularities.js  Auffälligkeiten (Trockenheit, Wärme, frühe Laubverfärbung …)
+src/trees.js         Waldbaumarten mit Phänologie, Trockenheitsempfindlichkeit und Gefahren
 src/exif.js          Aufnahmezeit, GPS und Blickrichtung aus den Bilddaten
 src/gpx.js           GPX-Parser
 src/geo.js           Distanzen und Interpolation auf dem Track
@@ -199,6 +210,9 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
 | `POST`   | `/api/spots/:id/align`       | Ausrichtung aller Fotos eines Spots neu berechnen        |
 | `GET`    | `/api/photos/:id/change?to=` | Veränderte Fläche zwischen zwei ausgerichteten Fotos, mit eingeordneten Regionen |
 | `GET`    | `/api/photos/:id/change.png?to=` | Heatmap der Veränderung (PNG, in der Ansicht des ersten Fotos) |
+| `GET`    | `/api/trees`                 | Liste der unterstützten Baumarten mit Steckbrief         |
+| `POST`   | `/api/spots/:id/species`     | Baumart einem Spot zuordnen (`{ scientificName }`)       |
+| `DELETE` | `/api/spots/:id/species?name=` | Baumart vom Spot entfernen                             |
 | `GET`    | `/api/photos/:id/context`    | Wetter-Kontext und Auffälligkeiten (wird beim ersten Abruf berechnet und gespeichert) |
 | `POST`   | `/api/photos/:id/context`    | Wetter-Kontext neu laden                                 |
 | `PATCH`  | `/api/photos/:id`            | Tags und Notiz ändern                                    |
@@ -217,8 +231,10 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
 **Phase 3: Automatische Auswertung**
 - Objekterkennung: umgestürzte Bäume, Wurzelteller, Totholz, Holzpolter und Rückegassen,
   z. B. mit einem feinjustierten YOLO- oder Segmentierungsmodell.
-- Einordnung lernen statt Regeln: aus den bestätigten Tags ein Modell trainieren und Baumarten
-  unterscheiden (Buche verfärbt anders als Fichte).
+- Einordnung lernen statt Regeln: aus den bestätigten Tags ein Modell trainieren; Baumarten auch ohne
+  Pl@ntNet direkt im Bild erkennen (z. B. Nadel-/Laubholzanteil pro Region) und Verfärbungen der
+  richtigen Art zuordnen.
+- Phänologie nach Höhenlage korrigieren (Herbstfärbung beginnt pro 100 m Höhe etwa 2–3 Tage früher).
 - Sturmereignisse aus Winddaten (Böen) mit Windwurf-Funden verknüpfen; Phänologie-Daten
   (z. B. MeteoSchweiz/DWD) als Referenz für den Beginn der Herbstfärbung pro Region und Höhenlage.
 - Vegetationsdichte: Grünanteil und Kronendach-Deckung aus den Bildern schätzen und als Zeitreihe

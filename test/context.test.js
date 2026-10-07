@@ -72,3 +72,48 @@ test('colouring in October is normal autumn, and normal weather points to other 
   assert.equal(summer.length, 1);
   assert.match(summer[0].text, /Borkenkäfer/);
 });
+
+const { TREES, treeInfo } = require('../src/trees');
+const tree = (name) => TREES.find((t) => t.de === name);
+const drought = { last90: { precip: 70, precipNormal: 280, precipRatio: 0.25, tempMean: 19, tempNormal: 16.6, tempAnomaly: 2.4, hotDays: 9, hotDaysNormal: 3, longestDrySpell: 30 } };
+
+test('tree names resolve with authors and subspecies', () => {
+  assert.equal(treeInfo('Fagus sylvatica L.').de, 'Rotbuche');
+  assert.equal(treeInfo('Picea abies (L.) H.Karst.').de, 'Fichte');
+  assert.equal(treeInfo('Bellis perennis'), null);
+});
+
+test('species set the expected start of colouring', () => {
+  const change = { summary: [{ class: 'verfaerbung', area: 0.1 }] };
+  const sept5 = Date.UTC(2026, 8, 5);
+  // Birch colours from mid-September: 5 Sept is early. Oak only from mid-October.
+  const birch = assess({ takenAt: Date.UTC(2026, 8, 20), change, species: [tree('Hängebirke')] });
+  assert.ok(!birch.some((i) => i.type === 'fruehe_verfaerbung'), 'birch on 20 Sept is on time');
+  const oak = assess({ takenAt: Date.UTC(2026, 8, 20), change, species: [tree('Stieleiche')] });
+  const early = oak.find((i) => i.type === 'fruehe_verfaerbung');
+  assert.ok(early, 'oak colouring on 20 Sept is early');
+  assert.match(early.text, /Stieleiche/);
+  assert.ok(assess({ takenAt: sept5, change, species: [tree('Hängebirke')] }).some((i) => i.type === 'fruehe_verfaerbung'));
+});
+
+test('discolouring spruce stand and drought raise bark beetle warnings', () => {
+  const change = { summary: [{ class: 'verfaerbung', area: 0.12 }] };
+  const found = assess({ takenAt: Date.UTC(2026, 6, 20), change, weather: drought, species: [tree('Fichte')] });
+  const types = found.map((i) => i.type);
+  assert.ok(types.includes('borkenkaefer_risiko'));
+  const needles = found.find((i) => i.type === 'nadelverfaerbung');
+  assert.equal(needles.severity, 'stark');
+  assert.equal(needles.suggestedTag, 'borkenkaefer');
+  assert.ok(!types.includes('fruehe_verfaerbung'), 'conifers have no autumn colouring to be early');
+  assert.match(found.find((i) => i.type === 'trockenheit').text, /Fichte/);
+
+  const mixed = assess({ takenAt: Date.UTC(2026, 6, 20), change, species: [tree('Fichte'), tree('Rotbuche')] });
+  assert.equal(mixed.find((i) => i.type === 'nadelverfaerbung').severity, 'hinweis');
+  assert.ok(mixed.some((i) => i.type === 'fruehe_verfaerbung'));
+});
+
+test('ash at a spot with canopy loss hints at ash dieback', () => {
+  const change = { summary: [{ class: 'auflichtung', area: 0.08 }] };
+  const found = assess({ takenAt: Date.UTC(2026, 6, 1), change, species: [tree('Gemeine Esche')] });
+  assert.deepEqual(found.map((i) => i.type), ['eschentriebsterben']);
+});

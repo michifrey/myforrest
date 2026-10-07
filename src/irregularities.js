@@ -19,20 +19,36 @@ const pct = (r) => `${Math.round(r * 100)} %`;
 const fmtDay = (t) => new Date(t).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
 const signed = (v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} °C`;
 
-function assess({ takenAt, tags = [], change = null, weather = null }) {
+/** "29.09." for a day of year (non-leap calendar). */
+const fmtDoy = (d) => new Date(Date.UTC(2023, 0, 1 + d)).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', timeZone: 'UTC' });
+const names = (list) => list.map((t) => t.de).join(', ');
+
+/**
+ * `species` are the tree species known at the spot (entries of trees.js):
+ * they set the expected start of autumn colouring and add species-specific
+ * risks (bark beetle on drought-stressed spruce, ash dieback, ...).
+ */
+function assess({ takenAt, tags = [], change = null, weather = null, species = [] }) {
   const out = [];
   const w = weather?.last90;
+  const colouredRegion = (change?.summary || []).find((s) => s.class === 'verfaerbung' && s.area >= 0.02);
+  const opened = (change?.summary || []).find((s) => s.class === 'auflichtung' && s.area >= 0.02);
+  const evergreen = species.filter((t) => t.evergreen);
+  const deciduous = species.filter((t) => !t.evergreen && t.colourDoy);
+  const spruce = species.find((t) => t.sci === 'Picea abies');
 
   const dry = w?.precipRatio !== null && w?.precipRatio !== undefined && w.precipRatio < 0.75;
   const hot = w && w.tempAnomaly >= 1.5;
   if (dry) {
+    const sensitive = species.filter((t) => t.drought === 'hoch');
     out.push({
       type: 'trockenheit',
       severity: w.precipRatio < 0.5 ? 'stark' : 'auffällig',
       title: w.precipRatio < 0.5 ? 'Ausgeprägte Trockenheit' : 'Trockener als üblich',
       text: `In den 90 Tagen vor der Aufnahme fielen ${Math.round(w.precip)} mm Niederschlag, ` +
         `${pct(w.precipRatio)} des Mittels 1991–2020 (${Math.round(w.precipNormal)} mm). ` +
-        `Längste Phase ohne nennenswerten Regen: ${w.longestDrySpell} Tage.`,
+        `Längste Phase ohne nennenswerten Regen: ${w.longestDrySpell} Tage.` +
+        (sensitive.length ? ` Besonders trockenheitsempfindlich an diesem Spot: ${names(sensitive)}.` : ''),
     });
   } else if (w?.precipRatio >= 1.5) {
     out.push({
@@ -52,13 +68,46 @@ function assess({ takenAt, tags = [], change = null, weather = null }) {
     });
   }
 
+  if (spruce && (dry || hot)) {
+    out.push({
+      type: 'borkenkaefer_risiko',
+      severity: (dry && hot) || colouredRegion ? 'stark' : 'auffällig',
+      title: 'Erhöhtes Borkenkäfer-Risiko',
+      text: 'Fichten unter Trocken- und Hitzestress können kaum Harz bilden und sind anfällig für den Buchdrucker. ' +
+        'Prüfen: braunes Bohrmehl am Stammfuss und in Rindenritzen, Harztröpfchen, sich rötlich verfärbende Kronen. ' +
+        'Befallene Bäume früh melden, bevor die nächste Käfergeneration ausfliegt.',
+    });
+  }
+
   const day = doy(takenAt);
-  const coloured = (change?.summary || []).find((s) => s.class === 'verfaerbung' && s.area >= 0.02);
   const taggedColouring = tags.includes('fruehverfaerbung') || tags.includes('trockenschaden');
-  if ((coloured || taggedColouring) && day >= SEASON_START_DOY && day < AUTUMN_START_DOY) {
+  const coloured = colouredRegion;
+
+  // Needles of spruce, fir, pine and Douglas fir do not colour in autumn.
+  if (colouredRegion && evergreen.length) {
+    const onlyConifers = evergreen.length === species.length;
+    out.push({
+      type: 'nadelverfaerbung',
+      severity: onlyConifers ? 'stark' : 'hinweis',
+      title: onlyConifers ? 'Verfärbung im Nadelwald' : 'Verfärbung – Nadelbäume prüfen',
+      text: `${onlyConifers ? 'An diesem Spot stehen nur immergrüne Nadelbäume' : `An diesem Spot stehen auch ${names(evergreen)}`}` +
+        ` – sie verfärben sich nicht im Herbst. ${onlyConifers ? 'Gelbe, rote oder braune Kronen' : 'Betrifft die Verfärbung Nadelbäume, ist das'}` +
+        ` ${onlyConifers ? 'deuten' : 'ein Warnsignal und deutet'} auf Borkenkäferbefall, Trockenschäden oder Pilzbefall hin.`,
+      suggestedTag: onlyConifers ? 'borkenkaefer' : undefined,
+    });
+  }
+
+  const autumnStart = deciduous.length ? Math.min(...deciduous.map((t) => t.colourDoy)) : AUTUMN_START_DOY;
+  const veryEarly = autumnStart - (AUTUMN_START_DOY - VERY_EARLY_DOY);
+  const deciduousCanColour = !species.length || deciduous.length;
+  if ((coloured || taggedColouring) && deciduousCanColour && day >= SEASON_START_DOY && day < autumnStart) {
     const source = coloured
       ? `Auf ${pct(coloured.area)} der Ansicht hat sich das Laub gegenüber dem ersten Foto gelb oder braun verfärbt`
       : 'Laubverfärbung beobachtet';
+    const first = deciduous.find((t) => t.colourDoy === autumnStart);
+    const reference = first
+      ? `Bei ${first.de} beginnt die Herbstfärbung im Flachland typischerweise um den ${fmtDoy(autumnStart)}.`
+      : 'Die natürliche Herbstfärbung beginnt im Flachland meist erst in der zweiten Septemberhälfte.';
     let cause;
     if (dry || hot) {
       const reasons = [dry && `Trockenheit (${pct(w.precipRatio)} Niederschlag in 90 Tagen)`, hot && `Wärme (${signed(w.tempAnomaly)})`].filter(Boolean);
@@ -70,10 +119,21 @@ function assess({ takenAt, tags = [], change = null, weather = null }) {
     }
     out.push({
       type: 'fruehe_verfaerbung',
-      severity: day < VERY_EARLY_DOY ? 'stark' : 'auffällig',
+      severity: day < veryEarly ? 'stark' : 'auffällig',
       title: 'Frühe Laubverfärbung',
-      text: `${source}, am ${fmtDay(takenAt)}. Die natürliche Herbstfärbung beginnt im Flachland meist erst in der zweiten Septemberhälfte.${cause}`,
+      text: `${source}, am ${fmtDay(takenAt)}. ${reference}${cause}`,
       suggestedTag: 'fruehverfaerbung',
+    });
+  }
+
+  const ash = species.find((t) => t.sci === 'Fraxinus excelsior');
+  if (ash && (coloured || opened)) {
+    out.push({
+      type: 'eschentriebsterben',
+      severity: 'hinweis',
+      title: 'Eschentriebsterben möglich',
+      text: 'An diesem Spot stehen Eschen. Welke Blätter, absterbende Triebe und lichter werdende Kronen sind typisch ' +
+        'für das Eschentriebsterben (Pilz Hymenoscyphus fraxineus); geschwächte Eschen können umstürzen.',
     });
   }
   return out;
