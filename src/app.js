@@ -58,6 +58,11 @@ function createApp({
   const app = express();
   app.locals.db = db;
   app.use(express.json({ limit: '100kb' }));
+  // The service worker must never be served stale from the HTTP cache, or app updates would stall.
+  app.get('/sw.js', (req, res) => {
+    res.set({ 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/' });
+    res.sendFile(path.join(__dirname, '..', 'public', 'sw.js'));
+  });
   app.use(express.static(path.join(__dirname, '..', 'public')));
   app.use('/vendor/leaflet', express.static(path.dirname(require.resolve('leaflet/dist/leaflet.js'))));
   for (const font of ['fraunces', 'manrope']) {

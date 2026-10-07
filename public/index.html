@@ -7,6 +7,10 @@
   <meta name="description" content="Fotos vom Joggen, Wandern und Biken dokumentieren, wie sich der Wald über die Zeit verändert.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2316301f' d='M12 2 5 12h4l-4 6h6v4h2v-4h6l-4-6h4z'/%3E%3C/svg%3E">
   <meta name="theme-color" content="#16301f">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="MyForrest">
   <link rel="stylesheet" href="vendor/fonts/fraunces/full.css">
   <link rel="stylesheet" href="vendor/fonts/fraunces/full-italic.css">
   <link rel="stylesheet" href="vendor/fonts/manrope/index.css">
@@ -27,6 +31,7 @@
       <a href="#how">So geht's</a>
       <a href="#explore">Karte</a>
     </nav>
+    <div id="pwa-status" class="pwa-status" aria-live="polite"></div>
     <button id="open-upload" class="btn primary">Foto beitragen</button>
   </header>
 
@@ -403,5 +408,7 @@
   <script src="app.js"></script>
   <script src="hotspots.js"></script>
   <script src="sunmap.js"></script>
+  <script src="offline-queue.js"></script>
+  <script src="pwa.js"></script>
 </body>
 </html>
