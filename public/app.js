@@ -310,6 +310,7 @@ function showPhoto(i) {
   renderContext(p);
   $('identify-group').hidden = !state.config.plantnet;
   renderIdentifications(p);
+  window.Account?.photoShown(p); // credit, licence, report/moderation (account.js)
 }
 
 function renderIdentifications(p) {
@@ -920,7 +921,7 @@ form.addEventListener('submit', async (e) => {
         fd.append('lon', String(state.picked.lng));
       }
       if (form.takenAtLocal.value) fd.append('takenAt', new Date(form.takenAtLocal.value).toISOString());
-      for (const name of ['activity', 'note', 'utcOffsetMinutes', 'clockShiftSeconds']) fd.append(name, form[name].value);
+      for (const name of ['activity', 'note', 'utcOffsetMinutes', 'clockShiftSeconds', 'license']) fd.append(name, form[name].value);
       const tags = [...$('upload-tags').querySelectorAll('input:checked')].map((c) => c.value);
       fd.append('tags', tags.join(','));
 

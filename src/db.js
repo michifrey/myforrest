@@ -74,6 +74,11 @@ const MIGRATIONS = [
   ['spots', 'tpi600', 'REAL'], // … within 600 m
   ['spots', 'landform', 'TEXT'], // 'senke' | 'hang' | 'kuppe' | 'ebene'
   ['spots', 'landform_source', 'TEXT'], // 'dem' | 'manual'
+  // Accounts, moderation and licences (src/auth.js, src/moderation.js)
+  ['photos', 'uploader_id', 'INTEGER'], // users.id, null for anonymous and older photos
+  ['photos', 'license', "TEXT NOT NULL DEFAULT 'cc-by-sa-4.0'"], // key of LICENSES in src/moderation.js
+  ['photos', 'hidden_at', 'INTEGER'], // set when a moderator hides the photo
+  ['photos', 'hidden_reason', 'TEXT'],
 ];
 
 function openDb(file) {
