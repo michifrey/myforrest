@@ -42,6 +42,10 @@ function createApp({
   app.use(express.json({ limit: '100kb' }));
   app.use(express.static(path.join(__dirname, '..', 'public')));
   app.use('/vendor/leaflet', express.static(path.dirname(require.resolve('leaflet/dist/leaflet.js'))));
+  for (const font of ['fraunces', 'manrope']) {
+    const dir = path.dirname(require.resolve(`@fontsource-variable/${font}/package.json`));
+    app.use(`/vendor/fonts/${font}`, express.static(dir, { maxAge: '30d' }));
+  }
   app.use('/uploads', express.static(uploadDir, { maxAge: '7d', immutable: true }));
 
   const tagsOf = db.prepare('SELECT tag FROM photo_tags WHERE photo_id = ? ORDER BY tag');

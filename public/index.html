@@ -5,55 +5,116 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MyForrest – Wald im Wandel</title>
   <meta name="description" content="Fotos vom Joggen, Wandern und Biken dokumentieren, wie sich der Wald über die Zeit verändert.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%232f6b3a' d='M12 2 5 12h4l-4 6h6v4h2v-4h6l-4-6h4z'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2316301f' d='M12 2 5 12h4l-4 6h6v4h2v-4h6l-4-6h4z'/%3E%3C/svg%3E">
+  <meta name="theme-color" content="#16301f">
+  <link rel="stylesheet" href="vendor/fonts/fraunces/full.css">
+  <link rel="stylesheet" href="vendor/fonts/fraunces/full-italic.css">
+  <link rel="stylesheet" href="vendor/fonts/manrope/index.css">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 5 12h4l-4 6h6v4h2v-4h6l-4-6h4z"/></svg>
-      <div>
-        <h1>MyForrest</h1>
-        <p>Wald im Wandel – Street View für die Natur, über die Zeit</p>
-      </div>
-    </div>
-    <div class="actions">
-      <label class="filter">
-        <span>Filter</span>
-        <select id="tag-filter"><option value="">Alle Spots</option></select>
-      </label>
-      <button id="open-upload" class="primary">Fotos hochladen</button>
-    </div>
+  <header class="nav" id="nav">
+    <a class="brand" href="#top" aria-label="MyForrest – zum Anfang">
+      <svg class="logo" viewBox="0 0 40 40" aria-hidden="true">
+        <circle cx="20" cy="20" r="18.5" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".35"/>
+        <circle cx="20" cy="20" r="14" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"/>
+        <path d="M20 7 13 18h4l-5 7h6v6h4v-6h6l-5-7h4z" fill="currentColor"/>
+      </svg>
+      <span>MyForrest</span>
+    </a>
+    <nav class="nav-links" aria-label="Hauptnavigation">
+      <a href="#how">So geht's</a>
+      <a href="#explore">Karte</a>
+    </nav>
+    <button id="open-upload" class="btn primary">Foto beitragen</button>
   </header>
 
-  <main class="layout">
+  <section class="hero" id="top">
+    <div class="sky" aria-hidden="true">
+      <div class="sun"></div>
+      <div class="rays"></div>
+      <svg id="stars" class="stars"></svg>
+    </div>
+    <div id="forest" class="forest" aria-hidden="true"></div>
+    <div id="fireflies" class="fireflies" aria-hidden="true"></div>
+
+    <div class="hero-content">
+      <p class="eyebrow">Citizen Science · Waldmonitoring</p>
+      <h1>Der Wald <em>erinnert</em> sich.<br>Wir auch.</h1>
+      <p class="lede">Fotos von deinen Läufen, Wanderungen und Touren zeigen, wie sich der Wald verändert:
+        Sturmschäden, Borkenkäfer, Neophyten. Jahr für Jahr, am selben Ort.</p>
+      <div class="cta">
+        <a href="#explore" class="btn primary large">Karte erkunden</a>
+        <button type="button" class="btn ghost large" data-action="upload">Foto beitragen</button>
+      </div>
+    </div>
+    <div id="hero-stats" class="hero-stats" aria-live="polite"></div>
+    <a class="scroll-cue" href="#how" aria-label="Weiter nach unten"><span></span></a>
+  </section>
+
+  <section class="how" id="how">
+    <div class="section-head">
+      <p class="eyebrow">So funktioniert's</p>
+      <h2>Unterwegs sein, hinschauen, <em>wiederkommen</em>.</h2>
+    </div>
+    <div class="cards">
+      <article class="card">
+        <span class="card-num">01</span>
+        <svg class="card-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M8 38c6-2 9-8 14-8s7 5 12 5 6-3 6-3" /><circle cx="30" cy="12" r="4"/><path d="M26 18l-6 8 6 4-2 8M26 18l6 6 6-2"/></svg>
+        <h3>Unterwegs fotografieren</h3>
+        <p>Handyfotos mit GPS einfach hochladen. Oder eine Action-Cam im Intervallmodus mitlaufen lassen: Mit dem
+          GPX-Track von Uhr, Strava oder Komoot wird jedes Bild automatisch auf der Strecke verortet.</p>
+      </article>
+      <article class="card">
+        <span class="card-num">02</span>
+        <svg class="card-icon" viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="13" width="36" height="26" rx="5"/><path d="M17 13l3-5h8l3 5"/><circle cx="24" cy="26" r="7"/><circle cx="24" cy="26" r="11" stroke-dasharray="2 3"/></svg>
+        <h3>Am selben Ort wiederkommen</h3>
+        <p>Beim nächsten Besuch legt die Kamera das alte Foto halbtransparent oder als Kontur über das Livebild.
+          So triffst du denselben Ausschnitt, auch Jahre später.</p>
+      </article>
+      <article class="card">
+        <span class="card-num">03</span>
+        <svg class="card-icon" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="18"/><circle cx="24" cy="24" r="12.5"/><circle cx="24" cy="24" r="7"/><circle cx="24" cy="24" r="2"/><path d="M24 6v4M42 24h-4"/></svg>
+        <h3>Veränderung sichtbar machen</h3>
+        <p>Fotos werden automatisch deckungsgleich ausgerichtet. Blättere wie im Zeitraffer durch die Jahre,
+          vergleiche Vorher und Nachher und bestimme Pflanzen und Neophyten.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="explore" id="explore" aria-label="Karte und Spots">
     <div id="map" aria-label="Karte der Foto-Spots"></div>
+    <div class="map-toolbar">
+      <label class="pill-select">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M6 10h8M9 15h2"/></svg>
+        <span class="sr-only">Filter</span>
+        <select id="tag-filter"><option value="">Alle Spots</option></select>
+      </label>
+      <div class="legend">
+        <span><i class="dot ok"></i>Spot</span>
+        <span><i class="dot damage"></i>Schäden</span>
+        <span><i class="dot neo"></i>Neophyten</span>
+      </div>
+    </div>
     <div id="pick-hint" class="pick-hint" hidden>Klicke auf die Karte, um den Standort zu wählen · <button id="pick-cancel" class="link">Abbrechen</button></div>
 
     <aside id="panel" class="panel">
       <section id="welcome">
+        <p class="eyebrow">Explorer</p>
         <h2>Willkommen im Wald</h2>
-        <p>Jeder Punkt auf der Karte ist ein <strong>Spot</strong>: ein Ort, an dem über die Zeit Fotos entstanden sind.
-          Wähle einen Spot, um durch die Jahre zu blättern oder Vorher/Nachher zu vergleichen.</p>
+        <p class="muted">Jeder Punkt ist ein <strong>Spot</strong>: ein Ort, an dem über die Zeit Fotos entstanden sind.
+          Wähle einen Spot, um durch die Jahre zu blättern.</p>
         <div id="stats" class="stats"></div>
-        <h3>So kommen Fotos rein</h3>
-        <ol class="howto">
-          <li><strong>Handyfotos mit GPS</strong> – einfach hochladen, Ort und Zeit kommen aus den Bilddaten.</li>
-          <li><strong>Action-Cam im Intervallmodus</strong> beim Joggen oder Biken + <strong>GPX-Track</strong> von Uhr, Strava oder Komoot –
-            die Fotos werden automatisch über die Aufnahmezeit auf der Strecke verortet.</li>
-          <li><strong>Ohne GPS</strong> – Standort einfach auf der Karte wählen.</li>
-        </ol>
-        <div class="legend">
-          <span><i class="dot ok"></i>Spot</span>
-          <span><i class="dot damage"></i>Schäden</span>
-          <span><i class="dot neo"></i>Neophyten</span>
-        </div>
+        <h3 class="label">Zuletzt fotografiert</h3>
+        <div id="recent" class="recent"></div>
+        <button type="button" class="btn primary wide" data-action="upload">Foto beitragen</button>
       </section>
 
       <section id="spot" hidden>
         <div class="spot-head">
           <button id="close-spot" class="icon" aria-label="Schliessen">×</button>
+          <p class="eyebrow">Spot</p>
           <h2 id="spot-title"></h2>
           <p id="spot-meta" class="muted"></p>
           <div id="spot-tags" class="chips"></div>
@@ -92,7 +153,7 @@
         </div>
 
         <div class="photo-details">
-          <h3>Beobachtungen auf diesem Foto</h3>
+          <h3 class="label">Beobachtungen auf diesem Foto</h3>
           <div id="photo-tags" class="chips editable"></div>
           <textarea id="photo-note" rows="2" placeholder="Notiz, z. B. «3 Fichten umgestürzt nach Sturm»"></textarea>
           <div class="row">
@@ -104,7 +165,15 @@
         </div>
       </section>
     </aside>
-  </main>
+  </section>
+
+  <footer class="footer">
+    <svg class="footer-trees" id="footer-trees" aria-hidden="true"></svg>
+    <div class="footer-inner">
+      <p><strong>MyForrest</strong> · Wald im Wandel</p>
+      <p class="muted small">Kartendaten © OpenStreetMap-Mitwirkende · Pflanzenbestimmung mit Pl@ntNet</p>
+    </div>
+  </footer>
 
   <div id="camera" class="camera" hidden role="dialog" aria-modal="true" aria-label="Wiederholungsfoto aufnehmen">
     <div class="cam-top">
@@ -140,14 +209,21 @@
 
   <dialog id="upload-dialog">
     <form id="upload-form" method="dialog">
-      <h2>Fotos hochladen</h2>
-      <label class="field">
-        <span>Fotos (JPEG, PNG, WebP)</span>
+      <div class="dialog-head">
+        <p class="eyebrow">Beitragen</p>
+        <h2>Fotos aus dem Wald</h2>
+      </div>
+      <label class="dropzone">
         <input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple required>
+        <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="10" width="36" height="28" rx="5"/><path d="M6 32l10-10 8 8 6-6 12 12"/><circle cx="32" cy="19" r="3"/></svg>
+        <strong data-empty="Fotos hierher ziehen oder auswählen">Fotos hierher ziehen oder auswählen</strong>
+        <span class="muted small">JPEG, PNG oder WebP · Ort und Zeit werden aus den Bilddaten gelesen</span>
       </label>
-      <label class="field">
-        <span>GPX-Track <em>optional – verortet Fotos ohne GPS über die Aufnahmezeit</em></span>
+      <label class="dropzone compact">
         <input type="file" name="gpx" accept=".gpx,application/gpx+xml">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 38c5-10 12-4 16-12s10-10 16-14"/><circle cx="8" cy="38" r="3"/><circle cx="40" cy="12" r="3"/></svg>
+        <strong data-empty="GPX-Track hinzufügen (optional)">GPX-Track hinzufügen (optional)</strong>
+        <span class="muted small">Verortet Fotos ohne GPS über die Aufnahmezeit</span>
       </label>
 
       <fieldset class="field">
@@ -203,12 +279,13 @@
       <div id="upload-result" class="upload-result"></div>
       <div class="row end">
         <button type="button" id="upload-cancel" class="link">Schliessen</button>
-        <button type="submit" id="upload-submit" class="primary">Hochladen</button>
+        <button type="submit" id="upload-submit" class="btn primary">Hochladen</button>
       </div>
     </form>
   </dialog>
 
   <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="forest.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

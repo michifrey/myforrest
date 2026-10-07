@@ -126,52 +126,100 @@ stageObserver.observe($('swipe'));
 
 /* ---------- Map ---------- */
 
-const map = L.map('map', { zoomControl: true }).setView([47.2, 8.4], 8);
+const map = L.map('map', { zoomControl: false, scrollWheelZoom: false }).setView([47.2, 8.4], 8);
+L.control.zoom({ position: 'bottomleft' }).addTo(map);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
 }).addTo(map);
 state.markers.addTo(map);
+// The map sits inside a scrolling page: only zoom with the wheel once it has been clicked.
+map.on('click focus', () => map.scrollWheelZoom.enable());
+map.on('mouseout', () => map.scrollWheelZoom.disable());
 
-function spotColor(spot) {
-  const css = getComputedStyle(document.documentElement);
-  if (spot.tags.includes('neophyt')) return css.getPropertyValue('--neo').trim();
-  if (spot.tags.some((t) => DAMAGE_TAGS.includes(t))) return css.getPropertyValue('--damage').trim();
-  return css.getPropertyValue('--ok').trim();
-}
+const pinKind = (spot) => {
+  if (spot.tags.includes('neophyt')) return 'neo';
+  if (spot.tags.some((t) => DAMAGE_TAGS.includes(t))) return 'damage';
+  return 'ok';
+};
+const pins = new Map();
 
 function renderMarkers() {
   state.markers.clearLayers();
+  pins.clear();
   for (const s of state.spots) {
-    const color = spotColor(s);
-    const m = L.circleMarker([s.lat, s.lon], {
-      radius: 6 + Math.min(Math.log2(s.photoCount) * 2, 8),
-      color: '#fff',
-      weight: 2,
-      fillColor: color,
-      fillOpacity: 0.9,
+    const size = Math.round(28 + Math.min(Math.log2(s.photoCount) * 5, 16));
+    const icon = L.divIcon({
+      className: 'pin-icon',
+      html: `<div class="pin ${pinKind(s)}${state.spot?.id === s.id ? ' active' : ''}"><b>${s.photoCount}</b></div>`,
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size * 1.2],
+      tooltipAnchor: [0, -size * 1.1],
     });
-    m.bindTooltip(`Spot ${s.id} · ${s.photoCount} Foto${s.photoCount === 1 ? '' : 's'} · ${fmtDate(s.firstTaken)}–${fmtDate(s.lastTaken)}`);
+    const m = L.marker([s.lat, s.lon], { icon, title: `Spot ${s.id}`, riseOnHover: true });
+    m.bindTooltip(`Spot ${s.id} · ${s.photoCount} Foto${s.photoCount === 1 ? '' : 's'} · ${fmtDate(s.firstTaken)}–${fmtDate(s.lastTaken)}`, { direction: 'top' });
     m.on('click', () => openSpot(s.id));
     state.markers.addLayer(m);
+    pins.set(s.id, m);
   }
+}
+
+function highlightPin(id) {
+  for (const [spotId, m] of pins) m.getElement()?.querySelector('.pin')?.classList.toggle('active', spotId === id);
 }
 
 async function loadSpots({ fit = false } = {}) {
   const tag = $('tag-filter').value;
   state.spots = await api(`/api/spots${tag ? `?tag=${encodeURIComponent(tag)}` : ''}`);
   renderMarkers();
-  renderStats();
+  renderStats(!tag);
   if (fit && state.spots.length) {
-    map.fitBounds(L.latLngBounds(state.spots.map((s) => [s.lat, s.lon])).pad(0.2), { maxZoom: 16 });
+    // Keep spots clear of the floating toolbar and (on wide screens) the side panel.
+    const wide = window.matchMedia('(min-width: 861px)').matches;
+    map.fitBounds(L.latLngBounds(state.spots.map((s) => [s.lat, s.lon])), {
+      maxZoom: 16,
+      paddingTopLeft: [40, 150],
+      paddingBottomRight: [wide ? $('panel').offsetWidth + 60 : 40, 50],
+    });
   }
 }
 
-function renderStats() {
+const RING_SVG = '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="22"/><circle cx="24" cy="24" r="16.5"/><circle cx="24" cy="24" r="11"/><circle cx="24" cy="24" r="5.5"/></svg>';
+
+function renderStats(updateHero = true) {
   const photos = state.spots.reduce((n, s) => n + s.photoCount, 0);
   const damaged = state.spots.filter((s) => s.tags.some((t) => DAMAGE_TAGS.includes(t) || t === 'neophyt')).length;
   const stat = (value, label) => el('div', { class: 'stat' }, [el('b', { text: String(value) }), el('span', { text: label })]);
   $('stats').replaceChildren(stat(state.spots.length, 'Spots'), stat(photos, 'Fotos'), stat(damaged, 'mit Befund'));
+
+  if (updateHero) {
+    const years = state.spots.length
+      ? new Date(Math.max(...state.spots.map((s) => Date.parse(s.lastTaken)))).getFullYear() -
+        new Date(Math.min(...state.spots.map((s) => Date.parse(s.firstTaken)))).getFullYear() + 1
+      : 0;
+    const heroStat = (value, label) => {
+      const node = el('div', { class: 'hero-stat' });
+      node.innerHTML = RING_SVG;
+      node.append(el('div', {}, [el('b', { text: String(value) }), el('span', { text: label })]));
+      return node;
+    };
+    $('hero-stats').replaceChildren(
+      heroStat(state.spots.length, 'Orte'),
+      heroStat(photos, 'Fotos'),
+      heroStat(years, years === 1 ? 'Jahr Waldgeschichte' : 'Jahre Waldgeschichte'),
+    );
+  }
+
+  const recent = [...state.spots].sort((a, b) => Date.parse(b.lastTaken) - Date.parse(a.lastTaken)).slice(0, 4);
+  $('recent').replaceChildren(...(recent.length
+    ? recent.map((s) => el('button', { type: 'button', onclick: () => openSpot(s.id) }, [
+      el('img', { src: s.latestUrl, alt: '', loading: 'lazy' }),
+      el('div', {}, [
+        el('strong', { text: `Spot ${s.id}` }),
+        el('span', { text: `${s.photoCount} Foto${s.photoCount === 1 ? '' : 's'} · zuletzt ${fmtDate(s.lastTaken)}` }),
+      ]),
+    ]))
+    : [el('p', { class: 'empty', text: 'Noch keine Fotos – sei die erste Person, die hier etwas festhält.' })]));
 }
 
 /* ---------- Spot panel ---------- */
@@ -182,8 +230,14 @@ async function openSpot(id, photoId) {
   const wanted = photos.findIndex((p) => p.id === photoId);
   state.index = wanted >= 0 ? wanted : photos.length - 1;
 
+  highlightPin(id);
   $('welcome').hidden = true;
   $('spot').hidden = false;
+  if (window.matchMedia('(max-width: 860px)').matches) {
+    $('panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else {
+    $('panel').scrollTop = 0;
+  }
   $('compare').hidden = true;
   $('spot-title').textContent = `Spot ${state.spot.id}`;
   const years = new Set(photos.map((p) => new Date(p.takenAt).getFullYear()));
@@ -257,6 +311,7 @@ $('close-spot').addEventListener('click', () => {
   $('spot').hidden = true;
   $('welcome').hidden = false;
   state.spot = null;
+  highlightPin(null);
 });
 
 $('save-photo').addEventListener('click', async () => {
@@ -366,6 +421,7 @@ function setPicked(latlng) {
 let pickMarker = null;
 function startPicking() {
   dialog.close();
+  $('explore').scrollIntoView({ behavior: 'smooth' });
   $('pick-hint').hidden = false;
   map.getContainer().style.cursor = 'crosshair';
 }
@@ -396,11 +452,32 @@ $('open-upload').addEventListener('click', () => {
   form.reset();
   form.utcOffsetMinutes.value = String(-new Date().getTimezoneOffset());
   $('upload-result').replaceChildren();
+  refreshDropzones();
   setPicked(null);
   if (pickMarker) { pickMarker.remove(); pickMarker = null; }
   dialog.showModal();
 });
 $('upload-cancel').addEventListener('click', () => dialog.close());
+document.querySelectorAll('[data-action="upload"]').forEach((b) => b.addEventListener('click', () => $('open-upload').click()));
+
+// Drop zones: show what was picked and highlight while dragging files over them.
+function refreshDropzones() {
+  for (const zone of form.querySelectorAll('.dropzone')) {
+    const input = zone.querySelector('input');
+    const label = zone.querySelector('strong');
+    const files = [...input.files];
+    zone.classList.toggle('has-files', files.length > 0);
+    label.textContent = !files.length ? label.dataset.empty
+      : files.length === 1 ? files[0].name
+        : `${files.length} Dateien ausgewählt`;
+  }
+}
+for (const zone of form.querySelectorAll('.dropzone')) {
+  const input = zone.querySelector('input');
+  input.addEventListener('change', refreshDropzones);
+  input.addEventListener('dragenter', () => zone.classList.add('dragging'));
+  for (const ev of ['dragleave', 'drop']) input.addEventListener(ev, () => zone.classList.remove('dragging'));
+}
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -445,7 +522,10 @@ form.addEventListener('submit', async (e) => {
   }
   $('upload-result').replaceChildren(...result);
   await loadSpots({ fit: created.length > 0 && !state.spot });
-  if (created.length) await openSpot(created[created.length - 1].spotId, created[created.length - 1].id);
+  if (created.length) {
+    await openSpot(created[created.length - 1].spotId, created[created.length - 1].id);
+    $('explore').scrollIntoView({ behavior: 'smooth' });
+  }
 });
 
 /* ---------- Rephotography (repeat photo with overlay) ---------- */

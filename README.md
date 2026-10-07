@@ -75,7 +75,7 @@ src/gpx.js           GPX-Parser
 src/geo.js           Distanzen und Interpolation auf dem Track
 src/plantnet.js      Anbindung an die Pl@ntNet-API
 src/neophytes.js     Liste invasiver Neophyten (Schwarze Liste CH / BfN)
-public/              Frontend (Leaflet, ohne Build-Schritt)
+public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet die Waldszene)
 ```
 
 ### API
