@@ -252,6 +252,24 @@ den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen und eine Notiz.
   - Die Bilder zieht das Systemprogramm `ffmpeg` (Pfad über `FFMPEG_PATH`). Fehlt es, meldet die App das
     beim Upload. Fortschritt (Hochladen, Bilder extrahieren) und Ergebnis (Bilder, Strecke, Spots) werden
     im Upload-Dialog angezeigt.
+- **Vegetationsdichte**: Für jedes Foto schätzt die App aus den Bildfarben den **Grünanteil** (Laub und Nadeln
+  über den Excess-Green-Index der chromatischen Koordinaten, unabhängig von der Belichtung), die
+  **Kronendach-Deckung** (Anteil der oberen Bildhälfte ohne sichtbaren Himmel; Himmel = hell und blau oder
+  fast weiss), den **Lückenanteil** (Himmel im ganzen Bild) und den Grünwert GCC. Ausgerichtete Fotos werden
+  dafür in den gemeinsamen Bildausschnitt des Spots gelegt, so dass die Werte aller Fotos dieselbe Szene
+  beschreiben. Die Berechnung läuft nach dem Upload im Hintergrund, bestehende Fotos werden beim Start
+  nachgerechnet, nach einer neuen Ausrichtung automatisch neu. In der Spot-Ansicht stehen die Werte als
+  Zeitreihen (kleine Mehrfachdiagramme mit Tooltip; ein Klick springt zum Foto).
+- **Satellitenkontext (Sentinel-2-NDVI)**: Zu jedem Spot lädt die App ohne API-Key eine NDVI-Zeitreihe aus
+  Sentinel-2 L2A (Copernicus, über die offene STAC-API von Earth Search). Gelesen werden nur die wenigen
+  Bytes um den Spot (HTTP-Range-Requests auf die Cloud-Optimized GeoTIFFs von Rot B04, Nahinfrarot B08 und
+  der Szenenklassifikation SCL). Wolken, Schatten und Schnee werden pixelweise ausgeblendet, gemittelt wird
+  ein Fenster von rund 30 × 30 m (3 × 3 Pixel à 10 m), pro Monat der Median der wolkenfreien Szenen. Die
+  Werte werden gecacht und wöchentlich ergänzt. Fällt der NDVI zwischen zwei Fotodaten deutlich (≥ 0,1
+  gegenüber derselben Jahreszeit vor dem ersten Foto), erscheint ein Hinweis, zusammen mit dem, was die
+  Fotos zeigen (*Windwurf*, *Auflichtung* oder passende Beobachtungen), als unabhängige Bestätigung. Wegen
+  der 10-m-Pixel umfasst der Satellitenwert mehr als den Bildausschnitt. Ohne Internetzugang bleibt der
+  Bereich leer und wird später erneut versucht.
 - **Drei Wege, Fotos zu verorten**:
   1. **GPS aus dem Foto** (EXIF), wie bei normalen Handyfotos.
   2. **Automatisch über einen GPX-Track**: Eine Action-Cam im Intervallmodus (z. B. alle 5 s) beim
@@ -294,6 +312,7 @@ Konfiguration über Umgebungsvariablen:
 | `PUBLIC_URL`       | –        | Öffentliche Adresse für Foto-Links im Export (sonst aus der Anfrage) |
 | `FFMPEG_PATH`      | `ffmpeg` | ffmpeg für die Bilder aus Videos               |
 | `VIDEO_MAX_MB`     | `4096`   | Maximale Grösse eines Videos                   |
+| `SENTINEL_STAC_URL`| Earth Search | STAC-API für Sentinel-2 L2A; leer = Satellitenkontext aus |
 
 ## Aufbau
 
@@ -308,6 +327,10 @@ src/align.js         Bildregistrierung (ORB-Merkmale, Matching, RANSAC)
 src/homography.js    3×3-Homographien: Verkettung, Inverse
 src/change.js        Veränderungserkennung und Heatmap
 src/classify.js      Einordnung der veränderten Regionen
+src/vegetation.js    Vegetationsdichte pro Foto (Grünanteil, Kronendach-Deckung, Lücken)
+src/sentinel.js      Sentinel-2-NDVI: STAC-Suche, COG-Fenster lesen, Wolkenmaske, Monatsreihe, Rückgänge
+src/utm.js           Umrechnung WGS84 ↔ UTM (Projektion der Sentinel-2-Kacheln)
+src/routes/vegetation.js  API für Vegetationsdichte und NDVI, Hintergrund-Berechnung
 src/weather.js       Wetterdaten und Mittel 1991–2020 von Open-Meteo (mit Cache)
 src/irregularities.js  Auffälligkeiten (Trockenheit, Wärme, frühe Laubverfärbung …)
 src/trees.js         Waldbaumarten mit Phänologie, Trockenheitsempfindlichkeit und Gefahren
@@ -330,7 +353,8 @@ docs/screenshots/    Bilder für dieses README
 public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet die Waldszene,
                      sun.js berechnet Sonnenstand und Einstrahlung, sunmap.js den Kartenmodus „Sonne & Wetter“,
                      hotspots.js den Kartenmodus „Arten & Neophyten“,
-                     video.js den Video-Upload und die 360°-Ansicht)
+                     video.js den Video-Upload und die 360°-Ansicht,
+                     vegetation.js die Diagramme zu Vegetationsdichte und NDVI)
 public/sw.js         Service Worker: App-Shell vorhalten, Laufzeit-Caches, Background Sync
 public/offline-queue.js  Warteschlange für Uploads ohne Verbindung (IndexedDB, von Seite und Service Worker genutzt)
 public/pwa.js        Registrierung, Warteschlangen-Anzeige, Installieren-Knopf, Kamera-Aufnahme im Upload
@@ -370,6 +394,9 @@ scripts/generate-icons.js  Erzeugt die App-Icons aus dem Logo (`node scripts/gen
 | `GET`    | `/api/spread?species=`       | Ausbreitungsfronten einer Art: Umriss, Fläche und Frontabstand pro Jahr, Rate und Richtung (`buffer` in m, Standard 25) |
 | `GET`    | `/api/export/dwc.csv`        | Funde als Darwin-Core-Occurrence-CSV (Info Flora, GBIF)  |
 | `GET`    | `/api/export/inaturalist.csv` | Funde im CSV-Importformat von iNaturalist               |
+| `GET`    | `/api/spots/:id/vegetation`  | Grünanteil, Kronendach-Deckung, Lückenanteil und GCC pro Foto (`pending`: noch in Berechnung) |
+| `GET`    | `/api/spots/:id/ndvi`        | Sentinel-2-NDVI pro Monat, NDVI-Rückgänge zwischen Fotodaten mit Belegen aus den Fotos; `status`: `ready`, `pending` (wird geladen), `offline` |
+| `POST`   | `/api/spots/:id/ndvi`        | Satellitendaten neu laden                                |
 
 ## Roadmap
 
@@ -394,13 +421,16 @@ scripts/generate-icons.js  Erzeugt die App-Icons aus dem Logo (`node scripts/gen
   für Höhe, Exposition und Kaltluft; nächtliche Abkühlung in Senken aus Wind und Bewölkung abschätzen.
 - Sturmereignisse aus Winddaten (Böen) mit Windwurf-Funden verknüpfen; Phänologie-Daten
   (z. B. MeteoSchweiz/DWD) als Referenz für den Beginn der Herbstfärbung pro Region und Höhenlage.
-- Vegetationsdichte: Grünanteil und Kronendach-Deckung aus den Bildern schätzen und als Zeitreihe
-  zeigen.
+- Vegetationsdichte verfeinern: Himmel und Vegetation mit einem Segmentierungsmodell statt Farbregeln
+  trennen (Schnee, helle Felsen und Mauern gelten heute teils als Himmel); Kennzahlen nur im Bildteil
+  vergleichen, den alle Fotos eines Spots abdecken.
 - Arten und Neophyten: Hotspot-Karten, Ausbreitungsfronten und Datei-Export zu Info Flora / iNaturalist
   sind umgesetzt. Offen: direkter Upload über die APIs (OAuth-Konto bei iNaturalist bzw. Info Flora),
   Bestätigung der automatischen Bestimmungen durch Menschen vor dem Export, Alpha-Shapes statt konvexer
   Hüllen für zerstückelte Bestände und eine Korrektur für ungleich verteilten Suchaufwand.
-- Kontext aus Satellitendaten (Sentinel-2-NDVI) und Sturmereignissen (z. B. MeteoSchweiz/DWD).
+- Satellitenkontext ausbauen: NDVI-Rückgänge auch ohne Fotos melden (Frühwarnung für Spots), weitere
+  Indizes (z. B. NDMI für Trockenstress, Sentinel-2 B11), Landsat für die Zeit vor 2017; Sturmereignisse
+  (z. B. MeteoSchweiz/DWD) als Kontext.
 
 ## Hinweise
 
@@ -413,6 +443,9 @@ scripts/generate-icons.js  Erzeugt die App-Icons aus dem Logo (`node scripts/gen
 - Wetterdaten von [Open-Meteo.com](https://open-meteo.com) (ERA5-Reanalyse, CC BY 4.0). Der Server braucht
   dafür Internetzugang zu `archive-api.open-meteo.com` und, für die Geländehöhe, zu `api.open-meteo.com`. Die Daten werden pro ~10-km-Zelle gecacht; die
   Normalwerte 1991–2020 werden nur einmal pro Zelle geladen.
+- Satellitendaten: enthält modifizierte Copernicus-Sentinel-Daten, bezogen über
+  [Earth Search](https://earth-search.aws.element84.com/v1) (Element 84, AWS Open Data). Der Server braucht dafür Zugang zu
+  `earth-search.aws.element84.com` und `sentinel-cogs.s3.us-west-2.amazonaws.com`.
 - Kartendaten © OpenStreetMap-Mitwirkende. Bei stärkerer Nutzung braucht es einen eigenen
   Tile-Anbieter (siehe Tile Usage Policy).
 - Der Service Worker braucht HTTPS (oder `localhost`). Nach Änderungen an der Liste vorgehaltener Dateien

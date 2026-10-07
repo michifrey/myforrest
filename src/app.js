@@ -575,6 +575,7 @@ function createApp({
       await safeAlign(alignPhoto(photoId, refPhotoId));
       await safeAlign(analyzeChange(photoId));
       background(analyzeContext(photoId));
+      vegetation.backfill(null, [photoId]);
       created.push(photoJson(getPhoto.get(photoId)));
     }
     return [created.length ? 201 : 422, { created, skipped, spots: [...touchedSpots] }];
@@ -876,6 +877,7 @@ function createApp({
 
   require('./routes/species')(app, { db, spotRadiusM });
   require('./routes/video')(app, { db, uploadDir, tmpDir, spotRadiusM, activities: ACTIVITIES, photoJson, getPhoto, setTags, alignPhoto, analyzeChange, analyzeContext, background, safeAlign });
+  const vegetation = require('./routes/vegetation')(app, { db, uploadDir, background, fetchImpl: weatherFetch });
 
   app.use('/api', (req, res) => res.status(404).json({ error: 'Nicht gefunden' }));
 
