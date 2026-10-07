@@ -1,0 +1,56 @@
+/* Videos: upload options, progress and the 360° viewer (tokens from style.css) */
+
+.video-options { margin-top: 0.8rem; }
+.video-options .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 0.9rem; }
+.video-options .grid3 .field { margin-top: 0.4rem; }
+.video-options .grid3 .field > span { font-weight: 600; font-size: 0.8rem; }
+.video-options .video-note { margin: 0.2rem 0 0; }
+.video-options .video-note.err { color: var(--danger); font-weight: 600; }
+@media (max-width: 560px) {
+  .video-options .grid3 { grid-template-columns: 1fr 1fr; }
+}
+
+.video-progress { margin-top: 1rem; display: grid; gap: 0.4rem; font-size: 0.88rem; font-weight: 600; }
+.video-progress-bar {
+  height: 6px; border-radius: 999px; overflow: hidden;
+  background: var(--surface-2); border: 1px solid var(--border);
+}
+.video-progress-bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.4s ease; }
+.upload-result .video-lines { list-style: none; padding: 0; }
+.upload-result .video-lines li { margin: 0.25rem 0; }
+
+/* 360° viewer inside the spot's photo stage */
+.stage.pano { aspect-ratio: 16 / 10; width: min(100%, calc(52vh * 1.6)); }
+.stage .pano-canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 2;
+  cursor: grab; touch-action: none; background: #000;
+}
+.stage .pano-canvas[hidden] { display: none; }
+.stage .pano-canvas.grabbing { cursor: grabbing; }
+.stage .pano-canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+.pano-ui {
+  position: absolute; z-index: 3; right: 0.55rem; bottom: 0.55rem;
+  display: flex; align-items: center; gap: 0.35rem;
+}
+.pano-ui[hidden], .pano-hint[hidden], .pano-btn[hidden], .pano-dir[hidden] { display: none; }
+.pano-dir, .pano-btn, .pano-hint {
+  font: 700 0.75rem/1 var(--font-body); color: #f6f3e8;
+  background: rgb(14 22 17 / 0.62); backdrop-filter: blur(6px);
+  border: 1px solid rgb(255 255 255 / 0.18); border-radius: 999px; padding: 0.38rem 0.65rem;
+}
+.pano-btn { cursor: pointer; }
+.pano-btn:hover { background: rgb(14 22 17 / 0.82); }
+.pano-hint {
+  position: absolute; z-index: 3; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  pointer-events: none; animation: pano-fade 3.5s ease forwards;
+}
+@keyframes pano-fade { 0%, 60% { opacity: 1; } 100% { opacity: 0; } }
+.viewer:fullscreen { display: flex; flex-direction: column; background: #000; }
+.viewer:fullscreen .stage { flex: 1; width: 100%; aspect-ratio: auto; }
+
+.thumbs button.is-pano { position: relative; }
+.thumbs button.is-pano::after {
+  content: '360°'; position: absolute; left: 4px; bottom: 4px;
+  font: 800 0.6rem/1 var(--font-body); color: #f6f3e8;
+  background: rgb(14 22 17 / 0.7); border-radius: 4px; padding: 2px 3px;
+}

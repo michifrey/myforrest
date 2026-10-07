@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="vendor/fonts/manrope/index.css">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="video.css">
 </head>
 <body>
   <header class="nav" id="nav">
@@ -321,10 +322,10 @@
         <h2>Fotos aus dem Wald</h2>
       </div>
       <label class="dropzone">
-        <input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple required>
+        <input type="file" name="photos" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,.mp4,.mov,.insv,.360" multiple required>
         <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="10" width="36" height="28" rx="5"/><path d="M6 32l10-10 8 8 6-6 12 12"/><circle cx="32" cy="19" r="3"/></svg>
-        <strong data-empty="Fotos hierher ziehen oder auswählen">Fotos hierher ziehen oder auswählen</strong>
-        <span class="muted small">JPEG, PNG oder WebP · Ort und Zeit werden aus den Bilddaten gelesen</span>
+        <strong data-empty="Fotos oder Videos hierher ziehen oder auswählen">Fotos oder Videos hierher ziehen oder auswählen</strong>
+        <span class="muted small">JPEG, PNG, WebP oder Video (GoPro, 360°-MP4) · Ort und Zeit werden aus den Bild- und Telemetriedaten gelesen</span>
       </label>
       <label class="dropzone compact">
         <input type="file" name="gpx" accept=".gpx,application/gpx+xml">
@@ -395,6 +396,7 @@
   <script src="sun.js"></script>
   <script src="forest.js"></script>
   <script src="app.js"></script>
+  <script src="video.js"></script>
   <script src="sunmap.js"></script>
 </body>
 </html>
