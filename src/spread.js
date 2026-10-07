@@ -162,79 +162,132 @@ function pointInRing([px, py], ring) {
   return inside;
 }
 
-/**
- * Patches (Teilbestände): the separate polygons of the newest alpha shape.
- * Each finding belongs to the patch that contains it (or the nearest one),
- * and every patch gets its own history: since when it exists, its area
- * and front radius per year, its own spread rate and direction, and – if
- * it appeared after the first year – how far it lies from the findings
- * that existed before (a jump, e.g. seeds carried by water or machines).
- */
-function patchesOf(items, finalShape, yearList, frame, toLatLon) {
-  const outers = finalShape.polygons.map((poly) => poly[0]);
-  const owner = items.map((i) => {
-    const k = outers.findIndex((ring) => pointInRing(i.xy, ring));
-    if (k >= 0) return k;
-    let best = 0; let bestD = Infinity;
-    outers.forEach((ring, idx) => {
-      for (const p of ring) {
-        const d = Math.hypot(p[0] - i.xy[0], p[1] - i.xy[1]);
-        if (d < bestD) { bestD = d; best = idx; }
-      }
-    });
-    return best;
+/** Area of a polygon with holes ([outer, ...holes]) in m². */
+const polygonWithHolesArea = (poly) => polygonArea(poly[0]) - poly.slice(1).reduce((sum, ring) => sum + polygonArea(ring), 0);
+
+/** Index of the polygon (by outer ring) that contains a point, or the nearest one. */
+function polygonOf(xy, polygons) {
+  const k = polygons.findIndex((poly) => pointInRing(xy, poly[0]));
+  if (k >= 0) return k;
+  let best = 0; let bestD = Infinity;
+  polygons.forEach((poly, idx) => {
+    for (const p of poly[0]) {
+      const d = Math.hypot(p[0] - xy[0], p[1] - xy[1]);
+      if (d < bestD) { bestD = d; best = idx; }
+    }
   });
-  const groups = outers.map((ring, k) => Object.assign(items.filter((_, n) => owner[n] === k), { ring }))
-    .filter((g) => g.length);
-  // Oldest patch first; among equals the one with more findings.
-  groups.sort((a, b) => Math.min(...a.map((i) => i.year)) - Math.min(...b.map((i) => i.year)) || b.length - a.length);
-  return groups.map((g, n) => {
-    const since = Math.min(...g.map((i) => i.year));
-    const years = yearList.filter((y) => y >= since);
-    const { origin, radii, rate } = frontRate(g, years);
-    const perYear = years.map((year, k) => {
-      const cumulative = g.filter((i) => i.year <= year).map((i) => i.xy);
-      return {
+  return best;
+}
+
+/**
+ * Patches (Teilbestände) tracked through the years. The yearly alpha shapes
+ * are nested, so every polygon of one year lies inside exactly one polygon
+ * of the next: a patch either carries on (one predecessor), is new (none) or
+ * results from patches growing together (several). When patches merge, the
+ * oldest keeps its number and the others end there ("mit Teilbestand 1
+ * zusammengewachsen"). Each patch keeps its own findings – those that
+ * appeared inside it while it existed – and gets its own history: since and
+ * until when, area and front radius per year, area growth, spread rate and
+ * direction from its first findings, and for patches that appeared later the
+ * jump from the nearest older finding.
+ */
+function trackPatches(items, shapes, yearList, toLatLon) {
+  const tracks = [];
+  const byId = new Map();
+  let prev = []; // [{ id, members }] of the previous year
+  shapes.forEach((shape, yi) => {
+    const year = yearList[yi];
+    const cumulative = items.filter((i) => i.year <= year);
+    const owner = cumulative.map((i) => polygonOf(i.xy, shape.polygons));
+    const members = shape.polygons.map((_, k) => cumulative.filter((_, n) => owner[n] === k));
+    // Predecessors: last year's patches whose findings lie in this polygon.
+    const preds = shape.polygons.map((_, k) => prev.filter((p) => p.members.length && members[k].includes(p.members[0])));
+    // New polygons get numbers in order of size; continuing ones keep theirs.
+    const order = shape.polygons.map((_, k) => k).sort((a, c) => members[c].length - members[a].length);
+    const current = [];
+    for (const k of order) {
+      if (!members[k].length) continue;
+      let id;
+      if (!preds[k].length) {
+        id = tracks.length + 1;
+        const t = { id, since: year, until: null, mergedInto: null, absorbed: [], years: [], own: [] };
+        tracks.push(t);
+        byId.set(id, t);
+      } else {
+        // The oldest predecessor (then the one with more findings) carries on.
+        const sorted = [...preds[k]].sort((a, c) => byId.get(a.id).since - byId.get(c.id).since || c.members.length - a.members.length);
+        id = sorted[0].id;
+        for (const other of sorted.slice(1)) {
+          const t = byId.get(other.id);
+          t.until = year;
+          t.mergedInto = id;
+          byId.get(id).absorbed.push({ id: other.id, year });
+        }
+      }
+      const t = byId.get(id);
+      const poly = shape.polygons[k];
+      t.own.push(...members[k].filter((i) => i.year === year));
+      t.years.push({
         year,
-        count: g.filter((i) => i.year === year).length,
-        cumulativeCount: cumulative.length,
-        areaM2: alphaShape(cumulative, frame).areaM2,
-        frontRadiusM: Math.round(radii[k]),
-      };
-    });
-    // A patch that appeared later: distance to the nearest finding of an earlier year.
+        count: members[k].filter((i) => i.year === year).length,
+        cumulativeCount: members[k].length,
+        areaM2: Math.round(polygonWithHolesArea(poly)),
+        outline: poly[0].map(toLatLon),
+        centroid: toLatLon(centroid(members[k].map((i) => i.xy))),
+      });
+      current.push({ id, members: members[k] });
+    }
+    prev = current;
+  });
+
+  // Who held a finding when it appeared, for the jump of later patches.
+  const holder = new Map();
+  for (const t of tracks) for (const i of t.own) holder.set(i, t.id);
+  return tracks.map((t) => {
+    const years = t.years.map((y) => y.year);
+    const { origin, radii, rate } = frontRate(t.own, years);
+    t.years.forEach((y, k) => { y.frontRadiusM = Math.round(radii[k]); });
     let jump = null;
-    if (since > yearList[0]) {
-      const earlier = items.filter((i) => i.year < since);
-      const firstOnes = g.filter((i) => i.year === since);
+    if (t.since > yearList[0]) {
+      const firstOnes = t.own.filter((i) => i.year === t.since);
       let best = Infinity; let from = null;
       for (const a of firstOnes) {
-        for (const e of earlier) {
+        for (const e of items) {
+          if (e.year >= t.since) continue;
           const d = Math.hypot(a.xy[0] - e.xy[0], a.xy[1] - e.xy[1]);
           if (d < best) { best = d; from = e; }
         }
       }
       if (from) {
-        const fromPatch = groups.findIndex((other) => other.includes(from)) + 1;
         const [cx, cy] = centroid(firstOnes.map((i) => i.xy));
-        jump = { distanceM: Math.round(best), fromPatch, compass: compass8(bearing(cx - from.xy[0], cy - from.xy[1])) };
+        jump = { distanceM: Math.round(best), fromPatch: holder.get(from) ?? null, compass: compass8(bearing(cx - from.xy[0], cy - from.xy[1])) };
       }
     }
-    const areaGrowth = perYear.length >= 2 ? Math.round(slope(years, perYear.map((y) => y.areaM2))) : null;
-    const label = `Teilbestand ${n + 1}`;
+    const last = t.years[t.years.length - 1];
+    const areaGrowth = t.years.length >= 2 ? Math.round(slope(years, t.years.map((y) => y.areaM2))) : null;
+    let text = rate ? rate.text : `Erst seit ${t.since} – Ausbreitung noch nicht abschätzbar`;
+    if (t.mergedInto) {
+      const merged = `${t.until} mit Teilbestand ${t.mergedInto} zusammengewachsen`;
+      text = rate
+        ? `${rate.text.replace(/ \(\d{4}–\d{4}\)$/, '')} bis ${t.until - 1}, ${merged}`
+        : `Nur ${t.since} eigenständig, ${merged}`;
+    }
     return {
-      id: n + 1,
-      label,
-      since,
-      count: g.length,
-      areaM2: perYear[perYear.length - 1].areaM2,
-      centroid: toLatLon(centroid(g.map((i) => i.xy))),
-      outline: g.ring.map(toLatLon),
+      id: t.id,
+      label: `Teilbestand ${t.id}`,
+      since: t.since,
+      until: t.until,
+      mergedInto: t.mergedInto,
+      absorbed: t.absorbed,
+      count: t.own.length,
+      areaM2: last.areaM2,
+      centroid: last.centroid,
+      outline: last.outline,
       origin: toLatLon(origin),
-      years: perYear,
+      years: t.years,
       rate: rate && { ...rate, areaM2PerYear: areaGrowth },
       jump,
-      text: rate ? rate.text : `Erst seit ${since} – Ausbreitung noch nicht abschätzbar`,
+      text,
     };
   });
 }
@@ -256,12 +309,12 @@ function spreadFronts(occurrences, { buffer = 25, alpha = 'auto' } = {}) {
   const frame = alphaM === null ? null : createFrame(allXY, { alpha: alphaM, buffer });
   const whole = frontRate(items, yearList);
 
-  let lastShape = null;
+  const shapes = [];
   const years = yearList.map((year, k) => {
     const cumulative = items.filter((i) => i.year <= year).map((i) => i.xy);
     const hull = bufferedHull(cumulative, buffer);
     const shape = frame ? alphaShape(cumulative, frame) : null;
-    lastShape = shape;
+    if (shape) shapes.push(shape);
     return {
       year,
       count: items.filter((i) => i.year === year).length,
@@ -285,7 +338,7 @@ function spreadFronts(occurrences, { buffer = 25, alpha = 'auto' } = {}) {
     alphaM,
     years,
     rate,
-    patches: frame ? patchesOf(items, lastShape, yearList, frame, toLatLon) : [],
+    patches: frame ? trackPatches(items, shapes, yearList, toLatLon) : [],
     text: rate ? rate.text : `Funde aus nur einem Jahr (${yearList[0]}) – Ausbreitung noch nicht abschätzbar`,
     method: methodText(!frame),
   };
@@ -298,7 +351,8 @@ const methodText = (convex) => (convex
     + 'Teilbestände, fundfreie Flächen breiter als 2α bleiben Lücken. ')
   + 'Rate: Steigung (kleinste Quadrate) des Abstands vom Schwerpunkt der Erstfunde zum jeweils entferntesten Fund. '
   + 'Richtung: gewichtetes Mittel der Funde, die die Front nach aussen geschoben haben.'
-  + (convex ? '' : ' Pro Teilbestand dasselbe, ab seinem ersten Fund und mit dessen Schwerpunkt als Ursprung; ein später '
-    + 'entstandener Teilbestand nennt den Abstand zum nächsten älteren Fund (Sprung).');
+  + (convex ? '' : ' Pro Teilbestand dasselbe, mit seinen eigenen Funden ab seinem ersten Jahr und deren Schwerpunkt als '
+    + 'Ursprung. Teilbestände werden Jahr für Jahr verfolgt; wachsen sie zusammen, behält der älteste seine Nummer. Ein '
+    + 'später entstandener Teilbestand nennt den Abstand zum nächsten älteren Fund (Sprung).');
 
 module.exports = { spreadFronts, convexHull, polygonArea, compass8 };

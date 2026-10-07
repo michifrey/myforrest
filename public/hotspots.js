@@ -265,11 +265,13 @@
     // Patches (Teilbestände) that exist by the chosen year: number at their centre, the hovered one outlined.
     const year = ys[hs.yearIndex].year;
     for (const p of hs.spread.patches || []) {
-      if (p.since > year) continue;
+      // Each patch with its outline of the chosen year; merged patches are part of another by then.
+      const y = p.years.find((e) => e.year === year);
+      if (!y) continue;
       if (hs.hoverPatch === p.id) {
-        L.polygon(p.outline, { color: cssToken('--text', '#1b2a1f'), weight: 2.5, dashArray: '6 4', fill: false, interactive: false }).addTo(frontLayer);
+        L.polygon(y.outline, { color: cssToken('--text', '#1b2a1f'), weight: 2.5, dashArray: '6 4', fill: false, interactive: false }).addTo(frontLayer);
       }
-      L.marker(p.centroid, {
+      L.marker(y.centroid, {
         icon: L.divIcon({ className: '', html: `<span class="patch-label${hs.hoverPatch === p.id ? ' active' : ''}">${p.id}</span>`, iconSize: null, iconAnchor: [10, 10] }),
         keyboard: false,
         zIndexOffset: 600,
@@ -419,6 +421,15 @@
       : '';
   }
 
+  /** "2025 mit Teilbeständen 2 und 3 zusammengewachsen", one line per year. */
+  function absorbedText(absorbed) {
+    const byYear = new Map();
+    for (const a of absorbed) byYear.set(a.year, [...(byYear.get(a.year) || []), a.id]);
+    return [...byYear].map(([year, ids]) => `${year} mit ${ids.length > 1
+      ? `Teilbeständen ${ids.slice(0, -1).join(', ')} und ${ids[ids.length - 1]}`
+      : `Teilbestand ${ids[0]}`} zusammengewachsen`);
+  }
+
   /** Spread per patch: since when, how large, how fast and where to; later patches with their jump. */
   function renderPatches() {
     const s = hs.spread;
@@ -430,16 +441,19 @@
       el('h4', { text: `Ausbreitung pro Teilbestand (${patches.length})` }),
       el('ol', {}, patches.map((p) => {
         const growth = p.rate?.areaM2PerYear ? ` (${p.rate.areaM2PerYear > 0 ? '+' : '−'}${ha(Math.abs(p.rate.areaM2PerYear))}/Jahr)` : '';
+        const merged = p.until && p.until <= year;
+        const absorbed = p.absorbed.filter((a) => a.year <= year);
         return el('li', {}, el('button', {
           type: 'button',
-          class: `sp-patch${p.since > year ? ' future' : ''}`,
+          class: `sp-patch${p.since > year || merged ? ' future' : ''}`,
           'data-id': String(p.id),
-          title: p.since > year ? `entsteht erst ${p.since}` : '',
+          title: p.since > year ? `entsteht erst ${p.since}` : merged ? `seit ${p.until} Teil von Teilbestand ${p.mergedInto}` : '',
         }, [
           el('span', { class: 'patch-label', text: String(p.id) }),
           el('span', { class: 'sp-patch-text' }, [
-            el('span', { class: 'small muted', text: `seit ${p.since} · ${fmt(p.count)} ${p.count === 1 ? 'Fund' : 'Funde'} · ${ha(p.areaM2)}${growth}` }),
+            el('span', { class: 'small muted', text: `${p.until ? (p.until - 1 > p.since ? `${p.since}–${p.until - 1}` : String(p.since)) : `seit ${p.since}`} · ${fmt(p.count)} ${p.count === 1 ? 'Fund' : 'Funde'} · ${ha(p.areaM2)}${growth}` }),
             el('b', { text: p.text.replace(/^Ausbreitung /, '') }),
+            ...absorbedText(absorbed).map((t) => el('span', { class: 'small', text: t })),
             p.jump ? el('span', { class: 'small', text: `Sprung: ${p.jump.distanceM >= 1000 ? `${fmt(p.jump.distanceM / 1000, 1)} km` : `${fmt(p.jump.distanceM)} m`} nach ${p.jump.compass} von Teilbestand ${p.jump.fromPatch}` }) : '',
           ]),
         ]));
@@ -581,7 +595,10 @@
   $('sp-patches').addEventListener('focusout', () => hoverPatch(null));
   $('sp-patches').addEventListener('click', (e) => {
     const p = patchOf(e);
-    if (p) map.fitBounds(L.latLngBounds(p.outline), { padding: [80, 80], maxZoom: 18 });
+    if (!p) return;
+    const year = hs.spread.years[hs.yearIndex]?.year;
+    const y = [...p.years].reverse().find((e) => e.year <= year) || p.years[0];
+    map.fitBounds(L.latLngBounds(y.outline), { padding: [80, 80], maxZoom: 18 });
   });
   $('sp-years').addEventListener('click', (e) => {
     const row = e.target.closest('tr[data-i]');

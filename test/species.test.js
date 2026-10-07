@@ -289,3 +289,34 @@ test('spread rate per patch: own origin, rate and direction; later patches repor
   // The convex hull has no patches.
   assert.deepEqual(spreadFronts(occ, { alpha: null }).patches, []);
 });
+
+test('patches are tracked through the years; when they grow together the oldest keeps its number', () => {
+  const base = { lat: 47, lon: 8 };
+  const at = (x, y, year) => ({ lat: base.lat + dLat(y), lon: base.lon + dLon(x), takenAt: Date.parse(`${year}-07-01T10:00:00Z`) });
+  const occ = [];
+  // A from 2020 at x = 0…100, B from 2021 at x = 600…700; 2023 findings fill the gap between them.
+  for (let x = 0; x <= 100; x += 25) occ.push(at(x, 0, 2020));
+  for (let x = 600; x <= 700; x += 25) occ.push(at(x, 0, 2021));
+  occ.push(at(125, 0, 2022), at(150, 0, 2022));
+  for (let x = 175; x < 600; x += 25) occ.push(at(x, 0, 2023));
+  // C appears in 2024 far to the north.
+  occ.push(at(300, 2000, 2024), at(325, 2000, 2024));
+  const s = spreadFronts(occ, { alpha: 60 });
+  assert.deepEqual(s.years.map((y) => y.patches), [1, 2, 2, 1, 2]);
+  const [a, b, c] = s.patches;
+  assert.deepEqual([a.id, a.since, a.until, b.id, b.since, b.until, b.mergedInto, c.id, c.since], [1, 2020, null, 2, 2021, 2023, 1, 3, 2024]);
+  assert.deepEqual(a.absorbed, [{ id: 2, year: 2023 }]);
+  assert.deepEqual(b.years.map((y) => y.year), [2021, 2022], 'B ends when it merges');
+  assert.deepEqual(a.years.map((y) => y.year), [2020, 2021, 2022, 2023, 2024]);
+  assert.ok(a.years[3].areaM2 > a.years[2].areaM2 + b.years[1].areaM2 * 0.9, 'after the merge A covers both');
+  assert.match(b.text, /2023 mit Teilbestand 1 zusammengewachsen$/);
+  assert.equal(b.count, 5, 'B keeps only its own findings');
+  assert.deepEqual([b.jump.fromPatch, b.jump.compass], [1, 'O']);
+  assert.ok(Math.abs(b.jump.distanceM - 500) < 5);
+  assert.deepEqual([c.jump.fromPatch, c.jump.compass], [1, 'N']);
+  // A patch that existed for one year only before merging has no rate.
+  const short = spreadFronts([...occ, at(-200, 0, 2023)].map((o) => o), { alpha: 60 });
+  assert.ok(short.patches.every((p) => !p.mergedInto || p.rate || /^Nur \d{4} eigenständig, /.test(p.text)));
+  // Each year's outline and centre travel with the patch.
+  assert.ok(a.years.every((y) => y.outline.length >= 3 && y.centroid.length === 2));
+});
