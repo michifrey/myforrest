@@ -84,7 +84,8 @@ MyForrest lässt sich als App auf den Startbildschirm legen
 vor, sodass die App auch ohne Netz startet. Zuletzt geladene Spots, Fotos und Kartenkacheln bleiben
 offline sichtbar (Kacheln bis ca. 800, Fotos bis 400, jeweils die ältesten werden verdrängt).
 Wer im Wald ohne Empfang fotografiert, verliert nichts: Uploads und Wiederholungsfotos ohne Verbindung
-landen samt Fotos, GPX und Angaben in einer Warteschlange auf dem Gerät (IndexedDB). In der Navigation
+landen samt Fotos, GPX und Angaben in einer Warteschlange auf dem Gerät (IndexedDB). Die installierte App
+empfängt auch die Push-Nachrichten der Satelliten-Frühwarnung (siehe Satellitenkontext). In der Navigation
 steht dann z. B. „3 Fotos warten auf Verbindung“; ein Klick zeigt die wartenden Uploads, die sich
 einzeln oder alle verwerfen lassen. Sobald wieder Netz da ist, werden sie automatisch gesendet: per
 Background Sync auch bei geschlossener App (Chrome/Android), sonst beim nächsten Öffnen oder sobald
@@ -325,10 +326,11 @@ misst den NDVI über Wald meist etwas tiefer, und Landsat 5 und 7 weichen von 8 
 - Die Werte werden gecacht und wöchentlich ergänzt. Szenen aus der Zeit vor dem NDMI werden nach und nach
   nachgerechnet.
 
-**Rückgänge zwischen zwei Fotos**: Fällt NDVI (≥ 0,1) oder NDMI (≥ 0,08) zwischen zwei Fotodaten
-gegenüber derselben Jahreszeit vor dem ersten Foto, erscheint ein Hinweis. Dazu kommt, was die Fotos
-zeigen (*Windwurf*, *Auflichtung* oder passende Beobachtungen), als unabhängige Bestätigung. Ab 0,2 (NDVI)
-bzw. 0,15 (NDMI) gilt der Rückgang als stark.
+**Rückgänge zwischen zwei Fotos**: Fällt NDVI oder NDMI zwischen zwei Fotodaten gegenüber derselben
+Jahreszeit vor dem ersten Foto, erscheint ein Hinweis. Dazu kommt, was die Fotos zeigen (*Windwurf*,
+*Auflichtung* oder passende Beobachtungen), als unabhängige Bestätigung. Die Anfangswerte der Schwellen
+sind 0,1 (NDVI) und 0,08 (NDMI), ab 0,2 bzw. 0,15 gilt der Rückgang als stark; geeicht werden sie wie die
+der Frühwarnung (siehe unten).
 
 **Frühwarnung ohne neue Fotos**: Einmal täglich aktualisiert der Server die Reihen aller Spots, auch wenn
 niemand den Spot öffnet (`SATELLITE_WATCH_HOURS`, 0 = aus). Er vergleicht die letzten ein bis zwei Monate
@@ -339,8 +341,24 @@ mit derselben Jahreszeit der bis zu fünf Vorjahre (mindestens zwei Vergleichswe
 - Ist das letzte Foto älter als der Rückgang, schlägt die App vor, den Spot zu besuchen: Ein neues Foto
   zeigt, was dahinter steckt.
 
-**Kalibrierung an bestätigten Schäden**: Die Schwellen der Frühwarnung eicht der Server an dem, was vor
-Ort bestätigt wurde.
+**Frühwarnung als Push-Nachricht**: Wer einen Spot regelmässig besucht, erfährt von einer neuen
+Frühwarnung auf dem Handy, ohne die App zu öffnen.
+- **Wer:** Konten, die den Spot in den letzten drei Jahren an mindestens zwei Tagen fotografiert haben.
+  Dazu kommt, wer dem Spot folgt (*Spot folgen* in der Spotansicht), und es fällt weg, wer ihn
+  stummgeschaltet hat. Die Spotansicht sagt angemeldeten Personen, ob und warum sie benachrichtigt werden.
+- **Einschalten:** Im Kontomenü *Push-Nachrichten einschalten*, einmal pro Gerät. Der Browser fragt
+  dann um Erlaubnis. *Testnachricht senden* prüft, ob Nachrichten ankommen. Auf iPhone und iPad geht das
+  nur, wenn MyForrest als App auf dem Home-Bildschirm liegt (iOS 16.4 oder neuer).
+- **Was:** Pro Frühwarnung eine Nachricht (Spot, Index, wie stark, seit wann); mehrere neue Warnungen für
+  dieselbe Person kommen gebündelt. Ein Tipp darauf öffnet den Spot. Gesendet wird nur, wenn seit dem
+  Beginn des Rückgangs niemand am Spot fotografiert hat, und jede Warnung nur einmal.
+- **Wann:** Nach der täglichen Runde, nach Angleichung und Kalibrierung.
+- **Technik:** Web Push mit VAPID und verschlüsselter Nachricht (RFC 8291/8292), ohne Fremddienst ausser
+  dem Push-Dienst des Browsers (Google, Mozilla, Apple, Microsoft). Der Server schickt nur an diese
+  Dienste; abgelaufene Abos löscht er.
+
+**Kalibrierung an bestätigten Schäden**: Die Schwellen der Frühwarnung und der Rückgänge zwischen zwei
+Fotos eicht der Server an dem, was vor Ort bestätigt wurde.
 - **Kontrollen:** Jedes Paar aufeinanderfolgender Fotos eines Spots (mindestens 30 Tage auseinander) ist
   eine Kontrolle.
   - *Schaden*, wenn das spätere Foto einen neuen Schadens-Tag trägt (Sturmschaden, Borkenkäfer,
@@ -349,8 +367,11 @@ Ort bestätigt wurde.
   - *Kein Schaden*, wenn beides fehlt.
   - Paare, bei denen derselbe Schadens-Tag schon auf dem früheren Foto stand, sagen nichts über den
     Zeitraum und zählen nicht.
-- **Nachgerechnet:** Für jede Kontrolle rechnet der Server Monat für Monat nach, wie stark die Frühwarnung
-  zwischen den beiden Besuchen ausgeschlagen hätte, jeweils nur mit den Daten, die damals vorlagen.
+- **Nachgerechnet:** Für jede Kontrolle rechnet der Server zwei Werte aus:
+  - Frühwarnung: Monat für Monat, wie stark sie zwischen den beiden Besuchen ausgeschlagen hätte, jeweils
+    nur mit den Daten, die damals vorlagen.
+  - Zwischen den Fotos: der Rückgang zwischen den beiden Fotodaten, so wie ihn die Spotansicht zeigt.
+  Beide werden getrennt geeicht.
 - **Wahl der Schwelle:** Gewählt wird pro Index die Schwelle zwischen 0,03 und 0,30 mit dem besten
   Verhältnis aus erkannten Schäden und Fehlalarmen (F1). Bei Gleichstand zählt die höhere, also die mit
   weniger Fehlalarmen. Die Schwelle für „stark“ behält das Verhältnis der Anfangswerte.
@@ -369,20 +390,32 @@ Ort bestätigt wurde.
     Die Prüfung würde dann vor allem den Anfangswert messen.
   - Die Kontrollen stammen von weniger als 3 Spots.
   - Die geeichte Schwelle war an zurückgehaltenen Spots nicht besser.
-- **Wann:** Nach jeder täglichen Runde wird neu kalibriert. Die Frühwarnkarte nennt die Schwelle, die
-  Zahl der Kontrollen und Spots, die Treffer und Fehlalarme an zurückgehaltenen Spots und den Vergleich
-  mit dem Anfangswert.
+- **Nach Waldtyp:** Laub- und Nadelwald reagieren verschieden. Laubkronen schwanken stärker übers Jahr;
+  Borkenkäfer senken den NDVI von Fichten oft nur wenig, bevor die Bäume absterben. Deshalb wird zusätzlich
+  pro Waldtyp geeicht.
+  - Der **Waldtyp** eines Spots kommt aus den erfassten Baumarten (ab 60 % Nadelbäume Nadelwald, bis 40 %
+    Laubwald, dazwischen Mischwald). Ohne Arten zählt der Nadelholzanteil auf den Fotos. Ohne beides
+    schätzt ihn der Satellit: Sinkt der NDVI vom Sommer zum Winter um mindestens 0,25, ist es Laubwald,
+    um höchstens 0,12 Nadelwald (je mindestens drei Sommer- und Wintermonate).
+  - Ein Waldtyp bekommt seine eigene Schwelle nur, wenn sie an seinen zurückgehaltenen Spots mindestens
+    so gut abschneidet wie die Schwelle aller Spots. Sonst gilt diese, mit Begründung.
+  - Mischwald und Spots ohne bekannten Waldtyp verwenden immer die Schwelle aller Spots.
+- **Wann:** Nach jeder täglichen Runde wird neu kalibriert. Die Karten der Frühwarnung und der Rückgänge
+  nennen die Schwelle, den Waldtyp, für den sie gilt, die Zahl der Kontrollen und Spots, die Treffer und
+  Fehlalarme an zurückgehaltenen Spots und den Vergleich mit dem Anfangswert bzw. der Schwelle aller
+  Spots. Unter den Diagrammen steht, als welcher Waldtyp der Spot gilt und woher das kommt.
 - **Grenzen:**
   - Bei wenigen Spots schwanken die Zahlen der Kreuzvalidierung stark.
   - „Kein Schaden“ heisst nur, dass niemand einen Schaden markiert hat.
+  - Pro Waldtyp braucht es entsprechend mehr bestätigte Schäden; bis dahin gilt die Schwelle aller Spots.
+  - Der Waldtyp aus dem Satelliten erkennt Lärchen (sommergrüne Nadelbäume) als Laubwald.
 
 **Sturm als Kontext**: Rückgänge und Frühwarnungen nennen den stärksten Sturm (Böen ab 75 km/h, siehe
 Sturmereignisse) im Zeitraum bzw. in den Monaten davor.
 
 **Grenzen**
 - Wegen der Pixelgrösse umfasst der Satellitenwert mehr (und anderes) als den Bildausschnitt.
-- Ohne genügend bestätigte Schäden bleiben die Schwellen der Frühwarnung Anfangswerte; die Rückgänge
-  zwischen zwei Fotos verwenden immer die Anfangswerte.
+- Ohne genügend bestätigte Schäden bleiben die Schwellen Anfangswerte.
 - Ohne Internetzugang bleibt der Bereich leer und wird später erneut versucht. Fällt nur Landsat aus,
   läuft Sentinel-2 weiter.
 

@@ -1067,6 +1067,17 @@ summary { cursor: pointer; color: var(--muted); font-weight: 600; font-size: 0.9
 }
 .thumbs button.is-hidden img { opacity: 0.4; filter: grayscale(1); }
 
+/* Push messages for the early warning (push.js) */
+.spot-follow {
+  margin: 0.4rem 0 0; padding: 0.45rem 0.65rem; border-radius: 10px; line-height: 1.45;
+  color: var(--muted); background: var(--surface-2);
+}
+.spot-follow .follow-device { display: block; margin-top: 0.2rem; }
+.spot-follow svg { width: 1rem; height: 1rem; vertical-align: -0.2em; margin-right: 0.3rem; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.spot-follow.is-on { color: var(--text); background: var(--accent-soft); }
+.spot-follow.is-on svg { color: var(--accent); fill: color-mix(in srgb, var(--accent) 25%, transparent); }
+.spot-follow button.link { padding: 0 0.1rem; font-size: inherit; }
+
 .mod-dialog { width: min(820px, calc(100vw - 32px)); }
 .mod-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
 .mod-head .icon { float: none; }

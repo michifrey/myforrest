@@ -48,6 +48,7 @@
   const toast = h('div', { class: 'pwa-toast', role: 'status', 'aria-live': 'polite', hidden: true });
   document.body.append(toast);
   let toastTimer = null;
+  window.pwaNotify = notify; // also used by account.js
   function notify(message, { sticky = false } = {}) {
     toast.replaceChildren(
       h('span', { text: message }),

@@ -19,6 +19,14 @@
  * each group the threshold is chosen on the other groups and tried on the
  * held-out one. The calibrated threshold is used only when it does at least
  * as well there as the starting value; otherwise the starting value stays.
+ *
+ * Two measures are calibrated on the same checks: the early warning
+ * ('warning', see above) and the drop between the two photos themselves
+ * ('photos', sentinel.js: pairDrop), which marks drops in the spot's chart.
+ * Each is calibrated on all spots, and again per forest type (Laub-,
+ * Nadelwald; forest-type.js) against the threshold of all spots: a forest
+ * type gets its own threshold only when it does at least as well on its
+ * held-out spots.
  */
 
 const { anomalyScores, THRESHOLDS } = require('./sentinel');
@@ -29,6 +37,8 @@ const MIN_NEGATIVES = 5;
 const MAX_FOLDS = 5;
 const MIN_SPOTS = 3; // fewer spots cannot be split into a meaningful cross-validation
 const DAY = 86400000;
+const MEASURES = ['warning', 'photos'];
+const FOREST_TYPES = ['laub', 'nadel']; // Mischwald and unknown spots use the threshold of all spots
 
 /**
  * The strongest early-warning drop of an index during (from, to] (ms): the
@@ -114,45 +124,51 @@ function crossValidate(samples, fallback, opts = {}) {
 /**
  * Thresholds per index from samples { ndvi: [{ drop, damage, group }], ndmi: [...] }
  * (`group`: the spot). The best F1 on all checks is the candidate; it is used
- * when the cross-validation shows it at least as good as the starting value
- * on held-out spots. Otherwise the starting value stays, with the reason:
- * 'zu-wenige-kontrollen' (also when fewer than half of the folds had enough
- * checks to choose a threshold of their own: then the cross-validation would
- * mostly measure the starting value), 'zu-wenige-spots' or 'nicht-besser'.
- * The "strong" threshold keeps the ratio of the starting values.
+ * when the cross-validation shows it at least as good as the fallback on
+ * held-out spots: the starting value, or `opts.fallback[index]` (the
+ * threshold of all spots, when calibrating one forest type). Otherwise the
+ * fallback stays, with the reason: 'zu-wenige-kontrollen' (also when fewer
+ * than half of the folds had enough checks to choose a threshold of their
+ * own: then the cross-validation would mostly measure the fallback),
+ * 'zu-wenige-spots' or 'nicht-besser'. The "strong" threshold keeps the
+ * ratio of the starting values.
  */
 function calibrate(samplesByIndex, opts = {}) {
   const out = {};
   for (const key of ['ndvi', 'ndmi']) {
-    const samples = (samplesByIndex[key] || []).filter((s) => s.drop !== null);
+    const samples = (samplesByIndex[key] || []).filter((s) => s.drop !== null && s.drop !== undefined);
     const positives = samples.filter((s) => s.damage).length;
     const negatives = samples.length - positives;
     const spots = new Set(samples.map((s) => s.group)).size;
-    const [defThreshold, defStrong] = THRESHOLDS[key];
+    const [startThreshold, startStrong] = THRESHOLDS[key];
+    const fallback = opts.fallback?.[key] ?? startThreshold;
     const rows = sweep(samples);
     const candidate = chooseThreshold(samples, opts);
-    const cv = candidate === null ? null : crossValidate(samples, defThreshold, opts);
+    const cv = candidate === null ? null : crossValidate(samples, fallback, opts);
     // The starting value is not fitted to these checks: its numbers on all of them are already out-of-sample.
-    const standard = rows.find((r) => r.threshold === defThreshold) || null;
+    // (The threshold of all spots was fitted on them among others, which makes the comparison stricter.)
+    const standard = rows.find((r) => r.threshold === fallback) || null;
     let reason = null;
     if (candidate === null) reason = 'zu-wenige-kontrollen';
     else if (!cv) reason = 'zu-wenige-spots';
     else if (cv.fitted * 2 < cv.folds) reason = 'zu-wenige-kontrollen';
     else if (cv.f1 < (standard?.f1 ?? 0)) reason = 'nicht-besser';
-    const threshold = reason ? defThreshold : candidate;
+    const threshold = reason ? fallback : candidate;
     out[key] = {
       index: key,
       source: reason ? 'standard' : 'kalibriert',
       reason,
       threshold,
-      strong: Math.round(threshold * (defStrong / defThreshold) * 100) / 100,
+      strong: Math.round(threshold * (startStrong / startThreshold) * 100) / 100,
       candidate,
       positives,
       negatives,
       spots,
+      // What `standard` is: the starting value, or the threshold of all spots.
+      baseline: opts.fallback?.[key] === undefined ? 'anfangswert' : 'alle-spots',
       // On all checks (optimistic for a calibrated threshold), …
       at: rows.find((r) => r.threshold === threshold) || null,
-      // … on held-out spots, and the starting value for comparison.
+      // … on held-out spots, and the fallback for comparison.
       cv,
       standard,
       sweep: rows,
@@ -161,4 +177,39 @@ function calibrate(samplesByIndex, opts = {}) {
   return out;
 }
 
-module.exports = { calibrate, crossValidate, chooseThreshold, sweep, maxDropBetween, GRID, MIN_POSITIVES, MIN_NEGATIVES, MIN_SPOTS };
+/**
+ * Both measures, on all spots and per forest type, from checks
+ * [{ spotId, damage, forestType, warning: { ndvi, ndmi }, photos: { ndvi, ndmi } }]:
+ * { checks, ndvi, ndmi (early warning, all spots), photos: { ndvi, ndmi },
+ *   forestTypes: { laub: { checks, spots, ndvi, ndmi, photos: { ndvi, ndmi } }, nadel: … } }.
+ */
+function calibrateAll(checks, opts = {}) {
+  const samples = (list, measure) => Object.fromEntries(['ndvi', 'ndmi'].map((key) => [
+    key, list.map((c) => ({ drop: c[measure]?.[key] ?? null, damage: c.damage, group: c.spotId })),
+  ]));
+  const all = Object.fromEntries(MEASURES.map((m) => [m, calibrate(samples(checks, m), opts)]));
+  const forestTypes = {};
+  for (const type of FOREST_TYPES) {
+    const list = checks.filter((c) => c.forestType === type);
+    const per = Object.fromEntries(MEASURES.map((m) => [m, calibrate(samples(list, m), {
+      ...opts, fallback: { ndvi: all[m].ndvi.threshold, ndmi: all[m].ndmi.threshold },
+    })]));
+    forestTypes[type] = { checks: list.length, spots: new Set(list.map((c) => c.spotId)).size, ...per.warning, photos: per.photos };
+  }
+  return { checks: checks.length, ...all.warning, photos: all.photos, forestTypes };
+}
+
+/**
+ * The calibration that applies to an index at a spot of forest type `type`
+ * for `measure` ('warning' or 'photos'): the forest type's own when it was
+ * calibrated, else the one of all spots. { entry, scope: 'waldtyp' | 'alle', typeEntry }.
+ */
+function calibrationFor(cal, { measure = 'warning', type = null, key }) {
+  const pick = (c) => (c ? (measure === 'photos' ? c.photos?.[key] : c[key]) : null);
+  const overall = pick(cal);
+  const typeEntry = type ? pick(cal.forestTypes?.[type]) : null;
+  if (typeEntry?.source === 'kalibriert') return { entry: typeEntry, scope: 'waldtyp', typeEntry };
+  return { entry: overall, scope: 'alle', typeEntry };
+}
+
+module.exports = { calibrate, calibrateAll, calibrationFor, FOREST_TYPES, crossValidate, chooseThreshold, sweep, maxDropBetween, GRID, MIN_POSITIVES, MIN_NEGATIVES, MIN_SPOTS };
