@@ -26,6 +26,7 @@ configMapGenerator:
   - name: myforrest-env
     literals:
       - PUBLIC_URL=http://localhost:8080
+      - METADATA_OWS_URL=http://localhost:8080/ows/
 images:
   # Built locally with podman and loaded into the cluster (start.sh); never pulled.
   - name: myforrest

@@ -38,7 +38,6 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 - **Arten und Neophyten**: direkter Upload über die APIs (OAuth-Konto bei iNaturalist bzw. Info Flora),
   Bestätigung der automatischen Bestimmungen durch Menschen vor dem Export und eine Korrektur für
   ungleich verteilten Suchaufwand.
-- **Geodienste**: Metadaten nach geocat.ch/ISO 19139 für einen Eintrag auf opendata.swiss.
 - **Satellitenkontext ausbauen**: NDVI-Rückgänge auch ohne Fotos melden (Frühwarnung für Spots), weitere
   Indizes (z. B. NDMI für Trockenstress, Sentinel-2 B11), Landsat für die Zeit vor 2017; Sturmereignisse
   (z. B. MeteoSchweiz/DWD) als Kontext.
@@ -52,3 +51,4 @@ Aus früheren Versionen dieser Roadmap:
 - DWD-Phänologie als Referenz für den Beginn der Herbstfärbung
 - Nächtliche Abkühlung in Senken aus Wind und Bewölkung
 - Hotspot-Karten, Ausbreitungsfronten und Datei-Export zu Info Flora / iNaturalist
+- Geodienste: OGC API – Features und Tiles (auch im LV95-Kachelgitter, vorberechnet, PMTiles/MBTiles), QGIS Server, Metadaten für geocat.ch (GM03)
