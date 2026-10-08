@@ -21,7 +21,8 @@
 - Ausgeblendete Fotos werden nicht mehr ausgeliefert, können aber noch bis zu 7 Tage im Browser-Cache von
   Personen liegen, die sie vorher gesehen haben.
 - Kartendaten © OpenStreetMap-Mitwirkende. Bei stärkerer Nutzung braucht es einen eigenen
-  Tile-Anbieter (siehe Tile Usage Policy).
+  Tile-Anbieter (siehe Tile Usage Policy). Das Offline-Speichern einer Route lädt höchstens 1500 Kacheln
+  bis Zoom 16 und nie Zoom 17 und mehr; bei vielen Nutzenden ist auch dafür ein eigener Anbieter angezeigt.
 
 ## Vorberechnete Vektorkacheln
 
@@ -39,7 +40,7 @@ Mit `TILES_PRECOMPUTE=0` schneidet der Server jede Kachel bei der Anfrage, wie v
 ## Service Worker
 
 Der Service Worker braucht HTTPS (oder `localhost`). Nach Änderungen an der Liste vorgehaltener Dateien
-in `public/sw.js` `SHELL_VERSION` erhöhen; alte Caches werden beim Aktivieren gelöscht. App-Code
+in `public/sw.js` `SHELL_VERSION` erhöhen; alte Caches werden beim Aktivieren gelöscht, offline gespeicherte Routen (`myforrest-offline-*`) nicht. App-Code
 (HTML, JS, CSS) wird immer zuerst aus dem Netz geladen, ein Deployment ist also sofort sichtbar.
 
 ## Push-Nachrichten

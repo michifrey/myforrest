@@ -126,7 +126,14 @@ oder 360°-Kameras, aus denen entlang der Route Einzelbilder werden. Ort und Zei
 Telemetriedaten. Fotos ohne GPS lassen sich über einen GPX-Track verorten (dafür gibt es unter
 *Zeitabgleich für GPX* Zeitzone und Korrektur für die Kamera-Uhr) oder von Hand auf der Karte bzw. über
 den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen, eine Notiz und die Lizenz (Standard
-CC BY-SA 4.0). Als installierte App landen Uploads ohne Empfang in einer Warteschlange und gehen später raus.
+CC BY-SA 4.0). Als installierte App landen Uploads ohne Empfang in einer Warteschlange und gehen später raus;
+lehnt der Server einen davon ab, während die App zu ist, meldet das eine Benachrichtigung.
+
+<p align="center"><img src="docs/screenshots/offline-route.jpg" width="400" alt="Karte entlang einer Route offline gespeichert"></p>
+
+Vor einer Tour ohne Empfang speichert *Touren & Aufträge → Karte entlang der Route offline speichern* die
+Kartenkacheln eines Korridors um die Route und die Spots daran (mit Vorschaubildern und den Referenzfotos
+für das Kamera-Overlay) auf dem Gerät. Unterwegs zeigt die App Karte und Spots dann auch ohne Netz.
 
 ### 6. Wetter, Stürme und Satellit
 

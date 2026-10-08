@@ -49,9 +49,10 @@
   document.body.append(toast);
   let toastTimer = null;
   window.pwaNotify = notify; // also used by account.js
-  function notify(message, { sticky = false } = {}) {
+  function notify(message, { sticky = false, action = null } = {}) {
     toast.replaceChildren(
       h('span', { text: message }),
+      ...(action ? [h('button', { type: 'button', class: 'link small', text: action.label, onclick: () => { toast.hidden = true; action.onclick(); } })] : []),
       h('button', { type: 'button', class: 'icon', 'aria-label': 'Hinweis schliessen', text: '×', onclick: () => { toast.hidden = true; } }),
     );
     toast.hidden = false;
@@ -175,6 +176,10 @@
           : 'Gespeicherte Uploads werden automatisch gesendet, sobald Verbindung besteht.',
       }),
       rows.length ? h('ul', { class: 'queue-list' }, rows) : h('p', { class: 'queue-empty', text: 'Keine wartenden Uploads.' }),
+      ...(canAskNotify() ? [h('p', { class: 'muted small' }, [
+        'Gesendet wird auch bei geschlossener App. ',
+        h('button', { type: 'button', class: 'link small', text: 'Benachrichtigen, wenn ein Upload abgelehnt wird', onclick: async () => { await askNotify(); renderDialog(); } }),
+      ])] : []),
       h('div', { class: 'row end' }, [
         rows.length ? h('button', {
           type: 'button', class: 'link danger', text: 'Alle verwerfen',
@@ -240,7 +245,10 @@
     const originalPost = q.post;
     q.post = async (fd, send) => {
       const res = await originalPost(fd, send);
-      if (res.queued) notify(`Keine Verbindung: ${plural(res.queued, 'Foto wird', 'Fotos werden')} gespeichert und später gesendet.`);
+      if (res.queued) {
+        notify(`Keine Verbindung: ${plural(res.queued, 'Foto wird', 'Fotos werden')} gespeichert und später gesendet.`,
+          canAskNotify() ? { sticky: true, action: { label: 'Bei Problemen benachrichtigen', onclick: askNotify } } : {});
+      }
       return res;
     };
   }
@@ -325,7 +333,29 @@
     dropzone?.after(camBtn, camInput);
   }
 
+  /* ---------- Notifications about background uploads (sw.js) ---------- */
+
+  // Only where the service worker sends in the background (Background Sync) and nobody was asked yet.
+  function canAskNotify() {
+    return 'Notification' in window && Notification.permission === 'default' && 'serviceWorker' in navigator && 'SyncManager' in window;
+  }
+  async function askNotify() {
+    const p = await Notification.requestPermission().catch(() => 'denied');
+    notify(p === 'granted'
+      ? 'Du wirst benachrichtigt, wenn ein Upload im Hintergrund abgelehnt wird.'
+      : 'Keine Benachrichtigungen: Abgelehnte Uploads stehen beim nächsten Öffnen in der Warteschlange.');
+  }
+
   /* ---------- Start ---------- */
+
+  // From a notification about the queue (sw.js): open the queue.
+  const openQueue = () => renderDialog().then(() => { if (!dialog.open) dialog.showModal(); });
+  if (new URLSearchParams(location.search).get('queue') === '1') {
+    window.addEventListener('load', () => { openQueue(); history.replaceState(null, '', location.pathname); });
+  }
+  navigator.serviceWorker?.addEventListener('message', (e) => {
+    if (e.data?.type === 'myforrest-open' && new URL(e.data.url).searchParams.get('queue') === '1') openQueue();
+  });
 
   // Manifest shortcut "Foto beitragen".
   if (new URLSearchParams(location.search).get('action') === 'upload') {

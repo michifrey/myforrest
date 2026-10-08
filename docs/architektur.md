@@ -91,7 +91,8 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
                      vektorkarte-lv95.html im LV95-Gitter mit OpenLayers auf der Landeskarte)
 public/sw.js         Service Worker: App-Shell vorhalten, Laufzeit-Caches, Background Sync
 public/offline-queue.js  Warteschlange für Uploads ohne Verbindung (IndexedDB, von Seite und Service Worker genutzt)
-public/pwa.js        Registrierung, Warteschlangen-Anzeige, Installieren-Knopf, Kamera-Aufnahme im Upload
+public/pwa.js        Registrierung, Warteschlangen-Anzeige, Installieren-Knopf, Kamera-Aufnahme im Upload, Erlaubnis für Benachrichtigungen
+public/offline-map.js  Karte und Spots entlang einer Route offline speichern (eigener Cache pro Route)
 public/manifest.webmanifest, public/icons/  Web-App-Manifest und App-Icons
 test/                Tests (`npm test`, Node-Testrunner)
 scripts/generate-icons.js  Erzeugt die App-Icons aus dem Logo (`node scripts/generate-icons.js`)
