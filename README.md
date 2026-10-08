@@ -25,12 +25,14 @@ Der Ablauf hat drei Schritte:
 3. **Veränderung sichtbar machen**: Die Fotos werden automatisch ausgerichtet. Zeitraffer,
    Vorher/Nachher-Regler und Heatmap zeigen, was passiert ist.
 
-> Die Screenshots zeigen generierte Demo-Bilder eines fiktiven Waldstücks und eine vereinfachte
-> Platzhalter-Karte. Im Betrieb zeigt die App echte Fotos und OpenStreetMap-Kacheln.
+> Die Screenshots zeigen generierte Demo-Bilder eines fiktiven Waldstücks bei Zürich, eine vereinfachte
+> Platzhalter-Karte und synthetische Wetter- und Satellitendaten. Im Betrieb zeigt die App echte Fotos,
+> OpenStreetMap- bzw. swisstopo-Kacheln und Daten von Open-Meteo, Sentinel-2 und Landsat. Wie die Bilder
+> entstehen, steht unter [`scripts/screenshots`](scripts/screenshots/README.md).
 
 ### 1. Karte mit Spots
 
-![Karte mit Spots und Übersicht](docs/screenshots/map.jpg)
+![Karte mit Spots, Sichtkegeln und Meldungen](docs/screenshots/map.jpg)
 
 Jeder Marker ist ein **Spot**, also ein Ort, an dem über die Zeit Fotos entstanden sind. Fotos, die
 weniger als 25 m auseinander liegen und in dieselbe Richtung blicken (±45°), landen automatisch im
@@ -38,30 +40,34 @@ selben Spot. Ein goldener Sichtkegel am Marker zeigt die Blickrichtung. Die Zahl
 Anzahl Fotos, die Farbe den Befund: grün für unauffällig, orange für Schäden (Sturm, Borkenkäfer,
 Trockenschaden, Holzschlag, frühe Laubverfärbung, Frost) und violett für Neophyten. Kleine Zeichen am
 Marker melden:
-- **Rotes Ausrufezeichen:** Auffälligkeiten im Wetter.
+- **Rotes Ausrufezeichen:** Auffälligkeiten im Wetter, etwa Trockenheit oder Hitze vor der Aufnahme.
 - **Blaues Windsymbol:** Einen Sturm seit dem letzten Besuch.
 - **Violetter Satellit:** Einen Rückgang im Satellitenbild, auch ohne neues Foto.
 
-Oben links lässt sich die Karte nach Beobachtungen und nach diesen Meldungen filtern. Rechts stehen
-Kennzahlen und die zuletzt fotografierten Spots.
+Beim Überfahren eines Markers fasst ein Tooltip alles zusammen: Veränderung, Wetter, Sturm, Satellit,
+Baumarten und Blickrichtung. Oben links lässt sich die Karte nach Beobachtungen und Meldungen filtern,
+daneben schalten *Sonne & Wetter* und *Arten & Neophyten* die beiden Kartenmodi ein (Abschnitte 7 und 8).
+Rechts stehen Kennzahlen und die zuletzt fotografierten Spots.
 
 ### 2. Zeitreise an einem Spot
 
-![Spot mit Zeitleiste](docs/screenshots/spot.jpg)
+![Spot mit Gelände, Baumarten und Zeitleiste](docs/screenshots/spot.jpg)
 
-Ein Klick auf einen Spot öffnet seine Geschichte: Koordinaten, Zeitraum, alle Beobachtungen und ein
-Hinweis, wie viel sich seit dem ersten Foto verändert hat. Mit dem Zeitregler oder den Vorschaubildern
-blättert man durch die Aufnahmen. Ist *Stabilisiert* aktiv, liegen alle Fotos deckungsgleich
-übereinander, auch wenn sie bei jedem Besuch etwas anders aufgenommen wurden. Das Ergebnis wirkt wie
-ein Zeitraffer:
+Ein Klick auf einen Spot öffnet seine Geschichte: Koordinaten, Zeitraum und Blickrichtung, dazu Höhe,
+Hangneigung, Exposition und Geländeform aus dem Höhenmodell und die erwartete Herbstfärbung an diesem Ort.
+Darunter folgen der Anteil der Ansicht, der sich seit dem ersten Foto verändert hat, alle Beobachtungen
+und die Baumarten am Spot. Mit dem Zeitregler oder den Vorschaubildern blättert man durch die Aufnahmen.
+Ist *Stabilisiert* aktiv, liegen alle Fotos deckungsgleich übereinander, auch wenn sie bei jedem Besuch
+etwas anders aufgenommen wurden. Das Ergebnis wirkt wie ein Zeitraffer:
 
 <p align="center"><img src="docs/screenshots/timelapse.gif" width="480" alt="Zeitraffer eines Spots: Windwurf 2022, danach Totholz und Verjüngung"></p>
 
-Im Beispiel: Sommer 2021 noch intakt, im Februar 2022 wirft ein Sturm zwei Buchen um, ab 2023 wachsen
-in der Lücke junge Bäume nach.
+Im Beispiel: Sommer 2021 noch intakt, im Februar 2022 wirft ein Sturm drei Buchen um, ab 2023 wachsen
+in der Lücke junge Bäume nach, und im Frühling 2026 schliesst der Jungwuchs die Lücke.
 
-Unter dem Bild lassen sich pro Foto Beobachtungen taggen und eine Notiz erfassen. Mit einem
-Pl@ntNet-Key bestimmt *Pflanze bestimmen* die Arten auf dem Foto und erkennt invasive Neophyten.
+Unter dem Bild lassen sich pro Foto Beobachtungen taggen und eine Notiz erfassen. Jedes Foto nennt
+Urheber und Lizenz und lässt sich melden. Mit einem Pl@ntNet-Key bestimmt *Art bestimmen* die Pflanzen
+auf dem Foto und erkennt invasive Neophyten.
 
 ### 3. Vorher / Nachher mit Veränderungs-Heatmap
 
@@ -73,9 +79,10 @@ Pl@ntNet-Key bestimmt *Pflanze bestimmen* die Arten auf dem Foto und erkennt inv
 *Vorher / Nachher vergleichen* legt zwei beliebige Aufnahmen übereinander. Mit dem Wischregler
 schiebt man die Grenze zwischen den beiden Bildern hin und her. *Automatisch ausrichten* korrigiert
 Unterschiede in Standort, Zoom und Neigung. *Veränderungen hervorheben* blendet eine Heatmap ein
-(gelb = wenig, rot = stark) und nennt den Anteil der veränderten Bildfläche. Hier sind die
-umgestürzten Bäume, die Lücke im Kronendach und der neue Jungwuchs gut zu erkennen. Unterschiede im
-Licht werden dabei ausgeglichen.
+(gelb = wenig, rot = stark) und nennt den Anteil der veränderten Bildfläche. Unterschiede im Licht werden
+dabei ausgeglichen, hier etwa das Abendlicht im Juni 2024 gegenüber dem Vormittag 2021. Die veränderten
+Regionen werden eingeordnet (Windwurf, Auflichtung, Verfärbung, neuer Bewuchs); bestätigt oder korrigiert
+man die Einordnung, lernt die App daraus.
 
 ### 4. Wiederholungsfoto mit Overlay
 
@@ -88,17 +95,73 @@ Licht werden dabei ausgeglichen.
 Auf dem Handy öffnet *Wiederholungsfoto aufnehmen* die Kamera. Das aktuell gewählte Foto dient als
 Referenz und liegt entweder halbtransparent (*Überblenden*) oder als gelbe Linien (*Konturen*) über dem
 Livebild. Man bewegt sich, bis Bild und Overlay übereinstimmen, und löst aus. Oben stehen die Entfernung
-zum Spot und, falls nötig, der Hinweis, das Handy wie beim Referenzfoto zu drehen. Das neue Foto gehört
-automatisch zu diesem Spot und öffnet sich gleich im Vorher/Nachher-Vergleich.
+zum Spot samt GPS-Genauigkeit und, falls nötig, der Hinweis, das Handy wie beim Referenzfoto zu drehen. Das
+neue Foto gehört automatisch zu diesem Spot und öffnet sich gleich im Vorher/Nachher-Vergleich.
 
-### 5. Fotos hochladen
+### 5. Fotos und Videos hochladen
 
-<p align="center"><img src="docs/screenshots/upload.png" width="480" alt="Upload-Dialog"></p>
+<p align="center"><img src="docs/screenshots/upload.png" width="420" alt="Upload-Dialog"></p>
 
-*Foto beitragen* nimmt beliebig viele Fotos auf einmal entgegen. Ort und Zeit kommen aus den
-EXIF-Daten. Fotos ohne GPS lassen sich über einen GPX-Track verorten (dafür gibt es unter
+*Foto beitragen* nimmt beliebig viele Fotos auf einmal entgegen, auch HEIC vom iPhone und Videos von GoPro
+oder 360°-Kameras, aus denen entlang der Route Einzelbilder werden. Ort und Zeit kommen aus den EXIF- bzw.
+Telemetriedaten. Fotos ohne GPS lassen sich über einen GPX-Track verorten (dafür gibt es unter
 *Zeitabgleich für GPX* Zeitzone und Korrektur für die Kamera-Uhr) oder von Hand auf der Karte bzw. über
-den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen und eine Notiz.
+den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen, eine Notiz und die Lizenz (Standard
+CC BY-SA 4.0). Als installierte App landen Uploads ohne Empfang in einer Warteschlange und gehen später raus.
+
+### 6. Wetter, Stürme und Satellit
+
+<p>
+  <img src="docs/screenshots/wetter-kontext.jpg" width="49%" alt="Wetter-Kontext einer Aufnahme mit Trockenheit und Hitze">
+  <img src="docs/screenshots/satellite.jpg" width="49%" alt="Vegetation im Zeitverlauf und Satelliten-Frühwarnung">
+</p>
+
+*Kontext zur Aufnahme* vergleicht die 90 Tage vor jedem Foto mit dem Mittel 1991–2020: Niederschlag,
+Temperatur, Hitzetage, längste Trockenphase und die Niederschläge der letzten zwölf Monate. Daraus
+entstehen Hinweise wie *Ausgeprägte Trockenheit*, *Frühe Laubverfärbung*, *Erhöhtes Borkenkäfer-Risiko*
+oder *Windwurf nach Sturm*, abgestimmt auf die Baumarten am Spot. Im Beispiel links färben die Buchen
+schon Ende August, nach einem Sommer mit 29 % des üblichen Regens.
+
+*Vegetation im Zeitverlauf* (rechts) zeigt den Grünanteil aus den Fotos und den NDVI und Feuchteindex
+NDMI aus Sentinel-2, vor 2017 aus Landsat. Fällt ein Index an einem Spot ohne neues Foto deutlich unter
+die Werte derselben Jahreszeit in den Vorjahren, meldet die **Frühwarnung**, dass sich ein Besuch lohnt.
+Hier: ein Fichtenbestand mit Borkenkäfer, dessen letztes Foto vom Juli 2025 stammt. Die Schwellen der
+Frühwarnung eichen sich an bestätigten Schäden.
+
+### 7. Sonne & Wetter auf der Karte
+
+![Kartenmodus Sonne & Wetter](docs/screenshots/sun.jpg)
+
+Der Kartenmodus *Sonne & Wetter* zeigt für ein beliebiges Datum und eine Uhrzeit die Sonnenbahn, den
+Sonnenstand, den Schatten eines 25-m-Baums und die Richtung von Auf- und Untergang. Der Geländehorizont aus
+dem Höhenmodell blockiert die Sonne hinter Hügeln (*Sonne ab 05:29*, *Sonne bis 20:36*). Das Panel nennt
+Sonnenhöhe, Einstrahlung bei klarem Himmel und gemessen, Himmelssicht, Sonnenstunden und Regen. An jedem
+Spot steht die Regenmenge des Tages.
+
+### 8. Arten & Neophyten
+
+<p>
+  <img src="docs/screenshots/neophyten-hotspots.jpg" width="49%" alt="Hotspots von Neophyten als Kerndichte-Karte">
+  <img src="docs/screenshots/neophyten-ausbreitung.jpg" width="49%" alt="Ausbreitungsfronten des Drüsigen Springkrauts">
+</p>
+
+*Arten & Neophyten* wertet die Pflanzenbestimmungen als Funde aus. **Hotspots** (links) zeigen als
+Kerndichte-Karte, wo sich Funde aller Neophyten, aller Arten oder einer Art häufen. **Ausbreitung** (rechts)
+zeichnet pro Art die besiedelte Fläche Jahr für Jahr, verfolgt einzelne Teilbestände und schätzt Tempo und
+Richtung, im Beispiel das Drüsige Springkraut entlang eines Bachs mit ~180 m pro Jahr. Unter *Export*
+gehen die Funde als Darwin-Core-CSV an Info Flora und GBIF oder als CSV an iNaturalist.
+
+### 9. Vektorkarten für GIS und Geoportale
+
+<p>
+  <img src="docs/screenshots/vektorkarte.jpg" width="49%" alt="Vektorkarte mit MapLibre in Web Mercator">
+  <img src="docs/screenshots/vektorkarte-lv95.jpg" width="49%" alt="Vektorkarte mit OpenLayers im Schweizer Kachelgitter LV95">
+</p>
+
+Alle Daten stehen auch als offene Geodienste bereit. `/vektorkarte.html` (links) zeigt Spots, Funde und
+Ausbreitungsfronten als Vektorkacheln mit MapLibre in Web Mercator, `/vektorkarte-lv95.html` (rechts) mit
+OpenLayers im Schweizer Kachelgitter LV95 auf der Landeskarte von swisstopo, deckungsgleich mit
+map.geo.admin.ch. Ein Klick auf ein Objekt zeigt seine Angaben.
 
 ## Was MyForrest kann
 
