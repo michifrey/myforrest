@@ -1285,7 +1285,7 @@ summary { cursor: pointer; color: var(--muted); font-weight: 600; font-size: 0.9
 }
 .pin .lock-flag svg { width: 10px; height: 10px; }
 .protected-cell { stroke: var(--protect); fill: var(--protect); fill-opacity: 0.12; stroke-dasharray: 6 4; }
-.protected-tip { max-width: 280px; white-space: normal; }
+.protected-tip { width: 280px; white-space: normal; }
 .protected-badge {
   display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600;
   color: var(--protect); background: color-mix(in srgb, var(--protect) 14%, var(--surface));

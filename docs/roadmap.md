@@ -12,6 +12,9 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
   werden bereits nach Richtung getrennt).
 - **PWA**: Kartenausschnitt einer geplanten Route gezielt für offline vorladen; Push-Benachrichtigung,
   wenn ein Upload aus der Warteschlange abgelehnt wurde.
+- **Geschützte Funde**: Schutzliste je Kanton (Rote Liste, kantonale Schutzverordnungen) laden, Pilze per
+  Bild erkennen, Gültigkeit der PRO-Verifizierung befristen und jährlich bestätigen lassen, Organisationen
+  mit mehreren Mitgliedern verwalten.
 - **Touren**: FIT-Dateien direkt lesen, Höhenprofil der Route, Abgleich mit Strava/Komoot per OAuth,
   Aufzeichnung im Hintergrund (braucht eine native Hülle, Browser stoppen GPS im Hintergrund),
   Benachrichtigung, wenn ein eigener Fotoauftrag erledigt wurde, Ablaufdatum für Aufträge.

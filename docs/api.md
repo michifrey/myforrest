@@ -9,7 +9,7 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/spots?tag=…`           | Alle Spots mit Anzahl Fotos, Zeitraum, Tags, Blickrichtung (`heading`) und Vorschaubild (`latestThumbUrl`) |
 | `GET`    | `/api/spots/:id`             | Ein Spot mit Blickrichtung und allen Fotos chronologisch (jedes Foto mit `url`, `thumbUrl` und `largeUrl`) |
 | `GET`    | `/thumbs/:datei`             | Vorschaubilder (WebP)                                    |
-| `POST`   | `/api/photos`                | Upload (multipart: `photos[]` als JPEG, PNG, WebP oder HEIC, optional `spotId` und `refPhotoId` für Wiederholungsfotos, `requestId` für einen Fotoauftrag, `license`, `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `utcOffsetMinutes`, `clockShiftSeconds`) |
+| `POST`   | `/api/photos`                | Upload (multipart: `photos[]` als JPEG, PNG, WebP oder HEIC, optional `spotId` und `refPhotoId` für Wiederholungsfotos, `requestId` für einen Fotoauftrag, `protected=1` für einen geschützten Fund, `license`, `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `utcOffsetMinutes`, `clockShiftSeconds`) |
 | `POST`   | `/api/videos`                | Video-Upload (multipart: `video`, optional `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `clockShiftSeconds`, `frameDistanceM`, `frameIntervalS`, `panorama` = `auto`/`1`/`0`, `async=1` für Hintergrundverarbeitung) |
 | `GET`    | `/api/videos/jobs/:id`       | Fortschritt und Ergebnis eines Video-Uploads mit `async=1` |
 | `GET`    | `/api/videos/config`         | ffmpeg verfügbar? Standardabstand und -intervall         |
@@ -45,7 +45,7 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `DELETE` | `/api/spots/:id/species?name=` | Baumart vom Spot entfernen                             |
 | `GET`    | `/api/photos/:id/context`    | Wetter-Kontext und Auffälligkeiten (wird beim ersten Abruf berechnet und gespeichert) |
 | `POST`   | `/api/photos/:id/context`    | Wetter-Kontext neu laden                                 |
-| `PATCH`  | `/api/photos/:id`            | Tags und Notiz ändern; `license` nur durch den Urheber   |
+| `PATCH`  | `/api/photos/:id`            | Tags und Notiz ändern; `license` nur durch den Urheber; `protected` (true/false) durch den Urheber, PRO-Mitglieder oder Moderation |
 | `DELETE` | `/api/photos/:id`            | Foto löschen (Urheber oder Moderation; anonyme Fotos ohne `REQUIRE_LOGIN` frei) |
 | `GET`    | `/api/auth/me`               | Angemeldetes Konto, CSRF-Token, Lizenzen, Meldegründe, `requireLogin` |
 | `POST`   | `/api/auth/register`         | Konto anlegen (JSON: `email`, `name`, `password`) und anmelden |
@@ -69,7 +69,10 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `POST`   | `/api/moderation/photos/:id/unhide` | Foto wieder einblenden                           |
 | `POST`   | `/api/moderation/photos/:id/dismiss` | Meldungen zu einem Foto verwerfen               |
 | `GET`    | `/api/moderation/log`        | Protokoll der Moderation                                 |
-| `GET`    | `/api/users`                 | Admin: Konten mit Rolle und Anzahl Fotos                 |
+| `GET`    | `/api/users`                 | Admin: Konten mit Rolle, Anzahl Fotos und PRO-Status (`proStatus`, `organization`, `proNote`) |
+| `POST`   | `/api/auth/pro`              | PRO-Mitgliedschaft beantragen (`{ organization, note }`) |
+| `POST`   | `/api/users/:id/pro`         | Admin: PRO-Antrag entscheiden (`{ decision: 'verifiziert' \| 'abgelehnt' \| 'entzogen', organization? }`) |
+| `GET`    | `/api/protected/cells`       | Geschützte Funde, die man nicht sehen darf, als 5-km-Quadrate (`bbox`, `spots`); leer für PRO-Mitglieder |
 | `PATCH`  | `/api/users/:id`             | Admin: Rolle setzen (`{ role: 'user' \| 'moderator' \| 'admin' }`) |
 
 | `POST`   | `/api/photos/:id/identify`   | Pflanzen bestimmen (Pl@ntNet)                            |

@@ -113,7 +113,7 @@ async function session(login, name) {
     return res;
   };
   let res = await call('POST', '/api/auth/register', { email: `${login}@example.org`, name, password: 'demo-passwort' });
-  if (res.status === 409) res = await call('POST', '/api/auth/login', { login, password: 'demo-passwort' });
+  if (res.status === 409) res = await call('POST', '/api/auth/login', { login: `${login}@example.org`, password: 'demo-passwort' });
   csrf = (await res.json()).csrfToken;
   return { get: (url) => call('GET', url), post: (url, body) => call('POST', url, body) };
 }

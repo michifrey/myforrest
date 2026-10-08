@@ -1,6 +1,6 @@
 'use strict';
 // Takes the README screenshots from the demo server (see README.md here).
-// Usage: node shoot.js [hero map spot satellite sun species vektor touren timelapse compare upload mobile]
+// Usage: node shoot.js [hero map spot satellite sun species vektor touren schutz timelapse compare upload mobile]
 const path = require('path');
 const fs = require('fs');
 const { execFileSync } = require('child_process');
@@ -178,6 +178,37 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await settle(page, 1200);
     await page.screenshot({ path: out('fotoauftraege.jpg'), ...jpg });
     await tctx.close();
+  }
+
+  if (want('schutz')) {
+    // Public: the protected orchid find only as a 5-km square.
+    let page = await explore(ctx);
+    await page.evaluate(() => map.setView([47.366, 8.628], 13));
+    await settle(page, 2500);
+    const cell = page.locator('path.protected-cell').first();
+    const box = await cell.boundingBox();
+    await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.45);
+    await settle(page, 1000);
+    await page.screenshot({ path: out('schutz-raster.jpg'), ...jpg });
+    await page.close();
+    // A verified PRO member (forest ranger) sees the find with its exact place.
+    const pctx = await desktop(browser);
+    page = await pctx.newPage();
+    await page.goto(`${BASE}/`);
+    await page.evaluate(() => fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: 'revier@example.org', password: 'demo-passwort' }) }));
+    await page.reload();
+    await settle(page, 2500);
+    await page.evaluate(() => document.querySelector('#explore').scrollIntoView());
+    await settle(page, 1500);
+    const orchid = await page.evaluate(() => state.spots.find((s) => s.protectedPhotos)?.id);
+    await page.evaluate((id) => openSpot(id), orchid);
+    await settle(page, 2500);
+    await page.evaluate(() => { map.setView([47.3796, 8.5852], 17, { animate: false }); map.panBy([230, 40], { animate: false }); });
+    await settle(page, 2000);
+    await page.evaluate(() => document.querySelector('#photo-credit')?.scrollIntoView({ block: 'center' }));
+    await settle(page, 1200);
+    await page.screenshot({ path: out('schutz-pro.jpg'), ...jpg });
+    await pctx.close();
   }
 
   await browser.close();

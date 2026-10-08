@@ -70,6 +70,8 @@ src/moderation.js    Lizenzen, Meldungen, Ausblenden und Protokoll
 src/routes/accounts.js  Routen für Konten und Moderation, CSRF-Schutz, Rechte auf Fotos
 src/trackfile.js     Touren lesen (GPX, TCX, KML, GeoJSON) und als GPX schreiben
 src/routegeo.js      Länge, Abstand zur Route und Position entlang der Route, Privatzone an den Enden
+src/sensitive.js     Sensible Arten (Orchideen, geschützte Pflanzen), deren Funde automatisch geschützt werden
+src/routes/protection.js  Geschützte Funde als 5-km-Raster für alle ohne PRO-Status
 src/routes/tracks.js Touren, Routing-Proxy, Fotoaufträge (Erfüllung beim Upload) und Vorschläge entlang der Route
 deploy/qgis-server/  Vorlage: MyForrest + QGIS Server (WMS/WMTS/WFS) + nginx per Docker Compose
 Dockerfile           Container für MyForrest (mit ffmpeg)

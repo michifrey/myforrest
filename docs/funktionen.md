@@ -12,6 +12,7 @@ Einen kürzeren Überblick mit Screenshots gibt das [README](../README.md).
 - [Kartenmodi](#kartenmodi)
 - [Touren und Fotoaufträge](#touren-und-fotoaufträge)
 - [Pflanzen und Baumarten](#pflanzen-und-baumarten)
+- [Geschützte Funde und PRO-Mitglieder](#geschützte-funde-und-pro-mitglieder)
 - [Konten, Moderation und Lizenzen](#konten-moderation-und-lizenzen)
 
 ## Fotos erfassen und verorten
@@ -603,9 +604,11 @@ wird.
 
 - **Zeichnen**: Jeder Klick auf die Karte setzt einen Wegpunkt; Wegpunkte lassen sich verschieben.
   *Rückgängig* nimmt den letzten zurück, *Zurück zum Start* schliesst die Runde. Die Länge steht gross im
-  Panel, gelbe Kilometer-Marken zeigen den Verlauf (je nach Zoom alle 1, 2, 5 oder 10 km). Mit einem
-  Routing-Dienst (`ROUTER_URL`, siehe [Installation](installation.md#umgebungsvariablen)) folgt die Linie auf
-  Wunsch den Wegen (*Magnet: Wegen folgen*); der Server fragt den Dienst an, der Browser spricht ihn nie direkt an.
+  Panel, gelbe Kilometer-Marken zeigen den Verlauf (je nach Zoom alle 1, 2, 5 oder 10 km). Der **Wege-Magnet**
+  (*Magnet: Wegen folgen*, standardmässig an) zieht die Linie zwischen zwei Klicks auf Wege und Pfade, wie bei
+  RunnerMaps. Dafür fragt der Server einen BRouter-Dienst an (Standard `brouter.de`, Profil `hiking-mountain`,
+  anpassbar mit `ROUTER_URL` und `ROUTER_PROFILE`, siehe [Installation](installation.md#umgebungsvariablen));
+  der Browser spricht ihn nie direkt an. Ohne Magnet oder ohne Dienst entstehen gerade Linien.
 - **Aufzeichnen**: Das Handy zeichnet die Strecke per GPS auf (Punkte ab ±40 m Genauigkeit, mindestens 4 m
   auseinander, mit Zeit und Höhe). Der Bildschirm bleibt dabei an (Wake Lock), denn Browser stoppen GPS
   für Seiten im Hintergrund. Die Punkte liegen laufend im Browser; nach einem Neuladen lässt sich die
@@ -680,6 +683,48 @@ Auffälligkeiten genauer:
 - Verfärbte immergrüne Nadelbäume gelten immer als Warnsignal.
 - Fichte bei Trockenheit oder Hitze löst eine Borkenkäfer-Warnung mit Prüfhinweisen aus.
 - Bei Esche mit Auflichtung oder Verfärbung erscheint ein Hinweis auf das Eschentriebsterben.
+
+## Geschützte Funde und PRO-Mitglieder
+
+Wer eine Orchideenwiese, eine Pilzstelle oder einen Horst veröffentlicht, lockt auch Sammler und
+Neugierige an. Solche **geschützten Funde** sehen deshalb nur **verifizierte PRO-Mitglieder** genau:
+Forstdienste, kantonale Fachstellen, Naturschutzorganisationen und ähnliche.
+
+### Was geschützt ist
+
+Ein Foto wird geschützt,
+- beim Hochladen mit *Geschützter Fund* (Fotos und Videos),
+- automatisch, wenn Pl@ntNet eine sensible Art erkennt (Score ab 0,3): alle einheimischen Orchideen,
+  Enziane, Küchenschellen, Edelweiss, Bärlappe, seltene Farne, Türkenbund und weitere (`src/sensitive.js`,
+  erweiterbar mit `SENSITIVE_SPECIES`). Pilze erkennt Pl@ntNet nicht; Pilzstellen schützt man beim Hochladen,
+- oder nachträglich mit *Schützen* unter dem Foto, durch die Person, die es hochgeladen hat, durch
+  PRO-Mitglieder oder die Moderation. *Schutz aufheben* geht ebenso.
+
+### Wer was sieht
+
+| | Öffentlichkeit | Wer hochgeladen hat | PRO-Mitglieder, Moderation |
+|---|---|---|---|
+| Foto, Spot, genaue Lage | – | ✓ (mit Konto) | ✓ |
+| Karte | schraffiertes 5-km-Quadrat mit Anzahl Funde | Pin mit Schloss | Pin mit Schloss |
+| Arten, Hotspots, Ausbreitung, Export (Darwin Core, iNaturalist) | ohne den Fund | mit | mit |
+| Offene Geodaten (OGC API, Vektorkacheln, GeoPackage, PMTiles) | ohne den Fund | ohne | ohne |
+| Fotoaufträge an geschützten Spots, Vorschläge entlang der Route | – | ✓ | ✓ |
+
+Das Raster ist fest (0,045° × 0,065°, rund 5 × 5 km) und verschiebt sich nicht mit den Daten. Ein Spot
+mit öffentlichen und geschützten Fotos bleibt sichtbar, zeigt öffentlich aber nur die öffentlichen Fotos,
+deren Tags und Veränderungen. Originale und Vorschaubilder geschützter Fotos gehen nur an Berechtigte und
+mit `Cache-Control: private, no-store`, ebenso alle API-Antworten an PRO-Mitglieder; der Service Worker
+speichert solche Antworten nicht auf dem Gerät. Push-Nachrichten der Frühwarnung erreichen nur Konten, die
+den Spot noch sehen dürfen. Ohne Konto hochgeladene geschützte Fotos sieht danach auch die Person nicht
+mehr, die sie hochgeladen hat.
+
+### PRO-Mitglied werden
+
+Im Konto-Menü *PRO-Mitgliedschaft beantragen*: Organisation und Angaben für die Prüfung. Admins sehen offene
+Anträge zuoberst unter *Konten & Rollen* und können sie verifizieren, ablehnen oder PRO später entziehen;
+jede Entscheidung steht im Moderationsprotokoll. PRO ist unabhängig von der Rolle (Mitglied, Moderation,
+Administration). PRO-Mitglieder können Fotoaufträge als *nur für PRO* markieren; Aufträge an geschützten
+Spots sind das automatisch.
 
 ## Konten, Moderation und Lizenzen
 

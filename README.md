@@ -45,7 +45,8 @@ Marker melden:
 - **Violetter Satellit:** Einen Rückgang im Satellitenbild, auch ohne neues Foto.
 
 Beim Überfahren eines Markers fasst ein Tooltip alles zusammen: Veränderung, Wetter, Sturm, Satellit,
-Baumarten und Blickrichtung. Oben links lässt sich die Karte nach Beobachtungen und Meldungen filtern,
+Baumarten und Blickrichtung. Schraffierte Quadrate stehen für geschützte Funde (Abschnitt 11).
+Oben links lässt sich die Karte nach Beobachtungen und Meldungen filtern,
 daneben schalten *Sonne & Wetter*, *Arten & Neophyten* und *Touren & Aufträge* die Kartenmodi ein
 (Abschnitte 7, 8 und 10). Gelbe Kamera-Pins sind Fotoaufträge.
 Rechts stehen Kennzahlen und die zuletzt fotografierten Spots.
@@ -180,7 +181,7 @@ map.geo.admin.ch. Ein Klick auf ein Objekt zeigt seine Angaben.
 </p>
 
 *Touren & Aufträge* hält fest, wo man unterwegs ist. Eine Route lässt sich auf der Karte **zeichnen**
-(Klick für Klick, auf Wunsch entlang der Wege), mit dem Handy per GPS **aufzeichnen** oder als GPX, TCX, KML
+(Klick für Klick; der Wege-Magnet zieht die Linie auf Wege und Pfade), mit dem Handy per GPS **aufzeichnen** oder als GPX, TCX, KML
 oder GeoJSON **importieren**. Gelbe Kilometer-Marken zeigen den Verlauf, jede Route geht auch als GPX
 wieder hinaus. Mit Konto lassen sich Touren speichern und veröffentlichen; andere sehen eine öffentliche
 Tour ohne Zeiten und ohne die ersten und letzten 200 m. Über eine Tour mit Zeitstempeln lassen sich im
@@ -191,6 +192,21 @@ Nordost», oder um ein neues Foto eines Spots. Er nennt keine Zeit und keinen Na
 sieht unter *Unterwegs fotografieren* (links) in der Reihenfolge der Strecke, was nahe am Weg liegt: offene
 Aufträge, Spots mit Satelliten-Frühwarnung und Fotoreihen, die seit über einem Jahr ruhen. Die Route wird
 dafür nicht gespeichert. Ein Foto am richtigen Ort erledigt den Auftrag automatisch.
+
+### 11. Geschützte Funde für PRO-Mitglieder
+
+<p>
+  <img src="docs/screenshots/schutz-raster.jpg" width="49%" alt="Geschützter Fund öffentlich nur als 5-km-Quadrat">
+  <img src="docs/screenshots/schutz-pro.jpg" width="49%" alt="Dieselbe Stelle für ein verifiziertes PRO-Mitglied mit Foto und genauer Lage">
+</p>
+
+Seltene Pflanzen, Pilzstellen oder Horste sollen nicht geplündert oder zertrampelt werden. Ein Foto lässt
+sich deshalb beim Hochladen als **geschützter Fund** markieren. Erkennt Pl@ntNet eine sensible Art, etwa
+eine Orchidee oder einen Enzian, wird es automatisch geschützt. Die Öffentlichkeit sieht davon nur ein
+schraffiertes **5-km-Quadrat** (links). Foto, Spot und genaue Lage sehen nur **verifizierte PRO-Mitglieder**
+wie Forstdienste oder Naturschutzorganisationen (rechts, mit Schloss am Pin). PRO beantragt man im
+Konto-Menü, eine Administratorin oder ein Administrator prüft den Antrag. Geschützte Funde fehlen in allen
+offenen Geodaten, Kacheln und Exporten für die Öffentlichkeit.
 
 ## Was MyForrest kann
 
@@ -226,6 +242,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
 - **[Touren und Fotoaufträge](docs/funktionen.md#touren-und-fotoaufträge)**: Routen zeichnen, per GPS
   aufzeichnen oder importieren (GPX, TCX, KML, GeoJSON), als GPX exportieren und speichern; Fotoaufträge
   ohne Zeit und Namen und Vorschläge entlang der eigenen Route.
+- **[Geschützte Funde](docs/funktionen.md#geschützte-funde-und-pro-mitglieder)**: seltene Arten und Pilzstellen
+  nur für verifizierte PRO-Mitglieder (Forstdienst, Naturschutz), öffentlich nur als 5-km-Raster.
 - **[Konten und Moderation](docs/funktionen.md#konten-moderation-und-lizenzen)**: Konten mit Rollen,
   Lizenz pro Foto, Melden und Moderieren.
 
