@@ -73,6 +73,11 @@ function createApp({
   });
   app.use(express.static(path.join(__dirname, '..', 'public')));
   app.use('/vendor/leaflet', express.static(path.dirname(require.resolve('leaflet/dist/leaflet.js'))));
+  app.use('/vendor/maplibre', express.static(path.dirname(require.resolve('maplibre-gl/dist/maplibre-gl.js')), { maxAge: '30d' }));
+  // OpenLayers for the LV95 map (vektorkarte-lv95.html): the full build plus its stylesheet.
+  const olDir = path.dirname(require.resolve('ol/package.json'));
+  app.get('/vendor/ol/ol.css', (req, res) => res.sendFile(path.join(olDir, 'ol.css'), { maxAge: '30d' }));
+  app.use('/vendor/ol', express.static(path.join(olDir, 'dist'), { maxAge: '30d' }));
   for (const font of ['fraunces', 'manrope']) {
     const dir = path.dirname(require.resolve(`@fontsource-variable/${font}/package.json`));
     app.use(`/vendor/fonts/${font}`, express.static(dir, { maxAge: '30d' }));

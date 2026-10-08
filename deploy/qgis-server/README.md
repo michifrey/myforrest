@@ -21,7 +21,7 @@ MyForrest ──/api/export/myforrest.gpkg──▶ GeoPackage (LV95, alle 15 mi
 | Ebene (WMS-Name) | Darstellung |
 |------------------|-------------|
 | `spread_fronts` – Ausbreitungsfronten | Fläche pro Art und Jahr, violett von hell (früher) bis dunkel (neuer); ältere, kleinere Umrisse liegen oben |
-| `spots` – Spots | Kreis nach Anzahl Fotos, grün *ohne Befund*, orange *mit Schäden* (Sturm, Borkenkäfer, Trockenheit, Holzschlag, Erosion, Frost), goldener Pfeil in Blickrichtung |
+| `spots` – Spots | Kreis nach Anzahl Fotos, grün *ohne Befund*, orange *mit Schäden* (Sturm, Borkenkäfer, Trockenschaden, Holzschlag, frühe Verfärbung, Frost – wie die orangen Marker der App; Attribut `status`), goldener Pfeil in Blickrichtung |
 | `findings` – Pflanzenfunde | Neophyten als violette Rauten, andere Pflanzen als grüne Punkte |
 | `photos` – Fotos | nur über WFS (keine Kartenebene) |
 

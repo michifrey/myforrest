@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vektorkarte LV95 · MyForrest</title>
+  <meta name="description" content="MyForrest als Vektorkacheln im Schweizer Kachelgitter LV95 auf der Landeskarte von swisstopo">
+  <link rel="stylesheet" href="vendor/fonts/fraunces/full.css">
+  <link rel="stylesheet" href="vendor/fonts/manrope/index.css">
+  <link rel="stylesheet" href="vendor/ol/ol.css">
+  <style>
+    :root {
+      --bg: #f4f0e4; --surface: #fbf8f0; --text: #1b2a1f; --muted: #5d6b5f; --border: rgb(27 42 31 / 0.14);
+      --accent: #2f5d34;
+      --font-display: 'Fraunces Variable', Georgia, serif; --font-body: 'Manrope Variable', system-ui, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0e1611; --surface: #152019; --text: #e6eadb; --muted: #a3ae9f; --border: rgb(230 234 219 / 0.16); --accent: #8fbf6a; }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 15px/1.5 var(--font-body); }
+    #map { position: absolute; inset: 0; }
+    .panel {
+      position: absolute; z-index: 2; top: 12px; left: 12px; width: min(340px, calc(100vw - 24px));
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px;
+      box-shadow: 0 10px 30px rgb(0 0 0 / 0.18);
+    }
+    .panel summary { list-style: none; cursor: pointer; }
+    .panel summary::-webkit-details-marker { display: none; }
+    .panel h1 { display: inline; font: 500 1.35rem/1.2 var(--font-display); margin: 0; }
+    .panel summary::after { content: '▾'; float: right; color: var(--muted); }
+    .panel:not([open]) summary::after { content: '▸'; }
+    .panel[open] summary { margin-bottom: 4px; }
+    .panel p { margin: 0 0 10px; color: var(--muted); font-size: 0.85rem; }
+    .panel a { color: var(--accent); }
+    .legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 0.85rem; }
+    .legend li { display: flex; align-items: center; gap: 8px; }
+    .sw { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--border); flex: none; }
+    .ramp { width: 44px; height: 12px; border-radius: 3px; background: linear-gradient(90deg, #c4bfde, #4a1486); flex: none; }
+    .base { display: flex; gap: 6px; margin: 12px 0 0; flex-wrap: wrap; }
+    .base label { font-size: 0.8rem; padding: 3px 10px; border: 1px solid var(--border); border-radius: 999px; cursor: pointer; }
+    .base input { position: absolute; opacity: 0; pointer-events: none; }
+    .base label:has(input:checked) { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+    .base label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .links { margin-top: 10px; font-size: 0.8rem; color: var(--muted); }
+    .coords { position: absolute; z-index: 2; left: 12px; bottom: 12px; font-size: 0.75rem; padding: 2px 8px; border-radius: 6px;
+      background: rgb(255 255 255 / 0.8); color: #1b2a1f; font-variant-numeric: tabular-nums; }
+    .popup { background: #fff; color: #1b2a1f; font-size: 0.85rem; line-height: 1.4; padding: 8px 12px; border-radius: 10px;
+      box-shadow: 0 6px 20px rgb(0 0 0 / 0.25); max-width: 260px; transform: translate(-50%, calc(-100% - 12px)); }
+    .popup b { display: block; font-size: 0.95rem; }
+    .ol-scale-line { right: 8px; left: auto; bottom: 8px; }
+    .ol-zoom { left: auto; right: 8px; top: 8px; }
+    @media (max-width: 600px) { .panel { width: calc(100vw - 70px); } }
+  </style>
+</head>
+<body>
+  <div id="map" role="region" aria-label="Vektorkarte LV95"></div>
+  <details class="panel" id="panel" open>
+    <summary><h1>Vektorkarte LV95</h1></summary>
+    <p>MyForrest im Schweizer Kachelgitter (EPSG:2056) auf den Karten von swisstopo: Kacheln liegen deckungsgleich mit map.geo.admin.ch.
+      <a href="./">Zurück zur App</a></p>
+    <ul class="legend">
+      <li><span class="ramp"></span> Ausbreitungsfronten: hell = früher, dunkel = neuer</li>
+      <li><span class="sw" style="background:#2f5d34"></span> Spot ohne Befund</li>
+      <li><span class="sw" style="background:#c2611d"></span> Spot mit Schäden</li>
+      <li><span class="sw" style="background:#8650c8"></span> Neophyt</li>
+      <li><span class="sw" style="background:#5c8f4a"></span> andere Pflanze</li>
+    </ul>
+    <div class="base" role="radiogroup" aria-label="Hintergrundkarte">
+      <label><input type="radio" name="base" value="ch.swisstopo.pixelkarte-grau" checked> Landeskarte grau</label>
+      <label><input type="radio" name="base" value="ch.swisstopo.pixelkarte-farbe"> farbig</label>
+      <label><input type="radio" name="base" value="ch.swisstopo.swissimage"> Luftbild</label>
+    </div>
+    <div class="links">
+      <a href="ogc/tiles/SwissLV95">Tileset</a> ·
+      <a href="ogc/tileMatrixSets/SwissLV95">Kachelgitter</a> ·
+      <a href="vektorkarte.html">Web-Mercator-Karte</a>
+    </div>
+  </details>
+  <div class="coords" id="coords" aria-live="off"></div>
+  <script src="vendor/ol/ol.js"></script>
+  <script>
+    'use strict';
+    if (window.matchMedia('(max-width: 600px)').matches) document.getElementById('panel').open = false;
+    (async () => {
+      // The grid comes from the server, so this page always matches src/tiles-lv95.js.
+      const [tms, tileset] = await Promise.all(['ogc/tileMatrixSets/SwissLV95', 'ogc/tiles/SwissLV95'].map((u) => fetch(u).then((r) => r.json())));
+      const bb = tms.boundingBox;
+      const extent = [...bb.lowerLeft, ...bb.upperRight];
+      const projection = new ol.proj.Projection({ code: 'EPSG:2056', units: 'm', extent });
+      ol.proj.addProjection(projection);
+      const tileGrid = new ol.tilegrid.TileGrid({
+        origin: tms.tileMatrices[0].pointOfOrigin,
+        resolutions: tms.tileMatrices.map((m) => m.cellSize),
+        tileSize: 256,
+        extent,
+      });
+
+      // swisstopo's WMTS in the same grid; grey map, colour map up to zoom 27, aerial photos up to 28.
+      const basemap = (layer) => new ol.source.XYZ({
+        url: `https://wmts.geo.admin.ch/1.0.0/${layer}/default/current/2056/{z}/{x}/{y}.jpeg`,
+        projection, tileGrid, maxZoom: layer === 'ch.swisstopo.swissimage' ? 28 : 27,
+        attributions: '© <a href="https://www.swisstopo.admin.ch/">swisstopo</a>',
+      });
+      const base = new ol.layer.Tile({ source: basemap('ch.swisstopo.pixelkarte-grau') });
+
+      // Same colours as the MapLibre style (ogc/styles/myforrest).
+      const ramp = ['#c4bfde', '#a39ccb', '#7f6db3', '#62409c', '#4a1486'];
+      const circle = (fill, r) => new ol.style.Style({
+        image: new ol.style.Circle({ radius: r, fill: new ol.style.Fill({ color: fill }), stroke: new ol.style.Stroke({ color: '#fff', width: 1.5 }) }),
+      });
+      const styles = {
+        spotOk: circle('#2f5d34', 5), spotDamage: circle('#c2611d', 6),
+        neophyte: circle('#8650c8', 4.5), plant: circle('#5c8f4a', 3.5),
+        fronts: ramp.map((c) => new ol.style.Style({
+          fill: new ol.style.Fill({ color: `${c}59` }), stroke: new ol.style.Stroke({ color: c, width: 1.5 }),
+        })),
+      };
+      const style = (f) => {
+        const p = f.getProperties();
+        if (p.layer === 'spread_fronts') return styles.fronts[p.recency_class ?? 4];
+        if (p.layer === 'spots') return p.status === 'schaden' ? styles.spotDamage : styles.spotOk;
+        return p.neophyte ? styles.neophyte : styles.plant;
+      };
+      const data = new ol.layer.VectorTile({
+        source: new ol.source.VectorTile({
+          format: new ol.format.MVT({ layerName: 'layer' }),
+          url: 'ogc/tiles/SwissLV95/{z}/{y}/{x}',
+          projection, tileGrid,
+          attributions: '© MyForrest-Mitwirkende',
+        }),
+        style,
+        declutter: false,
+        renderMode: 'hybrid',
+      });
+
+      const b = tileset.boundingBox;
+      const map = new ol.Map({
+        target: 'map',
+        layers: [base, data],
+        // Only the grid's own resolutions, so swisstopo's raster tiles are never scaled.
+        view: new ol.View({ projection, resolutions: tileGrid.getResolutions(), constrainResolution: true, extent, constrainOnlyCenter: true }),
+        controls: ol.control.defaults.defaults({ attributionOptions: { collapsible: true } }).extend([new ol.control.ScaleLine()]),
+      });
+      // Keep the data clear of the open panel on wide screens.
+      const left = window.innerWidth > 700 ? 380 : 40;
+      map.getView().fit([...b.lowerLeft, ...b.upperRight], { padding: [60, 60, 60, left], maxZoom: 24 });
+      window.lv95Map = map;
+
+      document.querySelectorAll('input[name=base]').forEach((input) => input.addEventListener('change', () => {
+        base.setSource(basemap(input.value));
+      }));
+
+      // The layer's own hit detection: in hybrid vector tiles map.getFeaturesAtPixel misses points.
+      const hitsAt = (pixel) => data.getFeatures(pixel);
+
+      const coords = document.getElementById('coords');
+      const fmt = (v) => Math.round(v).toLocaleString('de-CH');
+      map.on('pointermove', (e) => {
+        coords.textContent = `E ${fmt(e.coordinate[0])} · N ${fmt(e.coordinate[1])}`;
+        if (!e.dragging) hitsAt(e.pixel).then((hits) => { map.getTargetElement().style.cursor = hits.length ? 'pointer' : ''; });
+      });
+
+      const fmtDate = (v) => (v ? new Date(v).toLocaleDateString('de-CH') : '');
+      const ha = (m2) => `${(m2 / 10000).toLocaleString('de-CH', { maximumFractionDigits: 2 })} ha`;
+      const text = {
+        spots: (p) => [`Spot ${p.spot_id}`, `${p.photos} ${p.photos === 1 ? 'Foto' : 'Fotos'}, ${fmtDate(p.first_photo)} – ${fmtDate(p.last_photo)}`, p.tags || ''],
+        findings: (p) => [p.common_name || p.scientific_name, p.scientific_name, `${fmtDate(p.taken_at)} · Score ${Number(p.score).toFixed(2)}`],
+        spread_fronts: (p) => [`${p.common_name || p.scientific_name} ${p.year}`, `${ha(p.area_m2)} in ${p.patches} ${p.patches === 1 ? 'Teilbestand' : 'Teilbeständen'}`, `${p.findings} Funde bis dahin`],
+      };
+      const popupEl = document.createElement('div');
+      popupEl.className = 'popup';
+      const popup = new ol.Overlay({ element: popupEl, stopEvent: true });
+      map.addOverlay(popup);
+      const rank = { findings: 0, spots: 1, spread_fronts: 2 };
+      map.on('singleclick', async (e) => {
+        // Points before areas, like the MapLibre map.
+        const hits = (await hitsAt(e.pixel)).sort((a, c) => rank[a.get('layer')] - rank[c.get('layer')]);
+        if (!hits.length) { popup.setPosition(undefined); return; }
+        const [title, ...lines] = text[hits[0].get('layer')](hits[0].getProperties());
+        const el = (tag, t) => { const n = document.createElement(tag); n.textContent = t; return n; };
+        popupEl.replaceChildren(el('b', title), ...lines.filter(Boolean).flatMap((l) => [el('span', l), document.createElement('br')]));
+        popup.setPosition(e.coordinate);
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+# nginx in front, with the same configuration as the Compose template:
+# /ows/ to QGIS Server, everything else to MyForrest.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: nginx }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: nginx }
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: nginx
+          image: docker.io/library/nginx:1.27-alpine
+          ports:
+            - name: http
+              containerPort: 80
+          volumeMounts:
+            - { name: conf, mountPath: /etc/nginx/conf.d, readOnly: true }
+          readinessProbe:
+            tcpSocket: { port: http }
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+      volumes:
+        - name: conf
+          configMap: { name: nginx-conf }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+spec:
+  # NodePort 30080 as well, for clusters whose node port is mapped to the host.
+  type: NodePort
+  selector: { app.kubernetes.io/name: nginx }
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      nodePort: 30080

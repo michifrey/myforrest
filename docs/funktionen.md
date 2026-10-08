@@ -393,6 +393,30 @@ einbinden.
   Blickrichtung, Neophyten hervorgehoben) und eine Docker-Compose-Vorlage: MyForrest, QGIS Server und
   nginx, dazu ein Dienst, der das GeoPackage alle 15 Minuten neu exportiert.
 
+- **Vektorkacheln**: Dieselben Daten als Mapbox Vector Tiles nach **OGC API – Tiles** im Kachelgitter
+  WebMercatorQuad (Zoom 0–20), wie sie Webkarten und die Vektorkarten von swisstopo verwenden. Eine Kachel
+  `/ogc/tiles/WebMercatorQuad/{z}/{y}/{x}` enthält die Ebenen `spread_fronts`, `spots` und `findings`;
+  jede Collection hat zusätzlich eigene Kacheln (auch `photos`). Die Tileset-Beschreibung ist zugleich
+  TileJSON 3.0, leere Kacheln antworten mit 204. Geschnitten und vereinfacht wird pro Zoomstufe
+  (geojson-vt), die Kacheln folgen den Daten ohne Neuberechnung von Hand.
+- **Kartenstil und Vektorkarte**: `/ogc/styles/myforrest` ist ein MapLibre-Stil in den Farben der App
+  (Ausbreitungsfronten von hell = früher bis dunkel = neuer, Spots grün oder orange mit Schäden, Neophyten
+  violett). Er beschränkt sich auf Ausdrücke, die auch QGIS beim Import von MapLibre-Stilen versteht, und
+  nutzt dafür die Attribute `status` (Spots: `schaden`/`ohne`, wie die orangen Marker der App) und
+  `recency_class` (Ausbreitungsfronten: 0–4 vom ersten bis zum neusten Jahr). `/vektorkarte.html` zeigt
+  die Kacheln mit MapLibre, mit Legende und Angaben per Klick.
+- **Schweizer Kachelgitter LV95**: Dieselben Kacheln gibt es auch im Kachelgitter von swisstopo
+  (`/ogc/tiles/SwissLV95/{z}/{y}/{x}`, EPSG:2056): gleicher Ursprung (E 2'420'000 / N 1'350'000) und
+  dieselben 29 Auflösungen von 4000 m bis 0,1 m pro Pixel wie die WMTS-Dienste von map.geo.admin.ch. Die
+  Kacheln liegen damit deckungsgleich auf der Landeskarte und dem Luftbild, ohne Umprojektion im Browser.
+  `/vektorkarte-lv95.html` zeigt sie mit OpenLayers über der grauen oder farbigen Landeskarte oder
+  SWISSIMAGE, mit Koordinatenanzeige in LV95. Weil die Auflösungen keine Zweierpotenzen sind, schneidet
+  der Server diese Kacheln selbst zu (Rechteck-Clipping mit Rand, Douglas–Peucker, Ringorientierung nach
+  MVT-Spezifikation). In GDAL/QGIS liest man sie mit
+  `OGCAPI:https://<server>/ogc/collections/<id>` und den Optionen `API=TILES`, `TILEMATRIXSET=SwissLV95`
+  sowie dem Ausschnitt in LV95 (`MINX`, `MINY`, `MAXX`, `MAXY`): GDAL nimmt sonst die Ausdehnung der
+  Collection in Grad und findet keine Kacheln.
+
 Ausgeblendete (moderierte) Fotos erscheinen in keinem Dienst.
 
 ## Pflanzen und Baumarten

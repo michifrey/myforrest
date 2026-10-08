@@ -101,6 +101,7 @@ module.exports = function registerOgc(app, { db, spotRadiusM, publicUrl = proces
         link(url, 'self', 'application/json', c.title),
         link(`${url}/items`, 'items', 'application/geo+json', `${c.title} (GeoJSON)`),
         link(`${url}/items?crs=${encodeURIComponent(LV95)}`, 'items', 'application/geo+json', `${c.title} (GeoJSON, LV95)`),
+        link(`${url}/tiles`, 'http://www.opengis.net/def/rel/ogc/1.0/tilesets-vector', 'application/json', `${c.title} (Vektorkacheln)`),
       ],
     };
   }
@@ -120,22 +121,29 @@ module.exports = function registerOgc(app, { db, spotRadiusM, publicUrl = proces
     next();
   });
 
+  // Vector tiles (OGC API – Tiles, MVT) of the same collections.
+  const tiles = require('./ogc-tiles')(app, { geodata, baseUrl, link, send, HttpError });
+
   app.get('/ogc', (req, res) => {
     const base = baseUrl(req);
     res.json({
       title: 'MyForrest – Wald im Wandel',
-      description: 'Spots, Fotos, Pflanzenfunde und Ausbreitungsfronten als OGC API – Features (WGS84 und LV95).',
+      description: 'Spots, Fotos, Pflanzenfunde und Ausbreitungsfronten als OGC API – Features (WGS84 und LV95) '
+        + 'und als Vektorkacheln nach OGC API – Tiles (MVT).',
       links: [
         link(`${base}/ogc`, 'self', 'application/json', 'Diese Seite'),
         link(`${base}/ogc/api`, 'service-desc', 'application/vnd.oai.openapi+json;version=3.0', 'API-Beschreibung (OpenAPI)'),
         link(`${base}/ogc/conformance`, 'conformance', 'application/json', 'Konformitätsklassen'),
         link(`${base}/ogc/collections`, 'data', 'application/json', 'Collections'),
+        link(`${base}/ogc/tiles`, tiles.TILESETS_REL, 'application/json', 'Vektorkacheln (MVT)'),
+        link(`${base}/ogc/tileMatrixSets`, 'http://www.opengis.net/def/rel/ogc/1.0/tiling-schemes', 'application/json', 'Kachelgitter'),
+        link(`${base}/ogc/styles/myforrest`, 'http://www.opengis.net/def/rel/ogc/1.0/styles', 'application/vnd.mapbox.style+json', 'Kartenstil (MapLibre)'),
         link(`${base}/api/export/myforrest.gpkg`, 'enclosure', 'application/geopackage+sqlite3', 'Alles als GeoPackage (LV95)'),
       ],
     });
   });
 
-  app.get('/ogc/conformance', (req, res) => res.json({ conformsTo: CONFORMANCE }));
+  app.get('/ogc/conformance', (req, res) => res.json({ conformsTo: [...CONFORMANCE, ...tiles.conformance] }));
 
   app.get('/ogc/api', (req, res) => {
     const base = baseUrl(req);

@@ -29,6 +29,14 @@ in `public/sw.js` `SHELL_VERSION` erhöhen; alte Caches werden beim Aktivieren g
 | Deutscher Wetterdienst, Open Data | Phänologie-Referenzdaten ([laden](installation.md#phänologie-referenzdaten-laden)) | `opendata.dwd.de` |
 | [Pl@ntNet](https://my.plantnet.org) (optional, API-Key) | Pflanzenbestimmung | `my-api.plantnet.org` |
 | OpenStreetMap | Kartenkacheln (im Browser) | – |
+| swisstopo (geo.admin.ch) | Landeskarte und Luftbild der Vektorkarte LV95 (im Browser) | – |
+
+Im Browser laufen [Leaflet](https://leafletjs.com) (BSD-2-Clause) für die App-Karte und
+[MapLibre GL JS](https://maplibre.org) (BSD-3-Clause) für die Vektorkarte sowie
+[OpenLayers](https://openlayers.org) (BSD-2-Clause) für die Vektorkarte in LV95; alle liefert der Server aus
+`node_modules` aus, ohne CDN. Die LV95-Karte lädt ihre Hintergrundkarten im Browser von
+`wmts.geo.admin.ch` (© swisstopo, frei nutzbar mit Quellenangabe). Die Vektorkacheln erzeugen [geojson-vt](https://github.com/mapbox/geojson-vt)
+(ISC) und [vt-pbf](https://github.com/mapbox/vt-pbf) (MIT).
 
 Die Wetterdaten werden pro ~10-km-Zelle gecacht; die Normalwerte 1991–2020 werden nur einmal pro Zelle
 geladen. Die Satellitendaten enthalten modifizierte Copernicus-Sentinel-Daten.
