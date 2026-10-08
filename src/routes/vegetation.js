@@ -369,13 +369,14 @@ module.exports = function registerVegetation(app, {
 
   /* ---------- Early warning for all spots ---------- */
 
-  app.get('/api/satellite/alerts', (req, res) => {
-    if (!sentinel) return res.json([]);
+  function allAlerts() {
+    if (!sentinel) return [];
     const spots = db.prepare('SELECT s.id, s.lat, s.lon FROM spots s JOIN spot_ndvi n ON n.spot_id = s.id').all();
     const cal = calibration();
-    res.json(spots.map((spot) => ({ spotId: spot.id, lat: spot.lat, lon: spot.lon, alerts: alertsOf(spot.id, sentinel.series(spot.id).monthly, spot, cal) }))
-      .filter((x) => x.alerts.length));
-  });
+    return spots.map((spot) => ({ spotId: spot.id, lat: spot.lat, lon: spot.lon, alerts: alertsOf(spot.id, sentinel.series(spot.id).monthly, spot, cal) }))
+      .filter((x) => x.alerts.length);
+  }
+  app.get('/api/satellite/alerts', (req, res) => res.json(allAlerts()));
 
   app.get('/api/satellite/calibration', (req, res) => res.json(calibration()));
   app.post('/api/satellite/calibration', (req, res) => res.json(recalibrate()));
@@ -407,5 +408,5 @@ module.exports = function registerVegetation(app, {
     setInterval(watchOnce, watchHours * 3600000).unref?.();
   }
 
-  return { analyzePhoto, backfill };
+  return { analyzePhoto, backfill, alerts: allAlerts };
 };

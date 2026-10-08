@@ -12,6 +12,9 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
   werden bereits nach Richtung getrennt).
 - **PWA**: Kartenausschnitt einer geplanten Route gezielt für offline vorladen; Push-Benachrichtigung,
   wenn ein Upload aus der Warteschlange abgelehnt wurde.
+- **Touren**: FIT-Dateien direkt lesen, Höhenprofil der Route, Abgleich mit Strava/Komoot per OAuth,
+  Aufzeichnung im Hintergrund (braucht eine native Hülle, Browser stoppen GPS im Hintergrund),
+  Benachrichtigung, wenn ein eigener Fotoauftrag erledigt wurde, Ablaufdatum für Aufträge.
 - **Konten ausbauen**: Passwort zurücksetzen und E-Mail bestätigen, Profilseite mit eigenen Fotos,
   Konto löschen; Rate-Limits dauerhaft speichern statt im Arbeitsspeicher.
 

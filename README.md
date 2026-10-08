@@ -46,7 +46,8 @@ Marker melden:
 
 Beim Überfahren eines Markers fasst ein Tooltip alles zusammen: Veränderung, Wetter, Sturm, Satellit,
 Baumarten und Blickrichtung. Oben links lässt sich die Karte nach Beobachtungen und Meldungen filtern,
-daneben schalten *Sonne & Wetter* und *Arten & Neophyten* die beiden Kartenmodi ein (Abschnitte 7 und 8).
+daneben schalten *Sonne & Wetter*, *Arten & Neophyten* und *Touren & Aufträge* die Kartenmodi ein
+(Abschnitte 7, 8 und 10). Gelbe Kamera-Pins sind Fotoaufträge.
 Rechts stehen Kennzahlen und die zuletzt fotografierten Spots.
 
 ### 2. Zeitreise an einem Spot
@@ -163,6 +164,26 @@ Ausbreitungsfronten als Vektorkacheln mit MapLibre in Web Mercator, `/vektorkart
 OpenLayers im Schweizer Kachelgitter LV95 auf der Landeskarte von swisstopo, deckungsgleich mit
 map.geo.admin.ch. Ein Klick auf ein Objekt zeigt seine Angaben.
 
+### 10. Touren und Fotoaufträge
+
+<p>
+  <img src="docs/screenshots/touren.jpg" width="49%" alt="Geplante Tour mit Kilometer-Marken und Vorschlägen entlang der Route">
+  <img src="docs/screenshots/fotoauftraege.jpg" width="49%" alt="Fotoaufträge auf der Karte und in der Liste">
+</p>
+
+*Touren & Aufträge* hält fest, wo man unterwegs ist. Eine Route lässt sich auf der Karte **zeichnen**
+(Klick für Klick, auf Wunsch entlang der Wege), mit dem Handy per GPS **aufzeichnen** oder als GPX, TCX, KML
+oder GeoJSON **importieren**. Gelbe Kilometer-Marken zeigen den Verlauf, jede Route geht auch als GPX
+wieder hinaus. Mit Konto lassen sich Touren speichern und veröffentlichen; andere sehen eine öffentliche
+Tour ohne Zeiten und ohne die ersten und letzten 200 m. Über eine Tour mit Zeitstempeln lassen sich im
+Upload auch Fotos ohne GPS verorten.
+
+Ein **Fotoauftrag** (rechts) bittet um ein Foto von einem Ort, etwa «Neue Lichtung am Waldweg, Blick nach
+Nordost», oder um ein neues Foto eines Spots. Er nennt keine Zeit und keinen Namen. Wer eine Route plant,
+sieht unter *Unterwegs fotografieren* (links) in der Reihenfolge der Strecke, was nahe am Weg liegt: offene
+Aufträge, Spots mit Satelliten-Frühwarnung und Fotoreihen, die seit über einem Jahr ruhen. Die Route wird
+dafür nicht gespeichert. Ein Foto am richtigen Ort erledigt den Auftrag automatisch.
+
 ## Was MyForrest kann
 
 Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen unter
@@ -193,6 +214,9 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   - Zwei Vektorkarten: MapLibre in Web Mercator, OpenLayers auf der Landeskarte von swisstopo.
   - Metadaten für geocat.ch und opendata.swiss (GM03/ISO 19139).
   - Ein fertiges QGIS-Projekt für QGIS Server (WMS/WMTS/WFS) für Geoportale wie map.geo.admin.ch.
+- **[Touren und Fotoaufträge](docs/funktionen.md#touren-und-fotoaufträge)**: Routen zeichnen, per GPS
+  aufzeichnen oder importieren (GPX, TCX, KML, GeoJSON), als GPX exportieren und speichern; Fotoaufträge
+  ohne Zeit und Namen und Vorschläge entlang der eigenen Route.
 - **[Konten und Moderation](docs/funktionen.md#konten-moderation-und-lizenzen)**: Konten mit Rollen,
   Lizenz pro Foto, Melden und Moderieren.
 

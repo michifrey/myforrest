@@ -140,6 +140,16 @@ async function main() {
     identify.run(p.id, ...SPECIES[kind], 0.55 + (i % 4) * 0.1, SPECIES[kind][1], Date.now());
     console.log('fund', kind, year, p.id, 'spot', p.spotId);
   }
+  // Photo requests: a place on the track, the beetle stand again, and the stream bank.
+  const requests = [
+    { lat: 47.37445, lon: 8.57395, heading: 45, title: 'Neue Lichtung am Waldweg', note: 'Vom Weg aus Richtung Nordost, damit die Lücke im Kronendach zu sehen ist' },
+    { spotId: spots.kaefer, title: 'Fichten nach dem Käferbefall', note: 'Satellit meldet seit September einen Rückgang' },
+    { lat: 47.36985, lon: 8.57060, heading: 300, title: 'Bachböschung mit Springkraut', note: 'Wie weit ist es bachaufwärts gekommen?' },
+  ];
+  for (const r of requests) {
+    const res = await fetch(`${BASE}/api/photo-requests`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(r) });
+    if (!res.ok) console.warn('request', await res.text());
+  }
   seedSatellite(db, spots);
   // Live picture for the fake camera on the phone: spot 1 today, from a slightly different position.
   const live = path.join(IMG, 'live.jpg');

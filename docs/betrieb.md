@@ -42,6 +42,7 @@ in `public/sw.js` `SHELL_VERSION` erhöhen; alte Caches werden beim Aktivieren g
 | Landsat Collection 2 (USGS) über [Microsoft Planetary Computer](https://planetarycomputer.microsoft.com) | Satellitenkontext vor 2017 | `planetarycomputer.microsoft.com`, `landsateuwest.blob.core.windows.net` |
 | Deutscher Wetterdienst, Open Data | Phänologie-Referenzdaten ([laden](installation.md#phänologie-referenzdaten-laden)) | `opendata.dwd.de` |
 | [Pl@ntNet](https://my.plantnet.org) (optional, API-Key) | Pflanzenbestimmung | `my-api.plantnet.org` |
+| [BRouter](https://brouter.de) (optional, `ROUTER_URL`) | Gezeichnete Touren folgen den Wegen; der Server schickt nur die Wegpunkte | Host aus `ROUTER_URL` |
 | OpenStreetMap | Kartenkacheln (im Browser) | – |
 | swisstopo (geo.admin.ch) | Landeskarte und Luftbild der Vektorkarte LV95 (im Browser) | – |
 

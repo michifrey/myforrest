@@ -9,7 +9,7 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/spots?tag=…`           | Alle Spots mit Anzahl Fotos, Zeitraum, Tags, Blickrichtung (`heading`) und Vorschaubild (`latestThumbUrl`) |
 | `GET`    | `/api/spots/:id`             | Ein Spot mit Blickrichtung und allen Fotos chronologisch (jedes Foto mit `url`, `thumbUrl` und `largeUrl`) |
 | `GET`    | `/thumbs/:datei`             | Vorschaubilder (WebP)                                    |
-| `POST`   | `/api/photos`                | Upload (multipart: `photos[]` als JPEG, PNG, WebP oder HEIC, optional `spotId` und `refPhotoId` für Wiederholungsfotos, `license`, `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `utcOffsetMinutes`, `clockShiftSeconds`) |
+| `POST`   | `/api/photos`                | Upload (multipart: `photos[]` als JPEG, PNG, WebP oder HEIC, optional `spotId` und `refPhotoId` für Wiederholungsfotos, `requestId` für einen Fotoauftrag, `license`, `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `utcOffsetMinutes`, `clockShiftSeconds`) |
 | `POST`   | `/api/videos`                | Video-Upload (multipart: `video`, optional `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `clockShiftSeconds`, `frameDistanceM`, `frameIntervalS`, `panorama` = `auto`/`1`/`0`, `async=1` für Hintergrundverarbeitung) |
 | `GET`    | `/api/videos/jobs/:id`       | Fortschritt und Ergebnis eines Video-Uploads mit `async=1` |
 | `GET`    | `/api/videos/config`         | ffmpeg verfügbar? Standardabstand und -intervall         |
@@ -51,6 +51,18 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `POST`   | `/api/auth/register`         | Konto anlegen (JSON: `email`, `name`, `password`) und anmelden |
 | `POST`   | `/api/auth/login`            | Anmelden (JSON: `login` = E-Mail oder Name, `password`)  |
 | `POST`   | `/api/auth/logout`           | Abmelden                                                 |
+| `POST`   | `/api/tracks/parse`          | GPX, TCX, KML oder GeoJSON lesen (`{ text, filename }`), ohne zu speichern: Punkte, Name, Format, Länge |
+| `GET`    | `/api/tracks`                | Öffentliche Touren (Name, Länge, Start nach der 200-m-Privatzone, Besitzer), `?bbox=w,s,e,n`; `?mine=1` die eigenen |
+| `POST`   | `/api/tracks`                | Tour speichern (Konto nötig): `{ name, kind: gezeichnet\|aufgezeichnet\|importiert, activity, visibility: privat\|oeffentlich, points: [[lat, lon, ele, time], …] }` |
+| `GET`    | `/api/tracks/:id`            | Tour mit Punkten; für andere ohne Zeiten und ohne die ersten und letzten 200 m |
+| `GET`    | `/api/tracks/:id.gpx`        | Tour als GPX                                             |
+| `PATCH`  | `/api/tracks/:id`            | `name`, `activity`, `visibility` (nur Besitzer oder Moderation) |
+| `DELETE` | `/api/tracks/:id`            | Tour löschen                                             |
+| `GET`    | `/api/route?points=lat,lon;lat,lon` | Weg zwischen Wegpunkten vom Routing-Dienst (`ROUTER_URL`); 501 ohne Dienst |
+| `POST`   | `/api/route-suggestions`     | Fotoaufträge, Spots mit Satelliten-Frühwarnung und lange nicht besuchte Spots nahe einer Route (`{ points, maxDistanceM }`), mit Abstand und Kilometer; die Route wird nicht gespeichert |
+| `GET`    | `/api/photo-requests`        | Offene Fotoaufträge (`?status=alle` auch erledigte), ohne Namen der anfragenden Person |
+| `POST`   | `/api/photo-requests`        | Fotoauftrag: `{ lat, lon, heading?, title, note? }` oder `{ spotId, title }` |
+| `DELETE` | `/api/photo-requests/:id`    | Auftrag zurückziehen (wer ihn erstellt hat, oder Moderation) |
 | `POST`   | `/api/photos/:id/report`     | Foto melden (`{ reason, note }`), auch ohne Konto        |
 | `GET`    | `/api/moderation/queue`      | Moderation: offene Meldungen pro Foto und ausgeblendete Fotos |
 | `POST`   | `/api/moderation/photos/:id/hide` | Foto ausblenden (`{ reason }`), erledigt seine Meldungen |

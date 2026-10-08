@@ -44,6 +44,8 @@ function createApp({
   adminEmail = process.env.ADMIN_EMAIL || null,
   rateLimits,
   detectorUrl = process.env.DETECTOR_URL || null, detectorFetch = fetch,
+  // Routing along paths for drawn tours (BRouter-compatible, e.g. https://brouter.de/brouter); off when unset.
+  routerUrl = process.env.ROUTER_URL || null, routerFetch = fetch, routerProfile = process.env.ROUTER_PROFILE || 'hiking-mountain',
   // Vector tile precomputation (routes/ogc-tiles.js): { precompute, delayMs }.
   tileOptions = { precompute: process.env.TILES_PRECOMPUTE !== '0' },
 } = {}) {
@@ -64,7 +66,10 @@ function createApp({
 
   const app = express();
   app.locals.db = db;
-  app.use(express.json({ limit: '100kb' }));
+  // Tracks (src/routes/tracks.js) carry up to 20 000 points; everything else stays small.
+  const smallJson = express.json({ limit: '100kb' });
+  const trackJson = express.json({ limit: '15mb' });
+  app.use((req, res, next) => (/^\/api\/(tracks|route-suggestions)\b/.test(req.path) ? trackJson : smallJson)(req, res, next));
   // Accounts, CSRF, moderation (src/routes/accounts.js); must precede the routes below and /uploads.
   const accountsCtx = { db, requireLogin, adminEmail, rateLimits };
   const accounts = registerAccounts(app, accountsCtx);
@@ -358,6 +363,8 @@ function createApp({
     setContext.run(JSON.stringify(ctx), photoId);
   }
 
+  // Tours and photo requests (src/routes/tracks.js), registered further down.
+  const tours = {};
   // Background work (weather lookups) is tracked so tests and shutdown can wait for it.
   const pending = new Set();
   const background = (promise) => {
@@ -383,7 +390,7 @@ function createApp({
   const climate = require('./routes/climate')(app, { db, weatherFetch, getPhoto, terrainOf, background, reassessSpot });
 
   app.get('/api/config', (req, res) => {
-    res.json({ tags: TAGS, activities: ACTIVITIES, plantnet: Boolean(plantnetKey), spotRadiusM });
+    res.json({ tags: TAGS, activities: ACTIVITIES, plantnet: Boolean(plantnetKey), spotRadiusM, routing: Boolean(routerUrl) });
   });
 
   app.get('/api/spots', (req, res) => {
@@ -536,6 +543,7 @@ function createApp({
     const created = [];
     const skipped = [];
     const touchedSpots = new Set();
+    const requestsDone = new Set();
     for (const f of files) {
       const buf = await fsp.readFile(f.path);
       // iPhone photos (HEIC) are stored as JPEG; their EXIF is read from the original.
@@ -608,9 +616,10 @@ function createApp({
       await safeAlign(analyzeChange(photoId));
       background(analyzeContext(photoId));
       vegetation.backfill(null, [photoId]);
+      for (const r of tours.fulfil(photoId, b.requestId)) requestsDone.add(r);
       created.push(photoJson(getPhoto.get(photoId)));
     }
-    return [created.length ? 201 : 422, { created, skipped, spots: [...touchedSpots] }];
+    return [created.length ? 201 : 422, { created, skipped, spots: [...touchedSpots], requestsDone: [...requestsDone] }];
   }
 
   app.patch('/api/photos/:id', (req, res) => {
@@ -911,6 +920,9 @@ function createApp({
   require('./routes/ogc')(app, { db, spotRadiusM, dataDir, background, tiles: tileOptions });
   require('./routes/video')(app, { db, uploadDir, tmpDir, spotRadiusM, activities: ACTIVITIES, photoJson, getPhoto, setTags, alignPhoto, analyzeChange, analyzeContext, background, safeAlign });
   const vegetation = require('./routes/vegetation')(app, { db, uploadDir, background, fetchImpl: weatherFetch });
+  Object.assign(tours, require('./routes/tracks')(app, {
+    db, spotRadiusM, satelliteAlerts: vegetation.alerts, routerUrl, routerFetch, routerProfile,
+  }));
   require('./routes/analysis')(app, {
     db, uploadDir, getPhoto, idParam, background, changeBetween, spotTrees, terrainOf, refreshIrregularities, detectorUrl, detectorFetch,
   });

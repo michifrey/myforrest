@@ -10,6 +10,7 @@ Einen kürzeren Überblick mit Screenshots gibt das [README](../README.md).
 - [Bildanalyse](#bildanalyse)
 - [Wetter, Klima und Gelände](#wetter-klima-und-gelände)
 - [Kartenmodi](#kartenmodi)
+- [Touren und Fotoaufträge](#touren-und-fotoaufträge)
 - [Pflanzen und Baumarten](#pflanzen-und-baumarten)
 - [Konten, Moderation und Lizenzen](#konten-moderation-und-lizenzen)
 
@@ -544,6 +545,70 @@ Ausgeblendete (moderierte) Fotos erscheinen in keinem Dienst.
    Organisation muss auf opendata.swiss eingerichtet sein. Den genauen Ablauf beschreibt das Handbuch von
    opendata.swiss; die Bedingung muss zur Lizenz der Fotos passen (Standard CC BY-SA 4.0, also mindestens
    Quellenangabe).
+
+## Touren und Fotoaufträge
+
+Der Kartenmodus *Touren & Aufträge* verbindet die eigenen Wege mit den Orten, an denen ein Foto gebraucht
+wird.
+
+### Route zeichnen, aufzeichnen oder importieren
+
+- **Zeichnen**: Jeder Klick auf die Karte setzt einen Wegpunkt; Wegpunkte lassen sich verschieben.
+  *Rückgängig* nimmt den letzten zurück, *Zurück zum Start* schliesst die Runde. Die Länge steht gross im
+  Panel, gelbe Kilometer-Marken zeigen den Verlauf (je nach Zoom alle 1, 2, 5 oder 10 km). Mit einem
+  Routing-Dienst (`ROUTER_URL`, siehe [Installation](installation.md#umgebungsvariablen)) folgt die Linie auf
+  Wunsch den Wegen (*Magnet: Wegen folgen*); der Server fragt den Dienst an, der Browser spricht ihn nie direkt an.
+- **Aufzeichnen**: Das Handy zeichnet die Strecke per GPS auf (Punkte ab ±40 m Genauigkeit, mindestens 4 m
+  auseinander, mit Zeit und Höhe). Der Bildschirm bleibt dabei an (Wake Lock), denn Browser stoppen GPS
+  für Seiten im Hintergrund. Die Punkte liegen laufend im Browser; nach einem Neuladen lässt sich die
+  Aufzeichnung fortsetzen.
+- **Importieren**: GPX (Tracks, Routen oder Wegpunkte), Garmin TCX, KML (LineString und `gx:Track`) und
+  GeoJSON (LineString, MultiLineString, mit `coordTimes`), bis 14 MB und 20 000 Punkte. FIT-Dateien bitte in
+  Garmin Connect oder Strava als GPX exportieren.
+- **Exportieren**: jede Route als GPX, mit Höhe und Zeit, wo vorhanden.
+
+Die aktuelle Route bleibt im Browser, bis sie gespeichert wird. **Speichern** braucht ein Konto; Touren sind
+privat, bis man sie veröffentlicht. Andere sehen eine öffentliche Tour ohne Zeiten und ohne die ersten und
+letzten 200 m, denn Start und Ziel liegen oft vor der Haustür. *Öffentliche Touren auf der Karte zeigen*
+setzt einen Pin an den Anfang jeder öffentlichen Tour; beim Überfahren erscheint die Strecke, ein Klick lädt
+sie ins Panel.
+
+### Fotos über eine Tour verorten
+
+Fotos ohne GPS (Action-Cam, Kompaktkamera) bekommen ihren Ort aus einer Tour mit Zeitstempeln: Im
+Upload-Dialog steht unter dem GPX-Feld *oder Fotos über eine Tour verorten* mit der aktuellen Route und den
+eigenen gespeicherten Touren. Die Zuordnung ist dieselbe wie beim GPX-Track (Aufnahmezeit, Zeitzone,
+Uhrkorrektur); *Fotos zuordnen* in *Meine Touren* öffnet den Dialog mit der Tour vorausgewählt.
+
+### Fotoaufträge
+
+Ein **Fotoauftrag** bittet um ein Foto von einem Ort: *Neuer Fotoauftrag* im Tab *Aufträge*, dann den Ort
+auf der Karte wählen, beschreiben, was zu sehen sein soll, und optional die Blickrichtung angeben. Im
+Spot-Panel bittet *Neues Foto von diesem Spot anfragen* um ein Wiederholungsfoto in der Blickrichtung des
+Spots. Aufträge erscheinen für alle als gelbe Kamera-Pins auf der Karte, mit einem Kegel in die gewünschte
+Richtung.
+
+Ein Auftrag nennt **keine Zeit und keinen Namen**: Niemand muss sich verabreden oder seinen Weg
+preisgeben. Wer ohnehin vorbeikommt, macht das Foto. Erledigt ist ein Auftrag, sobald ein Foto
+- innerhalb von 40 m (bzw. dem Spot-Radius) entsteht und, wenn beide eine Richtung haben, höchstens 60°
+  davon abweicht,
+- zum angefragten Spot gehört, oder
+- über *Foto dafür hochladen* im Auftrag hochgeladen wird und höchstens 150 m entfernt liegt.
+
+Wer den Auftrag mit Konto erstellt hat, kann ihn zurückziehen; Moderation ebenso. Pro Konto bzw.
+Adresse sind 20 Aufträge pro Stunde möglich.
+
+### Vorschläge entlang der Route
+
+Sobald eine Route steht, listet das Panel unter *Unterwegs fotografieren* in der Reihenfolge der Strecke,
+was in ihrer Nähe (50–500 m, Standard 150 m) einen Halt lohnt, mit Kilometer und Abstand zur Route:
+
+- offene **Fotoaufträge**,
+- Spots mit einer **Satelliten-Frühwarnung** ([Satellitenkontext](#satellitenkontext-sentinel-2-und-landsat)),
+- Spots mit einer Fotoreihe (ab zwei Fotos), die seit über einem Jahr **nicht mehr besucht** wurden.
+
+Die Vorschläge stehen nummeriert auf der Karte. Der Server berechnet sie aus der mitgeschickten Route und
+speichert nichts davon.
 
 ## Pflanzen und Baumarten
 

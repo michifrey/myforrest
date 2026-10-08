@@ -1001,6 +1001,7 @@ form.addEventListener('submit', async (e) => {
   const created = [];
   const skipped = [];
   const touched = new Set();
+  const requestsDone = new Set();
   let queued = 0;
   const BATCH = 10;
   try {
@@ -1017,12 +1018,14 @@ form.addEventListener('submit', async (e) => {
       for (const name of ['activity', 'note', 'utcOffsetMinutes', 'clockShiftSeconds', 'license']) fd.append(name, form[name].value);
       const tags = [...$('upload-tags').querySelectorAll('input:checked')].map((c) => c.value);
       fd.append('tags', tags.join(','));
+      if (window.Tours) await Tours.decorateUpload(fd);
 
       const res = await postPhotos(fd);
       queued += res.queued || 0;
       created.push(...res.created);
       skipped.push(...res.skipped);
       res.spots.forEach((s) => touched.add(s));
+      (res.requestsDone || []).forEach((r) => requestsDone.add(r));
     }
   } catch (err) {
     skipped.push({ name: 'Upload', reason: err.message });
@@ -1033,6 +1036,8 @@ form.addEventListener('submit', async (e) => {
 
   const result = [el('p', { text: `${created.length} Foto${created.length === 1 ? '' : 's'} gespeichert, ${touched.size} Spot${touched.size === 1 ? '' : 's'} aktualisiert.` })];
   if (queued) result.push(el('p', { class: 'queued', text: `${queued} Foto${queued === 1 ? ' wartet' : 's warten'} auf Verbindung und ${queued === 1 ? 'wird' : 'werden'} automatisch gesendet.` }));
+  const doneText = window.Tours?.afterUpload([...requestsDone]);
+  if (doneText) result.push(el('p', { class: 'queued', text: doneText }));
   if (skipped.length) {
     result.push(el('ul', { class: 'err' }, skipped.map((s) => el('li', { text: `${s.name}: ${s.reason}` }))));
   }

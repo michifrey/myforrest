@@ -45,6 +45,8 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 | `SATELLITE_WATCH_HOURS` | `24` | Abstand der Frühwarn-Runde über alle Spots in Stunden; `0` = aus |
 | `REQUIRE_LOGIN`    | –        | `1`: Uploads und Änderungen nur mit Konto      |
 | `ADMIN_EMAIL`      | –        | Dieses Konto wird Admin (sonst das erste Konto) |
+| `ROUTER_URL`       | –        | Routing-Dienst im Format von [BRouter](https://brouter.de) (z. B. `https://brouter.de/brouter` oder ein eigener), damit gezeichnete Touren den Wegen folgen; ohne ihn gerade Linien |
+| `ROUTER_PROFILE`   | `hiking-mountain` | BRouter-Profil für das Routing |
 | `DETECTOR_URL`     | –        | Externer Objektdetektor (siehe [unten](#externer-detektor)); ohne ihn laufen die eingebauten Heuristiken |
 
 ## Externer Detektor

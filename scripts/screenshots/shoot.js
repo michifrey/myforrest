@@ -1,6 +1,6 @@
 'use strict';
 // Takes the README screenshots from the demo server (see README.md here).
-// Usage: node shoot.js [hero map spot satellite sun species vektor timelapse compare upload mobile]
+// Usage: node shoot.js [hero map spot satellite sun species vektor touren timelapse compare upload mobile]
 const path = require('path');
 const fs = require('fs');
 const { execFileSync } = require('child_process');
@@ -154,6 +154,30 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await settle(page, 1500);
     await page.locator('#upload-dialog').screenshot({ path: out('upload.png') });
     await page.close();
+  }
+
+  if (want('touren')) {
+    // A planned tour along the forest track, past the requests and the bark-beetle stand.
+    const wp = [[47.3660, 8.5652], [47.3700, 8.5690], [47.3733, 8.5722], [47.3760, 8.5760], [47.3768, 8.5795], [47.3741, 8.5826], [47.3716, 8.5858]]
+      .map(([lat, lon]) => ({ lat, lon }));
+    const route = { waypoints: wp, segments: wp.slice(1).map((p, i) => [wp[i], p]), raw: null, kind: 'gezeichnet', name: 'Waldrunde Adlisberg', savedId: null, hasTime: false };
+    const tctx = await desktop(browser);
+    await tctx.addInitScript((r) => { try { localStorage.setItem('myforrest.route.v1', r); } catch {} }, JSON.stringify(route));
+    const page = await explore(tctx);
+    await page.click('#tours-toggle');
+    await settle(page, 2500);
+    await page.evaluate(() => map.fitBounds([[47.3655, 8.5640], [47.3775, 8.5870]], { paddingTopLeft: [430, 60], paddingBottomRight: [460, 40] }));
+    await settle(page, 2500);
+    await page.evaluate(() => document.querySelector('#tour-suggestions')?.scrollIntoView({ block: 'end' }));
+    await settle(page, 800);
+    await page.screenshot({ path: out('touren.jpg'), ...jpg });
+    await page.click('[data-tab="auftraege"]');
+    await settle(page, 1200);
+    // The request on the forest track, opened from the list.
+    await page.locator('#tour-requests .sug-item', { hasText: 'Lichtung' }).click();
+    await settle(page, 1200);
+    await page.screenshot({ path: out('fotoauftraege.jpg'), ...jpg });
+    await tctx.close();
   }
 
   await browser.close();
