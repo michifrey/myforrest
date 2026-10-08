@@ -55,7 +55,7 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 ## E-Mail-Versand
 
 Wer sich mit E-Mail und Passwort registriert, bekommt einen Link zum Bestätigen der Adresse (24 Stunden
-gültig, im Konto-Menü neu anforderbar). Verschickt wird über SMTP, ohne zusätzliche Pakete:
+gültig, im Konto-Menü neu anforderbar), und wer das Passwort vergessen hat, einen Link zum Zurücksetzen. Verschickt wird über SMTP, ohne zusätzliche Pakete:
 
 ```bash
 SMTP_URL='smtps://wald%40example.org:passwort@smtp.example.org' \

@@ -151,18 +151,21 @@ authDialog.innerHTML = `
       <p class="eyebrow">Konto</p>
       <h2 id="auth-title">Anmelden</h2>
     </div>
-    <div class="tabs" role="tablist">
+    <div class="tabs" role="tablist" data-modes="login register">
       <button type="button" role="tab" data-mode="login" aria-selected="true">Anmelden</button>
       <button type="button" role="tab" data-mode="register" aria-selected="false">Registrieren</button>
     </div>
     <p id="auth-intro" class="muted small"></p>
     <div id="auth-providers" class="auth-providers" hidden></div>
-    <label class="field" data-only="register"><span>Name <em>wird bei deinen Fotos genannt</em></span>
+    <label class="field" data-modes="register"><span>Name <em>wird bei deinen Fotos genannt</em></span>
       <input name="name" autocomplete="nickname" maxlength="40"></label>
-    <label class="field"><span data-label-login="E-Mail oder Name" data-label-register="E-Mail">E-Mail oder Name</span>
+    <label class="field" data-modes="login register forgot"><span id="auth-login-label">E-Mail oder Name</span>
       <input name="login" autocomplete="username" required></label>
-    <label class="field"><span>Passwort <em data-only="register">mindestens 8 Zeichen</em></span>
+    <label class="field" data-modes="login register reset"><span><span id="auth-password-label">Passwort</span>
+      <em data-modes="register reset">mindestens 8 Zeichen</em></span>
       <input name="password" type="password" autocomplete="current-password" required minlength="8"></label>
+    <p class="auth-switch small" data-modes="login"><button type="button" class="link" data-to="forgot">Passwort vergessen?</button></p>
+    <p class="auth-switch small" data-modes="forgot"><button type="button" class="link" data-to="login">Zurück zur Anmeldung</button></p>
     <p id="auth-error" class="auth-error" role="alert" hidden></p>
     <div class="row end">
       <button type="button" class="link" id="auth-cancel">Abbrechen</button>
@@ -173,28 +176,49 @@ document.body.append(authDialog);
 const authForm = authDialog.querySelector('form');
 let authMode = 'login';
 let afterAuth = null;
+let resetToken = null;
+
+// Modes of the dialog: log in, register, ask for a reset link, set a new password from the link.
+const AUTH_MODES = {
+  login: { title: 'Anmelden', submit: 'Anmelden', login: 'E-Mail oder Name', password: 'Passwort' },
+  register: { title: 'Konto erstellen', submit: 'Registrieren', login: 'E-Mail', password: 'Passwort' },
+  forgot: { title: 'Passwort vergessen', submit: 'Link senden', login: 'E-Mail' },
+  reset: { title: 'Neues Passwort', submit: 'Passwort speichern', password: 'Neues Passwort' },
+};
 
 function setAuthMode(mode) {
   authMode = mode;
-  const reg = mode === 'register';
+  const m = AUTH_MODES[mode];
   authDialog.querySelectorAll('[role="tab"]').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.mode === mode)));
-  authDialog.querySelectorAll('[data-only="register"]').forEach((n) => { n.hidden = !reg; });
-  const loginLabel = authDialog.querySelector('[data-label-login]');
-  loginLabel.textContent = reg ? loginLabel.dataset.labelRegister : loginLabel.dataset.labelLogin;
-  authForm.login.type = reg ? 'email' : 'text';
-  authForm.login.autocomplete = reg ? 'email' : 'username';
-  authForm.password.autocomplete = reg ? 'new-password' : 'current-password';
-  $('auth-title').textContent = reg ? 'Konto erstellen' : 'Anmelden';
+  authDialog.querySelectorAll('[data-modes]').forEach((n) => { n.hidden = !n.dataset.modes.split(' ').includes(mode); });
+  if (m.login) $('auth-login-label').textContent = m.login;
+  if (m.password) $('auth-password-label').textContent = m.password;
+  const byEmail = mode !== 'login';
+  authForm.login.type = byEmail ? 'email' : 'text';
+  authForm.login.autocomplete = byEmail ? 'email' : 'username';
+  authForm.password.autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+  $('auth-title').textContent = m.title;
   renderProviders();
-  $('auth-submit').textContent = reg ? 'Registrieren' : 'Anmelden';
+  $('auth-submit').textContent = m.submit;
+  $('auth-submit').hidden = false;
   $('auth-error').hidden = true;
+  $('auth-error').classList.remove('ok');
 }
+const setIntro = (text) => {
+  $('auth-intro').textContent = text;
+  $('auth-intro').hidden = !text;
+};
 authDialog.querySelectorAll('[role="tab"]').forEach((t) => t.addEventListener('click', () => setAuthMode(t.dataset.mode)));
+authDialog.querySelectorAll('[data-to]').forEach((b) => b.addEventListener('click', () => {
+  setAuthMode(b.dataset.to);
+  setIntro(b.dataset.to === 'forgot' ? 'Gib die E-Mail-Adresse deines Kontos an. Wir schicken dir einen Link, mit dem du ein neues Passwort festlegst.' : '');
+  authForm.login.focus();
+}));
 
 /** "Continue with Google/GitHub": a plain link, the server redirects to the provider and back. */
 function renderProviders() {
   const box = $('auth-providers');
-  box.hidden = !Account.providers.length;
+  box.hidden = !Account.providers.length || !['login', 'register'].includes(authMode);
   box.replaceChildren(
     ...Account.providers.map((p) => el('a', {
       class: `btn secondary provider provider-${p.id}`, href: `/api/auth/oauth/${p.id}`, text: `Mit ${p.label} ${authMode === 'register' ? 'registrieren' : 'anmelden'}`,
@@ -208,8 +232,7 @@ $('auth-cancel').addEventListener('click', () => authDialog.close());
 function openAuth(mode = 'login', { intro = '', then = null } = {}) {
   authForm.reset();
   setAuthMode(mode);
-  $('auth-intro').textContent = intro;
-  $('auth-intro').hidden = !intro;
+  setIntro(intro);
   afterAuth = then;
   authDialog.showModal();
 }
@@ -218,18 +241,29 @@ Account.openAuth = openAuth;
 authForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = authForm;
-  const reg = authMode === 'register';
   const submit = $('auth-submit');
   submit.disabled = true;
   try {
-    const body = reg
-      ? { email: f.login.value, name: f.name.value, password: f.password.value }
-      : { login: f.login.value, password: f.password.value };
-    const res = await fetch(`/api/auth/${reg ? 'register' : 'login'}`, {
+    const [url, body] = {
+      login: ['login', { login: f.login.value, password: f.password.value }],
+      register: ['register', { email: f.login.value, name: f.name.value, password: f.password.value }],
+      forgot: ['password/forgot', { email: f.login.value }],
+      reset: ['password/reset', { token: resetToken, password: f.password.value }],
+    }[authMode];
+    const res = await fetch(`/api/auth/${url}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    if (authMode === 'forgot') {
+      $('auth-error').textContent = `Falls es zu ${f.login.value.trim()} ein Konto gibt, ist ein Link unterwegs. Er ist 1 Stunde gültig – schau auch im Spam-Ordner nach.`;
+      $('auth-error').classList.add('ok');
+      $('auth-error').hidden = false;
+      submit.hidden = true;
+      return;
+    }
+    const wasReset = authMode === 'reset';
+    resetToken = null;
     Account.user = data.user;
     Account.csrf = data.csrfToken;
     authDialog.close();
@@ -237,6 +271,7 @@ authForm.addEventListener('submit', async (e) => {
     fillLicenseSelect();
     await refreshViews();
     if (data.verification) alert(VERIFY_MESSAGE[data.verification](data.user.email));
+    if (wasReset) alert('Dein neues Passwort ist gespeichert. Du bist angemeldet; auf anderen Geräten bist du abgemeldet.');
     const next = afterAuth;
     afterAuth = null;
     next?.();
@@ -547,7 +582,28 @@ async function deletePhoto(p) {
 
 /* ---------- Back from Google/GitHub (/?auth=… or /?auth_error=…) ---------- */
 
+/** The link from the reset e-mail: /#reset=<token>. */
+async function resetFromLink() {
+  const m = location.hash.match(/^#reset=([\w-]+)$/);
+  if (!m) return false;
+  history.replaceState(null, '', `${location.pathname}${location.search}`);
+  openAuth('reset');
+  try {
+    const who = await api(`/api/auth/password/reset?token=${encodeURIComponent(m[1])}`);
+    resetToken = m[1];
+    setIntro(`Für das Konto «${who.name}» (${who.email}). Danach bist du auf allen anderen Geräten abgemeldet.`);
+    authForm.password.focus();
+  } catch (err) {
+    setAuthMode('forgot');
+    setIntro('');
+    $('auth-error').textContent = err.message;
+    $('auth-error').hidden = false;
+  }
+  return true;
+}
+
 function authReturn() {
+  if (location.hash.startsWith('#reset=')) return resetFromLink();
   const q = new URLSearchParams(location.search);
   const error = q.get('auth_error');
   const result = q.get('auth');

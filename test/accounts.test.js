@@ -449,3 +449,99 @@ test('requireVerifiedEmail: writes need a confirmed address', async () => {
     assert.equal(res.status, 201);
   });
 });
+
+/** The token from the last reset link mailed to `to` (`/#reset=<token>`). */
+const resetTokenFor = (mails, to) => mails.filter((m) => m.to === to && /Passwort/.test(m.subject)).at(-1)?.text.match(/#reset=([\w-]+)/)[1];
+
+test('a forgotten password is reset with a one-time link that ends all sessions', async () => {
+  await withServer({}, async (base, db, mails) => {
+    const anna = client(base);
+    await anna.register('anna@example.org', 'Anna Wald');
+    const laptop = client(base);
+    await laptop.login('anna@example.org');
+
+    const anon = client(base);
+    const forgot = (email) => anon.req('/api/auth/password/forgot', { method: 'POST', json: { email } });
+    // Same answer whether or not an account exists.
+    const unknown = await forgot('niemand@example.org');
+    assert.equal(unknown.status, 200);
+    assert.deepEqual(await unknown.json(), { ok: true });
+    assert.equal(mails.filter((m) => /Passwort/.test(m.subject)).length, 0);
+    const known = await forgot('ANNA@example.org');
+    assert.deepEqual(await known.json(), { ok: true });
+    const token = resetTokenFor(mails, 'anna@example.org');
+    assert.ok(token);
+    assert.match(mails.at(-1).text, new RegExp(`^${base}/#reset=`, 'm'));
+
+    // The page checks the link before showing the form.
+    const check = await anon.req(`/api/auth/password/reset?token=${token}`);
+    assert.deepEqual(await check.json(), { name: 'Anna Wald', email: 'anna@example.org' });
+    assert.equal((await anon.req('/api/auth/password/reset?token=falsch')).status, 400);
+
+    const reset = (t, password) => anon.req('/api/auth/password/reset', { method: 'POST', json: { token: t, password } });
+    assert.equal((await reset(token, 'kurz')).status, 400);
+    const ok = await reset(token, 'neues-passwort-1');
+    assert.equal(ok.status, 200);
+    const body = await ok.json();
+    assert.equal(body.user.email, 'anna@example.org');
+    assert.equal(body.user.emailVerified, true, 'the link proves control of the address');
+    assert.ok(anon.cookie, 'logged in with the new password');
+    anon.csrf = body.csrfToken;
+
+    // Used up; old sessions and the old password are gone.
+    assert.equal((await reset(token, 'noch-ein-passwort')).status, 400);
+    assert.equal((await (await laptop.req('/api/auth/me')).json()).user, null);
+    assert.equal((await (await anna.req('/api/auth/me')).json()).user, null);
+    assert.equal((await client(base).login('anna@example.org')).res.status, 401);
+    assert.equal((await client(base).login('anna@example.org', 'neues-passwort-1')).res.status, 200);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM email_tokens WHERE purpose = 'reset'").get().n, 0);
+  });
+});
+
+test('reset links expire, a newer one replaces the older, and requests are limited', async () => {
+  await withServer({ rateLimits: { forgotPerAddress: 2 } }, async (base, db, mails) => {
+    await client(base).register('ben@example.org', 'Ben Berg');
+    const anon = client(base);
+    const forgot = () => anon.req('/api/auth/password/forgot', { method: 'POST', json: { email: 'ben@example.org' } });
+    await forgot();
+    const first = resetTokenFor(mails, 'ben@example.org');
+    await forgot();
+    const second = resetTokenFor(mails, 'ben@example.org');
+    assert.notEqual(first, second);
+    const reset = (t) => anon.req('/api/auth/password/reset', { method: 'POST', json: { token: t, password: 'neues-passwort-1' } });
+    assert.equal((await reset(first)).status, 400);
+
+    // A third request within the hour answers the same but sends nothing.
+    const count = mails.length;
+    assert.equal((await forgot()).status, 200);
+    assert.equal(mails.length, count);
+
+    // Resetting does not touch the confirmation link and vice versa.
+    const verifyToken = linkFor(mails, 'ben@example.org').searchParams.get('token');
+    assert.equal((await reset(verifyToken)).status, 400);
+
+    db.prepare("UPDATE email_tokens SET expires_at = ? WHERE purpose = 'reset'").run(Date.now() - 1);
+    const expired = await reset(second);
+    assert.equal(expired.status, 400);
+    assert.match((await expired.json()).error, /abgelaufen/);
+  });
+});
+
+test('an account from Google can set a password by reset; forgot works with requireLogin', async () => {
+  await withServer({ requireLogin: true }, async (base, db, mails) => {
+    await client(base).register('cleo@example.org', 'Cleo');
+    db.prepare("UPDATE users SET password_hash = '' WHERE email = 'cleo@example.org'").run(); // like an account from a provider
+    const anon = client(base);
+    assert.equal((await anon.req('/api/auth/password/forgot', { method: 'POST', json: { email: 'cleo@example.org' } })).status, 200);
+    const res = await anon.req('/api/auth/password/reset', {
+      method: 'POST', json: { token: resetTokenFor(mails, 'cleo@example.org'), password: 'endlich-ein-passwort' },
+    });
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).user.hasPassword, true);
+    // Cross-site posts are refused like login.
+    const cross = await fetch(`${base}/api/auth/password/forgot`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://evil.example' }, body: JSON.stringify({ email: 'cleo@example.org' }),
+    });
+    assert.equal(cross.status, 403);
+  });
+});

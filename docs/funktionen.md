@@ -597,6 +597,13 @@ Auffälligkeiten genauer:
   *Bestätigungslink senden*. Mit `REQUIRE_VERIFIED_EMAIL=1` braucht es eine bestätigte Adresse für Uploads
   und Änderungen. Fällt der Mailserver aus, gelingt die Registrierung trotzdem; der Link lässt sich später
   neu anfordern.
+- *Passwort vergessen*: Im Anmeldedialog unter *Passwort vergessen?* die Adresse angeben; es kommt ein Link
+  (1 Stunde gültig, nur einmal nutzbar, ein neuer ersetzt den alten). Die Antwort ist dieselbe, ob es ein Konto
+  gibt oder nicht, und die E-Mail geht im Hintergrund raus, damit sich so keine Adressen abfragen lassen
+  (höchstens 3 Links pro Adresse und 10 Anfragen pro IP in der Stunde). Der Link führt auf `/#reset=…`: Der
+  Teil nach `#` geht an keinen Server und in keinen Referer. Mit dem neuen Passwort ist man angemeldet,
+  alle anderen Sitzungen des Kontos enden, und die Adresse gilt als bestätigt. So können auch Konten aus
+  Google oder GitHub ein Passwort festlegen.
 - *Anmelden mit Google oder GitHub*: Ist ein Anbieter eingerichtet (siehe
   [Installation](installation.md#anmelden-mit-google-und-github)), zeigt der Dialog „Mit Google anmelden“
   bzw. „Mit GitHub anmelden“. Der Ablauf ist OAuth 2.0 mit PKCE; `state` und Verifier liegen in einem

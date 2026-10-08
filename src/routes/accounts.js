@@ -28,6 +28,11 @@
  * which confirms the address and redirects to `/?auth=verified`. With
  * `requireVerifiedEmail`, writes need an account with a confirmed address
  * (it implies `requireLogin`).
+ *
+ * Forgotten password: POST /api/auth/password/forgot mails a link to
+ * `/#reset=<token>` (the fragment never reaches servers or Referer headers);
+ * the page then posts the new password to /api/auth/password/reset. The
+ * answer to "forgot" is the same whether or not the address has an account.
  */
 
 const crypto = require('node:crypto');
@@ -43,7 +48,7 @@ const {
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 // Writes that stay open to anonymous visitors even with requireLogin.
-const OPEN_WRITES = [/^\/auth\/(login|register|logout)$/, /^\/photos\/\d+\/report$/];
+const OPEN_WRITES = [/^\/auth\/(login|register|logout|password\/forgot|password\/reset)$/, /^\/photos\/\d+\/report$/];
 // Writes an account with an unconfirmed address may still make with requireVerifiedEmail.
 const UNVERIFIED_WRITES = [/^\/auth\//, ...OPEN_WRITES];
 
@@ -66,6 +71,9 @@ module.exports = function registerAccounts(app, ctx) {
   const loginPerIp = createLimiter({ max: limits.loginPerIp ?? 30, windowMs: 15 * 60 * 1000 });
   const oauthPerIp = createLimiter({ max: limits.oauthPerIp ?? 30, windowMs: 15 * 60 * 1000 });
   const registerPerIp = createLimiter({ max: limits.registerPerIp ?? 10, windowMs: 3600 * 1000 });
+  const forgotPerIp = createLimiter({ max: limits.forgotPerIp ?? 10, windowMs: 3600 * 1000 });
+  const forgotPerAddress = createLimiter({ max: limits.forgotPerAddress ?? 3, windowMs: 3600 * 1000 });
+  const resetPerIp = createLimiter({ max: limits.resetPerIp ?? 20, windowMs: 15 * 60 * 1000 });
   const verifyPerAccount = createLimiter({ max: limits.verifyPerAccount ?? 3, windowMs: 3600 * 1000 });
   const reportPerIp = createLimiter({ max: limits.reportPerIp ?? 30, windowMs: 3600 * 1000 });
 
@@ -98,7 +106,7 @@ module.exports = function registerAccounts(app, ctx) {
 
   app.use('/api', (req, res, next) => {
     if (SAFE_METHODS.has(req.method)) return next();
-    const authRoute = /^\/auth\/(login|register)$/.test(req.path);
+    const authRoute = /^\/auth\/(login|register|password\/forgot|password\/reset)$/.test(req.path);
     if ((req.session || authRoute) && crossOrigin(req)) return fail(res, 403, 'Anfrage von fremder Herkunft abgelehnt');
     if (req.session && !sameString(req.get('x-csrf-token') || '', req.session.csrf)) {
       return fail(res, 403, 'Sicherheitstoken fehlt oder ist abgelaufen – bitte Seite neu laden');
@@ -303,6 +311,73 @@ module.exports = function registerAccounts(app, ctx) {
       const verification = await sendVerification(req, req.user);
       if (verification === 'failed') return fail(res, 502, 'Die E-Mail konnte nicht verschickt werden – bitte später erneut versuchen');
       res.json({ verification });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  /* ---------- Forgotten password ---------- */
+
+  const baseUrl = (req) => (publicUrl || origin(req)).replace(/\/+$/, '');
+
+  async function sendReset(req, user) {
+    const token = auth.createEmailToken(user, 'reset');
+    try {
+      await mailer.send({
+        to: user.email,
+        subject: 'MyForrest: Passwort zurücksetzen',
+        text: [
+          `Hallo ${user.name}`,
+          '',
+          `Für dein MyForrest-Konto (${user.email}) wurde ein neues Passwort angefordert. Mit diesem Link legst du es fest:`,
+          '',
+          `${baseUrl(req)}/#reset=${encodeURIComponent(token)}`,
+          '',
+          'Der Link ist 1 Stunde gültig und funktioniert nur einmal. Danach bist du auf allen Geräten abgemeldet.',
+          'Hast du nichts angefordert, kannst du diese E-Mail ignorieren – dein Passwort bleibt, wie es ist.',
+        ].join('\n'),
+      });
+    } catch (err) {
+      console.error(`E-Mail zum Zurücksetzen an Konto ${user.id} fehlgeschlagen: ${err.message}`);
+    }
+  }
+
+  app.post('/api/auth/password/forgot', (req, res) => {
+    if (!jsonOnly(req, res)) return;
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    if (!email) return fail(res, 400, 'Bitte die E-Mail-Adresse angeben');
+    const wait = forgotPerIp.blocked(req.ip);
+    if (wait) return res.set('Retry-After', String(wait)).status(429).json({ error: 'Zu viele Anfragen – bitte später erneut versuchen' });
+    forgotPerIp.hit(req.ip);
+    // Same answer and timing for known and unknown addresses: the mail goes out in the background.
+    const user = forgotPerAddress.blocked(email) ? null : auth.userByEmail(email);
+    if (user) {
+      forgotPerAddress.hit(email);
+      sendReset(req, user);
+    }
+    res.json({ ok: true });
+  });
+
+  app.get('/api/auth/password/reset', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const r = auth.checkResetToken(req.query.token);
+    if (r.error) return fail(res, 400, r.error);
+    res.json({ name: r.user.name, email: r.user.email });
+  });
+
+  app.post('/api/auth/password/reset', async (req, res, next) => {
+    if (!jsonOnly(req, res)) return;
+    const wait = resetPerIp.blocked(req.ip);
+    if (wait) return res.set('Retry-After', String(wait)).status(429).json({ error: 'Zu viele Fehlversuche – bitte später erneut versuchen' });
+    try {
+      const r = await auth.resetPassword(req.body?.token, req.body?.password);
+      if (r.error) {
+        resetPerIp.hit(req.ip);
+        return fail(res, r.status, r.error);
+      }
+      // Every session of the account has ended, this browser's included: log in afresh.
+      loginPerAccount.reset(`${req.ip}|${r.user.email.toLowerCase()}`);
+      res.json(startSession(req, res, r.user));
     } catch (err) {
       next(err);
     }

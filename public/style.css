@@ -1056,6 +1056,7 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 .auth-or { text-align: center; margin: 0.4rem 0 0; }
 .auth-error { color: var(--danger); font-size: 0.9rem; margin: 0.8rem 0 0; }
 .auth-error.ok { color: var(--ok); }
+.auth-switch { margin: 0.5rem 0 0; text-align: right; }
 .field > .license-hint { font-weight: 400; }
 .license-hint a, .photo-credit a { color: var(--accent); }
 

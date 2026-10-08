@@ -14,6 +14,8 @@
  *   that way have no password (an empty `password_hash`) and a verified e-mail.
  * - E-mail addresses of password accounts are confirmed with a link: a random
  *   token, valid for 24 hours, of which the database again only keeps the SHA-256.
+ *   A forgotten password is reset the same way, with a link valid for 1 hour;
+ *   resetting ends every session of the account.
  */
 
 const crypto = require('node:crypto');
@@ -25,6 +27,8 @@ const ROLES = ['user', 'moderator', 'admin'];
 const SESSION_COOKIE = 'mf_session';
 const SESSION_TTL_MS = 30 * 24 * 3600 * 1000;
 const VERIFY_TTL_MS = 24 * 3600 * 1000;
+const RESET_TTL_MS = 3600 * 1000;
+const TOKEN_TTL_MS = { verify: VERIFY_TTL_MS, reset: RESET_TTL_MS };
 const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 64 };
 
 const SCHEMA = `
@@ -60,11 +64,12 @@ const SCHEMA = `
   CREATE TABLE IF NOT EXISTS email_tokens (
     token_hash TEXT PRIMARY KEY,
     user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    purpose    TEXT NOT NULL CHECK (purpose IN ('verify', 'reset')),
     email      TEXT NOT NULL,
     created_at INTEGER NOT NULL,
     expires_at INTEGER NOT NULL
   );
-  CREATE INDEX IF NOT EXISTS email_tokens_user ON email_tokens (user_id);
+  CREATE INDEX IF NOT EXISTS email_tokens_user ON email_tokens (user_id, purpose);
 `;
 
 async function hashPassword(password) {
@@ -255,31 +260,80 @@ function createAuth(db, { adminEmail = null } = {}) {
     }
   }
 
-  /** A new confirmation token for the account's current address (earlier ones stop working). */
-  function createEmailToken(user) {
+  /**
+   * A new token for a link to the account's current address, `purpose`
+   * 'verify' or 'reset'; earlier ones of the same purpose stop working.
+   */
+  function createEmailToken(user, purpose = 'verify') {
     const token = randomToken();
     const t = Date.now();
-    db.prepare('DELETE FROM email_tokens WHERE user_id = ? OR expires_at < ?').run(user.id, t);
-    db.prepare('INSERT INTO email_tokens (token_hash, user_id, email, created_at, expires_at) VALUES (?, ?, ?, ?, ?)')
-      .run(sha256(token), user.id, user.email, t, t + VERIFY_TTL_MS);
+    db.prepare('DELETE FROM email_tokens WHERE (user_id = ? AND purpose = ?) OR expires_at < ?').run(user.id, purpose, t);
+    db.prepare('INSERT INTO email_tokens (token_hash, user_id, purpose, email, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(sha256(token), user.id, purpose, user.email, t, t + TOKEN_TTL_MS[purpose]);
     return token;
   }
 
-  /** Confirms the address for a token from the link; returns the account or `{ error }`. */
-  function confirmEmail(token) {
-    if (typeof token !== 'string' || !token || token.length > 100) return { error: 'Der Bestätigungslink ist ungültig' };
-    const row = db.prepare('SELECT * FROM email_tokens WHERE token_hash = ?').get(sha256(token));
+  const LINK_ERRORS = {
+    verify: { invalid: 'Der Bestätigungslink ist ungültig oder wurde schon ersetzt', expired: 'Der Bestätigungslink ist abgelaufen – im Konto-Menü einen neuen anfordern' },
+    reset: { invalid: 'Der Link zum Zurücksetzen ist ungültig oder wurde schon benutzt', expired: 'Der Link zum Zurücksetzen ist abgelaufen – bitte einen neuen anfordern' },
+  };
+
+  /** The account for a token from a link, or `{ error }`. */
+  function tokenUser(token, purpose) {
+    const errors = LINK_ERRORS[purpose];
+    if (typeof token !== 'string' || !token || token.length > 100) return { error: errors.invalid };
+    const row = db.prepare('SELECT * FROM email_tokens WHERE token_hash = ? AND purpose = ?').get(sha256(token), purpose);
     const user = row ? userById.get(row.user_id) : null;
-    if (!row || !user) return { error: 'Der Bestätigungslink ist ungültig oder wurde schon ersetzt' };
+    if (!row || !user) return { error: errors.invalid };
     if (row.expires_at < Date.now()) {
       db.prepare('DELETE FROM email_tokens WHERE token_hash = ?').run(row.token_hash);
-      return { error: 'Der Bestätigungslink ist abgelaufen – im Konto-Menü einen neuen anfordern', expired: true };
+      return { error: errors.expired, expired: true };
     }
-    if (row.email.toLowerCase() !== user.email.toLowerCase()) return { error: 'Der Bestätigungslink gehört zu einer anderen Adresse' };
-    if (!user.email_verified_at) db.prepare('UPDATE users SET email_verified_at = ? WHERE id = ?').run(Date.now(), user.id);
-    db.prepare('DELETE FROM email_tokens WHERE user_id = ?').run(user.id);
-    return { user: userById.get(user.id) };
+    // The link went to an address the account no longer has.
+    if (row.email.toLowerCase() !== user.email.toLowerCase()) return { error: errors.invalid };
+    return { user };
   }
+
+  const markVerified = (user) => {
+    if (!user.email_verified_at) db.prepare('UPDATE users SET email_verified_at = ? WHERE id = ?').run(Date.now(), user.id);
+  };
+
+  /** Confirms the address for a token from the link; returns the account or `{ error }`. */
+  function confirmEmail(token) {
+    const r = tokenUser(token, 'verify');
+    if (r.error) return r;
+    markVerified(r.user);
+    db.prepare("DELETE FROM email_tokens WHERE user_id = ? AND purpose = 'verify'").run(r.user.id);
+    return { user: userById.get(r.user.id) };
+  }
+
+  /** May this token still reset a password? (to show the form only for live links) */
+  const checkResetToken = (token) => tokenUser(token, 'reset');
+
+  /**
+   * Sets a new password for the account of a reset token. The link proves
+   * control of the address, so it counts as confirmed; all sessions of the
+   * account end (whoever knew the old password is logged out) and the token
+   * is used up.
+   */
+  async function resetPassword(token, password) {
+    if (typeof password !== 'string' || password.length < 8 || password.length > 200) {
+      return { error: 'Das Passwort braucht mindestens 8 Zeichen', status: 400 };
+    }
+    const r = tokenUser(token, 'reset');
+    if (r.error) return { ...r, status: 400 };
+    const hash = await hashPassword(password);
+    // Re-check after the (slow) hashing: the token may have been used meanwhile.
+    const used = db.prepare("DELETE FROM email_tokens WHERE token_hash = ? AND purpose = 'reset'").run(sha256(token));
+    if (!used.changes) return { error: LINK_ERRORS.reset.invalid, status: 400 };
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, r.user.id);
+    markVerified(r.user);
+    db.prepare('DELETE FROM email_tokens WHERE user_id = ?').run(r.user.id);
+    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(r.user.id);
+    return { user: userById.get(r.user.id) };
+  }
+
+  const userByEmail = (email) => (typeof email === 'string' && EMAIL_RE.test(email.trim()) ? db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim()) : null);
 
   const identitiesOf = (userId) => db.prepare('SELECT provider FROM identities WHERE user_id = ? ORDER BY provider').all(userId).map((r) => r.provider);
 
@@ -337,7 +391,7 @@ function createAuth(db, { adminEmail = null } = {}) {
 
   return {
     register, authenticate, createSession, session, destroySession, identityLogin, identitiesOf, unlinkIdentity,
-    createEmailToken, confirmEmail,
+    createEmailToken, confirmEmail, checkResetToken, resetPassword, userByEmail,
     userById: (id) => userById.get(id),
   };
 }
@@ -361,6 +415,6 @@ const userJson = (u, { self = false, identities } = {}) => (u ? {
 } : null);
 
 module.exports = {
-  ROLES, SESSION_COOKIE, SESSION_TTL_MS, VERIFY_TTL_MS,
+  ROLES, SESSION_COOKIE, SESSION_TTL_MS, VERIFY_TTL_MS, RESET_TTL_MS,
   hashPassword, verifyPassword, parseCookies, serializeCookie, createLimiter, createAuth, isModerator, hasPassword, userJson,
 };
