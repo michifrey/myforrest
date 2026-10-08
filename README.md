@@ -216,6 +216,20 @@ wie Forstdienste oder Naturschutzorganisationen (rechts, mit Schloss am Pin). PR
 Konto-Menü, eine Administratorin oder ein Administrator prüft den Antrag. Geschützte Funde fehlen in allen
 offenen Geodaten, Kacheln und Exporten für die Öffentlichkeit.
 
+### 12. Konto: E-Mail, Google oder GitHub
+
+<p>
+  <img src="docs/screenshots/anmelden.png" width="49%" alt="Anmeldedialog mit Google, GitHub und E-Mail">
+  <img src="docs/screenshots/konto-menue.png" width="24%" alt="Konto-Menü mit Hinweis auf die unbestätigte Adresse">
+</p>
+
+Ein **Konto** legt man mit E-Mail und Passwort an oder mit einem Klick über **Google** oder **GitHub**
+(links). Nach der Registrierung kommt ein **Bestätigungslink** per E-Mail; bis dahin erinnert das Konto-Menü
+daran (rechts). Ein vergessenes Passwort lässt sich per Link **zurücksetzen**, im Menü **ändern**, und
+Google oder GitHub lassen sich mit einem bestehenden Konto **verknüpfen**. Uploads ohne Konto bleiben
+möglich, ausser der Betrieb verlangt eines (`REQUIRE_LOGIN`) oder eine bestätigte Adresse
+(`REQUIRE_VERIFIED_EMAIL`).
+
 ## Was MyForrest kann
 
 Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen unter

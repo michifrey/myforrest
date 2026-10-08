@@ -1,6 +1,6 @@
 'use strict';
 // Takes the README screenshots from the demo server (see README.md here).
-// Usage: node shoot.js [hero map spot satellite sun species vektor touren schutz timelapse compare upload mobile]
+// Usage: node shoot.js [hero map spot satellite sun species vektor touren schutz konto timelapse compare upload mobile]
 const path = require('path');
 const fs = require('fs');
 const { execFileSync } = require('child_process');
@@ -209,6 +209,26 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await settle(page, 1200);
     await page.screenshot({ path: out('schutz-pro.jpg'), ...jpg });
     await pctx.close();
+  }
+
+  if (want('konto')) {
+    // The login dialog with Google, GitHub and e-mail.
+    let page = await explore(ctx);
+    await page.click('#account-btn');
+    await settle(page, 800);
+    await page.locator('#auth-dialog').screenshot({ path: out('anmelden.png') });
+    await page.close();
+    // The account menu of a member whose address is not yet confirmed.
+    const kctx = await desktop(browser);
+    page = await kctx.newPage();
+    await page.goto(`${BASE}/`);
+    await page.evaluate(() => fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: 'revier@example.org', password: 'demo-passwort' }) }));
+    await page.reload();
+    await settle(page, 2500);
+    await page.click('#account-btn');
+    await settle(page, 800);
+    await page.locator('#account-menu').screenshot({ path: out('konto-menue.png') });
+    await kctx.close();
   }
 
   await browser.close();
