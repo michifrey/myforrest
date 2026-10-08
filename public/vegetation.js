@@ -274,9 +274,16 @@
         + (a.index === 'ndmi' ? ' Das kann Trockenstress anzeigen, bevor sich die Kronen verfärben.' : '')
         + stormSentence(a.storm, true)
         + (a.visit ? ` Das letzte Foto ist ${a.lastPhoto ? `vom ${fmtDate(a.lastPhoto)}` : 'älter'}: Ein neues Foto würde zeigen, was dahinter steckt.` : '');
+      const c = a.calibration;
+      const basis = !c ? ''
+        : c.source === 'kalibriert'
+          ? `Schwelle ${ndviText(c.threshold)}, geeicht an ${c.positives} bestätigten Schäden und ${c.negatives} Kontrollen ohne Schaden: `
+            + `${c.hits} der Schäden erkannt, ${c.falseAlarms} Fehlalarm${c.falseAlarms === 1 ? '' : 'e'}.`
+          : `Schwelle ${ndviText(c.threshold)} ist ein Anfangswert. Geeicht wird sie, sobald mindestens 5 bestätigte Schäden und 5 Kontrollen ohne Schaden vorliegen (bisher ${c.positives} und ${c.negatives}).`;
       return el('article', { class: 'irregular early-warning', 'data-severity': a.severity }, [
         el('header', {}, [el('h4', { text: `Satellit: Frühwarnung ${info.name}` }), el('span', { class: 'sev', text: a.severity })]),
         el('p', { text }),
+        ...(basis ? [el('p', { class: 'hint', text: basis })] : []),
       ]);
     });
   }

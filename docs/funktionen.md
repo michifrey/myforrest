@@ -324,12 +324,36 @@ mit derselben Jahreszeit der bis zu fünf Vorjahre (mindestens zwei Vergleichswe
 - Ist das letzte Foto älter als der Rückgang, schlägt die App vor, den Spot zu besuchen: Ein neues Foto
   zeigt, was dahinter steckt.
 
+**Kalibrierung an bestätigten Schäden**: Die Schwellen der Frühwarnung eicht der Server an dem, was vor
+Ort bestätigt wurde.
+- **Kontrollen:** Jedes Paar aufeinanderfolgender Fotos eines Spots (mindestens 30 Tage auseinander) ist
+  eine Kontrolle.
+  - *Schaden*, wenn das spätere Foto einen neuen Schadens-Tag trägt (Sturmschaden, Borkenkäfer,
+    Trockenschaden, Holzschlag, Frühverfärbung, Frost) oder eine Region darauf als Windwurf, Auflichtung
+    oder Verfärbung bestätigt wurde.
+  - *Kein Schaden*, wenn beides fehlt.
+  - Paare, bei denen derselbe Schadens-Tag schon auf dem früheren Foto stand, sagen nichts über den
+    Zeitraum und zählen nicht.
+- **Nachgerechnet:** Für jede Kontrolle rechnet der Server Monat für Monat nach, wie stark die Frühwarnung
+  zwischen den beiden Besuchen ausgeschlagen hätte, jeweils nur mit den Daten, die damals vorlagen.
+- **Wahl der Schwelle:** Gewählt wird pro Index die Schwelle zwischen 0,03 und 0,30 mit dem besten
+  Verhältnis aus erkannten Schäden und Fehlalarmen (F1). Bei Gleichstand zählt die höhere, also die mit
+  weniger Fehlalarmen. Die Schwelle für „stark“ behält das Verhältnis der Anfangswerte.
+- **Zu wenige Kontrollen:** Mit weniger als 5 bestätigten Schäden oder 5 Kontrollen ohne Schaden bleibt der
+  Anfangswert.
+- **Wann:** Nach jeder täglichen Runde wird neu kalibriert. Die Frühwarnkarte nennt die Schwelle, die
+  Zahl der Kontrollen und wie viele Schäden und Fehlalarme sie darauf ergab.
+- **Ehrlich gelesen:** Diese Zahlen sind an denselben Kontrollen gemessen, an denen die Schwelle gewählt
+  wurde, also optimistisch, umso mehr, je weniger Kontrollen es gibt. „Kein Schaden“ heisst nur, dass
+  niemand einen Schaden markiert hat.
+
 **Sturm als Kontext**: Rückgänge und Frühwarnungen nennen den stärksten Sturm (Böen ab 75 km/h, siehe
 Sturmereignisse) im Zeitraum bzw. in den Monaten davor.
 
 **Grenzen**
 - Wegen der Pixelgrösse umfasst der Satellitenwert mehr (und anderes) als den Bildausschnitt.
-- Die Schwellen der Frühwarnung sind Anfangswerte, nicht an Waldschäden kalibriert.
+- Ohne genügend bestätigte Schäden bleiben die Schwellen der Frühwarnung Anfangswerte; die Rückgänge
+  zwischen zwei Fotos verwenden immer die Anfangswerte.
 - Ohne Internetzugang bleibt der Bereich leer und wird später erneut versucht. Fällt nur Landsat aus,
   läuft Sentinel-2 weiter.
 

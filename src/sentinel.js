@@ -357,15 +357,16 @@ function indexDrops(monthly, photos, { key = 'ndvi', threshold = THRESHOLDS[key]
 const ndviDrops = (monthly, photos, opts = {}) => indexDrops(monthly, photos, { key: 'ndvi', ...opts });
 
 /**
- * Early warning without photos: the median of the last `recentMonths` months
- * with data (ending at most `maxAgeMonths` before `now`) against the same
- * season (±1 month) in the years before (up to five). Needs at least two
- * baseline values. Returns one entry per index that dropped by its threshold.
+ * The early-warning comparison per index, without a threshold: the median of
+ * the last `recentMonths` months with data (ending at most `maxAgeMonths`
+ * before `now`) against the same season (±1 month) in the years before (up
+ * to five). Needs at least two baseline values; uses no data after `now`.
+ * Returns { ndvi, ndmi } with null where there is nothing to compare.
  */
-function currentAnomalies(monthly, { now = Date.now(), recentMonths = 2, maxAgeMonths = 3 } = {}) {
+function anomalyScores(monthly, { now = Date.now(), recentMonths = 2, maxAgeMonths = 3 } = {}) {
   const d = new Date(now);
   const current = d.getUTCFullYear() * 12 + d.getUTCMonth();
-  const out = [];
+  const out = { ndvi: null, ndmi: null };
   for (const key of ['ndvi', 'ndmi']) {
     const byIndex = indexOf(monthly, key);
     const recent = [...byIndex.keys()].filter((i) => i <= current && i > current - maxAgeMonths).sort((a, b) => b - a).slice(0, recentMonths);
@@ -377,21 +378,31 @@ function currentAnomalies(monthly, { now = Date.now(), recentMonths = 2, maxAgeM
     if (baseline.length < 2) continue;
     const vNow = median(recent.map((i) => byIndex.get(i)));
     const vBase = median(baseline.map((i) => byIndex.get(i)));
-    const drop = vBase - vNow;
-    if (drop < THRESHOLDS[key][0]) continue;
     const ym = (i) => `${Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, '0')}`;
-    out.push({
+    out[key] = {
       index: key,
       since: ym(oldest),
       until: ym(newest),
       now: Math.round(vNow * 1000) / 1000,
       baseline: Math.round(vBase * 1000) / 1000,
       baselineYears: new Set(baseline.map((i) => Math.floor(i / 12))).size,
-      drop: Math.round(drop * 1000) / 1000,
-      severity: severityOf(key, drop),
-    });
+      drop: Math.round((vBase - vNow) * 1000) / 1000,
+    };
   }
   return out;
+}
+
+/**
+ * Early warning without photos: the indices whose drop (anomalyScores)
+ * reaches its threshold. `thresholds` maps index → [threshold, strong]
+ * (calibrated ones from src/calibration.js, else the starting values).
+ */
+function currentAnomalies(monthly, { thresholds = THRESHOLDS, ...opts } = {}) {
+  const scores = anomalyScores(monthly, opts);
+  return ['ndvi', 'ndmi'].filter((k) => scores[k] && scores[k].drop >= thresholds[k][0]).map((k) => ({
+    ...scores[k],
+    severity: scores[k].drop >= thresholds[k][1] ? 'stark' : 'auffällig',
+  }));
 }
 
 const SCHEMA = `
@@ -575,6 +586,6 @@ function createSentinel({ db, fetchImpl = fetch, stacUrl = STAC_URL, landsat = n
 
 module.exports = {
   createSentinel, searchScenes, stacSearch, sceneIndices, readWindow, projectToScene, windowMean, reflectance, normalisedDifference,
-  monthlySeries, indexDrops, ndviDrops, currentAnomalies, sceneOf, reflectanceScale,
+  monthlySeries, indexDrops, ndviDrops, anomalyScores, currentAnomalies, sceneOf, reflectanceScale,
   latLonFromUtm, STAC_URL, NDVI_DROP, NDMI_DROP, THRESHOLDS, SENTINEL_START,
 };

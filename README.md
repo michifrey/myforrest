@@ -36,8 +36,14 @@ Jeder Marker ist ein **Spot**, also ein Ort, an dem über die Zeit Fotos entstan
 weniger als 25 m auseinander liegen und in dieselbe Richtung blicken (±45°), landen automatisch im
 selben Spot. Ein goldener Sichtkegel am Marker zeigt die Blickrichtung. Die Zahl im Marker nennt die
 Anzahl Fotos, die Farbe den Befund: grün für unauffällig, orange für Schäden (Sturm, Borkenkäfer,
-Trockenheit, Holzschlag, Erosion) und violett für Neophyten. Oben links lässt sich die Karte nach
-Beobachtungen filtern. Rechts stehen Kennzahlen und die zuletzt fotografierten Spots.
+Trockenschaden, Holzschlag, frühe Laubverfärbung, Frost) und violett für Neophyten. Kleine Zeichen am
+Marker melden:
+- **Rotes Ausrufezeichen:** Auffälligkeiten im Wetter.
+- **Blaues Windsymbol:** Einen Sturm seit dem letzten Besuch.
+- **Violetter Satellit:** Einen Rückgang im Satellitenbild, auch ohne neues Foto.
+
+Oben links lässt sich die Karte nach Beobachtungen und nach diesen Meldungen filtern. Rechts stehen
+Kennzahlen und die zuletzt fotografierten Spots.
 
 ### 2. Zeitreise an einem Spot
 
@@ -110,15 +116,20 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
 - **[Wetter, Klima und Gelände](docs/funktionen.md#wetter-klima-und-gelände)**: Wetter-Kontext zu jedem
   Foto, Auffälligkeiten wie Trockenheit oder frühe Laubverfärbung, Stürme seit dem letzten Besuch,
   Höhe, Exposition, Kaltluftseen sowie Satellitendaten (NDVI und Feuchteindex NDMI aus Sentinel-2, vor 2017
-  Landsat) als unabhängige Bestätigung und als Frühwarnung für Spots ohne neue Fotos.
+  Landsat) als unabhängige Bestätigung und als Frühwarnung für Spots ohne neue Fotos, deren Schwellen sich an
+  bestätigten Schäden eichen.
 - **[Kartenmodi](docs/funktionen.md#kartenmodi)**: Sonnenstand, Schatten und Einstrahlung inklusive
   Geländehorizont sowie Hotspots und Ausbreitungsfronten von Neophyten.
 - **[Pflanzen und Baumarten](docs/funktionen.md#pflanzen-und-baumarten)**: Pflanzenbestimmung mit Pl@ntNet,
   Erkennung invasiver Neophyten, Artenbestand pro Spot und Export zu Info Flora, GBIF und iNaturalist.
-- **[Offene Geodaten](docs/funktionen.md#offene-geodaten-für-gis-und-geoportale)**: alle Daten als
-  OGC API – Features und GeoPackage, in WGS84 oder den Schweizer Landeskoordinaten LV95 wie bei swisstopo,
-  Vektorkacheln (OGC API – Tiles, MVT) in Web Mercator und im Schweizer Kachelgitter LV95, vorberechnet und als PMTiles/MBTiles, mit MapLibre-Stil und Vektorkarten, Metadaten für geocat.ch (GM03/ISO 19139) und ein fertiges QGIS-Projekt für
-  QGIS Server (WMS/WMTS/WFS) für Geoportale wie map.geo.admin.ch.
+- **[Offene Geodaten](docs/funktionen.md#offene-geodaten-für-gis-und-geoportale)**:
+  - Alle Daten als OGC API – Features und GeoPackage, in WGS84 oder den Schweizer Landeskoordinaten LV95
+    wie bei swisstopo.
+  - Vektorkacheln (OGC API – Tiles, MVT) in Web Mercator und im Schweizer Kachelgitter LV95, vorberechnet
+    und als PMTiles/MBTiles zum Herunterladen.
+  - Zwei Vektorkarten: MapLibre in Web Mercator, OpenLayers auf der Landeskarte von swisstopo.
+  - Metadaten für geocat.ch und opendata.swiss (GM03/ISO 19139).
+  - Ein fertiges QGIS-Projekt für QGIS Server (WMS/WMTS/WFS) für Geoportale wie map.geo.admin.ch.
 - **[Konten und Moderation](docs/funktionen.md#konten-moderation-und-lizenzen)**: Konten mit Rollen,
   Lizenz pro Foto, Melden und Moderieren.
 
@@ -135,6 +146,10 @@ npm test
 Für das Kamera-Overlay auf dem Handy braucht es HTTPS. Wie das geht und welche Umgebungsvariablen es gibt,
 steht unter [Installation und Konfiguration](docs/installation.md).
 
+Mit QGIS Server für Geoportale gibt es zwei fertige Zusammenstellungen: Docker Compose unter
+[`deploy/qgis-server`](deploy/qgis-server/README.md) und Kubernetes, etwa ein lokaler Cluster auf podman,
+unter [`deploy/k8s`](deploy/k8s/README.md) (`deploy/k8s/start.sh`).
+
 ## Dokumentation
 
 | Dokument | Inhalt |
@@ -145,11 +160,13 @@ steht unter [Installation und Konfiguration](docs/installation.md).
 | [Architektur](docs/architektur.md) | Aufbau des Codes, Module im Überblick |
 | [REST-API](docs/api.md) | Alle Routen des Servers |
 | [Roadmap](docs/roadmap.md) | Was als Nächstes geplant ist |
+| [QGIS Server](deploy/qgis-server/README.md) und [Kubernetes](deploy/k8s/README.md) | Betrieb mit Geodiensten per Docker Compose oder Kubernetes |
 
 ## Daten und Lizenz
 
-Kartendaten © OpenStreetMap-Mitwirkende. Wetterdaten von [Open-Meteo.com](https://open-meteo.com)
-(ERA5, CC BY 4.0). Enthält modifizierte Copernicus-Sentinel-Daten. Phänologie-Daten: Deutscher
-Wetterdienst. Details unter [Datenquellen](docs/betrieb.md#externe-datenquellen-und-netzzugang).
+Kartendaten © OpenStreetMap-Mitwirkende, Landeskarte und Luftbild © swisstopo. Wetterdaten von
+[Open-Meteo.com](https://open-meteo.com) (ERA5, CC BY 4.0). Enthält modifizierte Copernicus-Sentinel-Daten;
+Landsat-Daten mit freundlicher Genehmigung des U.S. Geological Survey. Phänologie-Daten: Deutscher
+Wetterdienst. Pflanzenbestimmung mit Pl@ntNet. Details unter [Datenquellen](docs/betrieb.md#externe-datenquellen-und-netzzugang).
 
 Der Code steht unter der [Apache-Lizenz 2.0](LICENSE).
