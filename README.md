@@ -109,7 +109,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   dazulernt, Objekterkennung für liegende Stämme und Holzpolter sowie Vegetationsdichte pro Foto.
 - **[Wetter, Klima und Gelände](docs/funktionen.md#wetter-klima-und-gelände)**: Wetter-Kontext zu jedem
   Foto, Auffälligkeiten wie Trockenheit oder frühe Laubverfärbung, Stürme seit dem letzten Besuch,
-  Höhe, Exposition, Kaltluftseen und Sentinel-2-Satellitendaten als unabhängige Bestätigung.
+  Höhe, Exposition, Kaltluftseen sowie Satellitendaten (NDVI und Feuchteindex NDMI aus Sentinel-2, vor 2017
+  Landsat) als unabhängige Bestätigung und als Frühwarnung für Spots ohne neue Fotos.
 - **[Kartenmodi](docs/funktionen.md#kartenmodi)**: Sonnenstand, Schatten und Einstrahlung inklusive
   Geländehorizont sowie Hotspots und Ausbreitungsfronten von Neophyten.
 - **[Pflanzen und Baumarten](docs/funktionen.md#pflanzen-und-baumarten)**: Pflanzenbestimmung mit Pl@ntNet,

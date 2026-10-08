@@ -1,11 +1,17 @@
 'use strict';
 
 /*
- * Vegetation density per photo and the Sentinel-2 NDVI context per spot.
+ * Vegetation density per photo and the satellite context per spot
+ * (Sentinel-2 NDVI and NDMI, Landsat before 2017).
  *
  *   GET  /api/spots/:id/vegetation   per-photo metrics (computed in the background when missing)
- *   GET  /api/spots/:id/ndvi         monthly NDVI series, drops between photo dates
+ *   GET  /api/spots/:id/ndvi         monthly NDVI/NDMI series, drops between photo dates, current anomalies
  *   POST /api/spots/:id/ndvi         fetch the satellite series again
+ *   GET  /api/satellite/alerts       spots whose last months dropped against earlier years (early warning)
+ *
+ * A watcher refreshes the series of all spots once a day (SATELLITE_WATCH_HOURS,
+ * 0 = off), so drops show up without anyone opening the spot or taking a photo.
+ * Drops and alerts carry the strongest storm of their period (storms.js).
  *
  * Usage in createApp: `const vegetation = require('./routes/vegetation')(app, ctx)`,
  * with ctx = { db, uploadDir, background, fetchImpl }. Returns { analyzePhoto, backfill };
@@ -14,7 +20,9 @@
 
 const path = require('node:path');
 const { analyzeVegetation, imageAspect } = require('../vegetation');
-const { createSentinel, ndviDrops, STAC_URL } = require('../sentinel');
+const { createSentinel, indexDrops, currentAnomalies, STAC_URL } = require('../sentinel');
+const { createLandsat, STAC_URL: LANDSAT_STAC_URL } = require('../landsat');
+const { createStorms, likelyStorm, stormText } = require('../storms');
 
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS photo_vegetation (
@@ -31,11 +39,20 @@ const SUPPORT_TAGS = ['sturmschaden', 'holzschlag', 'borkenkaefer'];
 
 const isIdentity = (h) => h.every((v, i) => Math.abs(v - [1, 0, 0, 0, 1, 0, 0, 0, 1][i]) < 1e-9);
 
+const DAY = 86400000;
+const monthStart = (ym) => Date.parse(`${ym}-01T00:00:00Z`);
+
 module.exports = function registerVegetation(app, {
   db, uploadDir, background, fetchImpl = fetch, stacUrl = process.env.SENTINEL_STAC_URL ?? STAC_URL,
+  landsatStacUrl = process.env.LANDSAT_STAC_URL ?? LANDSAT_STAC_URL, landsatTokenUrl = process.env.LANDSAT_TOKEN_URL,
+  watchHours = Number(process.env.SATELLITE_WATCH_HOURS ?? 24), now = () => Date.now(),
 }) {
   db.exec(SCHEMA);
-  const sentinel = stacUrl ? createSentinel({ db, fetchImpl, stacUrl }) : null;
+  const landsat = stacUrl && landsatStacUrl
+    ? createLandsat({ fetchImpl, stacUrl: landsatStacUrl, ...(landsatTokenUrl ? { tokenUrl: landsatTokenUrl } : {}), now })
+    : null;
+  const sentinel = stacUrl ? createSentinel({ db, fetchImpl, stacUrl, landsat, now }) : null;
+  const storms = createStorms({ db, fetchImpl, now });
 
   const getPhoto = db.prepare('SELECT * FROM photos WHERE id = ?');
   const stored = db.prepare('SELECT * FROM photo_vegetation WHERE photo_id = ?');
@@ -176,23 +193,66 @@ module.exports = function registerVegetation(app, {
     return evidence;
   }
 
+  /**
+   * The strongest storm (gusts ≥ 75 km/h) at the spot between two times, from
+   * the weather cache. Missing years are fetched in the background, so the
+   * storm shows up on the next look; until then `undefined`.
+   */
+  const stormFetches = new Set();
+  function stormBetween(lat, lon, from, to) {
+    const events = storms.cachedBetween(lat, lon, from, to);
+    if (events === null) {
+      const key = `${lat.toFixed(1)},${lon.toFixed(1)}`;
+      if (!stormFetches.has(key)) {
+        stormFetches.add(key);
+        background(storms.between(lat, lon, from, to).catch(() => null).finally(() => stormFetches.delete(key)));
+      }
+      return undefined;
+    }
+    const e = likelyStorm(events, from, to);
+    return e ? { date: e.date, gust: e.gust, class: e.class, text: stormText(e) } : null;
+  }
+
+  /** Early warnings of a spot from its cached series: index, since when, how strong, storm, whether to visit. */
+  function alertsOf(spotId, monthly, spot) {
+    const last = db.prepare('SELECT MAX(taken_at) AS t FROM photos WHERE spot_id = ?').get(spotId)?.t ?? null;
+    return currentAnomalies(monthly, { now: now() }).map((a) => ({
+      ...a,
+      lastPhoto: last ? new Date(last).toISOString().slice(0, 10) : null,
+      // A photo taken after the drop began would already show it.
+      visit: !last || last < monthStart(a.since),
+      // Storms from three months before the drop until now.
+      storm: stormBetween(spot.lat, spot.lon, monthStart(a.since) - 92 * DAY, now()),
+    }));
+  }
+
   const ndviJson = (id) => {
     const photos = db.prepare('SELECT id, taken_at FROM photos WHERE spot_id = ? ORDER BY taken_at, id').all(id)
       .map((p) => ({ id: p.id, takenAt: new Date(p.taken_at).toISOString() }));
-    if (!sentinel) return { status: 'disabled', monthly: [], drops: [], photos };
+    if (!sentinel) return { status: 'disabled', monthly: [], drops: [], alerts: [], photos };
+    const spot = db.prepare('SELECT lat, lon FROM spots WHERE id = ?').get(id);
     const s = sentinel.series(id);
-    const drops = ndviDrops(s.monthly, photos).map((d) => ({ ...d, evidence: photoEvidence(d.fromPhotoId, d.toPhotoId) }));
+    const drops = ['ndvi', 'ndmi'].flatMap((key) => indexDrops(s.monthly, photos, { key })).map((d) => ({
+      ...d,
+      evidence: photoEvidence(d.fromPhotoId, d.toPhotoId),
+      storm: stormBetween(spot.lat, spot.lon, Date.parse(d.fromDate), Date.parse(d.toDate) + DAY - 1),
+    }));
     const running = refreshing.has(id);
     let status = 'ready';
     if (running) status = 'pending';
     else if (s.error) status = 'offline';
+    const sensors = new Set(s.monthly.flatMap((m) => m.sensors));
     return {
       status,
-      source: 'Copernicus Sentinel-2 L2A über Earth Search (Element 84)',
+      source: [
+        'Copernicus Sentinel-2 L2A über Earth Search (Element 84)',
+        ...([...sensors].some((x) => x.startsWith('L')) ? ['Landsat Collection 2 (USGS) über Microsoft Planetary Computer'] : []),
+      ].join('; '),
       resolutionM: 10,
       windowM: 30,
       ...s,
       drops,
+      alerts: alertsOf(id, s.monthly, spot),
       photos,
     };
   };
@@ -226,6 +286,40 @@ module.exports = function registerVegetation(app, {
       next(err);
     }
   });
+
+  /* ---------- Early warning for all spots ---------- */
+
+  app.get('/api/satellite/alerts', (req, res) => {
+    if (!sentinel) return res.json([]);
+    const spots = db.prepare('SELECT s.id, s.lat, s.lon FROM spots s JOIN spot_ndvi n ON n.spot_id = s.id').all();
+    res.json(spots.map((spot) => ({ spotId: spot.id, lat: spot.lat, lon: spot.lon, alerts: alertsOf(spot.id, sentinel.series(spot.id).monthly, spot) }))
+      .filter((x) => x.alerts.length));
+  });
+
+  /** Refreshes the satellite series of every spot that is due, one after the other. */
+  let watching = null;
+  function watchOnce() {
+    if (!sentinel) return Promise.resolve(0);
+    if (!watching) {
+      watching = (async () => {
+        let refreshed = 0;
+        for (const { id } of db.prepare('SELECT id FROM spots ORDER BY id').all()) {
+          if (!sentinel.needsRefresh(id)) continue;
+          await refreshNdvi(id);
+          refreshed++;
+        }
+        return refreshed;
+      })().finally(() => { watching = null; });
+      background(watching);
+    }
+    return watching;
+  }
+  app.locals.satelliteWatch = watchOnce;
+  if (sentinel && watchHours > 0) {
+    // First round a few minutes after startup, then daily; timers never keep the process alive.
+    setTimeout(watchOnce, 5 * 60000).unref?.();
+    setInterval(watchOnce, watchHours * 3600000).unref?.();
+  }
 
   return { analyzePhoto, backfill };
 };

@@ -1,7 +1,8 @@
 'use strict';
 
 /*
- * Satellite context: Sentinel-2 L2A NDVI time series for a spot.
+ * Satellite context: Sentinel-2 L2A NDVI and NDMI time series for a spot,
+ * with Landsat 5/7/8 (src/landsat.js) for the years before 2017.
  *
  * Scenes are found with the public Earth Search STAC API (Element 84, no key)
  * and read as Cloud-Optimized GeoTIFFs: only the few hundred bytes of header
@@ -9,8 +10,15 @@
  * requests. Per scene the red (B04) and near-infrared (B08) reflectance of a
  * ~30 m window (3 × 3 pixels of 10 m) is read, clouds, shadows and snow are
  * masked with the scene classification (SCL, 20 m), and the mean NDVI of the
- * clear pixels is cached. Scenes are grouped per month; the monthly value is
- * the median of the clear scenes of that month.
+ * clear pixels is cached. The moisture index NDMI ((B08 − B11) / (B08 + B11),
+ * a common measure of water stress in canopies) is read the same way from the
+ * 20 m SWIR pixels within ~20 m, with the mean of the four 10 m NIR pixels in
+ * each (B08 is read anyway, so NDMI costs one band more, not two). Scenes are grouped per month; the
+ * monthly value is the median of the clear scenes of that month.
+ *
+ * Besides drops between two photo dates (supporting evidence for what the
+ * photos show), `currentAnomalies` compares the last months with the same
+ * season of the years before: an early warning that does not need new photos.
  *
  * Without network access every step fails softly: the spot simply has no
  * satellite series and the cached values (if any) are kept.
@@ -31,6 +39,14 @@ const ATTEMPTS_PER_MONTH = 4; // scenes tried per month (lowest cloud cover firs
 const SCL_CLEAR = new Set([4, 5, 6, 7]);
 const NDVI_DROP = 0.1; // drop between photo dates flagged as supporting evidence
 const NDVI_DROP_STRONG = 0.2;
+// NDMI varies less than NDVI over the seasons; drops of this size mark water stress in canopies.
+const NDMI_DROP = 0.08;
+const NDMI_DROP_STRONG = 0.15;
+const NDMI_RADIUS_M = 20; // 20 m pixels whose centre lies within 20 m: about 2 × 2 pixels
+const THRESHOLDS = { ndvi: [NDVI_DROP, NDVI_DROP_STRONG], ndmi: [NDMI_DROP, NDMI_DROP_STRONG] };
+// Bump when a scene's stored values gain a new index: older rows are evaluated again.
+const INDEX_VERSION = 2;
+const SENTINEL_START = '2017-01-01'; // Earth Search's Sentinel-2 L2A archive; earlier years come from Landsat
 
 let geotiffModule = null;
 async function geotiff() {
@@ -59,11 +75,14 @@ async function makeClient(url, fetchImpl, timeoutMs) {
 /** Scale and offset that turn the asset's digital numbers into reflectance. */
 function reflectanceScale(asset, properties) {
   const band = asset?.['raster:bands']?.[0];
-  if (band && Number.isFinite(band.scale)) return { scale: band.scale, offset: Number.isFinite(band.offset) ? band.offset : 0 };
-  // Processing baseline 04.00 (2022) added an offset of −1000 to the digital numbers.
+  const scale = band && Number.isFinite(band.scale) ? band.scale : 1e-4;
+  // Processing baseline 04.00 (2022) added an offset of −1000 to the digital numbers. Earth Search
+  // removes it from the COGs and then says so in `earthsearch:boa_offset_applied`, while raster:bands
+  // still lists the −0.1: applying it again would push dark forest red below zero (NDVI ≈ 1).
+  if (properties?.['earthsearch:boa_offset_applied'] === true) return { scale, offset: 0 };
+  if (band && Number.isFinite(band.scale)) return { scale, offset: Number.isFinite(band.offset) ? band.offset : 0 };
   const baseline = Number.parseFloat(properties?.['s2:processing_baseline'] || '0');
-  const applied = properties?.['earthsearch:boa_offset_applied'];
-  return { scale: 1e-4, offset: baseline >= 4 && !applied ? -0.1 : 0 };
+  return { scale, offset: baseline >= 4 ? -0.1 : 0 };
 }
 
 /** EPSG code of an item (STAC projection extension, old and new field names). */
@@ -80,25 +99,28 @@ function sceneOf(item) {
   const red = a.red || a.B04;
   const nir = a.nir || a.B08;
   const scl = a.scl || a.SCL;
+  const swir16 = a.swir16 || a.B11;
   const epsg = itemEpsg(item);
   const datetime = item.properties?.datetime;
   if (!red?.href || !nir?.href || !scl?.href || !epsg || !datetime) return null;
   return {
     id: item.id,
+    sensor: 'S2',
     date: datetime.slice(0, 10),
     cloud: item.properties['eo:cloud_cover'] ?? null,
     epsg,
     red: { href: red.href, ...reflectanceScale(red, item.properties) },
     nir: { href: nir.href, ...reflectanceScale(nir, item.properties) },
     scl: { href: scl.href },
+    // SWIR at 20 m for the moisture index (absent in old fixtures: then NDVI only).
+    swir16: swir16?.href ? { href: swir16.href, ...reflectanceScale(swir16, item.properties) } : null,
   };
 }
 
 /** All scenes over a point within [from, to] (YYYY-MM-DD), following STAC paging. */
 async function searchScenes({ lat, lon, from, to, fetchImpl, stacUrl = STAC_URL, maxPages = 20, timeoutMs = 20000 }) {
-  let req = {
-    url: `${stacUrl.replace(/\/$/, '')}/search`,
-    method: 'POST',
+  return stacSearch({
+    stacUrl, fetchImpl, maxPages, timeoutMs, toScene: sceneOf,
     body: {
       collections: [COLLECTION],
       intersects: { type: 'Point', coordinates: [lon, lat] },
@@ -106,7 +128,16 @@ async function searchScenes({ lat, lon, from, to, fetchImpl, stacUrl = STAC_URL,
       query: { 'eo:cloud_cover': { lt: MAX_CLOUD } },
       limit: 100,
     },
-  };
+  });
+}
+
+/**
+ * A STAC item search (POST, following `next` links) mapped to scenes with
+ * `toScene`; one scene per day (the least cloudy, as overlapping tiles repeat
+ * the same acquisition), sorted by date.
+ */
+async function stacSearch({ stacUrl, body, toScene, fetchImpl, maxPages = 20, timeoutMs = 20000 }) {
+  let req = { url: `${stacUrl.replace(/\/$/, '')}/search`, method: 'POST', body };
   const scenes = [];
   for (let page = 0; req && page < maxPages; page++) {
     const res = await fetchImpl(req.url, {
@@ -118,7 +149,7 @@ async function searchScenes({ lat, lon, from, to, fetchImpl, stacUrl = STAC_URL,
     if (!res.ok) throw new Error(`STAC-Suche: HTTP ${res.status}`);
     const json = await res.json();
     for (const f of json.features || []) {
-      const s = sceneOf(f);
+      const s = toScene(f);
       if (s) scenes.push(s);
     }
     const next = (json.links || []).find((l) => l.rel === 'next');
@@ -166,45 +197,74 @@ async function readWindow(href, x, y, radiusM, fetchImpl, timeoutMs = 20000) {
   };
 }
 
-/** Mean NDVI of the clear pixels within ~30 m of the point in one scene. */
-async function sceneNdvi(scene, lat, lon, fetchImpl, { radiusM = WINDOW_RADIUS_M, timeoutMs } = {}) {
+/** The point in the scene's UTM projection; scenes in other projections cannot be read. */
+function projectToScene(scene, lat, lon) {
   const zone = scene.epsg % 100;
   const south = Math.floor(scene.epsg / 100) === 327;
   if (!(Math.floor(scene.epsg / 100) === 326 || south) || zone < 1 || zone > 60) {
     throw Object.assign(new Error(`Projektion EPSG:${scene.epsg} nicht unterstützt`), { permanent: true });
   }
-  const { x, y } = utmFromLatLon(lat, lon, zone, south);
-  const [red, nir, scl] = await Promise.all([
-    readWindow(scene.red.href, x, y, radiusM, fetchImpl, timeoutMs),
-    readWindow(scene.nir.href, x, y, radiusM, fetchImpl, timeoutMs),
-    readWindow(scene.scl.href, x, y, radiusM + 20, fetchImpl, timeoutMs),
-  ]);
+  return utmFromLatLon(lat, lon, zone, south);
+}
+
+/**
+ * Mean over the pixels of `grid` whose centre lies within `radiusM` of
+ * (x, y) of `valueAt(px, py)` (null for masked pixels), with the share of
+ * pixels that had a value. Too few clear pixels give no value.
+ */
+function windowMean(grid, x, y, radiusM, valueAt) {
   let total = 0;
   let clear = 0;
   let sum = 0;
-  for (let r = 0; r < red.height; r++) {
-    for (let c = 0; c < red.width; c++) {
-      const px = red.ox + (red.c0 + c + 0.5) * red.rx;
-      const py = red.oy + (red.r0 + r + 0.5) * red.ry;
-      // Only pixels whose centre lies within the window radius (a 3 × 3 block at 10 m).
+  for (let r = 0; r < grid.height; r++) {
+    for (let c = 0; c < grid.width; c++) {
+      const px = grid.ox + (grid.c0 + c + 0.5) * grid.rx;
+      const py = grid.oy + (grid.r0 + r + 0.5) * grid.ry;
       if (Math.abs(px - x) > radiusM || Math.abs(py - y) > radiusM) continue;
       total++;
-      const dnRed = red.data[r * red.width + c];
-      const dnNir = nir.at(px, py);
-      const cls = scl.at(px, py);
-      if (!dnRed || !dnNir || !SCL_CLEAR.has(cls)) continue;
-      const R = Math.max(0, dnRed * scene.red.scale + scene.red.offset);
-      const N = Math.max(0, dnNir * scene.nir.scale + scene.nir.offset);
-      if (R + N <= 0) continue;
-      sum += Math.max(-1, Math.min(1, (N - R) / (N + R)));
+      const v = valueAt(px, py);
+      if (v === null) continue;
+      sum += v;
       clear++;
     }
   }
   const clearFraction = total ? clear / total : 0;
   return {
-    ndvi: clear && clearFraction >= MIN_CLEAR ? Math.round((sum / clear) * 1000) / 1000 : null,
+    value: clear && clearFraction >= MIN_CLEAR ? Math.round((sum / clear) * 1000) / 1000 : null,
     clearFraction: Math.round(clearFraction * 100) / 100,
   };
+}
+
+/** Surface reflectance of a digital number (0 = no data → null). */
+const reflectance = (dn, band) => (dn ? Math.max(0, dn * band.scale + band.offset) : null);
+/** (a − b) / (a + b) of two reflectances, null when either is missing. */
+const normalisedDifference = (a, b) => (a === null || b === null || a + b <= 0 ? null : Math.max(-1, Math.min(1, (a - b) / (a + b))));
+
+/**
+ * NDVI of the clear pixels within ~30 m of the point in one scene, and NDMI
+ * of the clear 20 m pixels within ~20 m (when the scene has B11).
+ */
+async function sceneIndices(scene, lat, lon, fetchImpl, { radiusM = WINDOW_RADIUS_M, timeoutMs } = {}) {
+  const { x, y } = projectToScene(scene, lat, lon);
+  const nirRadius = scene.swir16 ? Math.max(radiusM, NDMI_RADIUS_M + 10) : radiusM;
+  const [red, nir, scl, swir16] = await Promise.all([
+    readWindow(scene.red.href, x, y, radiusM, fetchImpl, timeoutMs),
+    readWindow(scene.nir.href, x, y, nirRadius, fetchImpl, timeoutMs),
+    readWindow(scene.scl.href, x, y, radiusM + 20, fetchImpl, timeoutMs),
+    scene.swir16 ? readWindow(scene.swir16.href, x, y, NDMI_RADIUS_M, fetchImpl, timeoutMs) : null,
+  ]);
+  const clearAt = (px, py) => SCL_CLEAR.has(scl.at(px, py));
+  // NDVI over the 10 m pixels.
+  const v = windowMean(nir, x, y, radiusM, (px, py) => (clearAt(px, py)
+    ? normalisedDifference(reflectance(nir.at(px, py), scene.nir), reflectance(red.at(px, py), scene.red)) : null));
+  // NDMI over the 20 m SWIR pixels, NIR as the mean of the four 10 m pixels inside each.
+  const nirMean = (px, py) => {
+    const values = [[-5, -5], [5, -5], [-5, 5], [5, 5]].map(([dx, dy]) => reflectance(nir.at(px + dx, py + dy), scene.nir));
+    return values.includes(null) ? null : values.reduce((a, b) => a + b, 0) / 4;
+  };
+  const m = swir16 ? windowMean(swir16, x, y, NDMI_RADIUS_M, (px, py) => (clearAt(px, py)
+    ? normalisedDifference(nirMean(px, py), reflectance(swir16.at(px, py), scene.swir16)) : null)) : null;
+  return { ndvi: v.value, ndmi: m ? m.value : null, clearFraction: v.clearFraction };
 }
 
 const median = (values) => {
@@ -214,31 +274,55 @@ const median = (values) => {
 };
 const monthIndex = (ym) => Number(ym.slice(0, 4)) * 12 + Number(ym.slice(5, 7)) - 1;
 
-/** Monthly NDVI from per-scene values: median of the clear scenes of each month. */
+/**
+ * Monthly values from per-scene values: per index the median of the clear
+ * scenes of each month. A month appears when it has an NDVI or an NDMI.
+ */
 function monthlySeries(scenes) {
   const byMonth = new Map();
   for (const s of scenes) {
-    if (s.ndvi === null || s.ndvi === undefined) continue;
+    const hasNdmi = s.ndmi !== null && s.ndmi !== undefined;
+    if ((s.ndvi === null || s.ndvi === undefined) && !hasNdmi) continue;
     const m = s.date.slice(0, 7);
     if (!byMonth.has(m)) byMonth.set(m, []);
     byMonth.get(m).push(s);
   }
-  return [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, list]) => ({
-    month,
-    ndvi: Math.round(median(list.map((s) => s.ndvi)) * 1000) / 1000,
-    scenes: list.length,
-    dates: list.map((s) => s.date),
-  }));
+  const round = (v) => Math.round(v * 1000) / 1000;
+  return [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, list]) => {
+    const ndvi = list.filter((s) => s.ndvi !== null && s.ndvi !== undefined);
+    const ndmi = list.filter((s) => s.ndmi !== null && s.ndmi !== undefined);
+    return {
+      month,
+      ndvi: ndvi.length ? round(median(ndvi.map((s) => s.ndvi))) : null,
+      ndmi: ndmi.length ? round(median(ndmi.map((s) => s.ndmi))) : null,
+      scenes: ndvi.length,
+      dates: list.map((s) => s.date),
+      sensors: [...new Set(list.map((s) => s.sensor || 'S2'))],
+    };
+  });
 }
 
+const indexOf = (monthly, key) => new Map(monthly.filter((m) => m[key] !== null && m[key] !== undefined).map((m) => [monthIndex(m.month), m[key]]));
+/** Month indices of `byIndex` in the season (±1 month) of month index `target` within [lo, hi]. */
+const seasonMonths = (byIndex, target, lo, hi) => {
+  const out = [];
+  for (let i = lo; i <= hi; i++) {
+    const d = Math.abs((((i - target) % 12) + 12) % 12);
+    if (Math.min(d, 12 - d) <= 1 && byIndex.has(i)) out.push(i);
+  }
+  return out;
+};
+const severityOf = (key, drop) => (drop >= THRESHOLDS[key][1] ? 'stark' : 'auffällig');
+
 /**
- * Strong NDVI drops between consecutive photo dates. NDVI follows the
- * seasons (deciduous forest is low in winter), so the value around the later
- * photo is compared with the same season (±1 month) during the two years up
- * to the earlier photo. `photos` are { id, takenAt (ISO) } sorted by time.
+ * Strong drops of an index (`key`: 'ndvi' or 'ndmi') between consecutive
+ * photo dates. Both follow the seasons (deciduous forest is low in winter),
+ * so the value around the later photo is compared with the same season
+ * (±1 month) during the two years up to the earlier photo. `photos` are
+ * { id, takenAt (ISO) } sorted by time.
  */
-function ndviDrops(monthly, photos, { threshold = NDVI_DROP } = {}) {
-  const byIndex = new Map(monthly.map((m) => [monthIndex(m.month), m.ndvi]));
+function indexDrops(monthly, photos, { key = 'ndvi', threshold = THRESHOLDS[key][0] } = {}) {
+  const byIndex = indexOf(monthly, key);
   const drops = [];
   for (let k = 1; k < photos.length; k++) {
     const a = photos[k - 1];
@@ -247,17 +331,14 @@ function ndviDrops(monthly, photos, { threshold = NDVI_DROP } = {}) {
     const ib = monthIndex(b.takenAt.slice(0, 7));
     if (ib - ia < 1) continue;
     const after = [ib - 1, ib, ib + 1].filter((i) => i > ia && byIndex.has(i)).map((i) => byIndex.get(i));
-    const before = [];
-    for (let i = ia - 24; i <= ia; i++) {
-      const d = Math.abs((((i - ib) % 12) + 12) % 12);
-      if (Math.min(d, 12 - d) <= 1 && byIndex.has(i)) before.push(byIndex.get(i));
-    }
+    const before = seasonMonths(byIndex, ib, ia - 24, ia).map((i) => byIndex.get(i));
     if (!after.length || !before.length) continue;
     const vBefore = median(before);
     const vAfter = median(after);
     const drop = vBefore - vAfter;
     if (drop >= threshold) {
       drops.push({
+        index: key,
         fromPhotoId: a.id,
         toPhotoId: b.id,
         fromDate: a.takenAt.slice(0, 10),
@@ -265,11 +346,52 @@ function ndviDrops(monthly, photos, { threshold = NDVI_DROP } = {}) {
         before: Math.round(vBefore * 1000) / 1000,
         after: Math.round(vAfter * 1000) / 1000,
         drop: Math.round(drop * 1000) / 1000,
-        severity: drop >= NDVI_DROP_STRONG ? 'stark' : 'auffällig',
+        severity: severityOf(key, drop),
       });
     }
   }
   return drops;
+}
+
+/** NDVI drops between photo dates (see indexDrops). */
+const ndviDrops = (monthly, photos, opts = {}) => indexDrops(monthly, photos, { key: 'ndvi', ...opts });
+
+/**
+ * Early warning without photos: the median of the last `recentMonths` months
+ * with data (ending at most `maxAgeMonths` before `now`) against the same
+ * season (±1 month) in the years before (up to five). Needs at least two
+ * baseline values. Returns one entry per index that dropped by its threshold.
+ */
+function currentAnomalies(monthly, { now = Date.now(), recentMonths = 2, maxAgeMonths = 3 } = {}) {
+  const d = new Date(now);
+  const current = d.getUTCFullYear() * 12 + d.getUTCMonth();
+  const out = [];
+  for (const key of ['ndvi', 'ndmi']) {
+    const byIndex = indexOf(monthly, key);
+    const recent = [...byIndex.keys()].filter((i) => i <= current && i > current - maxAgeMonths).sort((a, b) => b - a).slice(0, recentMonths);
+    if (!recent.length) continue;
+    const newest = recent[0];
+    const oldest = recent[recent.length - 1];
+    // Same season, from one year before the recent window back five years.
+    const baseline = seasonMonths(byIndex, newest, newest - 60, oldest - 11);
+    if (baseline.length < 2) continue;
+    const vNow = median(recent.map((i) => byIndex.get(i)));
+    const vBase = median(baseline.map((i) => byIndex.get(i)));
+    const drop = vBase - vNow;
+    if (drop < THRESHOLDS[key][0]) continue;
+    const ym = (i) => `${Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, '0')}`;
+    out.push({
+      index: key,
+      since: ym(oldest),
+      until: ym(newest),
+      now: Math.round(vNow * 1000) / 1000,
+      baseline: Math.round(vBase * 1000) / 1000,
+      baselineYears: new Set(baseline.map((i) => Math.floor(i / 12))).size,
+      drop: Math.round(drop * 1000) / 1000,
+      severity: severityOf(key, drop),
+    });
+  }
+  return out;
 }
 
 const SCHEMA = `
@@ -293,27 +415,41 @@ const SCHEMA = `
     PRIMARY KEY (spot_id, scene_id)
   );
 `;
+// Added with NDMI and Landsat: the moisture index, the sensor and which index version a row holds.
+const MIGRATIONS = [
+  ['spot_ndvi_scenes', 'ndmi', 'REAL'],
+  ['spot_ndvi_scenes', 'sensor', "TEXT NOT NULL DEFAULT 'S2'"],
+  ['spot_ndvi_scenes', 'v', 'INTEGER NOT NULL DEFAULT 1'],
+  ['spot_ndvi', 'landsat_error', 'TEXT'],
+];
 
 const DAY = 86400000;
 const isoDate = (ms) => new Date(ms).toISOString().slice(0, 10);
+const LANDSAT_START = '1984-04-01'; // Landsat 5 Thematic Mapper
 
 /**
- * NDVI service with a per-spot cache in the database. `refresh(spotId)`
+ * Satellite service with a per-spot cache in the database. `refresh(spotId)`
  * searches scenes over the spot's photo period (from a year before the first
- * photo until today) and evaluates the scenes not evaluated yet, at most
- * `maxScenes` per call so a long history is filled in over several refreshes.
+ * photo until today: Sentinel-2 from 2017, Landsat before when `landsat` is
+ * given) and evaluates the scenes not evaluated yet, at most `maxScenes` per
+ * call so a long history is filled in over several refreshes. Scenes cached
+ * by an older index version are evaluated again (newest first) within the
+ * same budget.
  */
-function createSentinel({ db, fetchImpl = fetch, stacUrl = STAC_URL, maxScenes = 60, timeoutMs = 20000 }) {
+function createSentinel({ db, fetchImpl = fetch, stacUrl = STAC_URL, landsat = null, maxScenes = 60, timeoutMs = 20000, now = () => Date.now() }) {
   db.exec(SCHEMA);
+  for (const [table, column, type] of MIGRATIONS) {
+    if (!db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+  }
   const getStatus = db.prepare('SELECT * FROM spot_ndvi WHERE spot_id = ?');
-  const sceneRows = db.prepare('SELECT scene_id, date, cloud, ndvi, clear_fraction FROM spot_ndvi_scenes WHERE spot_id = ? ORDER BY date');
+  const sceneRows = db.prepare('SELECT scene_id, date, cloud, ndvi, ndmi, sensor, v, clear_fraction FROM spot_ndvi_scenes WHERE spot_id = ? ORDER BY date');
 
   function period(spotId) {
     const r = db.prepare('SELECT MIN(taken_at) AS first, MAX(taken_at) AS last FROM photos WHERE spot_id = ?').get(spotId);
     if (r?.first === null || r?.first === undefined) return null;
-    // Sentinel-2 L2A coverage starts in 2017; a year of history before the first photo gives the baseline.
-    const from = Math.max(Date.parse('2017-01-01'), r.first - 365 * DAY);
-    return { from: isoDate(from), to: isoDate(Date.now()) };
+    // A year of history before the first photo gives the baseline; before 2017 only Landsat has it.
+    const from = Math.max(Date.parse(landsat ? LANDSAT_START : SENTINEL_START), r.first - 365 * DAY);
+    return { from: isoDate(from), to: isoDate(now()) };
   }
 
   /** Whether the cached series should be (re)fetched. */
@@ -325,7 +461,7 @@ function createSentinel({ db, fetchImpl = fetch, stacUrl = STAC_URL, maxScenes =
     if (!st || st.fetched_at === null) return true;
     const moved = Math.abs(st.lat - spot.lat) > 1e-4 || Math.abs(st.lon - spot.lon) > 1e-4;
     if (moved || p.from < st.from_date) return true;
-    const age = Date.now() - st.fetched_at;
+    const age = now() - st.fetched_at;
     if (st.error) return age > 3600000; // offline: retry after an hour
     if (!st.complete) return true; // more scenes waiting
     return age > 7 * DAY; // new acquisitions every few days
@@ -340,24 +476,37 @@ function createSentinel({ db, fetchImpl = fetch, stacUrl = STAC_URL, maxScenes =
       // The spot centre moved (new photos): the cached window no longer fits.
       db.prepare('DELETE FROM spot_ndvi_scenes WHERE spot_id = ?').run(spotId);
     }
-    const save = (complete, error) => db.prepare(`
-      INSERT INTO spot_ndvi (spot_id, lat, lon, from_date, to_date, fetched_at, complete, error)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    const save = (complete, error, landsatError = null) => db.prepare(`
+      INSERT INTO spot_ndvi (spot_id, lat, lon, from_date, to_date, fetched_at, complete, error, landsat_error)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (spot_id) DO UPDATE SET lat = excluded.lat, lon = excluded.lon, from_date = excluded.from_date,
-        to_date = excluded.to_date, fetched_at = excluded.fetched_at, complete = excluded.complete, error = excluded.error
-    `).run(spotId, spot.lat, spot.lon, p.from, p.to, Date.now(), complete ? 1 : 0, error);
+        to_date = excluded.to_date, fetched_at = excluded.fetched_at, complete = excluded.complete, error = excluded.error,
+        landsat_error = excluded.landsat_error
+    `).run(spotId, spot.lat, spot.lon, p.from, p.to, now(), complete ? 1 : 0, error, landsatError);
 
+    // Sentinel-2 from 2017; Landsat for the years before, when the photos reach back that far.
     let scenes;
     try {
-      scenes = await searchScenes({ lat: spot.lat, lon: spot.lon, from: p.from, to: p.to, fetchImpl, stacUrl, timeoutMs });
+      const from = p.from > SENTINEL_START ? p.from : SENTINEL_START;
+      scenes = await searchScenes({ lat: spot.lat, lon: spot.lon, from, to: p.to, fetchImpl, stacUrl, timeoutMs });
     } catch (err) {
       save(false, err.message);
       return;
     }
+    let landsatError = null;
+    if (landsat && p.from < SENTINEL_START) {
+      try {
+        scenes.push(...await landsat.scenes(spot.lat, spot.lon, p.from, isoDate(Date.parse(SENTINEL_START) - DAY)));
+      } catch (err) {
+        // Landsat is extra history: Sentinel-2 goes ahead, Landsat is tried again later.
+        landsatError = err.message;
+      }
+    }
+    const read = (s) => (s.sensor === 'S2' ? sceneIndices(s, spot.lat, spot.lon, fetchImpl, { timeoutMs }) : landsat.indices(s, spot.lat, spot.lon));
     const done = new Map(sceneRows.all(spotId).map((r) => [r.scene_id, r]));
     const insert = db.prepare(`
-      INSERT OR REPLACE INTO spot_ndvi_scenes (spot_id, scene_id, date, cloud, ndvi, clear_fraction)
-      VALUES (?, ?, ?, ?, ?, ?)`);
+      INSERT OR REPLACE INTO spot_ndvi_scenes (spot_id, scene_id, date, cloud, ndvi, ndmi, sensor, v, clear_fraction)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     // Per month: lowest cloud cover first, until enough clear scenes or attempts.
     const byMonth = new Map();
     for (const s of scenes) {
@@ -366,10 +515,10 @@ function createSentinel({ db, fetchImpl = fetch, stacUrl = STAC_URL, maxScenes =
       byMonth.get(m).push(s);
     }
     let budget = maxScenes;
-    let complete = true;
+    let complete = !landsatError;
     let lastError = null;
     let failures = 0;
-    // Newest months first: the recent past matters most for fresh photos.
+    // Newest months first: the recent past matters most for fresh photos and the early warning.
     for (const month of [...byMonth.keys()].sort().reverse()) {
       const list = byMonth.get(month).sort((a, b) => (a.cloud ?? 100) - (b.cloud ?? 100));
       let clear = 0;
@@ -378,34 +527,36 @@ function createSentinel({ db, fetchImpl = fetch, stacUrl = STAC_URL, maxScenes =
         if (clear >= SCENES_PER_MONTH || tried >= ATTEMPTS_PER_MONTH) break;
         tried++;
         const cached = done.get(s.id);
-        if (cached) {
+        // Rows of the current version (or scenes without the bands for more) need no new read.
+        if (cached && (cached.v >= INDEX_VERSION || (s.sensor === 'S2' && !s.swir16))) {
           if (cached.ndvi !== null) clear++;
           continue;
         }
         if (budget <= 0) { complete = false; break; }
         budget--;
         try {
-          const r = await sceneNdvi(s, spot.lat, spot.lon, fetchImpl, { timeoutMs });
-          insert.run(spotId, s.id, s.date, s.cloud, r.ndvi, r.clearFraction);
+          const r = await read(s);
+          insert.run(spotId, s.id, s.date, s.cloud, r.ndvi, r.ndmi, s.sensor, INDEX_VERSION, r.clearFraction);
           if (r.ndvi !== null) clear++;
         } catch (err) {
           // A scene that cannot cover the spot is recorded as without value.
-          if (err.permanent) { insert.run(spotId, s.id, s.date, s.cloud, null, 0); continue; }
-          // Network trouble: leave the scene for the next refresh.
+          if (err.permanent) { insert.run(spotId, s.id, s.date, s.cloud, null, null, s.sensor, INDEX_VERSION, 0); continue; }
+          // Network trouble: an old row keeps its NDVI; the scene is tried again on the next refresh.
+          if (cached && cached.ndvi !== null) clear++;
           lastError = err.message;
           complete = false;
-          if (++failures >= 3) { save(false, `Szenen nicht lesbar: ${lastError}`); return; }
+          if (++failures >= 3) { save(false, `Szenen nicht lesbar: ${lastError}`, landsatError); return; }
         }
       }
     }
-    save(complete, null);
+    save(complete, null, landsatError);
   }
 
   /** Cached series of a spot with status information. */
   function series(spotId) {
     const st = getStatus.get(spotId);
     const scenes = sceneRows.all(spotId).map((r) => ({
-      id: r.scene_id, date: r.date, cloud: r.cloud, ndvi: r.ndvi, clearFraction: r.clear_fraction,
+      id: r.scene_id, date: r.date, cloud: r.cloud, ndvi: r.ndvi, ndmi: r.ndmi, sensor: r.sensor, clearFraction: r.clear_fraction,
     }));
     return {
       fetchedAt: st?.fetched_at ? new Date(st.fetched_at).toISOString() : null,
@@ -413,6 +564,7 @@ function createSentinel({ db, fetchImpl = fetch, stacUrl = STAC_URL, maxScenes =
       to: st?.to_date ?? null,
       complete: Boolean(st?.complete),
       error: st?.error ?? null,
+      landsatError: st?.landsat_error ?? null,
       scenesEvaluated: scenes.length,
       monthly: monthlySeries(scenes),
     };
@@ -422,6 +574,7 @@ function createSentinel({ db, fetchImpl = fetch, stacUrl = STAC_URL, maxScenes =
 }
 
 module.exports = {
-  createSentinel, searchScenes, sceneNdvi, readWindow, monthlySeries, ndviDrops, sceneOf, reflectanceScale,
-  latLonFromUtm, STAC_URL, NDVI_DROP,
+  createSentinel, searchScenes, stacSearch, sceneIndices, readWindow, projectToScene, windowMean, reflectance, normalisedDifference,
+  monthlySeries, indexDrops, ndviDrops, currentAnomalies, sceneOf, reflectanceScale,
+  latLonFromUtm, STAC_URL, NDVI_DROP, NDMI_DROP, THRESHOLDS, SENTINEL_START,
 };

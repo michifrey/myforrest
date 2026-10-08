@@ -38,7 +38,8 @@ in `public/sw.js` `SHELL_VERSION` erhöhen; alte Caches werden beim Aktivieren g
 | Quelle | Wofür | Hosts, die der Server erreichen muss |
 |--------|-------|--------------------------------------|
 | [Open-Meteo.com](https://open-meteo.com) (ERA5-Reanalyse, CC BY 4.0) | Wetter, Normalwerte, Böen, Geländehöhe | `archive-api.open-meteo.com`, `api.open-meteo.com` |
-| Copernicus Sentinel-2 über [Earth Search](https://earth-search.aws.element84.com/v1) (Element 84, AWS Open Data) | NDVI-Satellitenkontext | `earth-search.aws.element84.com`, `sentinel-cogs.s3.us-west-2.amazonaws.com` |
+| Copernicus Sentinel-2 über [Earth Search](https://earth-search.aws.element84.com/v1) (Element 84, AWS Open Data) | Satellitenkontext NDVI/NDMI ab 2017, Frühwarnung | `earth-search.aws.element84.com`, `sentinel-cogs.s3.us-west-2.amazonaws.com` |
+| Landsat Collection 2 (USGS) über [Microsoft Planetary Computer](https://planetarycomputer.microsoft.com) | Satellitenkontext vor 2017 | `planetarycomputer.microsoft.com`, `landsateuwest.blob.core.windows.net` |
 | Deutscher Wetterdienst, Open Data | Phänologie-Referenzdaten ([laden](installation.md#phänologie-referenzdaten-laden)) | `opendata.dwd.de` |
 | [Pl@ntNet](https://my.plantnet.org) (optional, API-Key) | Pflanzenbestimmung | `my-api.plantnet.org` |
 | OpenStreetMap | Kartenkacheln (im Browser) | – |
@@ -52,4 +53,7 @@ Im Browser laufen [Leaflet](https://leafletjs.com) (BSD-2-Clause) für die App-K
 (ISC) und [vt-pbf](https://github.com/mapbox/vt-pbf) (MIT).
 
 Die Wetterdaten werden pro ~10-km-Zelle gecacht; die Normalwerte 1991–2020 werden nur einmal pro Zelle
-geladen. Die Satellitendaten enthalten modifizierte Copernicus-Sentinel-Daten.
+geladen. Die Satellitendaten enthalten modifizierte Copernicus-Sentinel-Daten; Landsat-Daten mit freundlicher
+Genehmigung des U.S. Geological Survey. Eine Sentinel-2-Szene kostet pro Spot rund 4,4 MB Download (eine
+interne Kachel pro Band); der erste Abruf eines Spots liest bis zu 60 Szenen, danach kommen nur neue
+Aufnahmen dazu (die tägliche Frühwarn-Runde liest also wenig).

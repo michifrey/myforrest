@@ -112,29 +112,34 @@ test('STAC items are read with old and new projection fields', () => {
   const [a, , c] = [...pages[0].features, ...pages[1].features].map(sceneOf);
   assert.equal(a.epsg, 32632);
   assert.equal(c.epsg, 32632);
-  assert.deepEqual([a.red.scale, a.red.offset], [0.0001, -0.1]);
+  // Earth Search removed the 2022 offset from the data (boa_offset_applied) but still lists it: not applied twice.
+  assert.deepEqual([a.red.scale, a.red.offset], [0.0001, 0]);
+  // Without that flag the listed offset counts.
+  assert.deepEqual([c.red.scale, c.red.offset], [0.0001, -0.1]);
+  assert.match(a.swir16.href, /B11\.tif$/);
   assert.equal(sceneOf({ id: 'x', properties: {}, assets: {} }), null);
 });
 
 /* ---------- API with mocked Earth Search ---------- */
 
 const SPOT = { lat: 47.36, lon: 8.58 };
-// Digital numbers per scene: [red, nir, scl]. Reflectance = DN · 1e-4 − 0.1.
+// Digital numbers per scene: [red, nir, scl, swir16]. Reflectance = DN · 1e-4, minus 0.1 for the 2024
+// scene whose item does not say the offset was removed already.
 const SCENES = {
-  S2A_32TMT_20230612_0_L2A: [1300, 4500, 4], // dense forest: NDVI 0.84
-  S2B_32TMT_20230717_0_L2A: [2000, 2200, 9], // cloud over the spot: masked
-  S2A_32TMT_20240616_0_L2A: [1800, 3400, 4], // after windthrow: NDVI 0.5
+  S2A_32TMT_20230612_0_L2A: [300, 3500, 4, 1700], // dense forest: NDVI 0.84, NDMI 0.35
+  S2B_32TMT_20230717_0_L2A: [2000, 2200, 9, 2000], // cloud over the spot: masked
+  S2A_32TMT_20240616_0_L2A: [1800, 3400, 4, 2800], // after windthrow: NDVI 0.5, NDMI 0.14
 };
 
 async function geotiffFor(sceneId, band) {
   const { writeArrayBuffer } = await import('geotiff');
   const { x, y } = utmFromLatLon(SPOT.lat, SPOT.lon, 32);
-  const res = band === 'SCL' ? 20 : 10;
-  const n = band === 'SCL' ? 10 : 20;
+  const res = band === 'SCL' || band === 'B11' ? 20 : 10;
+  const n = res === 20 ? 10 : 20;
   const ox = Math.floor(x / 20) * 20 - 100;
   const oy = Math.ceil(y / 20) * 20 + 100;
-  const [red, nir, scl] = SCENES[sceneId];
-  const value = { B04: red, B08: nir, SCL: scl }[band];
+  const [red, nir, scl, swir] = SCENES[sceneId];
+  const value = { B04: red, B08: nir, SCL: scl, B11: swir }[band];
   const values = band === 'SCL' ? new Uint8Array(n * n).fill(value) : new Uint16Array(n * n).fill(value);
   return Buffer.from(writeArrayBuffer(values, {
     width: n,
@@ -161,7 +166,7 @@ function mockEarthSearch(log) {
       return Response.json(pages[0]);
     }
     if (u.endsWith('/search?page=2')) return Response.json(pages[1]);
-    const m = /\/([^/]+)\/(B04|B08|SCL)\.tif$/.exec(u);
+    const m = /\/([^/]+)\/(B04|B08|B11|SCL)\.tif$/.exec(u);
     if (m) {
       const buf = await geotiffFor(m[1], m[2]);
       const range = /bytes=(\d+)-(\d+)/.exec(opts.headers?.Range || '');
@@ -226,16 +231,19 @@ test('vegetation density and the NDVI series of a spot, with the drop backed by 
     assert.equal(ndvi.status, 'ready');
     assert.equal(ndvi.error, null);
     assert.equal(ndvi.resolutionM, 10);
-    assert.deepEqual(ndvi.monthly.map((m) => [m.month, m.ndvi]), [['2023-06', 0.842], ['2024-06', 0.5]]);
+    assert.deepEqual(ndvi.monthly.map((m) => [m.month, m.ndvi, m.ndmi, m.sensors.join()]), [['2023-06', 0.842, 0.346, 'S2'], ['2024-06', 0.5, 0.143, 'S2']]);
     assert.equal(ndvi.scenesEvaluated, 3); // the cloudy July scene is cached without value
-    assert.equal(ndvi.drops.length, 1);
+    assert.deepEqual(ndvi.drops.map((x) => [x.index, x.severity]), [['ndvi', 'stark'], ['ndmi', 'stark']]);
     const d = ndvi.drops[0];
     assert.deepEqual([d.fromPhotoId, d.toPhotoId, d.severity], [a.id, b.id, 'stark']);
     assert.ok(d.evidence.some((e) => e.kind === 'change' && e.class === 'auflichtung'), JSON.stringify(d.evidence));
+    // No weather service in this test: the storm lookup is pending (undefined → omitted in JSON).
+    assert.equal(d.storm, undefined);
 
     // Only small range requests reach the COGs, never the whole file.
     const tifs = log.filter((r) => r.url.endsWith('.tif'));
-    assert.ok(tifs.length >= 9);
+    assert.ok(tifs.length >= 12);
+    assert.ok(tifs.some((r) => r.url.endsWith('/B11.tif')));
     assert.ok(tifs.every((r) => /^bytes=\d+-\d+$/.test(r.range)));
 
     // Cached: a second look does not search again.
