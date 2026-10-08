@@ -1263,3 +1263,26 @@ summary { cursor: pointer; color: var(--muted); font-weight: 600; font-size: 0.9
 
 .upload-tour { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.5rem; font-size: 0.85rem; }
 .upload-request { margin: 0 0 0.6rem; padding: 0.5rem 0.7rem; border-radius: var(--radius); background: color-mix(in srgb, var(--request) 18%, var(--surface)); font-size: 0.88rem; }
+
+/* ---------- Protected finds and PRO membership ---------- */
+:root { --protect: #9b4d16; }
+@media (prefers-color-scheme: dark) { :root { --protect: #e0955a; } }
+.pin .lock-flag {
+  position: absolute; left: -7px; top: -7px; transform: rotate(45deg);
+  width: 18px; height: 18px; border-radius: 50%; background: var(--protect); color: #fff;
+  display: grid; place-items: center; border: 2px solid #fbf8f0;
+}
+.pin .lock-flag svg { width: 10px; height: 10px; }
+.protected-cell { stroke: var(--protect); fill: var(--protect); fill-opacity: 0.12; stroke-dasharray: 6 4; }
+.protected-tip { max-width: 280px; white-space: normal; }
+.protected-badge {
+  display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600;
+  color: var(--protect); background: color-mix(in srgb, var(--protect) 14%, var(--surface));
+}
+.protect-field { margin-top: 0.6rem; }
+.protect-field p { margin: 0.2rem 0 0; }
+.pro-form { display: grid; gap: 0.4rem; margin-top: 0.6rem; }
+.pro-form label { font-weight: 600; font-size: 0.85rem; }
+#pro-dialog { max-width: 520px; }
+.pro-cell { display: flex; flex-direction: column; gap: 0.2rem; }
+.pro-actions { display: flex; gap: 0.5rem; align-items: center; }

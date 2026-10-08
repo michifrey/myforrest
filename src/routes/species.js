@@ -10,11 +10,11 @@ const { listOccurrences, speciesSummary, parseFilters } = require('../occurrence
 const { spreadFronts } = require('../spread');
 const { darwinCoreCsv, inaturalistCsv } = require('../export');
 
-module.exports = function speciesRoutes(app, { db, spotRadiusM = 25, publicUrl = process.env.PUBLIC_URL } = {}) {
+module.exports = function speciesRoutes(app, { db, spotRadiusM = 25, publicUrl = process.env.PUBLIC_URL, visibleSql = null } = {}) {
   /** Parses the shared filter parameters, answering 400 on bad input. */
   const filters = (req, res) => {
     try {
-      return { ...parseFilters(req.query), spotRadiusM };
+      return { ...parseFilters(req.query), spotRadiusM, ...(visibleSql ? { visibleSql: visibleSql(req, 'p') } : {}) };
     } catch (err) {
       res.status(err.status || 400).json({ error: err.message });
       return null;

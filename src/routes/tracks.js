@@ -29,7 +29,7 @@
  * upload names the request and was taken within 150 m of it.
  */
 
-const { createLimiter, isModerator } = require('../auth');
+const { createLimiter, isModerator, canSeeProtected } = require('../auth');
 const { distanceM, isValidCoord } = require('../geo');
 const { parseTrackFile, toGpx, MAX_POINTS } = require('../trackfile');
 const { lengthM, bbox, nearRoute, trimEnds } = require('../routegeo');
@@ -80,6 +80,8 @@ const SCHEMA = `
   );
   CREATE INDEX IF NOT EXISTS photo_requests_status ON photo_requests (status, lat, lon);
 `;
+// Requests at protected finds are shown to verified PRO members only.
+const REQUEST_MIGRATIONS = [['protected', 'INTEGER NOT NULL DEFAULT 0']];
 
 const angleDiff = (a, b) => Math.abs((((a - b) % 360) + 540) % 360 - 180);
 const dayDe = (ms) => new Date(ms).toISOString().slice(0, 10).split('-').reverse().join('.');
@@ -111,8 +113,16 @@ const unpackPoints = (json) => JSON.parse(json).map(([lat, lon, ele, time]) => {
 });
 
 module.exports = function registerTracks(app, ctx) {
-  const { db, spotRadiusM, satelliteAlerts = () => [], routerUrl = null, routerFetch = fetch, routerProfile = 'hiking-mountain' } = ctx;
+  const { db, spotRadiusM, satelliteAlerts = () => [], routerUrl = null, routerFetch = fetch, routerProfile = 'hiking-mountain', accounts = null } = ctx;
   db.exec(SCHEMA);
+  const reqCols = new Set(db.prepare('PRAGMA table_info(photo_requests)').all().map((c) => c.name));
+  for (const [col, type] of REQUEST_MIGRATIONS) if (!reqCols.has(col)) db.exec(`ALTER TABLE photo_requests ADD COLUMN ${col} ${type}`);
+  // What the request may see; without the accounts module (tests of this file alone): the public view.
+  const photoVisible = (req, alias = 'p') => (accounts ? accounts.visibleSql(req, alias) : `${alias}.hidden_at IS NULL AND COALESCE(${alias}.protected, 0) = 0`);
+  const spotVisible = (req, spotId) => spotId === null
+    || Boolean(db.prepare(`SELECT 1 FROM photos p WHERE p.spot_id = ? AND ${photoVisible(req)} LIMIT 1`).get(spotId));
+  const requestVisible = (req, r) => (r.protected ? canSeeProtected(req.user) || Boolean(req.user && r.requester_id === req.user.id) : true)
+    && spotVisible(req, r.spot_id);
   const requestLimit = createLimiter({ max: 20, windowMs: 3600 * 1000 });
   const fail = (res, status, error) => res.status(status).json({ error });
   const idOf = (req) => {
@@ -284,6 +294,7 @@ module.exports = function registerTracks(app, ctx) {
       title: r.title,
       note: r.note,
       status: r.status,
+      protected: Boolean(r.protected),
       photoId: r.photo_id,
       createdAt: new Date(r.created_at).toISOString().slice(0, 10), // day only
       doneAt: r.done_at ? new Date(r.done_at).toISOString().slice(0, 10) : null,
@@ -295,7 +306,12 @@ module.exports = function registerTracks(app, ctx) {
     const status = req.query.status === 'alle' ? null : 'offen';
     const rows = db.prepare(`SELECT * FROM photo_requests WHERE (? IS NULL AND status != 'zurueckgezogen') OR status = ?
       ORDER BY created_at DESC LIMIT 2000`).all(status, status);
-    res.json(rows.map((r) => requestJson(r, req.user)));
+    const photoOk = (pid) => Boolean(db.prepare(`SELECT 1 FROM photos p WHERE p.id = ? AND ${photoVisible(req)}`).get(pid));
+    res.json(rows.filter((r) => requestVisible(req, r)).map((r) => {
+      const j = requestJson(r, req.user);
+      if (j.photoId !== null && !photoOk(j.photoId)) j.photoId = null; // answered with a protected photo
+      return j;
+    }));
   });
 
   app.post('/api/photo-requests', (req, res) => {
@@ -304,9 +320,12 @@ module.exports = function registerTracks(app, ctx) {
     let lon = Number(b.lon);
     let heading = b.heading === undefined || b.heading === null || b.heading === '' ? null : Number(b.heading);
     let spotId = null;
+    let protect = Boolean(b.protected) && canSeeProtected(req.user);
     if (b.spotId !== undefined && b.spotId !== null && b.spotId !== '') {
       const spot = db.prepare('SELECT id, lat, lon, heading FROM spots WHERE id = ?').get(Number(b.spotId));
-      if (!spot) return fail(res, 400, 'Spot nicht gefunden');
+      if (!spot || !spotVisible(req, spot.id)) return fail(res, 400, 'Spot nicht gefunden');
+      // A spot the public cannot see stays hidden behind its request too.
+      if (!spotVisible({ user: null }, spot.id)) protect = true;
       [spotId, lat, lon] = [spot.id, spot.lat, spot.lon];
       heading ??= spot.heading;
     }
@@ -318,16 +337,16 @@ module.exports = function registerTracks(app, ctx) {
     const wait = requestLimit.blocked(key);
     if (wait) return res.status(429).set('Retry-After', String(wait)).json({ error: 'Zu viele Aufträge – bitte später wieder' });
     requestLimit.hit(key);
-    const id = Number(db.prepare(`INSERT INTO photo_requests (lat, lon, heading, radius_m, spot_id, title, note, requester_id, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(lat, lon, heading === null ? null : ((heading % 360) + 360) % 360,
-      Math.max(REQUEST_RADIUS_M, spotRadiusM), spotId, title, clean(b.note, 1000), req.user?.id ?? null, Date.now()).lastInsertRowid);
+    const id = Number(db.prepare(`INSERT INTO photo_requests (lat, lon, heading, radius_m, spot_id, title, note, requester_id, created_at, protected)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(lat, lon, heading === null ? null : ((heading % 360) + 360) % 360,
+      Math.max(REQUEST_RADIUS_M, spotRadiusM), spotId, title, clean(b.note, 1000), req.user?.id ?? null, Date.now(), protect ? 1 : 0).lastInsertRowid);
     res.status(201).json(requestJson(db.prepare('SELECT * FROM photo_requests WHERE id = ?').get(id), req.user));
   });
 
   app.delete('/api/photo-requests/:id', (req, res) => {
     const id = idOf(req);
     const r = id && db.prepare('SELECT * FROM photo_requests WHERE id = ?').get(id);
-    if (!r) return fail(res, 404, 'Auftrag nicht gefunden');
+    if (!r || !requestVisible(req, r)) return fail(res, 404, 'Auftrag nicht gefunden');
     const own = req.user && r.requester_id === req.user.id;
     if (!own && !isModerator(req.user)) return fail(res, req.user ? 403 : 401, 'Nur wer den Auftrag erstellt hat, kann ihn zurückziehen');
     db.prepare("UPDATE photo_requests SET status = 'zurueckgezogen', done_at = ? WHERE id = ? AND status = 'offen'").run(Date.now(), id);
@@ -360,11 +379,11 @@ module.exports = function registerTracks(app, ctx) {
     if (!route) return fail(res, 400, `Die Route braucht 2 bis ${MAX_POINTS} gültige Punkte`);
     const maxM = Math.min(1000, Math.max(20, Number(b.maxDistanceM) || 150));
     const candidates = [];
-    for (const r of db.prepare("SELECT * FROM photo_requests WHERE status = 'offen'").all()) {
+    for (const r of db.prepare("SELECT * FROM photo_requests WHERE status = 'offen'").all().filter((x) => requestVisible(req, x))) {
       candidates.push({ kind: 'auftrag', requestId: r.id, spotId: r.spot_id, lat: r.lat, lon: r.lon, heading: r.heading, title: r.title, text: r.note });
     }
     const alerted = new Set();
-    for (const a of satelliteAlerts()) {
+    for (const a of satelliteAlerts(req)) {
       alerted.add(a.spotId);
       const strongest = a.alerts.find((x) => x.severity === 'stark') || a.alerts[0];
       const spot = db.prepare('SELECT heading FROM spots WHERE id = ?').get(a.spotId);
@@ -375,7 +394,7 @@ module.exports = function registerTracks(app, ctx) {
       });
     }
     const stale = db.prepare(`SELECT s.id, s.lat, s.lon, s.heading, MAX(p.taken_at) AS last FROM spots s
-      JOIN photos p ON p.spot_id = s.id AND p.hidden_at IS NULL GROUP BY s.id HAVING COUNT(p.id) >= 2 AND last < ?`).all(Date.now() - STALE_DAYS * DAY);
+      JOIN photos p ON p.spot_id = s.id AND ${photoVisible(req)} GROUP BY s.id HAVING COUNT(p.id) >= 2 AND last < ?`).all(Date.now() - STALE_DAYS * DAY);
     for (const s of stale) {
       if (alerted.has(s.id)) continue;
       const years = Math.floor((Date.now() - s.last) / (365.25 * DAY));

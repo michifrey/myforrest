@@ -76,8 +76,12 @@ function listOccurrences(db, filters = {}) {
   const cols = columnsOf(db);
   const license = cols.has('license') ? 'p.license' : 'NULL';
   const where = ['i.score >= ?'];
-  // Photos hidden by moderators are never exported or mapped.
-  if (cols.has('hidden_at')) where.push('p.hidden_at IS NULL');
+  // Photos hidden by moderators are never exported or mapped; protected finds only for those who may see them.
+  if (f.visibleSql) where.push(`(${f.visibleSql})`);
+  else {
+    if (cols.has('hidden_at')) where.push('p.hidden_at IS NULL');
+    if (cols.has('protected')) where.push('COALESCE(p.protected, 0) = 0');
+  }
   const args = [f.minScore];
   if (f.from !== null && f.from !== undefined) { where.push('p.taken_at >= ?'); args.push(f.from); }
   if (f.to !== null && f.to !== undefined) { where.push('p.taken_at <= ?'); args.push(f.to); }

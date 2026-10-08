@@ -30,7 +30,7 @@
     open: false,
     tab: 'route',
     drawing: true, // clicks on the map add waypoints while the route tab is open
-    follow: false,
+    follow: true, // "Magnet": follow paths whenever the server has a routing service
     route: emptyRoute(),
     requests: [],
     suggestions: [],
@@ -372,7 +372,7 @@
   function requestPopup(r) {
     const dir = r.heading !== null ? `Blick nach ${COMPASS_LONG[compass(r.heading)]} (${Math.round(r.heading)}°)` : 'Blickrichtung frei';
     return el('div', { class: 'req-popup' }, [
-      el('p', { class: 'eyebrow', text: 'Fotoauftrag' }),
+      el('p', { class: 'eyebrow', text: r.protected ? 'Fotoauftrag · nur PRO' : 'Fotoauftrag' }),
       el('strong', { text: r.title }),
       r.note ? el('p', { class: 'small', text: r.note }) : '',
       el('p', { class: 'muted small', text: `${dir} · seit ${fmtDate(r.createdAt)}${r.spotId ? ` · Spot ${r.spotId}` : ''}` }),
@@ -434,6 +434,9 @@
         el('input', { id: 'req-title', maxlength: '120', required: '', placeholder: 'z. B. Bachufer mit Springkraut' }),
         el('label', { for: 'req-note', text: 'Hinweis (optional)' }),
         el('textarea', { id: 'req-note', rows: '2', maxlength: '1000', placeholder: 'z. B. vom Brückengeländer aus, Richtung Wald' }),
+        ...(Account.user && (Account.user.pro || ['moderator', 'admin'].includes(Account.user.role)) ? [
+          el('label', { class: 'toggle small' }, [el('input', { type: 'checkbox', id: 'req-protected' }), ' Nur für PRO-Mitglieder (geschützter Fund)']),
+        ] : []),
         el('label', { for: 'req-dir', text: 'Blickrichtung' }),
         el('select', { id: 'req-dir' }, [el('option', { value: '', text: d.spotId ? 'wie die bisherigen Fotos' : 'frei' }),
           ...COMPASS.map((c, i) => el('option', { value: String(i * 45), text: `nach ${COMPASS_LONG[c]}` }))]),
@@ -475,6 +478,7 @@
       await json('/api/photo-requests', {
         lat: d.lat, lon: d.lon, spotId: d.spotId, title: $('req-title').value, note: $('req-note').value,
         heading: $('req-dir').value === '' ? null : Number($('req-dir').value),
+        protected: Boolean($('req-protected')?.checked),
       });
       T.draft = null;
       await loadRequests();
@@ -657,7 +661,7 @@
           el('input', { type: 'file', id: 'tour-file', accept: '.gpx,.tcx,.kml,.geojson,.json,application/gpx+xml', hidden: '' }),
         ]),
         el('p', { id: 'tour-hint', class: 'muted small' }),
-        el('label', { class: 'toggle', id: 'tour-follow-wrap', hidden: '' }, [el('input', { type: 'checkbox', id: 'tour-follow' }), ' Magnet: Wegen folgen']),
+        el('label', { class: 'toggle', id: 'tour-follow-wrap', hidden: '' }, [el('input', { type: 'checkbox', id: 'tour-follow', checked: '' }), ' Magnet: Wegen folgen']),
         el('div', { class: 'tour-tools' }, [
           el('button', { type: 'button', id: 'tour-undo', class: 'link small', text: 'Rückgängig' }),
           el('button', { type: 'button', id: 'tour-loop', class: 'link small', text: 'Zurück zum Start' }),

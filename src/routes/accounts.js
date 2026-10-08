@@ -22,7 +22,7 @@
 const crypto = require('node:crypto');
 const path = require('node:path');
 const {
-  SESSION_COOKIE, SESSION_TTL_MS, ROLES, parseCookies, serializeCookie, createLimiter, createAuth, isModerator, userJson,
+  SESSION_COOKIE, SESSION_TTL_MS, ROLES, parseCookies, serializeCookie, createLimiter, createAuth, isModerator, canSeeProtected, userJson,
 } = require('../auth');
 const {
   LICENSES, DEFAULT_LICENSE, REPORT_REASONS, licenseJson, parseLicense, visibleSql, createModeration,
@@ -49,16 +49,24 @@ module.exports = function registerAccounts(app, ctx) {
   const reportPerIp = createLimiter({ max: limits.reportPerIp ?? 30, windowMs: 3600 * 1000 });
 
   const canSeeHidden = (req) => isModerator(req.user);
+  /** What this request may see: hidden photos (moderation), protected ones (PRO, moderation), own uploads. */
+  const view = (req) => ({ hidden: canSeeHidden(req), protected: canSeeProtected(req.user), userId: req.user?.id ?? null });
   const secure = (req) => req.secure || req.get('x-forwarded-proto') === 'https';
   const fail = (res, status, error) => res.status(status).json({ error });
 
   /* ---------- Session from the cookie ---------- */
 
-  app.use(['/api', '/uploads'], (req, res, next) => {
+  app.use(['/api', '/uploads', '/thumbs'], (req, res, next) => {
     const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
     req.session = token ? auth.session(token) : null;
     req.user = req.session?.user ?? null;
     if (token && !req.session) res.append('Set-Cookie', serializeCookie(SESSION_COOKIE, '', { maxAge: 0, secure: secure(req) }));
+    next();
+  });
+
+  // Answers for PRO members and moderation may contain protected finds: no shared or device caches.
+  app.use('/api', (req, res, next) => {
+    if (canSeeProtected(req.user)) res.set('Cache-Control', 'private, no-store');
     next();
   });
 
@@ -90,13 +98,28 @@ module.exports = function registerAccounts(app, ctx) {
 
   /* ---------- Hidden photos are not served to the public ---------- */
 
-  const hiddenFile = db.prepare('SELECT 1 FROM photos WHERE file = ? AND hidden_at IS NOT NULL');
-  app.use('/uploads', (req, res, next) => {
-    if (!canSeeHidden(req) && hiddenFile.get(path.basename(req.path))) return res.status(404).end();
+  // Originals and previews of hidden and protected photos; protected files are never cached by proxies.
+  const fileRow = db.prepare(`SELECT p.id FROM photos p WHERE (p.file = ? OR p.thumb_file = ? OR p.large_file = ?)
+    AND NOT (${visibleSql(false, 'p')})`);
+  app.use(['/uploads', '/thumbs'], (req, res, next) => {
+    const name = path.basename(req.path);
+    const restricted = fileRow.get(name, name, name);
+    if (!restricted) return next();
+    const ok = db.prepare(`SELECT 1 FROM photos p WHERE p.id = ? AND ${visibleSql(view(req), 'p')}`).get(restricted.id);
+    if (!ok) return res.status(404).end();
+    // express.static sets its own Cache-Control afterwards: override it on the way out.
+    const setHeader = res.setHeader.bind(res);
+    res.setHeader = (k, v) => setHeader(k, String(k).toLowerCase() === 'cache-control' ? 'private, no-store' : v);
+    res.setHeader('Cache-Control', 'private, no-store');
     next();
   });
 
-  const photoRow = db.prepare('SELECT id, spot_id, uploader_id, hidden_at FROM photos WHERE id = ?');
+  const photoRow = db.prepare('SELECT id, spot_id, uploader_id, hidden_at, protected FROM photos WHERE id = ?');
+  /** May this request see the photo row at all? */
+  const mayView = (req, photo) => {
+    if (photo.hidden_at && !canSeeHidden(req)) return false;
+    return !photo.protected || canSeeProtected(req.user) || Boolean(req.user && req.user.id === photo.uploader_id);
+  };
   const userName = db.prepare('SELECT id, name FROM users WHERE id = ?');
 
   /** May `user` edit (tags, note) or delete this photo? */
@@ -110,9 +133,9 @@ module.exports = function registerAccounts(app, ctx) {
 
   app.use('/api/spots/:id', (req, res, next) => {
     const id = Number(req.params.id);
-    if (!Number.isSafeInteger(id) || canSeeHidden(req)) return next();
+    if (!Number.isSafeInteger(id) || isModerator(req.user)) return next();
     const exists = db.prepare('SELECT 1 FROM spots WHERE id = ?').get(id);
-    const visible = db.prepare('SELECT 1 FROM photos WHERE spot_id = ? AND hidden_at IS NULL LIMIT 1').get(id);
+    const visible = db.prepare(`SELECT 1 FROM photos p WHERE p.spot_id = ? AND ${visibleSql(view(req), 'p')} LIMIT 1`).get(id);
     if (exists && !visible) return fail(res, 404, 'Spot nicht gefunden');
     next();
   });
@@ -122,10 +145,10 @@ module.exports = function registerAccounts(app, ctx) {
     const photo = Number.isSafeInteger(id) ? photoRow.get(id) : null;
     if (!photo) return next(); // app.js answers 400/404
     const own = Boolean(req.user && req.user.id === photo.uploader_id);
-    if (photo.hidden_at && !canSeeHidden(req) && !(own && req.method === 'DELETE')) return fail(res, 404, 'Foto nicht gefunden');
+    if (!mayView(req, photo) && !(own && req.method === 'DELETE')) return fail(res, 404, 'Foto nicht gefunden');
     if (req.query.to !== undefined) {
       const other = photoRow.get(Number(req.query.to));
-      if (other?.hidden_at && !canSeeHidden(req)) return fail(res, 404, 'Foto nicht gefunden');
+      if (other && !mayView(req, other)) return fail(res, 404, 'Foto nicht gefunden');
     }
     if (req.path !== '/') return next();
 
@@ -134,6 +157,14 @@ module.exports = function registerAccounts(app, ctx) {
       const touchesContent = body.tags !== undefined || body.note !== undefined;
       if (touchesContent && !mayChange(req.user, photo, 'edit')) {
         return fail(res, req.user ? 403 : 401, 'Nur wer das Foto hochgeladen hat, kann es bearbeiten');
+      }
+      if (body.protected !== undefined) {
+        // Uploaders protect or release their own photos; PRO members and moderation any photo.
+        if (!own && !canSeeProtected(req.user)) return fail(res, req.user ? 403 : 401, 'Nur wer das Foto hochgeladen hat, PRO-Mitglieder oder Moderation können den Schutz ändern');
+        const on = body.protected === true || body.protected === 1 || body.protected === '1';
+        const reason = !on ? null : own && !canSeeProtected(req.user) ? 'upload' : isModerator(req.user) && !own ? 'moderation' : own ? 'upload' : 'pro';
+        db.prepare('UPDATE photos SET protected = ?, protected_reason = ? WHERE id = ?').run(on ? 1 : 0, reason, id);
+        if (!own) mod.log(req.user, on ? 'protect' : 'unprotect', { photoId: id, targetUserId: photo.uploader_id });
       }
       if (body.license !== undefined) {
         const license = parseLicense(body.license);
@@ -317,9 +348,13 @@ module.exports = function registerAccounts(app, ctx) {
 
   app.get('/api/users', adminOnly, (req, res) => {
     res.json(db.prepare(`
-      SELECT u.id, u.name, u.email, u.role, u.created_at, COUNT(p.id) AS photos
+      SELECT u.id, u.name, u.email, u.role, u.created_at, u.pro_status, u.organization, u.pro_note, u.pro_requested_at, COUNT(p.id) AS photos
       FROM users u LEFT JOIN photos p ON p.uploader_id = u.id GROUP BY u.id ORDER BY u.id`).all()
-      .map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role, photos: u.photos, createdAt: new Date(u.created_at).toISOString() })));
+      .map((u) => ({
+        id: u.id, name: u.name, email: u.email, role: u.role, photos: u.photos, createdAt: new Date(u.created_at).toISOString(),
+        proStatus: u.pro_status || null, organization: u.organization || null, proNote: u.pro_note || null,
+        proRequestedAt: u.pro_requested_at ? new Date(u.pro_requested_at).toISOString() : null,
+      })));
   });
 
   app.patch('/api/users/:id', adminOnly, (req, res) => {
@@ -334,13 +369,51 @@ module.exports = function registerAccounts(app, ctx) {
     res.json(userJson(auth.userById(id)));
   });
 
+  /* ---------- PRO membership: verified organisations (forest services, nature NGOs …) ---------- */
+
+  const proPerUser = createLimiter({ max: limits.proPerUser ?? 5, windowMs: 24 * 3600 * 1000 });
+  app.post('/api/auth/pro', (req, res) => {
+    if (!req.user) return fail(res, 401, 'Bitte zuerst anmelden');
+    if (!jsonOnly(req, res)) return;
+    if (req.user.pro_status === 'verifiziert') return fail(res, 409, 'Das Konto ist bereits PRO-Mitglied');
+    const organization = String(req.body?.organization || '').trim().slice(0, 160);
+    const note = String(req.body?.note || '').trim().slice(0, 1000) || null;
+    if (organization.length < 2) return fail(res, 400, 'Bitte die Organisation angeben (z. B. Forstamt, Naturschutzorganisation)');
+    if (proPerUser.blocked(String(req.user.id))) return fail(res, 429, 'Zu viele Anträge – bitte morgen wieder');
+    proPerUser.hit(String(req.user.id));
+    db.prepare("UPDATE users SET pro_status = 'angefragt', organization = ?, pro_note = ?, pro_requested_at = ?, pro_decided_at = NULL, pro_decided_by = NULL WHERE id = ?")
+      .run(organization, note, Date.now(), req.user.id);
+    res.json(userJson(auth.userById(req.user.id), { self: true }));
+  });
+
+  /** Admins verify or decline a request, or revoke PRO. */
+  app.post('/api/users/:id/pro', adminOnly, (req, res) => {
+    const id = Number(req.params.id);
+    const target = Number.isSafeInteger(id) ? auth.userById(id) : null;
+    if (!target) return fail(res, 404, 'Konto nicht gefunden');
+    const decision = req.body?.decision;
+    if (!['verifiziert', 'abgelehnt', 'entzogen'].includes(decision)) return fail(res, 400, 'decision: verifiziert, abgelehnt oder entzogen');
+    const organization = req.body?.organization !== undefined ? String(req.body.organization).trim().slice(0, 160) : target.organization;
+    if (decision === 'verifiziert' && !organization) return fail(res, 400, 'Bitte die Organisation angeben');
+    db.prepare('UPDATE users SET pro_status = ?, organization = ?, pro_decided_at = ?, pro_decided_by = ? WHERE id = ?')
+      .run(decision === 'entzogen' ? null : decision, organization || null, Date.now(), req.user.id, id);
+    mod.log(req.user, `pro-${decision}`, { targetUserId: id, detail: organization || null });
+    res.json(userJson(auth.userById(id)));
+  });
+
   /* ---------- Helpers for app.js ---------- */
 
   return {
     canSeeHidden,
     /** SQL condition for visible photo rows (alias `p` by default) in this request. */
-    visibleSql: (req, alias) => visibleSql(canSeeHidden(req), alias),
+    visibleSql: (req, alias) => visibleSql(view(req), alias),
     publicSql: (alias) => visibleSql(false, alias),
+    view,
+    canSeeProtected: (req) => canSeeProtected(req.user),
+    /** Ids of the spots with at least one photo this request may see. */
+    visibleSpotIds(req) {
+      return new Set(db.prepare(`SELECT DISTINCT p.spot_id AS id FROM photos p WHERE ${visibleSql(view(req), 'p')}`).all().map((r) => r.id));
+    },
 
     /** Uploader and licence for an upload, or `{ error }` for an unknown licence. */
     uploadOwner(req) {
@@ -363,6 +436,8 @@ module.exports = function registerAccounts(app, ctx) {
         uploader: u ? { id: u.id, name: u.name } : null,
         license: licenseJson(p.license),
         hidden: Boolean(p.hidden_at),
+        protected: Boolean(p.protected),
+        ...(p.protected ? { protectedReason: p.protected_reason } : {}),
         ...(p.hidden_at ? { hiddenReason: p.hidden_reason } : {}),
       };
     },

@@ -161,6 +161,7 @@ module.exports = function videoRoutes(app, ctx) {
     const activity = activities.includes(b.activity) ? b.activity : null;
     const note = b.note ? String(b.note).slice(0, 2000) : null;
     const tags = parseTags(b.tags);
+    const protect = ['1', 'true', 'on'].includes(String(b.protected)); // protected finds: PRO members only
     const panoramaChoice = ['0', '1'].includes(String(b.panorama)) ? String(b.panorama) : 'auto';
 
     // Positions: GPMF telemetry of the camera, else a GPX track, else a fixed place.
@@ -249,6 +250,7 @@ module.exports = function videoRoutes(app, ctx) {
           frame.alt === null ? null : Math.round(frame.alt * 10) / 10, source, activity, note, Date.now(),
           panorama ? 1 : 0, Math.round(frame.t * 1000) / 1000).lastInsertRowid);
         setTags(id, tags);
+        if (protect) db.prepare("UPDATE photos SET protected = 1, protected_reason = 'upload' WHERE id = ?").run(id);
         refreshSpot(db, spotId);
         touchedSpots.add(spotId);
         return id;

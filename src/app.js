@@ -25,6 +25,7 @@ const { assess } = require('./irregularities');
 const { TREES, treeInfo, treeJson } = require('./trees');
 const { createElevation } = require('./elevation');
 const registerAccounts = require('./routes/accounts');
+const { isSensitive } = require('./sensitive');
 const {
   altitudeShift, aspectShift, coldPoolShift, expectedColourDoy, aspectLabel, aspectFromCompass, COMPASS, LANDFORMS, landform,
 } = require('./phenology');
@@ -45,7 +46,9 @@ function createApp({
   rateLimits,
   detectorUrl = process.env.DETECTOR_URL || null, detectorFetch = fetch,
   // Routing along paths for drawn tours (BRouter-compatible, e.g. https://brouter.de/brouter); off when unset.
-  routerUrl = process.env.ROUTER_URL || null, routerFetch = fetch, routerProfile = process.env.ROUTER_PROFILE || 'hiking-mountain',
+  // Public BRouter by default (only waypoints are sent, by the server); ROUTER_URL= (empty) turns it off.
+  routerUrl = (process.env.ROUTER_URL ?? 'https://brouter.de/brouter') || null, routerFetch = fetch,
+  routerProfile = process.env.ROUTER_PROFILE || 'hiking-mountain',
   // Vector tile precomputation (routes/ogc-tiles.js): { precompute, delayMs }.
   tileOptions = { precompute: process.env.TILES_PRECOMPUTE !== '0' },
 } = {}) {
@@ -387,7 +390,7 @@ function createApp({
     return id;
   };
 
-  const climate = require('./routes/climate')(app, { db, weatherFetch, getPhoto, terrainOf, background, reassessSpot });
+  const climate = require('./routes/climate')(app, { db, weatherFetch, getPhoto, terrainOf, background, reassessSpot, visibleSpotIds: accounts.visibleSpotIds });
 
   app.get('/api/config', (req, res) => {
     res.json({ tags: TAGS, activities: ACTIVITIES, plantnet: Boolean(plantnetKey), spotRadiusM, routing: Boolean(routerUrl) });
@@ -401,6 +404,7 @@ function createApp({
              COUNT(DISTINCT p.id) AS photo_count,
              MIN(p.taken_at) AS first_taken,
              MAX(p.taken_at) AS last_taken,
+             SUM(COALESCE(p.protected, 0)) AS protected_count,
              GROUP_CONCAT(DISTINCT t.tag) AS tags,
              (SELECT file FROM photos WHERE spot_id = s.id AND ${vis('photos')} ORDER BY taken_at DESC LIMIT 1) AS latest_file,
              (SELECT thumb_file FROM photos WHERE spot_id = s.id AND ${vis('photos')} ORDER BY taken_at DESC LIMIT 1) AS latest_thumb,
@@ -422,6 +426,7 @@ function createApp({
       photoCount: r.photo_count,
       firstTaken: new Date(r.first_taken).toISOString(),
       lastTaken: new Date(r.last_taken).toISOString(),
+      protectedPhotos: r.protected_count || 0,
       tags: r.tags ? r.tags.split(',').sort() : [],
       latestUrl: `/uploads/${r.latest_file}`,
       latestThumbUrl: r.latest_thumb ? `/thumbs/${r.latest_thumb}` : `/uploads/${r.latest_file}`,
@@ -433,13 +438,14 @@ function createApp({
     })));
   });
 
-  const spotJson = (id, showHidden = false) => {
+  /** The spot with the photos `req` may see (without a request: what the public sees). */
+  const spotJson = (id, req = null) => {
     const spot = db.prepare(`
       SELECT id, lat, lon, heading, elevation, elevation_source, slope, aspect, terrain_source,
              tpi300, tpi600, landform, landform_source
       FROM spots WHERE id = ?`).get(id);
     if (!spot) return null;
-    const photos = db.prepare(`SELECT * FROM photos p WHERE spot_id = ? AND ${showHidden ? '1 = 1' : accounts.publicSql('p')} ORDER BY taken_at, id`).all(id);
+    const photos = db.prepare(`SELECT * FROM photos p WHERE spot_id = ? AND ${req ? accounts.visibleSql(req, 'p') : accounts.publicSql('p')} ORDER BY taken_at, id`).all(id);
     return {
       id: spot.id,
       lat: spot.lat,
@@ -471,7 +477,7 @@ function createApp({
   app.get('/api/spots/:id', (req, res) => {
     const id = idParam(req, res);
     if (id === null) return;
-    const spot = spotJson(id, accounts.canSeeHidden(req));
+    const spot = spotJson(id, req);
     if (!spot) return res.status(404).json({ error: 'Spot nicht gefunden' });
     res.json(spot);
   });
@@ -482,7 +488,7 @@ function createApp({
     if (!spotJson(id)) return res.status(404).json({ error: 'Spot nicht gefunden' });
     try {
       await realignSpot(id);
-      res.json(spotJson(id));
+      res.json(spotJson(id, req));
     } catch (err) {
       next(err);
     }
@@ -524,6 +530,7 @@ function createApp({
     const activity = ACTIVITIES.includes(b.activity) ? b.activity : null;
     const note = b.note ? String(b.note).slice(0, 2000) : null;
     const tags = parseTags(b.tags);
+    const protect = ['1', 'true', 'on'].includes(String(b.protected));
     // Repeat photos taken at a known spot (rephotography) are pinned to that spot.
     let targetSpot = null;
     if (b.spotId !== undefined && b.spotId !== '') {
@@ -607,6 +614,7 @@ function createApp({
           source, activity, note, Date.now()).lastInsertRowid);
         setTags(id, tags);
         accounts.stampPhoto(id, owner);
+        if (protect) db.prepare("UPDATE photos SET protected = 1, protected_reason = 'upload' WHERE id = ?").run(id);
         refreshSpot(db, spotId);
         touchedSpots.add(spotId);
         return id;
@@ -681,7 +689,7 @@ function createApp({
   app.get('/api/weather/day/spots', async (req, res) => {
     const date = parseDate(req.query.date);
     if (!date) return res.status(400).json({ error: 'date (JJJJ-MM-TT) angeben' });
-    const spots = db.prepare(`SELECT id, lat, lon FROM spots s WHERE EXISTS (SELECT 1 FROM photos p WHERE p.spot_id = s.id AND ${accounts.publicSql('p')})`).all();
+    const spots = db.prepare(`SELECT id, lat, lon FROM spots s WHERE EXISTS (SELECT 1 FROM photos p WHERE p.spot_id = s.id AND ${accounts.visibleSql(req, 'p')})`).all();
     const byCell = new Map();
     for (const s of spots) {
       const key = `${s.lat.toFixed(1)},${s.lon.toFixed(1)}`;
@@ -766,7 +774,7 @@ function createApp({
       for (const { id: photoId } of db.prepare('SELECT id FROM photos WHERE spot_id = ? AND context_json IS NOT NULL').all(id)) {
         background(analyzeContext(photoId));
       }
-      res.json(spotJson(id));
+      res.json(spotJson(id, req));
     } catch (err) {
       next(err);
     }
@@ -881,7 +889,8 @@ function createApp({
   }));
 
   app.get('/api/photos/:id/change.png', changeRoute((res, r) => {
-    res.type('png').set('Cache-Control', 'private, max-age=300').send(r.png);
+    if (!/no-store/.test(res.get('Cache-Control') || '')) res.set('Cache-Control', 'private, max-age=300');
+    res.type('png').send(r.png);
   }));
 
   app.post('/api/photos/:id/identify', async (req, res, next) => {
@@ -903,6 +912,10 @@ function createApp({
         if (results.some((r) => r.neophyte && r.score >= NEOPHYTE_MIN_SCORE)) {
           db.prepare('INSERT OR IGNORE INTO photo_tags (photo_id, tag) VALUES (?, ?)').run(id, 'neophyt');
         }
+        // Rare and collected species: the find is protected (src/sensitive.js).
+        if (results.some((r) => isSensitive(r.scientificName) && r.score >= NEOPHYTE_MIN_SCORE)) {
+          db.prepare("UPDATE photos SET protected = 1, protected_reason = COALESCE(protected_reason, 'art') WHERE id = ? AND protected = 0").run(id);
+        }
         // Confidently recognised trees join the spot's species inventory.
         for (const r of results) {
           const tree = treeInfo(r.scientificName);
@@ -916,12 +929,13 @@ function createApp({
     }
   });
 
-  require('./routes/species')(app, { db, spotRadiusM });
+  require('./routes/species')(app, { db, spotRadiusM, visibleSql: accounts.visibleSql });
+  require('./routes/protection')(app, { db, accounts });
   require('./routes/ogc')(app, { db, spotRadiusM, dataDir, background, tiles: tileOptions });
   require('./routes/video')(app, { db, uploadDir, tmpDir, spotRadiusM, activities: ACTIVITIES, photoJson, getPhoto, setTags, alignPhoto, analyzeChange, analyzeContext, background, safeAlign });
-  const vegetation = require('./routes/vegetation')(app, { db, uploadDir, background, fetchImpl: weatherFetch });
+  const vegetation = require('./routes/vegetation')(app, { db, uploadDir, background, fetchImpl: weatherFetch, accounts });
   Object.assign(tours, require('./routes/tracks')(app, {
-    db, spotRadiusM, satelliteAlerts: vegetation.alerts, routerUrl, routerFetch, routerProfile,
+    db, spotRadiusM, satelliteAlerts: vegetation.alerts, routerUrl, routerFetch, routerProfile, accounts,
   }));
   require('./routes/analysis')(app, {
     db, uploadDir, getPhoto, idParam, background, changeBetween, spotTrees, terrainOf, refreshIrregularities, detectorUrl, detectorFetch,

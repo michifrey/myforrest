@@ -98,6 +98,26 @@ const SPECIES = {
   goldrute: ['Solidago canadensis', 'Kanadische Goldrute'],
 };
 
+/** A logged-in client for the demo server (registers the account on first use). */
+async function session(login, name) {
+  let cookie = '';
+  let csrf = '';
+  const call = async (method, url, body) => {
+    const res = await fetch(`${BASE}${url}`, {
+      method,
+      headers: { ...(body ? { 'content-type': 'application/json' } : {}), ...(cookie ? { cookie } : {}), ...(csrf && method !== 'GET' ? { 'x-csrf-token': csrf } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const set = res.headers.get('set-cookie');
+    if (set) cookie = set.split(';')[0];
+    return res;
+  };
+  let res = await call('POST', '/api/auth/register', { email: `${login}@example.org`, name, password: 'demo-passwort' });
+  if (res.status === 409) res = await call('POST', '/api/auth/login', { login, password: 'demo-passwort' });
+  csrf = (await res.json()).csrfToken;
+  return { get: (url) => call('GET', url), post: (url, body) => call('POST', url, body) };
+}
+
 async function main() {
   const db = new DatabaseSync(path.join(DATA, 'myforrest.db'));
   db.exec('PRAGMA busy_timeout = 15000'); // the server writes weather context in the background
@@ -140,6 +160,18 @@ async function main() {
     identify.run(p.id, ...SPECIES[kind], 0.55 + (i % 4) * 0.1, SPECIES[kind][1], Date.now());
     console.log('fund', kind, year, p.id, 'spot', p.spotId);
   }
+  // Accounts: an admin, and a forest ranger verified as PRO member.
+  const admin = await session('admin', 'Admin');
+  const ranger = await session('revier', 'Revierförsterin');
+  await ranger.post('/api/auth/pro', { organization: 'Forstrevier Adlisberg', note: 'Revierförsterin, Kontakt über das Forstamt' });
+  const users = await (await admin.get('/api/users')).json();
+  await admin.post(`/api/users/${users.find((u) => u.name === 'Revierförsterin').id}/pro`, { decision: 'verifiziert' });
+  // A protected find: lady's slipper orchids at the forest edge, seen exactly only by PRO members.
+  const orchidFile = path.join(IMG, 'frauenschuh.jpg');
+  await scene.renderCloseup(901, 'frauenschuh', orchidFile);
+  const orchid = await upload(orchidFile, { lat: 47.37960, lon: 8.58520, takenAt: '2026-06-04T10:30:00+02:00', utcOffsetMinutes: 120,
+    activity: 'wandern', protected: '1', note: 'Frauenschuh, 14 blühende Stängel' });
+  identify.run(orchid.id, 'Cypripedium calceolus', 'Frauenschuh', 0.86, null, Date.now());
   // Photo requests: a place on the track, the beetle stand again, and the stream bank.
   const requests = [
     { lat: 47.37445, lon: 8.57395, heading: 45, title: 'Neue Lichtung am Waldweg', note: 'Vom Weg aus Richtung Nordost, damit die Lücke im Kronendach zu sehen ist' },

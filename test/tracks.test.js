@@ -278,7 +278,8 @@ test('routing along paths through a BRouter-compatible service', async () => {
     assert.match(asked, /lonlats=8\.540000%2C47\.370000%7C8\.540000%2C47\.372000&profile=hiking-mountain/);
     assert.equal((await fetch(`${base}/api/route?points=47.37,8.54`)).status, 400);
   });
-  await withServer({}, async (base) => {
+  await withServer({ routerUrl: '' }, async (base) => {
+    assert.equal((await fetch(`${base}/api/config`).then((r) => r.json())).routing, false);
     assert.equal((await fetch(`${base}/api/route?points=47.37,8.54;47.372,8.54`)).status, 501);
   });
 });
