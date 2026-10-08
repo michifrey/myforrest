@@ -11,7 +11,7 @@ const { openDb, transaction } = require('./db');
 const { distanceM, isValidCoord, positionAt } = require('./geo');
 const { parseGpx } = require('./gpx');
 const { readPhotoMeta, imageExtension } = require('./exif');
-const { assignSpot, refreshSpot, backfillSpotHeadings, HEADING_TOLERANCE_DEG } = require('./spots');
+const { assignSpot, refreshSpot, backfillSpotHeadings, planSplit, splitSpot, HEADING_TOLERANCE_DEG } = require('./spots');
 const { isHeic, heicExif, heicToJpeg } = require('./heic');
 const { createThumbnails } = require('./thumbs');
 const sharp = require('sharp');
@@ -527,6 +527,56 @@ function createApp({
     try {
       await realignSpot(id);
       res.json(spotJson(id, req));
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  /* ---------- Splitting a spot with mixed viewing directions ---------- */
+
+  /** The automatic split of a spot by viewing direction (all its photos, hidden ones too). */
+  const splitPlan = (id) => planSplit(db.prepare('SELECT id, heading, panorama, taken_at FROM photos WHERE spot_id = ?').all(id)
+    .map((p) => ({ id: p.id, heading: p.heading, panorama: Boolean(p.panorama), takenAt: p.taken_at })), headingToleranceDeg);
+
+  /** Proposed groups, as far as `req` may see the photos. */
+  app.get('/api/spots/:id/split', (req, res) => {
+    const id = idParam(req, res);
+    if (id === null) return;
+    if (!db.prepare('SELECT 1 FROM spots WHERE id = ?').get(id)) return res.status(404).json({ error: 'Spot nicht gefunden' });
+    const visible = new Set(db.prepare(`SELECT id FROM photos p WHERE spot_id = ? AND ${accounts.visibleSql(req, 'p')}`).all(id).map((r) => r.id));
+    const plan = splitPlan(id);
+    res.json({
+      mixed: plan.mixed,
+      toleranceDeg: headingToleranceDeg,
+      groups: plan.groups.map((g) => ({ heading: g.heading, photoIds: g.photoIds.filter((pid) => visible.has(pid)) })),
+    });
+  });
+
+  /**
+   * Splits the spot: by viewing direction (no body), or `{ photoIds }` move
+   * into a new spot. The spots are aligned and compared again afterwards.
+   */
+  app.post('/api/spots/:id/split', async (req, res, next) => {
+    const id = idParam(req, res);
+    if (id === null) return;
+    if (!db.prepare('SELECT 1 FROM spots WHERE id = ?').get(id)) return res.status(404).json({ error: 'Spot nicht gefunden' });
+    const all = db.prepare('SELECT id FROM photos WHERE spot_id = ?').all(id).map((r) => r.id);
+    let groups;
+    if (req.body?.photoIds !== undefined) {
+      const chosen = [...new Set(Array.isArray(req.body.photoIds) ? req.body.photoIds.map(Number) : [])];
+      if (!chosen.length || !chosen.every((pid) => all.includes(pid))) return res.status(400).json({ error: 'photoIds: Fotos dieses Spots angeben' });
+      if (chosen.length === all.length) return res.status(400).json({ error: 'Mindestens ein Foto muss im Spot bleiben' });
+      groups = [all.filter((pid) => !chosen.includes(pid)), chosen];
+    } else {
+      const plan = splitPlan(id);
+      if (!plan.mixed) return res.status(422).json({ error: 'Die Fotos dieses Spots blicken alle in dieselbe Richtung' });
+      groups = plan.groups.map((g) => g.photoIds);
+    }
+    try {
+      const ids = transaction(db, () => splitSpot(db, id, groups));
+      // Each spot gets its own frame for alignment and change detection.
+      for (const sid of ids) await realignSpot(sid);
+      res.json({ spots: ids.map((sid) => spotJson(sid, req)) });
     } catch (err) {
       next(err);
     }

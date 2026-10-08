@@ -46,6 +46,15 @@ Marker melden:
 
 Beim Überfahren eines Markers fasst ein Tooltip alles zusammen: Veränderung, Wetter, Sturm, Satellit,
 Baumarten und Blickrichtung. Schraffierte Quadrate stehen für geschützte Funde (Abschnitt 11).
+
+<p>
+  <img src="docs/screenshots/spot-aufteilen-vorher.jpg" width="49%" alt="Spot mit Fotos in verschiedene Richtungen und dem Angebot, ihn aufzuteilen">
+  <img src="docs/screenshots/spot-aufteilen-nachher.jpg" width="49%" alt="Nach dem Aufteilen: Spot nach Osten mit Link zum Spot nach Westen">
+</p>
+
+Ältere Spots (oder Fotos ohne Kompass) können Fotos in verschiedene Richtungen mischen. Dann bietet der
+Spot an, sich **aufzuteilen**: ein Spot pro Blickrichtung, jeder für sich ausgerichtet und verglichen,
+oder nur das gezeigte Foto abzutrennen.
 Oben links lässt sich die Karte nach Beobachtungen und Meldungen filtern,
 daneben schalten *Sonne & Wetter*, *Arten & Neophyten* und *Touren & Aufträge* die Kartenmodi ein
 (Abschnitte 7, 8 und 10). Gelbe Kamera-Pins sind Fotoaufträge.

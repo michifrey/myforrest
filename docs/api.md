@@ -14,6 +14,8 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/videos/jobs/:id`       | Fortschritt und Ergebnis eines Video-Uploads mit `async=1` |
 | `GET`    | `/api/videos/config`         | ffmpeg verfügbar? Standardabstand und -intervall         |
 | `POST`   | `/api/spots/:id/align`       | Ausrichtung aller Fotos eines Spots neu berechnen        |
+| `GET`    | `/api/spots/:id/split`       | Vorschlag zum Aufteilen nach Blickrichtung: `mixed`, `groups` (`heading`, `photoIds`; die grösste Gruppe zuerst, sie behält den Spot) |
+| `POST`   | `/api/spots/:id/split`       | Spot aufteilen: ohne Body nach Blickrichtung, mit `{ photoIds }` diese Fotos in einen neuen Spot; Antwort `spots` (alle betroffenen Spots), danach neu ausgerichtet |
 | `GET`    | `/api/photos/:id/change?to=` | Veränderte Fläche zwischen zwei ausgerichteten Fotos, mit eingeordneten Regionen |
 | `GET`    | `/api/photos/:id/change.png?to=` | Heatmap der Veränderung (PNG, in der Ansicht des ersten Fotos) |
 | `GET`    | `/api/photos/:id/aligned.jpg?frame=` | 360°-Panorama in die Blickrichtung eines anderen Panoramas desselben Spots gedreht (JPEG 2048 × 1024, mit ETag) |

@@ -105,6 +105,76 @@ function backfillSpotHeadings(db) {
   for (const { id } of rows) set.run(spotHeading(db, id), id);
 }
 
+/**
+ * How a spot whose photos look in different directions splits up (spots
+ * from before directions existed, or photos without compass that joined
+ * first). `photos` are { id, heading, panorama, takenAt } of the spot. Photos
+ * are grouped in time order as `assignSpot` does for new photos: a photo
+ * joins the group whose mean heading is nearest and within ±`toleranceDeg`,
+ * else starts a new group. Photos without a heading and 360° panoramas fit
+ * every direction and stay with the largest group, which keeps the spot.
+ * Returns { mixed, groups: [{ heading, photoIds }] }, largest group first.
+ */
+function planSplit(photos, toleranceDeg = HEADING_TOLERANCE_DEG) {
+  const sorted = [...photos].sort((a, b) => a.takenAt - b.takenAt || a.id - b.id);
+  const groups = [];
+  const rest = [];
+  for (const p of sorted) {
+    if (!Number.isFinite(p.heading) || p.panorama) {
+      rest.push(p.id);
+      continue;
+    }
+    let best = null;
+    for (const g of groups) {
+      const d = headingDiff(p.heading, g.mean);
+      if (d <= toleranceDeg && (!best || d < best.d)) best = { g, d };
+    }
+    const g = best ? best.g : (groups[groups.push({ headings: [], photoIds: [], mean: p.heading }) - 1]);
+    g.headings.push(p.heading);
+    g.photoIds.push(p.id);
+    g.mean = circularMean(g.headings).mean;
+  }
+  // Largest first; on a tie the one photographed first keeps the spot.
+  groups.sort((a, b) => b.photoIds.length - a.photoIds.length);
+  if (!groups.length) return { mixed: false, groups: [{ heading: null, photoIds: rest }] };
+  groups[0].photoIds.push(...rest);
+  return {
+    mixed: groups.length > 1,
+    groups: groups.map((g) => ({ heading: Math.round(g.mean), photoIds: g.photoIds })),
+  };
+}
+
+// Spot data that holds for every direction at the place: copied to the new spots of a split.
+const PLACE_TABLES = ['spot_species', 'spot_ndvi', 'spot_ndvi_scenes', 'spot_follows', 'push_alerts_sent'];
+
+/**
+ * Splits a spot: the first group stays, every further group of photo ids
+ * becomes a new spot at the same place (with the terrain, species,
+ * satellite series and followers of the old one). Returns the ids of the
+ * spots, in the order of `groups`. Runs in the caller's transaction.
+ */
+function splitSpot(db, spotId, groups) {
+  const tableCols = (t) => db.prepare(`PRAGMA table_info(${t})`).all();
+  const spotCols = tableCols('spots').map((c) => c.name).filter((c) => c !== 'id');
+  const ids = [spotId];
+  for (const photoIds of groups.slice(1)) {
+    const newId = Number(db.prepare(`INSERT INTO spots (${spotCols.join(', ')}) SELECT ${spotCols.join(', ')} FROM spots WHERE id = ?`)
+      .run(spotId).lastInsertRowid);
+    const move = db.prepare('UPDATE photos SET spot_id = ? WHERE id = ? AND spot_id = ?');
+    for (const pid of photoIds) move.run(newId, pid, spotId);
+    for (const t of PLACE_TABLES) {
+      const cols = tableCols(t);
+      if (!cols.length) continue;
+      const names = cols.filter((c) => !(c.pk && c.name === 'id')).map((c) => c.name);
+      const select = names.map((n) => (n === 'spot_id' ? '?' : n)).join(', ');
+      db.prepare(`INSERT OR IGNORE INTO ${t} (${names.join(', ')}) SELECT ${select} FROM ${t} WHERE spot_id = ?`).run(newId, spotId);
+    }
+    ids.push(newId);
+  }
+  for (const id of ids) refreshSpot(db, id);
+  return ids;
+}
+
 module.exports = {
-  assignSpot, refreshSpot, backfillSpotHeadings, circularMean, headingDiff, HEADING_TOLERANCE_DEG,
+  assignSpot, refreshSpot, backfillSpotHeadings, circularMean, headingDiff, planSplit, splitSpot, HEADING_TOLERANCE_DEG,
 };

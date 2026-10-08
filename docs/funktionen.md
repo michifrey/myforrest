@@ -122,10 +122,23 @@ Kompass des Handys (EXIF `GPSImgDirection`). Regel für neue Fotos:
 
 Die Richtung eines Spots ist das zirkuläre Mittel seiner Fotos (350° und 10° ergeben 0°). Blicken die
 Fotos eines Spots in sehr verschiedene Richtungen, hat der Spot keine Richtung. Bestehende Spots werden
-beim Start nur um ihre Richtung ergänzt und nie aufgeteilt. Auf der Karte zeigt ein goldener Sichtkegel
+beim Start nur um ihre Richtung ergänzt und nie von selbst aufgeteilt. Auf der Karte zeigt ein goldener Sichtkegel
 die Richtung. Liegen mehrere Spots am selben Ort, rücken ihre Marker in Blickrichtung auseinander, damit
 jeder anklickbar bleibt. Im Kopf des Spots stehen die Richtung („Blick nach NO (45°)“) und Links zu den
 anderen Spots am selben Ort.
+
+**Spots aufteilen**: Blicken die Fotos eines Spots in verschiedene Richtungen (Spots von vor der
+Richtungstrennung, oder Fotos ohne Kompass kamen zuerst), sagt der Spot das in seinem Kopf, z. B.
+„3 Fotos nach O, 2 Fotos nach W“, und bietet zwei Wege an:
+- *In N Spots aufteilen*: Die Fotos werden in Aufnahmereihenfolge so gruppiert, wie neue Fotos zugeordnet
+  werden (±45° um das Mittel der Gruppe). Die grösste Gruppe behält den Spot, jede weitere wird ein neuer
+  Spot am selben Ort. Fotos ohne Richtung und 360°-Panoramen passen zu jeder Richtung und bleiben im
+  ursprünglichen Spot.
+- *Nur das gezeigte Foto abtrennen*: Das Foto kommt in einen eigenen Spot.
+
+Die neuen Spots übernehmen, was für den Ort gilt: Höhe und Gelände, Baumarten, die Satellitenreihe und wer
+dem Spot folgt. Danach wird jeder Spot neu ausgerichtet, und die Veränderung wird gegen sein eigenes erstes
+Foto gerechnet. Fotoaufträge für den Spot bleiben beim ursprünglichen Spot.
 
 ### Zeitreise pro Spot
 

@@ -8,8 +8,6 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 - **360°-Rohdateien**: Insta360-`.insv` und GoPro-MAX-`.360` direkt lesen (Fischaugen stitchen, GPS aus dem
   Datei-Trailer). Braucht Beispieldateien der Kameras und deren Objektivdaten; bis dahin über den Export
   als 360°-MP4.
-- **Spots aufteilen**: Bestehende Spots mit gemischten Blickrichtungen auf Wunsch aufteilen (neue Fotos
-  werden bereits nach Richtung getrennt).
 - **PWA**: Kartenausschnitt einer geplanten Route gezielt für offline vorladen; Push-Benachrichtigung,
   wenn ein Upload aus der Warteschlange abgelehnt wurde.
 - **Geschützte Funde**: Schutzliste je Kanton (Rote Liste, kantonale Schutzverordnungen) laden, Pilze per
@@ -60,6 +58,7 @@ Aus früheren Versionen dieser Roadmap:
 
 - Video statt Einzelbilder (GoPro mit GPMF, 360°-MP4, GPX), unscharfe Bilder werden ersetzt oder verworfen
 - 360°-Fotos beim Upload erkennen, Panoramen über eine Drehung der Kugel ausrichten und vergleichen
+- Spots mit gemischten Blickrichtungen auf Wunsch aufteilen
 - Sturmereignisse aus Böen mit Windwurf-Funden verknüpfen
 - DWD-Phänologie als Referenz für den Beginn der Herbstfärbung
 - Nächtliche Abkühlung in Senken aus Wind und Bewölkung
