@@ -84,7 +84,8 @@ MyForrest lässt sich als App auf den Startbildschirm legen
 vor, sodass die App auch ohne Netz startet. Zuletzt geladene Spots, Fotos und Kartenkacheln bleiben
 offline sichtbar (Kacheln bis ca. 800, Fotos bis 400, jeweils die ältesten werden verdrängt).
 Wer im Wald ohne Empfang fotografiert, verliert nichts: Uploads und Wiederholungsfotos ohne Verbindung
-landen samt Fotos, GPX und Angaben in einer Warteschlange auf dem Gerät (IndexedDB). In der Navigation
+landen samt Fotos, GPX und Angaben in einer Warteschlange auf dem Gerät (IndexedDB). Die installierte App
+empfängt auch die Push-Nachrichten der Satelliten-Frühwarnung (siehe Satellitenkontext). In der Navigation
 steht dann z. B. „3 Fotos warten auf Verbindung“; ein Klick zeigt die wartenden Uploads, die sich
 einzeln oder alle verwerfen lassen. Sobald wieder Netz da ist, werden sie automatisch gesendet: per
 Background Sync auch bei geschlossener App (Chrome/Android), sonst beim nächsten Öffnen oder sobald
@@ -339,6 +340,22 @@ mit derselben Jahreszeit der bis zu fünf Vorjahre (mindestens zwei Vergleichswe
   eine Karte *Frühwarnung*.
 - Ist das letzte Foto älter als der Rückgang, schlägt die App vor, den Spot zu besuchen: Ein neues Foto
   zeigt, was dahinter steckt.
+
+**Frühwarnung als Push-Nachricht**: Wer einen Spot regelmässig besucht, erfährt von einer neuen
+Frühwarnung auf dem Handy, ohne die App zu öffnen.
+- **Wer:** Konten, die den Spot in den letzten drei Jahren an mindestens zwei Tagen fotografiert haben.
+  Dazu kommt, wer dem Spot folgt (*Spot folgen* in der Spotansicht), und es fällt weg, wer ihn
+  stummgeschaltet hat. Die Spotansicht sagt angemeldeten Personen, ob und warum sie benachrichtigt werden.
+- **Einschalten:** Im Kontomenü *Push-Nachrichten einschalten*, einmal pro Gerät. Der Browser fragt
+  dann um Erlaubnis. *Testnachricht senden* prüft, ob Nachrichten ankommen. Auf iPhone und iPad geht das
+  nur, wenn MyForrest als App auf dem Home-Bildschirm liegt (iOS 16.4 oder neuer).
+- **Was:** Pro Frühwarnung eine Nachricht (Spot, Index, wie stark, seit wann); mehrere neue Warnungen für
+  dieselbe Person kommen gebündelt. Ein Tipp darauf öffnet den Spot. Gesendet wird nur, wenn seit dem
+  Beginn des Rückgangs niemand am Spot fotografiert hat, und jede Warnung nur einmal.
+- **Wann:** Nach der täglichen Runde, nach Angleichung und Kalibrierung.
+- **Technik:** Web Push mit VAPID und verschlüsselter Nachricht (RFC 8291/8292), ohne Fremddienst ausser
+  dem Push-Dienst des Browsers (Google, Mozilla, Apple, Microsoft). Der Server schickt nur an diese
+  Dienste; abgelaufene Abos löscht er.
 
 **Kalibrierung an bestätigten Schäden**: Die Schwellen der Frühwarnung und der Rückgänge zwischen zwei
 Fotos eicht der Server an dem, was vor Ort bestätigt wurde.

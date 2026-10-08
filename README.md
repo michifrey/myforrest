@@ -130,6 +130,12 @@ bestätigten Schäden, getrennt für Laub- und Nadelwald. Hier: ein Fichten-Tann
 Sein NDVI sank nur um 0,07–0,08; die Nadelwald-Schwelle 0,06 erkennt das, die Schwelle aller Spots (0,18)
 hätte an Nadelwald-Spots keinen der bestätigten Schäden gefunden.
 
+<p align="center"><img src="docs/screenshots/push.jpg" width="420" alt="Spotansicht mit Hinweis auf Push-Nachrichten der Frühwarnung"></p>
+
+Wer einen Spot regelmässig besucht (an mindestens zwei Tagen fotografiert) oder ihm folgt, bekommt neue
+Frühwarnungen als **Push-Nachricht** aufs Handy; ein Tipp darauf öffnet den Spot. Eingeschaltet wird das
+einmal pro Gerät im Kontomenü, stummschalten lässt es sich pro Spot.
+
 ### 7. Sonne & Wetter auf der Karte
 
 ![Kartenmodus Sonne & Wetter](docs/screenshots/sun.jpg)
@@ -182,7 +188,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   Foto, Auffälligkeiten wie Trockenheit oder frühe Laubverfärbung, Stürme seit dem letzten Besuch,
   Höhe, Exposition, Kaltluftseen sowie Satellitendaten (NDVI und Feuchteindex NDMI aus Sentinel-2, vor 2017
   Landsat) als unabhängige Bestätigung und als Frühwarnung für Spots ohne neue Fotos, deren Schwellen sich an
-  bestätigten Schäden eichen (getrennt für Laub- und Nadelwald) und an zurückgehaltenen Spots geprüft werden.
+  bestätigten Schäden eichen (getrennt für Laub- und Nadelwald) und an zurückgehaltenen Spots geprüft werden,
+  als Push-Nachricht an alle, die den Spot regelmässig besuchen.
 - **[Kartenmodi](docs/funktionen.md#kartenmodi)**: Sonnenstand, Schatten und Einstrahlung inklusive
   Geländehorizont sowie Hotspots und Ausbreitungsfronten von Neophyten.
 - **[Pflanzen und Baumarten](docs/funktionen.md#pflanzen-und-baumarten)**: Pflanzenbestimmung mit Pl@ntNet,

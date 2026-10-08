@@ -45,6 +45,9 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 | `SATELLITE_WATCH_HOURS` | `24` | Abstand der Frühwarn-Runde über alle Spots in Stunden; `0` = aus |
 | `REQUIRE_LOGIN`    | –        | `1`: Uploads und Änderungen nur mit Konto      |
 | `ADMIN_EMAIL`      | –        | Dieses Konto wird Admin (sonst das erste Konto) |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | erzeugt | Schlüssel für Web Push (base64url); ohne sie erzeugt der Server beim ersten Start ein Paar und speichert es in der Datenbank |
+| `VAPID_SUBJECT`    | `mailto:ADMIN_EMAIL` | Kontakt für die Push-Dienste (`mailto:` oder `https:`) |
+| `PUSH_HOSTS`       | –        | Weitere erlaubte Push-Dienste (Hostnamen, kommagetrennt), zusätzlich zu Google, Mozilla, Apple und Microsoft |
 | `DETECTOR_URL`     | –        | Externer Objektdetektor (siehe [unten](#externer-detektor)); ohne ihn laufen die eingebauten Heuristiken |
 
 ## Externer Detektor

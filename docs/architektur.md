@@ -25,6 +25,8 @@ src/sentinel.js      Sentinel-2 NDVI/NDMI: STAC-Suche, COG-Fenster lesen, Wolken
 src/landsat.js       Landsat 5/7/8 (Collection 2) über Planetary Computer: signierte Links, QA-Maske, 30-m-Indizes
 src/harmonize.js     Angleichung von Landsat an Sentinel-2 aus den Überlappungsmonaten (Theil–Sen, Landsat 5 über 7)
 src/calibration.js   Kalibrierung der Frühwarnung und der Rückgänge zwischen Fotos an bestätigten Schäden (Rückrechnung ohne Blick nach vorn, F1, Kreuzvalidierung nach Spots, pro Waldtyp)
+src/webpush.js       Web Push ohne Abhängigkeiten: VAPID (RFC 8292) und Verschlüsselung aes128gcm (RFC 8291)
+src/routes/push.js   Push-Abos, Spot folgen/stummschalten, Frühwarnungen an regelmässige Besucher
 src/forest-type.js   Waldtyp eines Spots (Laub/Nadel/Misch) aus Baumarten, Nadelholzanteil der Fotos oder dem winterlichen NDVI
 src/utm.js           Umrechnung WGS84 ↔ UTM (Projektion der Sentinel-2-Kacheln)
 src/routes/vegetation.js  API für Vegetationsdichte und NDVI, Hintergrund-Berechnung

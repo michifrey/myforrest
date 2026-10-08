@@ -16,12 +16,14 @@
  * A watcher refreshes the series of all spots once a day (SATELLITE_WATCH_HOURS,
  * 0 = off), so drops show up without anyone opening the spot or taking a photo.
  * Drops and alerts carry the strongest storm of their period (storms.js).
+ * New warnings go out as push messages to the people who visit the spot
+ * regularly (routes/push.js).
  * After each round the thresholds of the early warning and of the drops
  * between photos are calibrated again (calibration.js) against the damage
  * photographers confirmed, on all spots and per forest type (forest-type.js).
  *
  * Usage in createApp: `const vegetation = require('./routes/vegetation')(app, ctx)`,
- * with ctx = { db, uploadDir, background, fetchImpl }. Returns { analyzePhoto, backfill };
+ * with ctx = { db, uploadDir, background, fetchImpl, push }. Returns { analyzePhoto, backfill };
  * `backfill(null, [photoId])` queues a new photo for analysis in the background.
  */
 
@@ -56,7 +58,7 @@ const monthStart = (ym) => Date.parse(`${ym}-01T00:00:00Z`);
 module.exports = function registerVegetation(app, {
   db, uploadDir, background, fetchImpl = fetch, stacUrl = process.env.SENTINEL_STAC_URL ?? STAC_URL,
   landsatStacUrl = process.env.LANDSAT_STAC_URL ?? LANDSAT_STAC_URL, landsatTokenUrl = process.env.LANDSAT_TOKEN_URL,
-  watchHours = Number(process.env.SATELLITE_WATCH_HOURS ?? 24), now = () => Date.now(),
+  watchHours = Number(process.env.SATELLITE_WATCH_HOURS ?? 24), now = () => Date.now(), push = null,
 }) {
   db.exec(SCHEMA);
   const landsat = stacUrl && landsatStacUrl
@@ -403,13 +405,16 @@ module.exports = function registerVegetation(app, {
 
   /* ---------- Early warning for all spots ---------- */
 
-  app.get('/api/satellite/alerts', (req, res) => {
-    if (!sentinel) return res.json([]);
+  /** Spots with current early warnings: [{ spotId, lat, lon, alerts }]. */
+  function allAlerts() {
+    if (!sentinel) return [];
     const spots = db.prepare('SELECT s.id, s.lat, s.lon FROM spots s JOIN spot_ndvi n ON n.spot_id = s.id').all();
     const cal = calibration();
-    res.json(spots.map((spot) => ({ spotId: spot.id, lat: spot.lat, lon: spot.lon, alerts: alertsOf(spot.id, sentinel.series(spot.id).monthly, spot, cal) }))
-      .filter((x) => x.alerts.length));
-  });
+    return spots.map((spot) => ({ spotId: spot.id, lat: spot.lat, lon: spot.lon, alerts: alertsOf(spot.id, sentinel.series(spot.id).monthly, spot, cal) }))
+      .filter((x) => x.alerts.length);
+  }
+
+  app.get('/api/satellite/alerts', (req, res) => res.json(allAlerts()));
 
   app.get('/api/satellite/calibration', (req, res) => res.json(calibration()));
   app.get('/api/satellite/harmonization', (req, res) => res.json(sentinel ? sentinel.harmonization() : {}));
@@ -431,6 +436,8 @@ module.exports = function registerVegetation(app, {
         // New scenes or new photos since the last round: harmonise Landsat again, then calibrate on the result.
         sentinel.harmonize();
         recalibrate();
+        // New warnings to the people who visit those spots regularly.
+        if (push) await push.notifyAlerts(allAlerts()).catch((err) => console.warn(`Push der Frühwarnungen: ${err.message}`));
         return refreshed;
       })().finally(() => { watching = null; });
       background(watching);

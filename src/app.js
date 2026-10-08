@@ -46,6 +46,8 @@ function createApp({
   detectorUrl = process.env.DETECTOR_URL || null, detectorFetch = fetch,
   // Vector tile precomputation (routes/ogc-tiles.js): { precompute, delayMs }.
   tileOptions = { precompute: process.env.TILES_PRECOMPUTE !== '0' },
+  // Push messages (routes/push.js): { fetchImpl, allowedHosts, allowHttp } for tests.
+  pushOptions = {},
 } = {}) {
   const uploadDir = path.join(dataDir, 'uploads');
   const tmpDir = path.join(dataDir, 'tmp');
@@ -910,7 +912,9 @@ function createApp({
   require('./routes/species')(app, { db, spotRadiusM });
   require('./routes/ogc')(app, { db, spotRadiusM, dataDir, background, tiles: tileOptions });
   require('./routes/video')(app, { db, uploadDir, tmpDir, spotRadiusM, activities: ACTIVITIES, photoJson, getPhoto, setTags, alignPhoto, analyzeChange, analyzeContext, background, safeAlign });
-  const vegetation = require('./routes/vegetation')(app, { db, uploadDir, background, fetchImpl: weatherFetch });
+  const push = require('./routes/push')(app, { db, idParam, adminEmail, ...pushOptions });
+  app.locals.push = push;
+  const vegetation = require('./routes/vegetation')(app, { db, uploadDir, background, fetchImpl: weatherFetch, push });
   require('./routes/analysis')(app, {
     db, uploadDir, getPhoto, idParam, background, changeBetween, spotTrees, terrainOf, refreshIrregularities, detectorUrl, detectorFetch,
   });
