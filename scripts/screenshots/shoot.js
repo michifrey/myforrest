@@ -228,6 +228,14 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.click('#account-btn');
     await settle(page, 800);
     await page.locator('#account-menu').screenshot({ path: out('konto-menue.png') });
+    // Deleting the account: what happens to the photos is an explicit choice. The demo photos are
+    // anonymous, so the dialog gets example numbers of a member with photos and tours.
+    await page.route('**/api/auth/account', (r) => r.fulfill({
+      json: { photos: 12, tracks: 2, requests: 1, confirmWith: 'password', blocker: null },
+    }));
+    await page.click('text=Konto löschen …');
+    await settle(page, 1000);
+    await page.locator('#delete-dialog').screenshot({ path: out('konto-loeschen.png') });
     await kctx.close();
   }
 

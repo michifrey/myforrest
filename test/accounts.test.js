@@ -588,3 +588,70 @@ test('an account without password cannot use change, only the e-mail link', asyn
     assert.match((await res.json()).error, /kein Passwort/);
   });
 });
+
+test('deleting an account: confirmation, photos deleted or kept anonymous, everything else gone', async () => {
+  await withServer({}, async (base, db, mails) => {
+    const admin = client(base);
+    await admin.register('admin@example.org', 'Admin');
+    const anna = client(base);
+    await anna.register('anna@example.org', 'Anna Wald');
+    const phone = client(base);
+    await phone.login('anna@example.org');
+    const p1 = (await (await anna.upload('nogps.jpg', { lat: '47.1', lon: '8.1' })).json()).created[0];
+    const p2 = (await (await anna.upload('nogps.jpg', { lat: '47.2', lon: '8.2' })).json()).created[0];
+    const anna2 = db.prepare("SELECT id FROM users WHERE email = 'anna@example.org'").get().id;
+
+    const info = await (await anna.req('/api/auth/account')).json();
+    assert.deepEqual(info, { photos: 2, tracks: 0, requests: 0, confirmWith: 'password', blocker: null });
+
+    const del = (c, json) => c.req('/api/auth/account', { method: 'DELETE', json });
+    assert.equal((await del(client(base), { photos: 'delete', password: 'geheim-1234' })).status, 401);
+    assert.equal((await del(anna, { password: 'geheim-1234' })).status, 400, 'photos must be chosen');
+    assert.equal((await del(anna, { photos: 'delete', password: 'falsch-falsch' })).status, 403);
+    assert.equal((await anna.req('/api/auth/account', { method: 'DELETE', json: { photos: 'delete', password: 'geheim-1234' }, csrf: false })).status, 403);
+
+    const res = await del(anna, { photos: 'delete', password: 'geheim-1234' });
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { deletedPhotos: 2, anonymizedPhotos: 0, deletedTracks: 0 });
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM photos WHERE id IN (?, ?)').get(p1.id, p2.id).n, 0);
+    assert.equal((await fetch(`${base}${p1.url}`)).status, 404, 'the file is gone');
+    for (const table of ['users WHERE id = ?', 'sessions WHERE user_id = ?', 'email_tokens WHERE user_id = ?']) {
+      assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(anna2).n, 0, table);
+    }
+    assert.equal((await (await phone.req('/api/auth/me')).json()).user, null, 'other devices are logged out');
+    assert.equal((await client(base).login('anna@example.org')).res.status, 401);
+    assert.match(mails.at(-1).subject, /Konto gelöscht/);
+    // The log keeps counts, not the name.
+    const entry = db.prepare("SELECT * FROM moderation_log WHERE action = 'account-delete'").get();
+    assert.equal(entry.actor_name, null);
+    assert.match(entry.detail, /2 Fotos gelöscht/);
+    // The address is free again.
+    assert.equal((await client(base).register('anna@example.org', 'Anna Neu')).res.status, 201);
+  });
+});
+
+test('photos kept anonymous; accounts without password confirm with their name; the last admin stays', async () => {
+  await withServer({}, async (base, db) => {
+    const admin = client(base);
+    await admin.register('admin@example.org', 'Admin');
+    const ben = client(base);
+    await ben.register('ben@example.org', 'Ben Berg');
+    const p = (await (await ben.upload('nogps.jpg', { lat: '47.1', lon: '8.1' })).json()).created[0];
+    db.prepare("UPDATE users SET password_hash = '' WHERE email = 'ben@example.org'").run(); // like an account from a provider
+
+    assert.equal((await (await ben.req('/api/auth/account')).json()).confirmWith, 'name');
+    const del = (c, json) => c.req('/api/auth/account', { method: 'DELETE', json });
+    assert.equal((await del(ben, { photos: 'anonymize', name: 'Ben' })).status, 403);
+    const res = await del(ben, { photos: 'anonymize', name: ' ben  berg ' });
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).anonymizedPhotos, 1);
+    const spot = await (await fetch(`${base}/api/spots/${p.spotId}`)).json();
+    assert.equal(spot.photos.find((x) => x.id === p.id).uploader, null, 'the photo stays, now anonymous');
+
+    // The only admin cannot leave while other accounts exist.
+    await client(base).register('cleo@example.org', 'Cleo');
+    const info = await (await admin.req('/api/auth/account')).json();
+    assert.match(info.blocker, /einzige Administration/);
+    assert.equal((await del(admin, { photos: 'anonymize', password: 'geheim-1234' })).status, 409);
+  });
+});

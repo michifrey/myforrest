@@ -1041,6 +1041,16 @@ summary { cursor: pointer; color: var(--muted); font-weight: 600; font-size: 0.9
 .menu-item { justify-content: flex-start; border: none; border-radius: 10px; background: transparent; padding: 0.55rem 0.7rem; font-weight: 600; }
 .menu-item:hover, .menu-item:focus-visible { background: var(--surface-2); }
 .menu-item.danger { color: var(--danger); }
+.menu-item { text-align: left; }
+.menu-item.subtle { font-weight: 500; font-size: 0.85rem; opacity: 0.85; }
+.btn.danger { background: var(--danger); border-color: var(--danger); color: var(--surface); }
+.btn.danger:disabled { opacity: 0.5; }
+#delete-dialog .checks { display: grid; gap: 0.5rem; }
+#delete-dialog .checks label {
+  display: flex; gap: 0.6rem; align-items: flex-start; justify-content: flex-start; text-align: left;
+  border-radius: 12px; padding: 0.6rem 0.8rem; font-weight: 400;
+}
+#delete-dialog .checks input { width: auto; flex: none; margin: 0.2rem 0 0; }
 a.menu-item { display: flex; color: var(--text); text-decoration: none; font-size: 0.95rem; }
 
 .tabs { display: inline-flex; gap: 0.2rem; padding: 0.2rem; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); flex-wrap: wrap; }

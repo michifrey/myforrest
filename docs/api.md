@@ -55,6 +55,8 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/auth/verify?token=`    | Link aus der Bestätigungs-E-Mail: bestätigt die Adresse, leitet nach `/?auth=verified` bzw. `/?auth_error=…` |
 | `POST`   | `/api/auth/verify/resend`    | Neuen Bestätigungslink senden (angemeldet, Adresse unbestätigt; 3 pro Stunde) |
 | `POST`   | `/api/auth/password/forgot`  | Link zum Zurücksetzen an `{ email }` schicken; antwortet immer `{ ok: true }` |
+| `GET`    | `/api/auth/account`          | Angemeldet: was beim Löschen betroffen wäre (`photos`, `tracks`, `requests`), `confirmWith` (`password` oder `name`), `blocker` |
+| `DELETE` | `/api/auth/account`          | Eigenes Konto löschen (`{ photos: delete\|anonymize, password }` bzw. `name` ohne Passwort) |
 | `POST`   | `/api/auth/password/change`  | Angemeldet: Passwort ändern (`{ current, password }`); beendet die anderen Sitzungen, Hinweis per E-Mail |
 | `GET`    | `/api/auth/password/reset?token=` | Prüft einen Link: `{ name, email }` oder 400 |
 | `POST`   | `/api/auth/password/reset`   | Neues Passwort setzen (`{ token, password }`): beendet alle Sitzungen und meldet an |

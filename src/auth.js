@@ -363,6 +363,46 @@ function createAuth(db, { adminEmail = null } = {}) {
     return { user: userById.get(user.id), endedSessions: Number(ended) };
   }
 
+  /**
+   * Checks that the person deleting the account is its owner: the current
+   * password, or for accounts without one (Google/GitHub) the account name typed out.
+   */
+  async function confirmOwner(user, { password, name }) {
+    if (hasPassword(user)) {
+      const ok = typeof password === 'string' && password.length <= 200 && await verifyPassword(password, user.password_hash);
+      return ok ? {} : { error: 'Das Passwort stimmt nicht', status: 403, wrong: true };
+    }
+    const typed = typeof name === 'string' ? name.trim().replace(/\s+/g, ' ') : '';
+    return typed.toLowerCase() === user.name.toLowerCase() ? {} : { error: 'Bitte den Kontonamen genau eintippen', status: 403 };
+  }
+
+  /** Why this account may not be deleted now, or null. */
+  function deleteBlocker(user) {
+    if (user.role !== 'admin') return null;
+    const otherAdmin = db.prepare("SELECT 1 FROM users WHERE role = 'admin' AND id != ?").get(user.id);
+    const otherUser = db.prepare('SELECT 1 FROM users WHERE id != ?').get(user.id);
+    return otherUser && !otherAdmin ? 'Du bist die einzige Administration – gib zuerst einem anderen Konto die Rolle Administration' : null;
+  }
+
+  /**
+   * Deletes the account. Photos still attributed to it become anonymous
+   * (the caller deletes them beforehand when asked to). Sessions, provider
+   * logins, links, tours, push subscriptions and followed spots go with the
+   * account (ON DELETE CASCADE); reports and photo requests stay without a name.
+   */
+  function deleteUser(user) {
+    db.exec('BEGIN');
+    try {
+      const anonymized = db.prepare('UPDATE photos SET uploader_id = NULL WHERE uploader_id = ?').run(user.id).changes;
+      db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
+      db.exec('COMMIT');
+      return { anonymized: Number(anonymized) };
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
   const userByEmail = (email) => (typeof email === 'string' && EMAIL_RE.test(email.trim()) ? db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim()) : null);
 
   const identitiesOf = (userId) => db.prepare('SELECT provider FROM identities WHERE user_id = ? ORDER BY provider').all(userId).map((r) => r.provider);
@@ -422,6 +462,7 @@ function createAuth(db, { adminEmail = null } = {}) {
   return {
     register, authenticate, createSession, session, destroySession, identityLogin, identitiesOf, unlinkIdentity,
     createEmailToken, confirmEmail, checkResetToken, resetPassword, changePassword, userByEmail,
+    confirmOwner, deleteBlocker, deleteUser,
     userById: (id) => userById.get(id),
   };
 }

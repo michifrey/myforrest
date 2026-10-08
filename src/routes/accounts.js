@@ -35,12 +35,16 @@
  * answer to "forgot" is the same whether or not the address has an account.
  * Logged in, POST /api/auth/password/change takes the current and a new
  * password; the account gets a notice by e-mail.
+ *
+ * Deleting the account: DELETE /api/auth/account with the password (or,
+ * without one, the account name) and `photos: 'delete' | 'anonymize'`.
+ * GET /api/auth/account tells the dialog what would be affected.
  */
 
 const crypto = require('node:crypto');
 const path = require('node:path');
 const {
-  SESSION_COOKIE, SESSION_TTL_MS, ROLES, parseCookies, serializeCookie, createLimiter, createAuth, isModerator, canSeeProtected, userJson,
+  SESSION_COOKIE, SESSION_TTL_MS, ROLES, hasPassword, parseCookies, serializeCookie, createLimiter, createAuth, isModerator, canSeeProtected, userJson,
 } = require('../auth');
 const { STATE_COOKIE, STATE_TTL_MS, createOAuth } = require('../oauth');
 const { createMailer } = require('../mail');
@@ -422,6 +426,76 @@ module.exports = function registerAccounts(app, ctx) {
         ].join('\n'),
       }).catch((err) => console.error(`Hinweis zur Passwortänderung an Konto ${r.user.id} fehlgeschlagen: ${err.message}`));
       res.json({ user: selfJson(r.user), endedSessions: r.endedSessions });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  /* ---------- Deleting the account ---------- */
+
+  const accountCounts = (userId) => ({
+    photos: db.prepare('SELECT COUNT(*) AS n FROM photos WHERE uploader_id = ?').get(userId).n,
+    tracks: db.prepare('SELECT COUNT(*) AS n FROM tracks WHERE owner_id = ?').get(userId).n,
+    requests: db.prepare("SELECT COUNT(*) AS n FROM photo_requests WHERE requester_id = ? AND status = 'offen'").get(userId).n,
+  });
+
+  app.get('/api/auth/account', (req, res) => {
+    if (!req.user) return fail(res, 401, 'Bitte zuerst anmelden');
+    res.set('Cache-Control', 'no-store');
+    res.json({ ...accountCounts(req.user.id), confirmWith: hasPassword(req.user) ? 'password' : 'name', blocker: auth.deleteBlocker(req.user) });
+  });
+
+  app.delete('/api/auth/account', async (req, res, next) => {
+    if (!jsonOnly(req, res)) return;
+    if (!req.user) return fail(res, 401, 'Bitte zuerst anmelden');
+    const user = req.user;
+    const photos = req.body?.photos;
+    if (!['delete', 'anonymize'].includes(photos)) return fail(res, 400, 'Bitte wählen, was mit den Fotos geschieht (photos: delete oder anonymize)');
+    const accountKey = `${req.ip}|${user.email.toLowerCase()}`;
+    const wait = loginPerAccount.blocked(accountKey);
+    if (wait) {
+      return res.set('Retry-After', String(wait)).status(429)
+        .json({ error: `Zu viele Fehlversuche – bitte in ${Math.ceil(wait / 60)} Minuten erneut versuchen` });
+    }
+    try {
+      const ok = await auth.confirmOwner(user, { password: req.body?.password, name: req.body?.name });
+      if (ok.error) {
+        if (ok.wrong) loginPerAccount.hit(accountKey);
+        return fail(res, ok.status, ok.error);
+      }
+      const blocker = auth.deleteBlocker(user);
+      if (blocker) return fail(res, 409, blocker);
+
+      const counts = accountCounts(user.id);
+      let deleted = 0;
+      if (photos === 'delete') {
+        for (const photo of db.prepare('SELECT * FROM photos WHERE uploader_id = ?').all(user.id)) {
+          await ctx.removePhoto(photo);
+          deleted += 1;
+        }
+      }
+      const { anonymized } = auth.deleteUser(user);
+      loginPerAccount.reset(accountKey);
+      // Only counts and the account id stay in the log, not the name or the address.
+      mod.log(null, 'account-delete', {
+        targetUserId: user.id,
+        detail: `${deleted} Fotos gelöscht, ${anonymized} anonym behalten, ${counts.tracks} Touren gelöscht`,
+      });
+      mailer.send({
+        to: user.email,
+        subject: 'MyForrest: Konto gelöscht',
+        text: [
+          `Hallo ${user.name}`,
+          '',
+          `Dein MyForrest-Konto (${user.email}) ist gelöscht. ${photos === 'delete'
+            ? `Deine ${deleted} Fotos sind ebenfalls gelöscht.`
+            : `Deine ${anonymized} Fotos bleiben ohne deinen Namen («Anonym») erhalten.`}`,
+          '',
+          'Warst du das nicht? Dann antworte bitte auf diese E-Mail.',
+        ].join('\n'),
+      }).catch((err) => console.error(`Bestätigung der Kontolöschung fehlgeschlagen: ${err.message}`));
+      res.append('Set-Cookie', serializeCookie(SESSION_COOKIE, '', { maxAge: 0, secure: secure(req) }));
+      res.json({ deletedPhotos: deleted, anonymizedPhotos: anonymized, deletedTracks: counts.tracks });
     } catch (err) {
       next(err);
     }
