@@ -113,7 +113,7 @@ CC BY-SA 4.0). Als installierte App landen Uploads ohne Empfang in einer Wartesc
 
 <p>
   <img src="docs/screenshots/wetter-kontext.jpg" width="49%" alt="Wetter-Kontext einer Aufnahme mit Trockenheit und Hitze">
-  <img src="docs/screenshots/satellite.jpg" width="49%" alt="Vegetation im Zeitverlauf und Satelliten-Frühwarnung">
+  <img src="docs/screenshots/satellite.jpg" width="49%" alt="Satelliten-Frühwarnung und NDVI-Rückgang eines Nadelwald-Spots mit geeichter Schwelle">
 </p>
 
 *Kontext zur Aufnahme* vergleicht die 90 Tage vor jedem Foto mit dem Mittel 1991–2020: Niederschlag,
@@ -124,9 +124,11 @@ schon Ende August, nach einem Sommer mit 29 % des üblichen Regens.
 
 *Vegetation im Zeitverlauf* (rechts) zeigt den Grünanteil aus den Fotos und den NDVI und Feuchteindex
 NDMI aus Sentinel-2, vor 2017 aus Landsat, an Sentinel-2 angeglichen. Fällt ein Index an einem Spot ohne neues Foto deutlich unter
-die Werte derselben Jahreszeit in den Vorjahren, meldet die **Frühwarnung**, dass sich ein Besuch lohnt.
-Hier: ein Fichtenbestand mit Borkenkäfer, dessen letztes Foto vom Juli 2025 stammt. Die Schwellen der
-Frühwarnung eichen sich an bestätigten Schäden.
+die Werte derselben Jahreszeit in den Vorjahren, meldet die **Frühwarnung**, dass sich ein Besuch lohnt;
+fällt er zwischen zwei Fotos, markiert das Diagramm den Zeitraum. Die Schwellen für beides eichen sich an
+bestätigten Schäden, getrennt für Laub- und Nadelwald. Hier: ein Fichten-Tannen-Bestand mit Borkenkäfer.
+Sein NDVI sank nur um 0,07–0,08; die Nadelwald-Schwelle 0,06 erkennt das, die Schwelle aller Spots (0,18)
+hätte an Nadelwald-Spots keinen der bestätigten Schäden gefunden.
 
 ### 7. Sonne & Wetter auf der Karte
 
@@ -180,7 +182,7 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   Foto, Auffälligkeiten wie Trockenheit oder frühe Laubverfärbung, Stürme seit dem letzten Besuch,
   Höhe, Exposition, Kaltluftseen sowie Satellitendaten (NDVI und Feuchteindex NDMI aus Sentinel-2, vor 2017
   Landsat) als unabhängige Bestätigung und als Frühwarnung für Spots ohne neue Fotos, deren Schwellen sich an
-  bestätigten Schäden eichen und an zurückgehaltenen Spots geprüft werden.
+  bestätigten Schäden eichen (getrennt für Laub- und Nadelwald) und an zurückgehaltenen Spots geprüft werden.
 - **[Kartenmodi](docs/funktionen.md#kartenmodi)**: Sonnenstand, Schatten und Einstrahlung inklusive
   Geländehorizont sowie Hotspots und Ausbreitungsfronten von Neophyten.
 - **[Pflanzen und Baumarten](docs/funktionen.md#pflanzen-und-baumarten)**: Pflanzenbestimmung mit Pl@ntNet,

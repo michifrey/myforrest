@@ -24,7 +24,8 @@ src/vegetation.js    Vegetationsdichte pro Foto (Grünanteil, Kronendach-Deckung
 src/sentinel.js      Sentinel-2 NDVI/NDMI: STAC-Suche, COG-Fenster lesen, Wolkenmaske, Monatsreihe, Rückgänge, Frühwarnung
 src/landsat.js       Landsat 5/7/8 (Collection 2) über Planetary Computer: signierte Links, QA-Maske, 30-m-Indizes
 src/harmonize.js     Angleichung von Landsat an Sentinel-2 aus den Überlappungsmonaten (Theil–Sen, Landsat 5 über 7)
-src/calibration.js   Kalibrierung der Frühwarnung an bestätigten Schäden (Rückrechnung ohne Blick nach vorn, F1, Kreuzvalidierung nach Spots)
+src/calibration.js   Kalibrierung der Frühwarnung und der Rückgänge zwischen Fotos an bestätigten Schäden (Rückrechnung ohne Blick nach vorn, F1, Kreuzvalidierung nach Spots, pro Waldtyp)
+src/forest-type.js   Waldtyp eines Spots (Laub/Nadel/Misch) aus Baumarten, Nadelholzanteil der Fotos oder dem winterlichen NDVI
 src/utm.js           Umrechnung WGS84 ↔ UTM (Projektion der Sentinel-2-Kacheln)
 src/routes/vegetation.js  API für Vegetationsdichte und NDVI, Hintergrund-Berechnung
 src/weather.js       Wetterdaten und Mittel 1991–2020 von Open-Meteo (mit Cache)

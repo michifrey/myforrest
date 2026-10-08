@@ -342,42 +342,51 @@ const seasonMonths = (byIndex, target, lo, hi) => {
   }
   return out;
 };
-const severityOf = (key, drop) => (drop >= THRESHOLDS[key][1] ? 'stark' : 'auffällig');
+const severityOf = (key, drop, strong = THRESHOLDS[key][1]) => (drop >= strong ? 'stark' : 'auffällig');
 
 /**
- * Strong drops of an index (`key`: 'ndvi' or 'ndmi') between consecutive
- * photo dates. Both follow the seasons (deciduous forest is low in winter),
- * so the value around the later photo is compared with the same season
- * (±1 month) during the two years up to the earlier photo. `photos` are
- * { id, takenAt (ISO) } sorted by time.
+ * How much an index (`key`: 'ndvi' or 'ndmi') dropped between two photo
+ * dates (ISO strings). Both indices follow the seasons (deciduous forest is
+ * low in winter), so the value around the later photo is compared with the
+ * same season (±1 month) during the two years up to the earlier photo.
+ * Returns { before, after, drop } or null when either side has no data.
  */
-function indexDrops(monthly, photos, { key = 'ndvi', threshold = THRESHOLDS[key][0] } = {}) {
+function pairDrop(monthly, fromIso, toIso, key = 'ndvi', byIndex = indexOf(monthly, key)) {
+  const ia = monthIndex(fromIso.slice(0, 7));
+  const ib = monthIndex(toIso.slice(0, 7));
+  if (ib - ia < 1) return null;
+  const after = [ib - 1, ib, ib + 1].filter((i) => i > ia && byIndex.has(i)).map((i) => byIndex.get(i));
+  const before = seasonMonths(byIndex, ib, ia - 24, ia).map((i) => byIndex.get(i));
+  if (!after.length || !before.length) return null;
+  const vBefore = median(before);
+  const vAfter = median(after);
+  // Rounded: 0.84 − 0.74 is 0.0999… in floating point and must count as 0.10.
+  const r = (v) => Math.round(v * 1000) / 1000;
+  return { before: r(vBefore), after: r(vAfter), drop: r(vBefore - vAfter) };
+}
+
+/**
+ * Strong drops of an index between consecutive photo dates (see pairDrop).
+ * `photos` are { id, takenAt (ISO) } sorted by time; `threshold` and
+ * `strong` default to the starting values (calibrated ones come from
+ * src/calibration.js).
+ */
+function indexDrops(monthly, photos, { key = 'ndvi', threshold = THRESHOLDS[key][0], strong = THRESHOLDS[key][1] } = {}) {
   const byIndex = indexOf(monthly, key);
   const drops = [];
   for (let k = 1; k < photos.length; k++) {
     const a = photos[k - 1];
     const b = photos[k];
-    const ia = monthIndex(a.takenAt.slice(0, 7));
-    const ib = monthIndex(b.takenAt.slice(0, 7));
-    if (ib - ia < 1) continue;
-    const after = [ib - 1, ib, ib + 1].filter((i) => i > ia && byIndex.has(i)).map((i) => byIndex.get(i));
-    const before = seasonMonths(byIndex, ib, ia - 24, ia).map((i) => byIndex.get(i));
-    if (!after.length || !before.length) continue;
-    const vBefore = median(before);
-    const vAfter = median(after);
-    // Rounded before comparing: 0.84 − 0.74 is 0.0999… in floating point and must count as 0.10.
-    const drop = Math.round((vBefore - vAfter) * 1000) / 1000;
-    if (drop >= threshold) {
+    const d = pairDrop(monthly, a.takenAt, b.takenAt, key, byIndex);
+    if (d && d.drop >= threshold) {
       drops.push({
         index: key,
         fromPhotoId: a.id,
         toPhotoId: b.id,
         fromDate: a.takenAt.slice(0, 10),
         toDate: b.takenAt.slice(0, 10),
-        before: Math.round(vBefore * 1000) / 1000,
-        after: Math.round(vAfter * 1000) / 1000,
-        drop: Math.round(drop * 1000) / 1000,
-        severity: severityOf(key, drop),
+        ...d,
+        severity: severityOf(key, d.drop, strong),
       });
     }
   }
@@ -645,6 +654,6 @@ function createSentinel({ db, fetchImpl = fetch, stacUrl = STAC_URL, landsat = n
 
 module.exports = {
   createSentinel, searchScenes, stacSearch, sceneIndices, readWindow, projectToScene, windowMean, reflectance, normalisedDifference,
-  monthlySeries, indexDrops, ndviDrops, anomalyScores, currentAnomalies, sceneOf, reflectanceScale,
+  monthlySeries, pairDrop, indexDrops, ndviDrops, anomalyScores, currentAnomalies, sceneOf, reflectanceScale,
   latLonFromUtm, STAC_URL, NDVI_DROP, NDMI_DROP, THRESHOLDS, SENTINEL_START, OVERLAP_END,
 };
