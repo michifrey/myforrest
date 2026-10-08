@@ -12,6 +12,9 @@ const { wgs84ToLv95 } = require('./lv95');
 const { listOccurrences, speciesSummary, licenseForExport } = require('./occurrences');
 const { spreadFronts } = require('./spread');
 
+// Tags that make a spot count as damaged: the same list as the orange pins in the app (public/app.js).
+const DAMAGE_TAGS = ['sturmschaden', 'borkenkaefer', 'trockenschaden', 'holzschlag', 'fruehverfaerbung', 'frostschaden'];
+
 const CRS84 = 'http://www.opengis.net/def/crs/OGC/1.3/CRS84';
 const LV95 = 'http://www.opengis.net/def/crs/EPSG/0/2056';
 
@@ -23,7 +26,7 @@ const COLLECTIONS = {
     geometry: 'POINT',
     fields: {
       spot_id: 'INTEGER', photos: 'INTEGER', first_photo: 'TEXT', last_photo: 'TEXT', years: 'INTEGER',
-      heading: 'REAL', elevation: 'REAL', tags: 'TEXT', latest_photo_url: 'TEXT',
+      heading: 'REAL', elevation: 'REAL', tags: 'TEXT', status: 'TEXT', latest_photo_url: 'TEXT',
     },
     time: ['first_photo', 'last_photo'],
   },
@@ -53,7 +56,7 @@ const COLLECTIONS = {
     geometry: 'MULTIPOLYGON',
     fields: {
       scientific_name: 'TEXT', common_name: 'TEXT', neophyte: 'INTEGER', year: 'INTEGER', findings: 'INTEGER',
-      area_m2: 'REAL', patches: 'INTEGER', front_radius_m: 'REAL', alpha_m: 'REAL',
+      area_m2: 'REAL', patches: 'INTEGER', front_radius_m: 'REAL', alpha_m: 'REAL', recency: 'REAL', recency_class: 'INTEGER',
     },
     time: ['year'],
   },
@@ -95,6 +98,8 @@ function createGeodata({ db, spotRadiusM = 25 }) {
         heading: r.heading ?? null,
         elevation: r.elevation ?? null,
         tags: tags.map((t) => t.tag).join(', ') || null,
+        // "schaden" when a photo of the spot is tagged with damage (the orange pins in the app), else "ohne".
+        status: tags.some((t) => DAMAGE_TAGS.includes(t.tag)) ? 'schaden' : 'ohne',
         latest_photo_url: latest ? `${base}/uploads/${latest.file}` : null,
       });
     });
@@ -148,6 +153,8 @@ function createGeodata({ db, spotRadiusM = 25 }) {
       const occ = listOccurrences(db, { species: sp.scientificName, spotRadiusM });
       if (!occ.length) continue;
       const s = spreadFronts(occ);
+      const first = s.years[0]?.year;
+      const span = s.years.length > 1 ? s.years[s.years.length - 1].year - first : 0;
       for (const y of s.years) {
         // Leaflet-style [lat, lon] rings → GeoJSON [lon, lat].
         const coordinates = y.polygons.map((poly) => poly.map((ring) => closeRing(ring.map(([la, lo]) => [lo, la]))));
@@ -161,6 +168,10 @@ function createGeodata({ db, spotRadiusM = 25 }) {
           patches: y.patches,
           front_radius_m: y.frontRadiusM,
           alpha_m: s.alphaM,
+          // 0 = first year of the species, 1 = newest: lets map styles shade the years without aggregates.
+          recency: span ? Math.round(((y.year - first) / span) * 1000) / 1000 : 1,
+          // The same in five steps (0–4), for styles that can only match exact values (QGIS' MapLibre import).
+          recency_class: span ? Math.round(((y.year - first) / span) * 4) : 4,
         }));
       }
     }
@@ -213,4 +224,4 @@ function bboxOf(geometry) {
   return b;
 }
 
-module.exports = { createGeodata, COLLECTIONS, CRS84, LV95, toLv95, bboxOf, mapCoords };
+module.exports = { createGeodata, COLLECTIONS, DAMAGE_TAGS, CRS84, LV95, toLv95, bboxOf, mapCoords };

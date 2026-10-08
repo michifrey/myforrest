@@ -43,13 +43,12 @@ LAYERS = [
      'gepuffert. Hellere, grössere Flächen sind jüngere Jahre. Filterbar nach scientific_name und year.', True),
     ('spots', 'Spots',
      'Orte, an denen über die Zeit Fotos entstanden sind. Grösse nach Anzahl Fotos, Pfeil in Blickrichtung, '
-     'orange bei Schäden (Sturm, Borkenkäfer, Trockenheit, Holzschlag, Erosion).', True),
+     'orange bei Schäden (Sturm, Borkenkäfer, Trockenschaden, Holzschlag, frühe Verfärbung, Frost).', True),
     ('findings', 'Pflanzenfunde',
      'Automatische Pflanzenbestimmungen (Pl@ntNet, bestes Ergebnis pro Foto ab Score 0,2). Violett: invasive '
      'Neophyten.', True),
 ]
 
-DAMAGE_TAGS = ['sturmschaden', 'borkenkaefer', 'trockenheit', 'holzschlag', 'erosion', 'frostschaden']
 
 
 def style_fronts(layer):
@@ -90,11 +89,10 @@ def spot_symbol(colour):
 
 
 def style_spots(layer):
-    """Orange with damage tags (storm, bark beetle, drought, logging, erosion, frost), green otherwise."""
-    damage = ' OR '.join(f"\"tags\" LIKE '%{t}%'" for t in DAMAGE_TAGS)
+    """Orange with damage tags (attribute "status", same tags as the orange pins in the app), green otherwise."""
     root = QgsRuleBasedRenderer.Rule(None)
-    root.appendChild(QgsRuleBasedRenderer.Rule(spot_symbol(FOREST), 0, 0, f'NOT ({damage}) OR "tags" IS NULL', 'Ohne Befund'))
-    root.appendChild(QgsRuleBasedRenderer.Rule(spot_symbol(DAMAGE), 0, 0, damage, 'Mit Schäden'))
+    root.appendChild(QgsRuleBasedRenderer.Rule(spot_symbol(FOREST), 0, 0, 'coalesce("status", \'ohne\') <> \'schaden\'', 'Ohne Befund'))
+    root.appendChild(QgsRuleBasedRenderer.Rule(spot_symbol(DAMAGE), 0, 0, '"status" = \'schaden\'', 'Mit Schäden'))
     layer.setRenderer(QgsRuleBasedRenderer(root))
 
 

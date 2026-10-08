@@ -52,6 +52,8 @@ src/lv95.js          Schweizer Landeskoordinaten LV95 ↔ WGS84 (Näherungsforme
 src/geodata.js       Daten als GIS-Collections (Spots, Fotos, Funde, Ausbreitungsfronten)
 src/gpkg.js          GeoPackage-Schreiber (OGC GeoPackage 1.3) ohne GDAL
 src/routes/ogc.js    OGC API – Features und GeoPackage-Export
+src/tiles.js         Vektorkacheln: WebMercatorQuad, Kachelindex (geojson-vt), MVT-Kodierung (vt-pbf)
+src/routes/ogc-tiles.js  OGC API – Tiles und MapLibre-Stil
 src/auth.js          Konten, Passwort-Hashing (scrypt), Sitzungen, Rate-Limit
 src/moderation.js    Lizenzen, Meldungen, Ausblenden und Protokoll
 src/routes/accounts.js  Routen für Konten und Moderation, CSRF-Schutz, Rechte auf Fotos
@@ -63,7 +65,8 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
                      hotspots.js den Kartenmodus „Arten & Neophyten“,
                      video.js den Video-Upload und die 360°-Ansicht,
                      vegetation.js die Diagramme zu Vegetationsdichte und NDVI,
-                     account.js Konto-Menü, Lizenz, Melden und Moderation)
+                     account.js Konto-Menü, Lizenz, Melden und Moderation;
+                     vektorkarte.html zeigt die Vektorkacheln mit MapLibre)
 public/sw.js         Service Worker: App-Shell vorhalten, Laufzeit-Caches, Background Sync
 public/offline-queue.js  Warteschlange für Uploads ohne Verbindung (IndexedDB, von Seite und Service Worker genutzt)
 public/pwa.js        Registrierung, Warteschlangen-Anzeige, Installieren-Knopf, Kamera-Aufnahme im Upload

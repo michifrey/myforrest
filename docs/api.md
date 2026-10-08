@@ -23,6 +23,11 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/ogc/collections[/:id]`       | Collections `spots`, `photos`, `findings`, `spread_fronts` mit Ausdehnung und Koordinatensystemen |
 | `GET`    | `/ogc/collections/:id/items[/:fid]` | GeoJSON; `crs` (CRS84 oder `http://www.opengis.net/def/crs/EPSG/0/2056`), `bbox`, `bbox-crs`, `datetime`, `limit`, `offset` |
 | `GET`    | `/api/export/myforrest.gpkg`   | Alle Collections als GeoPackage (LV95, `?crs=4326` für WGS84) |
+| `GET`    | `/ogc/tileMatrixSets[/WebMercatorQuad]` | Kachelgitter (OGC Two Dimensional Tile Matrix Set) |
+| `GET`    | `/ogc/tiles[/WebMercatorQuad]` | Vektorkacheln des Datensatzes: Liste und Tileset (zugleich TileJSON 3.0) |
+| `GET`    | `/ogc/tiles/WebMercatorQuad/{z}/{y}/{x}` | Kachel (MVT) mit den Ebenen `spread_fronts`, `spots`, `findings`; 204 wenn leer |
+| `GET`    | `/ogc/collections/:id/tiles[/WebMercatorQuad[/{z}/{y}/{x}]]` | Vektorkacheln einer Collection |
+| `GET`    | `/ogc/styles/myforrest`        | MapLibre-Stil für die Kacheln (auch für QGIS) |
 | `GET`    | `/api/trees`                 | Liste der unterstützten Baumarten mit Steckbrief         |
 | `GET`    | `/api/spots/:id/storms`      | Sturmereignisse am Spot (ab 12 Monate vor dem ersten Foto), mit verknüpften Windwurf-Fotos |
 | `GET`    | `/api/photos/:id/storm?to=`  | Wahrscheinlichster Sturm zwischen zwei Fotos             |

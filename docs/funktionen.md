@@ -393,6 +393,19 @@ einbinden.
   Blickrichtung, Neophyten hervorgehoben) und eine Docker-Compose-Vorlage: MyForrest, QGIS Server und
   nginx, dazu ein Dienst, der das GeoPackage alle 15 Minuten neu exportiert.
 
+- **Vektorkacheln**: Dieselben Daten als Mapbox Vector Tiles nach **OGC API – Tiles** im Kachelgitter
+  WebMercatorQuad (Zoom 0–20), wie sie Webkarten und die Vektorkarten von swisstopo verwenden. Eine Kachel
+  `/ogc/tiles/WebMercatorQuad/{z}/{y}/{x}` enthält die Ebenen `spread_fronts`, `spots` und `findings`;
+  jede Collection hat zusätzlich eigene Kacheln (auch `photos`). Die Tileset-Beschreibung ist zugleich
+  TileJSON 3.0, leere Kacheln antworten mit 204. Geschnitten und vereinfacht wird pro Zoomstufe
+  (geojson-vt), die Kacheln folgen den Daten ohne Neuberechnung von Hand.
+- **Kartenstil und Vektorkarte**: `/ogc/styles/myforrest` ist ein MapLibre-Stil in den Farben der App
+  (Ausbreitungsfronten von hell = früher bis dunkel = neuer, Spots grün oder orange mit Schäden, Neophyten
+  violett). Er beschränkt sich auf Ausdrücke, die auch QGIS beim Import von MapLibre-Stilen versteht, und
+  nutzt dafür die Attribute `status` (Spots: `schaden`/`ohne`, wie die orangen Marker der App) und
+  `recency_class` (Ausbreitungsfronten: 0–4 vom ersten bis zum neusten Jahr). `/vektorkarte.html` zeigt
+  die Kacheln mit MapLibre, mit Legende und Angaben per Klick.
+
 Ausgeblendete (moderierte) Fotos erscheinen in keinem Dienst.
 
 ## Pflanzen und Baumarten

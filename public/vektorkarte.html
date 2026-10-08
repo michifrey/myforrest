@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vektorkarte · MyForrest</title>
+  <meta name="description" content="MyForrest als Vektorkacheln (OGC API – Tiles, MVT) mit MapLibre">
+  <link rel="stylesheet" href="vendor/fonts/fraunces/full.css">
+  <link rel="stylesheet" href="vendor/fonts/manrope/index.css">
+  <link rel="stylesheet" href="vendor/maplibre/maplibre-gl.css">
+  <style>
+    :root {
+      --bg: #f4f0e4; --surface: #fbf8f0; --text: #1b2a1f; --muted: #5d6b5f; --border: rgb(27 42 31 / 0.14);
+      --accent: #2f5d34; --neo: #8650c8; --damage: #c2611d;
+      --font-display: 'Fraunces Variable', Georgia, serif; --font-body: 'Manrope Variable', system-ui, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0e1611; --surface: #152019; --text: #e6eadb; --muted: #a3ae9f; --border: rgb(230 234 219 / 0.16); --accent: #8fbf6a; --neo: #b38be6; --damage: #f08a3e; }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 15px/1.5 var(--font-body); }
+    #map { position: absolute; inset: 0; }
+    .panel {
+      position: absolute; z-index: 2; top: 12px; left: 12px; width: min(340px, calc(100vw - 24px));
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px;
+      box-shadow: 0 10px 30px rgb(0 0 0 / 0.18);
+    }
+    .panel summary { list-style: none; cursor: pointer; }
+    .panel summary::-webkit-details-marker { display: none; }
+    .panel h1 { display: inline; font: 500 1.35rem/1.2 var(--font-display); margin: 0; }
+    .panel summary::after { content: '▾'; float: right; color: var(--muted); }
+    .panel:not([open]) summary::after { content: '▸'; }
+    .panel[open] summary { margin-bottom: 4px; }
+    .panel p { margin: 0 0 10px; color: var(--muted); font-size: 0.85rem; }
+    .panel a { color: var(--accent); }
+    .legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 0.85rem; }
+    .legend li { display: flex; align-items: center; gap: 8px; }
+    .sw { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--border); flex: none; }
+    .ramp { width: 44px; height: 12px; border-radius: 3px; background: linear-gradient(90deg, #c4bfde, #4a1486); flex: none; }
+    .links { margin-top: 10px; font-size: 0.8rem; color: var(--muted); }
+    .maplibregl-popup-content { font: 0.85rem/1.4 var(--font-body); color: #1b2a1f; border-radius: 10px; }
+    .maplibregl-popup-content b { display: block; font-size: 0.95rem; }
+    @media (max-width: 600px) { .panel { top: 12px; width: calc(100vw - 70px); } }
+  </style>
+</head>
+<body>
+  <div id="map" role="region" aria-label="Vektorkarte"></div>
+  <details class="panel" id="panel" open>
+    <summary><h1 id="title">Vektorkarte</h1></summary>
+    <p>MyForrest als Vektorkacheln (OGC API – Tiles, MVT). Ein Klick auf ein Objekt zeigt seine Angaben.
+      <a href="./">Zurück zur App</a></p>
+    <ul class="legend">
+      <li><span class="ramp"></span> Ausbreitungsfronten: hell = früher, dunkel = neuer</li>
+      <li><span class="sw" style="background:#2f5d34"></span> Spot ohne Befund</li>
+      <li><span class="sw" style="background:#c2611d"></span> Spot mit Schäden</li>
+      <li><span class="sw" style="background:#8650c8"></span> Neophyt</li>
+      <li><span class="sw" style="background:#5c8f4a"></span> andere Pflanze</li>
+    </ul>
+    <div class="links">
+      <a href="ogc/tiles/WebMercatorQuad">Tileset (TileJSON)</a> ·
+      <a href="ogc/styles/myforrest">Stil (MapLibre)</a> ·
+      <a href="ogc">OGC API</a>
+    </div>
+  </details>
+  <script src="vendor/maplibre/maplibre-gl.js"></script>
+  <script>
+    'use strict';
+    // On phones the legend starts folded so the map stays visible.
+    if (window.matchMedia('(max-width: 600px)').matches) document.getElementById('panel').open = false;
+    (async () => {
+      const tileset = await (await fetch('ogc/tiles/WebMercatorQuad')).json();
+      const map = new maplibregl.Map({
+        container: 'map',
+        style: 'ogc/styles/myforrest',
+        bounds: tileset.bounds,
+        fitBoundsOptions: { padding: 60, maxZoom: 16 },
+        attributionControl: { compact: true },
+      });
+      window.vectorMap = map;
+      map.addControl(new maplibregl.NavigationControl(), 'top-right');
+      map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-right');
+
+      const fmtDate = (v) => (v ? new Date(v).toLocaleDateString('de-CH') : '');
+      const ha = (m2) => `${(m2 / 10000).toLocaleString('de-CH', { maximumFractionDigits: 2 })} ha`;
+      const text = {
+        spots: (p) => [`Spot ${p.spot_id}`, `${p.photos} ${p.photos === 1 ? 'Foto' : 'Fotos'}, ${fmtDate(p.first_photo)} – ${fmtDate(p.last_photo)}`, p.tags || ''],
+        findings: (p) => [p.common_name || p.scientific_name, p.scientific_name, `${fmtDate(p.taken_at)} · Score ${Number(p.score).toFixed(2)}`],
+        spread_fronts: (p) => [`${p.common_name || p.scientific_name} ${p.year}`, `${ha(p.area_m2)} in ${p.patches} ${p.patches === 1 ? 'Teilbestand' : 'Teilbeständen'}`, `${p.findings} Funde bis dahin`],
+      };
+      const el = (tag, t) => { const n = document.createElement(tag); n.textContent = t; return n; };
+      map.on('click', (e) => {
+        const f = map.queryRenderedFeatures(e.point, { layers: ['findings-neophytes', 'findings', 'spots-damage', 'spots', 'spread-fronts-fill'] })[0];
+        if (!f) return;
+        const [title, ...lines] = text[f.sourceLayer](f.properties);
+        const box = document.createElement('div');
+        box.append(el('b', title), ...lines.filter(Boolean).flatMap((l) => [el('span', l), document.createElement('br')]));
+        new maplibregl.Popup({ maxWidth: '260px' }).setLngLat(e.lngLat).setDOMContent(box).addTo(map);
+      });
+      for (const layer of ['findings-neophytes', 'findings', 'spots-damage', 'spots', 'spread-fronts-fill']) {
+        map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
+        map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
+      }
+    })();
+  </script>
+</body>
+</html>

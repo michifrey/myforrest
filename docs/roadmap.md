@@ -38,8 +38,8 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 - **Arten und Neophyten**: direkter Upload über die APIs (OAuth-Konto bei iNaturalist bzw. Info Flora),
   Bestätigung der automatischen Bestimmungen durch Menschen vor dem Export und eine Korrektur für
   ungleich verteilten Suchaufwand.
-- **Geodienste**: Vektorkacheln (OGC API – Tiles / MVT) für grosse Datenmengen, Metadaten nach
-  geocat.ch/ISO 19139 für einen Eintrag auf opendata.swiss.
+- **Geodienste**: Metadaten nach geocat.ch/ISO 19139 für einen Eintrag auf opendata.swiss; Vektorkacheln
+  zusätzlich im Schweizer Kachelgitter (LV95) und vorberechnet für sehr grosse Datenmengen.
 - **Satellitenkontext ausbauen**: NDVI-Rückgänge auch ohne Fotos melden (Frühwarnung für Spots), weitere
   Indizes (z. B. NDMI für Trockenstress, Sentinel-2 B11), Landsat für die Zeit vor 2017; Sturmereignisse
   (z. B. MeteoSchweiz/DWD) als Kontext.

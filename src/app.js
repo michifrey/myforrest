@@ -73,6 +73,7 @@ function createApp({
   });
   app.use(express.static(path.join(__dirname, '..', 'public')));
   app.use('/vendor/leaflet', express.static(path.dirname(require.resolve('leaflet/dist/leaflet.js'))));
+  app.use('/vendor/maplibre', express.static(path.dirname(require.resolve('maplibre-gl/dist/maplibre-gl.js')), { maxAge: '30d' }));
   for (const font of ['fraunces', 'manrope']) {
     const dir = path.dirname(require.resolve(`@fontsource-variable/${font}/package.json`));
     app.use(`/vendor/fonts/${font}`, express.static(dir, { maxAge: '30d' }));

@@ -30,5 +30,10 @@ in `public/sw.js` `SHELL_VERSION` erhöhen; alte Caches werden beim Aktivieren g
 | [Pl@ntNet](https://my.plantnet.org) (optional, API-Key) | Pflanzenbestimmung | `my-api.plantnet.org` |
 | OpenStreetMap | Kartenkacheln (im Browser) | – |
 
+Im Browser laufen [Leaflet](https://leafletjs.com) (BSD-2-Clause) für die App-Karte und
+[MapLibre GL JS](https://maplibre.org) (BSD-3-Clause) für die Vektorkarte; beide liefert der Server aus
+`node_modules` aus, ohne CDN. Die Vektorkacheln erzeugen [geojson-vt](https://github.com/mapbox/geojson-vt)
+(ISC) und [vt-pbf](https://github.com/mapbox/vt-pbf) (MIT).
+
 Die Wetterdaten werden pro ~10-km-Zelle gecacht; die Normalwerte 1991–2020 werden nur einmal pro Zelle
 geladen. Die Satellitendaten enthalten modifizierte Copernicus-Sentinel-Daten.
