@@ -9,7 +9,11 @@
  * - Photos under /uploads are immutable (UUID file names): cache-first.
  * - API GETs: network-first with the last answer as offline fallback.
  * - OpenStreetMap tiles: cache-first with an entry limit.
- * - Background Sync sends uploads queued while offline (see offline-queue.js).
+ * - Background Sync sends uploads queued while offline (see offline-queue.js);
+ *   with no window open, a notification says what was sent and what the
+ *   server rejected.
+ * - Routes saved for offline use (offline-map.js) live in caches of their own
+ *   (myforrest-offline-*): read like the others, never trimmed or deleted here.
  * - Push messages (satellite early warnings, src/routes/push.js) are shown as
  *   notifications; a click opens the spot in an open window or a new one.
  *
@@ -19,7 +23,7 @@
 
 importScripts('offline-queue.js');
 
-const SHELL_VERSION = 'v8';
+const SHELL_VERSION = 'v9';
 const DATA_VERSION = 'v1';
 const CACHE = {
   shell: `myforrest-shell-${SHELL_VERSION}`,
@@ -53,6 +57,7 @@ const PRECACHE = [
   'analysis.js',
   'offline-queue.js',
   'pwa.js',
+  'offline-map.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',
@@ -91,7 +96,9 @@ self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const keep = new Set(Object.values(CACHE));
     const names = await caches.keys();
-    await Promise.all(names.filter((n) => n.startsWith('myforrest-') && !keep.has(n)).map((n) => caches.delete(n)));
+    // Routes saved for offline use belong to the user, not to a version of the app.
+    const stale = (n) => n.startsWith('myforrest-') && !n.startsWith('myforrest-offline-') && !keep.has(n);
+    await Promise.all(names.filter(stale).map((n) => caches.delete(n)));
     if (self.registration.navigationPreload) await self.registration.navigationPreload.enable().catch(() => {});
     const api = await caches.open(CACHE.api);
     await Promise.all(WARM_API.map(async (p) => {
@@ -213,10 +220,42 @@ self.addEventListener('fetch', (event) => {
 
 /* ---------- Offline uploads ---------- */
 
+/**
+ * After a background send with no MyForrest window in view, a notification
+ * says what happened (the page shows the same as a note when it is open).
+ */
+async function notifyFlush(summary) {
+  if (!summary || summary.busy || self.Notification?.permission !== 'granted') return;
+  const windows = await self.clients.matchAll({ type: 'window' });
+  if (windows.some((w) => w.visibilityState === 'visible')) return;
+  const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
+  const icon = new URL('icons/icon-192.png', scopeUrl()).href;
+  if (summary.failed.length || summary.skipped.length) {
+    const rejected = summary.failed.reduce((s, f) => s + (f.photos?.length || 1), 0) + summary.skipped.length;
+    const reason = summary.failed[0]?.reason || summary.skipped[0]?.reason || '';
+    await self.registration.showNotification(`Upload abgelehnt: ${n(rejected, 'Foto', 'Fotos')}`, {
+      body: `${reason}${summary.created.length ? ` · ${n(summary.created.length, 'weiteres Foto', 'weitere Fotos')} hochgeladen` : ''}. Tippen zeigt die Warteschlange.`,
+      tag: 'upload-queue',
+      icon,
+      badge: icon,
+      data: { url: new URL('./?queue=1', scopeUrl()).href },
+    });
+  } else if (summary.created.length) {
+    await self.registration.showNotification(`${n(summary.created.length, 'Foto', 'Fotos')} hochgeladen`, {
+      body: 'Die Fotos aus der Warteschlange sind jetzt auf der Karte.',
+      tag: 'upload-queue',
+      icon,
+      badge: icon,
+      data: { url: new URL(summary.spots?.length ? `./?spot=${summary.spots[0]}` : './', scopeUrl()).href },
+    });
+  }
+}
+
 self.addEventListener('sync', (event) => {
   if (event.tag !== self.offlineQueue.SYNC_TAG) return;
   event.waitUntil((async () => {
     const summary = await self.offlineQueue.flush();
+    await notifyFlush(summary).catch(() => {});
     // Rejecting makes the browser retry the sync later with back-off.
     if (summary.offline && !event.lastChance) throw new Error('Noch offline');
   })());

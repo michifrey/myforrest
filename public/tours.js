@@ -7,6 +7,8 @@
  *    GPX/TCX/KML/GeoJSON. Kilometre marks, undo, round trip, GPX export, saving
  *    (with an account), and suggestions near the route: photo requests, spots
  *    with a satellite early warning and spots not visited for a year.
+ *  - Offline: the map along a route and the spots on it can be saved on the
+ *    device (offline-map.js) for areas without reception.
  *  - Meine Touren: saved tours; public tours of others can be shown on the map.
  *  - Aufträge: photo requests ("please photograph this place, looking east"),
  *    shown on the map for everyone; a photo nearby fulfils them.
@@ -496,6 +498,54 @@
     return T.trackCache.get(id);
   }
 
+  /* ---------- Offline along a route (offline-map.js) ---------- */
+
+  const fmtMb = (b) => (b < 1e5 ? `${Math.max(1, Math.round(b / 1e3))} kB` : `${(b / 1e6).toLocaleString('de-CH', { maximumFractionDigits: 1 })} MB`);
+
+  /** Saves the map and spots along `points` on this device, with progress in the route tab. */
+  async function saveOffline(points, name) {
+    const om = window.offlineMap;
+    if (!om?.supported()) return setStatus('Dieser Browser kann keine Karten offline speichern.');
+    if (points.length < 2) return;
+    const plan = om.plan(points);
+    if (plan.tooLong) {
+      return setStatus(`Die Route ist zu lang, um sie offline zu speichern (höchstens ${om.MAX_TILES} Kartenkacheln). Teile sie in kürzere Abschnitte.`);
+    }
+    const near = om.spotsNear(points, state.spots || []);
+    if (!confirm(`Karte entlang der Route offline speichern?\n${plan.tiles.length} Kartenkacheln bis Zoomstufe ${plan.maxZoom}, ${near.length} Spot${near.length === 1 ? '' : 's'} mit Fotos.`)) return;
+    setTab('route');
+    $('tour-offline-save').disabled = true;
+    try {
+      const meta = await om.save(name, points, state.spots || [], (p) => setStatus(`Offline speichern … ${Math.round((p.n / p.total) * 100)} % (${fmtMb(p.bytes)})`));
+      setStatus(`Offline gespeichert: ${meta.tiles} Kartenkacheln, ${meta.spots} Spot${meta.spots === 1 ? '' : 's'}, ${fmtMb(meta.bytes)}${meta.failed ? ` (${meta.failed} nicht erreichbar)` : ''}.`);
+    } catch (err) {
+      setStatus(`Offline speichern fehlgeschlagen: ${err.message}`);
+    }
+    renderOffline();
+  }
+
+  async function renderOffline() {
+    const box = $('tour-offline');
+    const om = window.offlineMap;
+    const pts = routePoints();
+    $('tour-offline-save').disabled = !om?.supported() || pts.length < 2;
+    const saved = om?.supported() ? await om.list().catch(() => []) : [];
+    box.replaceChildren(...(saved.length ? [el('ul', { class: 'tour-list' }, saved.map((m) => el('li', {}, [
+      el('div', { class: 'tour-row' }, [
+        el('strong', { text: m.name }),
+        el('span', { class: 'muted small', text: [fmtDate(m.savedAt), `${m.tiles} Kacheln bis Zoom ${m.maxZoom}`, `${m.spots} Spot${m.spots === 1 ? '' : 's'}`, fmtMb(m.bytes)].join(' · ') }),
+      ]),
+      el('div', { class: 'tour-actions' }, [
+        el('button', { type: 'button', class: 'link small', text: 'Auf der Karte', onclick: () => map.fitBounds(m.bounds, { padding: [30, 30] }) }),
+        el('button', { type: 'button', class: 'link small danger', text: 'Löschen', onclick: async () => {
+          if (!confirm(`Offline-Karte «${m.name}» von diesem Gerät löschen?`)) return;
+          await om.remove(m.id);
+          renderOffline();
+        } }),
+      ]),
+    ])))] : [el('p', { class: 'muted small', text: 'Noch nichts offline gespeichert.' })]));
+  }
+
   async function renderMine() {
     const box = $('tour-mine');
     if (!Account.user) {
@@ -519,6 +569,10 @@
           setTab('route');
         } }),
         el('a', { class: 'link small', href: `/api/tracks/${t.id}.gpx`, text: 'GPX' }),
+        el('button', { type: 'button', class: 'link small', text: 'Offline speichern', onclick: async () => {
+          const full = await trackPoints(t.id);
+          saveOffline(full.points, t.name);
+        } }),
         el('button', { type: 'button', class: 'link small', text: t.visibility === 'oeffentlich' ? 'privat machen' : 'veröffentlichen', onclick: async () => {
           await json(`/api/tracks/${t.id}`, { visibility: t.visibility === 'oeffentlich' ? 'privat' : 'oeffentlich' }, 'PATCH');
           renderMine();
@@ -677,6 +731,10 @@
           el('button', { type: 'button', id: 'tour-save', class: 'btn primary', text: 'Tour speichern' }),
         ]),
         el('p', { id: 'tour-status', class: 'small tour-status', 'aria-live': 'polite' }),
+        el('h3', { class: 'label', text: 'Offline unterwegs' }),
+        el('p', { class: 'muted small', text: 'Ohne Empfang im Wald: Karte und Spots entlang der Route vorher auf diesem Gerät speichern. Fotos landen dann in der Warteschlange und gehen später raus.' }),
+        el('button', { type: 'button', id: 'tour-offline-save', class: 'secondary wide', text: 'Karte entlang der Route offline speichern' }),
+        el('div', { id: 'tour-offline' }),
         el('h3', { class: 'label sug-head' }, [el('span', { text: 'Unterwegs fotografieren' })]),
         el('div', { class: 'sp-row' }, [
           el('label', { for: 'tour-dist', class: 'small muted', text: 'Abstand zur Route' }),
@@ -727,6 +785,7 @@
     if (!$('tour-name').matches(':focus')) $('tour-name').value = r.name || '';
     $('tour-save').disabled = pts.length < 2 || Boolean(T.recorder) || Boolean(r.savedId);
     $('tour-gpx').disabled = pts.length < 2;
+    $('tour-offline-save').disabled = !window.offlineMap?.supported() || pts.length < 2;
     $('tour-undo').disabled = !pts.length || Boolean(T.recorder);
     $('tour-loop').disabled = Boolean(r.raw) || r.waypoints.length < 2;
   }
@@ -754,6 +813,7 @@
       suggestionLayer.addTo(map);
       setTab(T.tab);
       renderRoute();
+      renderOffline();
       scheduleSuggestions();
     } else {
       map.getContainer().classList.remove('tour-drawing');
@@ -785,6 +845,7 @@
   $('tour-loop').addEventListener('click', roundTrip);
   $('tour-clear').addEventListener('click', clearRoute);
   $('tour-gpx').addEventListener('click', exportGpx);
+  $('tour-offline-save').addEventListener('click', () => saveOffline(routePoints(), T.route.name || 'Route'));
   $('tour-save').addEventListener('click', saveRoute);
   $('tour-name').addEventListener('input', (e) => { T.route.name = e.target.value; });
   $('tour-dist').addEventListener('input', (e) => {

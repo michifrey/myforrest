@@ -101,6 +101,27 @@ das Gerät wieder online ist. Auf dem Handy nimmt *Mit Kamera aufnehmen* im Uplo
 auf und setzt den aktuellen Standort, falls das Foto kein GPS hat. Ohne Service Worker (z. B. über
 http auf einer fremden IP) funktioniert die App wie bisher, nur ohne Offline-Modus.
 
+**Benachrichtigung bei abgelehnten Uploads**: Sendet der Service Worker die Warteschlange im Hintergrund
+(Background Sync) und ist MyForrest gerade nicht offen, meldet eine Benachrichtigung, was der Server
+abgelehnt hat (z. B. „Upload abgelehnt: 2 Fotos – Kein GPS im Foto“); ein Tipp darauf öffnet die
+Warteschlange. Ging alles durch, sagt eine kurze Nachricht, wie viele Fotos jetzt auf der Karte sind. Die
+Erlaubnis dafür fragt die App, sobald ein Upload in der Warteschlange landet (oder im Dialog der
+Warteschlange), nicht schon beim ersten Besuch. Ist die App offen, erscheint dasselbe als Hinweis in der App.
+
+**Karte entlang einer Route offline speichern**: Im Kartenmodus *Touren & Aufträge* speichert *Karte
+entlang der Route offline speichern* (oder *Offline speichern* bei einer gespeicherten Tour) vor dem
+Losgehen auf dem Gerät:
+- die Kartenkacheln eines Korridors von 300 m um die Route, Zoomstufe 12 bis 16, höchstens 1500 Kacheln.
+  Bei langen Routen fallen zuerst die tiefen Zoomstufen weg; reicht es nicht einmal bis Zoom 14, ist die
+  Route zu lang. Zoom 17 und mehr wird nie vorgeladen, wie es die Nutzungsregeln von OpenStreetMap
+  verlangen.
+- die Spots bis 150 m neben der Route: Angaben, Vorschaubilder aller Fotos und die vier neusten Fotos in
+  Ansichtsgrösse (Referenz für das Kamera-Overlay beim Wiederholungsfoto). Geschützte Funde werden nie
+  gespeichert.
+Jede Route liegt in einem eigenen Speicher des Browsers, der nicht verdrängt wird und Updates der App
+übersteht. Die Liste im Panel nennt Grösse und Inhalt; *Auf der Karte* zeigt den Ausschnitt, *Löschen*
+gibt den Platz frei. Die App bittet den Browser, die Daten dauerhaft zu behalten.
+
 ## Spots und Zeitreise
 
 ### Karte mit Spots
