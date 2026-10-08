@@ -416,6 +416,28 @@ einbinden.
   `OGCAPI:https://<server>/ogc/collections/<id>` und den Optionen `API=TILES`, `TILEMATRIXSET=SwissLV95`
   sowie dem Ausschnitt in LV95 (`MINX`, `MINY`, `MAXX`, `MAXY`): GDAL nimmt sonst die Ausdehnung der
   Collection in Grad und findet keine Kacheln.
+- **Vorberechnete Kacheln**: Nach jeder Änderung der Daten schneidet der Server alle Kachelsätze im
+  Hintergrund neu, 10 Sekunden nach der letzten Änderung, damit ein Upload-Stapel nur eine Berechnung
+  auslöst. Das sind beide Kachelgitter, der Datensatz und jede Collection, in WebMercatorQuad bis Zoom 18
+  (rund 0,4 m pro Pixel) und in LV95 bis Zoom 26 (0,5 m).
+  - **Speicher und Auslieferung**: Die Kacheln liegen gzip-komprimiert in `data/tiles/tiles.db`. Eine
+    Anfrage liest nur noch eine Zeile und liefert sie komprimiert aus. Leere Kacheln kennt der Speicher
+    ebenfalls, sie antworten sofort mit 204.
+  - **Live geschnitten** werden nur tiefere Zoomstufen und Kacheln, deren Neuberechnung noch läuft. Der
+    Kopf `X-Tile-Source` zeigt, woher eine Kachel kommt.
+  - **Ohne Unterbruch**: Eine neue Version wird neben der alten aufgebaut und erst am Ende umgeschaltet.
+    Der Server antwortet währenddessen weiter.
+  - **Von Hand**: `npm run tiles` rechnet alles sofort vor, etwa nach einem Import oder aus einem
+    Cron-Job, auch während der Server läuft.
+- **PMTiles und MBTiles**: Der Datensatz in WebMercatorQuad steht nach jeder Berechnung auch als eine Datei
+  bereit.
+  - `/api/export/myforrest.pmtiles` lässt sich auf jedem statischen Webserver oder Objektspeicher ablegen.
+    Webkarten lesen daraus einzelne Kacheln per HTTP-Range-Anfrage, ohne MyForrest-Server. GDAL ab 3.8
+    liest PMTiles, QGIS über GDAL als Vektorlayer.
+  - `/api/export/myforrest.mbtiles` öffnet QGIS direkt als Vektorkachel-Layer, ebenso GDAL und Kachelserver
+    wie tileserver-gl oder martin.
+  - Solange die Dateien zur aktuellen Datenversion noch berechnet werden, antworten beide mit 503 und
+    `Retry-After`.
 
 Ausgeblendete (moderierte) Fotos erscheinen in keinem Dienst.
 

@@ -54,6 +54,9 @@ src/gpkg.js          GeoPackage-Schreiber (OGC GeoPackage 1.3) ohne GDAL
 src/routes/ogc.js    OGC API – Features und GeoPackage-Export
 src/tiles.js         Vektorkacheln: WebMercatorQuad, Kachelindex (geojson-vt), MVT-Kodierung (vt-pbf)
 src/tiles-lv95.js    Vektorkacheln im Schweizer Kachelgitter LV95 (swisstopo): Zuschnitt pro Kachel, MVT-Kodierung
+src/tile-cache.js    Vorberechnete Kacheln in data/tiles/tiles.db (pro Datenversion, gzip, Umschalten am Ende)
+src/pmtiles.js       PMTiles-v3-Schreiber (Hilbert-Kachel-IDs, Verzeichnisse mit Leaf-Verzeichnissen, Deduplizierung)
+src/mbtiles.js       MBTiles-1.3-Schreiber (SQLite)
 src/routes/ogc-tiles.js  OGC API – Tiles (WebMercatorQuad und SwissLV95) und MapLibre-Stil
 src/auth.js          Konten, Passwort-Hashing (scrypt), Sitzungen, Rate-Limit
 src/moderation.js    Lizenzen, Meldungen, Ausblenden und Protokoll
@@ -75,4 +78,5 @@ public/pwa.js        Registrierung, Warteschlangen-Anzeige, Installieren-Knopf, 
 public/manifest.webmanifest, public/icons/  Web-App-Manifest und App-Icons
 test/                Tests (`npm test`, Node-Testrunner)
 scripts/generate-icons.js  Erzeugt die App-Icons aus dem Logo (`node scripts/generate-icons.js`)
+scripts/build-tiles.js     Rechnet alle Vektorkacheln vor und schreibt PMTiles/MBTiles (`npm run tiles`)
 ```

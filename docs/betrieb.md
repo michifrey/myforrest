@@ -14,6 +14,19 @@
 - Kartendaten © OpenStreetMap-Mitwirkende. Bei stärkerer Nutzung braucht es einen eigenen
   Tile-Anbieter (siehe Tile Usage Policy).
 
+## Vorberechnete Vektorkacheln
+
+Die Kacheln und die PMTiles/MBTiles-Exporte liegen in `data/tiles/` und gehören nicht ins Backup: Sie
+entstehen jederzeit neu aus der Datenbank (`npm run tiles`). Weil die Kacheln Links auf die Fotos
+enthalten, rechnet der Server pro Adresse, unter der er erreicht wird, einen eigenen Satz.
+
+- **Mit `PUBLIC_URL`**: Der Server rechnet beim Start und nach Änderungen nur für diese Adresse vor. Für
+  den öffentlichen Betrieb ist das die empfohlene Einstellung.
+- **Ohne `PUBLIC_URL`**: Er rechnet für die Adresse aus der Anfrage vor und behält höchstens die Sätze der
+  zwei zuletzt benutzten Adressen. So können erfundene `Host`-Köpfe den Speicher nicht füllen.
+
+Mit `TILES_PRECOMPUTE=0` schneidet der Server jede Kachel bei der Anfrage, wie vor der Vorberechnung.
+
 ## Service Worker
 
 Der Service Worker braucht HTTPS (oder `localhost`). Nach Änderungen an der Liste vorgehaltener Dateien

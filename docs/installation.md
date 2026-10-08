@@ -28,7 +28,8 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 | `SPOT_RADIUS_M`    | `25`     | Radius, in dem Fotos zum selben Spot gehören   |
 | `HEADING_TOLERANCE_DEG` | `45` | Abweichung der Blickrichtung (±°), bis zu der Fotos zum selben Spot gehören |
 | `PLANTNET_API_KEY` | –        | Aktiviert die Pflanzenbestimmung               |
-| `PUBLIC_URL`       | –        | Öffentliche Adresse für Foto-Links im Export (sonst aus der Anfrage) |
+| `PUBLIC_URL`       | –        | Öffentliche Adresse für Foto-Links im Export (sonst aus der Anfrage); mit ihr werden die Vektorkacheln schon beim Start vorberechnet |
+| `TILES_PRECOMPUTE` | `1`      | `0`: Vektorkacheln nicht vorberechnen, jede Kachel bei der Anfrage schneiden |
 | `FFMPEG_PATH`      | `ffmpeg` | ffmpeg für die Bilder aus Videos               |
 | `VIDEO_MAX_MB`     | `4096`   | Maximale Grösse eines Videos                   |
 | `SENTINEL_STAC_URL`| Earth Search | STAC-API für Sentinel-2 L2A; leer = Satellitenkontext aus |

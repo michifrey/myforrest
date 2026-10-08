@@ -68,7 +68,9 @@ function featureTime(f, id) {
   return [t, t];
 }
 
-module.exports = function registerOgc(app, { db, spotRadiusM, publicUrl = process.env.PUBLIC_URL }) {
+module.exports = function registerOgc(app, {
+  db, spotRadiusM, publicUrl = process.env.PUBLIC_URL, dataDir, background, tiles: tileOptions = {},
+}) {
   const geodata = createGeodata({ db, spotRadiusM });
   const baseUrl = (req) => (publicUrl ? String(publicUrl).replace(/\/+$/, '') : `${req.protocol}://${req.get('host')}`);
   const link = (href, rel, type, title) => ({ href, rel, type, ...(title ? { title } : {}) });
@@ -122,7 +124,12 @@ module.exports = function registerOgc(app, { db, spotRadiusM, publicUrl = proces
   });
 
   // Vector tiles (OGC API – Tiles, MVT) of the same collections.
-  const tiles = require('./ogc-tiles')(app, { geodata, baseUrl, link, send, HttpError });
+  const tiles = require('./ogc-tiles')(app, {
+    geodata, baseUrl, link, send, HttpError, dataDir, background,
+    startupBase: publicUrl ? String(publicUrl).replace(/\/+$/, '') : undefined,
+    ...tileOptions,
+  });
+  app.locals.ogcTiles = tiles;
 
   app.get('/ogc', (req, res) => {
     const base = baseUrl(req);
@@ -139,6 +146,8 @@ module.exports = function registerOgc(app, { db, spotRadiusM, publicUrl = proces
         link(`${base}/ogc/tileMatrixSets`, 'http://www.opengis.net/def/rel/ogc/1.0/tiling-schemes', 'application/json', 'Kachelgitter'),
         link(`${base}/ogc/styles/myforrest`, 'http://www.opengis.net/def/rel/ogc/1.0/styles', 'application/vnd.mapbox.style+json', 'Kartenstil (MapLibre)'),
         link(`${base}/api/export/myforrest.gpkg`, 'enclosure', 'application/geopackage+sqlite3', 'Alles als GeoPackage (LV95)'),
+        link(`${base}/api/export/myforrest.pmtiles`, 'enclosure', 'application/vnd.pmtiles', 'Vektorkacheln als PMTiles (WebMercatorQuad)'),
+        link(`${base}/api/export/myforrest.mbtiles`, 'enclosure', 'application/vnd.sqlite3', 'Vektorkacheln als MBTiles (WebMercatorQuad)'),
       ],
     });
   });

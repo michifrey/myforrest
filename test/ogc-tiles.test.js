@@ -5,21 +5,26 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const zlib = require('node:zlib');
+const { DatabaseSync } = require('node:sqlite');
 const { createApp } = require('../src/app');
+const { zxyToTileId, writePmtiles } = require('../src/pmtiles');
 const { tileMatrixSet, tileRange, validTile } = require('../src/tiles');
 
 const noWeather = async () => new Response('offline', { status: 503 });
 
-async function withServer(fn) {
+async function withServer(fn, tileOptions = { delayMs: 0 }) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'myforrest-tiles-'));
-  const app = createApp({ dataDir, weatherFetch: noWeather });
+  const app = createApp({ dataDir, weatherFetch: noWeather, tileOptions });
+  app.locals.dataDirForTests = dataDir;
   const server = app.listen(0);
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
-    await fn(base, app.locals.db);
+    await fn(base, app.locals.db, app);
   } finally {
     await app.locals.idle();
+    app.locals.ogcTiles.close();
     server.close();
     app.locals.db.close();
     fs.rmSync(dataDir, { recursive: true, force: true });
@@ -294,4 +299,182 @@ test('Swiss LV95 tile grid: swisstopo resolutions, clipping, winding, tiles at t
     assert.equal((await fetch(`${base}/vendor/ol/ol.css`)).status, 200);
     assert.equal((await fetch(`${base}/vektorkarte-lv95.html`)).status, 200);
   });
+});
+
+/* ---------- Precomputed tiles ---------- */
+
+/** A small PMTiles v3 reader (header, gzip directories with leaves, tile lookup), independent of the writer. */
+function readPmtiles(buf) {
+  assert.equal(buf.toString('ascii', 0, 7), 'PMTiles');
+  const u64 = (at) => Number(buf.readBigUInt64LE(at));
+  const h = {
+    version: buf[7], rootOffset: u64(8), rootLength: u64(16), metaOffset: u64(24), metaLength: u64(32),
+    leafOffset: u64(40), dataOffset: u64(56), addressed: u64(72), internalCompression: buf[97],
+    tileCompression: buf[98], tileType: buf[99], minZoom: buf[100], maxZoom: buf[101],
+    bounds: [102, 106, 110, 114].map((at) => buf.readInt32LE(at) / 1e7),
+  };
+  const dir = (offset, length) => {
+    const raw = zlib.gunzipSync(buf.subarray(offset, offset + length));
+    const r = reader(raw);
+    const n = r.varint();
+    const e = Array.from({ length: n }, () => ({}));
+    let id = 0;
+    for (const x of e) { id += r.varint(); x.tileId = id; }
+    for (const x of e) x.runLength = r.varint();
+    for (const x of e) x.length = r.varint();
+    e.forEach((x, i) => { const v = r.varint(); x.offset = v === 0 && i > 0 ? e[i - 1].offset + e[i - 1].length : v - 1; });
+    return e;
+  };
+  const metadata = JSON.parse(zlib.gunzipSync(buf.subarray(h.metaOffset, h.metaOffset + h.metaLength)));
+  const tile = (z, x, y) => {
+    const id = zxyToTileId(z, x, y);
+    let entries = dir(h.rootOffset, h.rootLength);
+    for (let depth = 0; depth < 4; depth++) {
+      let found = null;
+      for (const e of entries) if (e.tileId <= id) found = e;
+      if (!found) return null;
+      if (found.runLength === 0) { entries = dir(h.leafOffset + found.offset, found.length); continue; }
+      if (id >= found.tileId + found.runLength) return null;
+      return zlib.gunzipSync(buf.subarray(h.dataOffset + found.offset, h.dataOffset + found.offset + found.length));
+    }
+    return null;
+  };
+  return { header: h, metadata, tile };
+}
+
+test('PMTiles tile ids follow the Hilbert curve of the spec', () => {
+  // Values from the PMTiles specification / reference implementation.
+  assert.deepEqual([[0, 0, 0], [1, 0, 0], [1, 0, 1], [1, 1, 1], [1, 1, 0], [2, 0, 0]].map((t) => zxyToTileId(...t)), [0, 1, 2, 3, 4, 5]);
+  // Each zoom level fills its own id range without gaps or duplicates.
+  for (let z = 1; z <= 4; z++) {
+    const start = (4 ** z - 1) / 3;
+    const ids = [];
+    for (let x = 0; x < 2 ** z; x++) for (let y = 0; y < 2 ** z; y++) ids.push(zxyToTileId(z, x, y) - start);
+    assert.deepEqual(ids.sort((a, b) => a - b), Array.from({ length: 4 ** z }, (_, i) => i));
+  }
+});
+
+test('PMTiles writer: leaf directories, run lengths for repeated tiles, deduplicated contents', () => {
+  const gz = (s) => zlib.gzipSync(Buffer.from(s));
+  const tiles = [];
+  for (let x = 0; x < 32; x++) for (let y = 0; y < 32; y++) tiles.push({ z: 5, x, y, data: gz(y < 16 ? 'water' : `land ${x}/${y}`) });
+  const meta = { minzoom: 5, maxzoom: 5, bounds: [-180, -85, 180, 85], center: [0, 0, 5], metadata: { name: 't' } };
+  for (const options of [{}, { rootMaxBytes: 60 }]) {
+    const buf = writePmtiles(tiles, meta, options);
+    const pm = readPmtiles(buf);
+    if (options.rootMaxBytes) assert.ok(Number(buf.readBigUInt64LE(48)) > 0, 'leaf directories written');
+    assert.equal(pm.header.addressed, 1024);
+    for (const [x, y] of [[0, 0], [31, 15], [3, 16], [31, 31], [17, 22]]) {
+      assert.equal(pm.tile(5, x, y).toString(), y < 16 ? 'water' : `land ${x}/${y}`, `${options.rootMaxBytes ? 'leaf' : 'root'} ${x}/${y}`);
+    }
+    assert.equal(pm.tile(4, 0, 0), null);
+    assert.equal(Number(buf.readBigUInt64LE(88)), 1 + 512, 'identical tiles stored once');
+  }
+});
+
+test('Precomputed tiles: same bytes as live tiles, gzip, 204 from the store, PMTiles and MBTiles exports, rebuilt after changes', async () => {
+  await withServer(async (base, db, app) => {
+    seed(db);
+    const t15 = tileOf(47.37 + dLat(300), 8.54, 15);
+    const url = `${base}/ogc/tiles/WebMercatorQuad/15/${t15.y}/${t15.x}`;
+    const live = await fetch(url);
+    assert.equal(live.headers.get('x-tile-source'), 'live');
+    const liveBytes = Buffer.from(await live.arrayBuffer());
+    assert.equal((await fetch(`${base}/api/export/myforrest.pmtiles`)).status, 503, 'export not ready before the first build');
+
+    const built = await app.locals.ogcTiles.precompute(base);
+    assert.equal(built.length, 10, 'two grids × (dataset + 4 collections)');
+    assert.ok(built.every((b) => b.tiles > 0));
+    assert.deepEqual(await app.locals.ogcTiles.precompute(base), [], 'nothing to do while the data is unchanged');
+
+    const pre = await fetch(url);
+    assert.equal(pre.headers.get('x-tile-source'), 'precomputed');
+    assert.equal(pre.headers.get('content-encoding'), 'gzip', 'fetch asks for gzip and decodes it');
+    assert.deepEqual(Buffer.from(await pre.arrayBuffer()), liveBytes);
+    // Without gzip in Accept-Encoding the tile comes uncompressed.
+    const plain = await fetch(url, { headers: { 'Accept-Encoding': 'identity' } });
+    assert.equal(plain.headers.get('content-encoding'), null);
+    assert.deepEqual(Buffer.from(await plain.arrayBuffer()), liveBytes);
+    // Empty tiles are known from the store; deeper zooms are still cut live.
+    const empty = await fetch(`${base}/ogc/tiles/WebMercatorQuad/15/0/0`);
+    assert.equal(empty.status, 204);
+    assert.equal(empty.headers.get('x-tile-source'), 'precomputed');
+    const t20 = tileOf(47.37 + dLat(300), 8.54, 20);
+    assert.equal((await fetch(`${base}/ogc/tiles/WebMercatorQuad/20/${t20.y}/${t20.x}`)).headers.get('x-tile-source'), 'live');
+    // LV95 and collection tiles are precomputed too.
+    const [e, n] = require('../src/lv95').wgs84ToLv95(47.37 + dLat(300), 8.54);
+    const lv = await fetch(`${base}/ogc/collections/findings/tiles/SwissLV95/22/${Math.floor((1350000 - n) / 640)}/${Math.floor((e - 2420000) / 640)}`);
+    assert.equal(lv.status, 200);
+    assert.equal(lv.headers.get('x-tile-source'), 'precomputed');
+    assert.equal(decodeTile(Buffer.from(await lv.arrayBuffer())).findings.features.length, 3);
+
+    // PMTiles: header, metadata and a tile identical to the API's.
+    const pmRes = await fetch(`${base}/api/export/myforrest.pmtiles`);
+    assert.equal(pmRes.status, 200);
+    assert.equal(pmRes.headers.get('content-type'), 'application/vnd.pmtiles');
+    const pm = readPmtiles(Buffer.from(await pmRes.arrayBuffer()));
+    assert.deepEqual([pm.header.version, pm.header.tileType, pm.header.tileCompression, pm.header.internalCompression], [3, 1, 2, 2]);
+    assert.deepEqual([pm.header.minZoom, pm.header.maxZoom], [0, 18]);
+    assert.ok(pm.header.bounds[0] <= 8.54 && pm.header.bounds[3] >= 47.37 + dLat(300) - 1e-6);
+    assert.deepEqual(pm.metadata.vector_layers.map((l) => l.id), ['spread_fronts', 'spots', 'findings']);
+    assert.deepEqual(pm.tile(15, t15.x, t15.y), liveBytes);
+    assert.equal(pm.tile(15, 0, 0), null);
+    // Range requests, as PMTiles clients make them.
+    const range = await fetch(`${base}/api/export/myforrest.pmtiles`, { headers: { Range: 'bytes=0-126' } });
+    assert.equal(range.status, 206);
+    assert.equal((await range.arrayBuffer()).byteLength, 127);
+
+    // MBTiles: TMS rows, gzip tiles, metadata.
+    const mbFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'mbtiles-')), 'x.mbtiles');
+    fs.writeFileSync(mbFile, Buffer.from(await (await fetch(`${base}/api/export/myforrest.mbtiles`)).arrayBuffer()));
+    const mb = new DatabaseSync(mbFile);
+    const meta = Object.fromEntries(mb.prepare('SELECT name, value FROM metadata').all().map((r) => [r.name, r.value]));
+    assert.equal(meta.format, 'pbf');
+    assert.equal(meta.maxzoom, '18');
+    assert.deepEqual(JSON.parse(meta.json).vector_layers.map((l) => l.id), ['spread_fronts', 'spots', 'findings']);
+    const row = mb.prepare('SELECT tile_data FROM tiles WHERE zoom_level = 15 AND tile_column = ? AND tile_row = ?').get(t15.x, 2 ** 15 - 1 - t15.y);
+    assert.deepEqual(zlib.gunzipSync(row.tile_data), liveBytes);
+    mb.close();
+    fs.rmSync(path.dirname(mbFile), { recursive: true, force: true });
+
+    // New data: the stored version no longer counts, tiles are cut live until the rebuild.
+    db.prepare('INSERT INTO photo_tags (photo_id, tag) VALUES ((SELECT MIN(id) FROM photos), ?)').run('borkenkaefer');
+    assert.equal((await fetch(url)).headers.get('x-tile-source'), 'live');
+    assert.equal((await fetch(`${base}/api/export/myforrest.pmtiles`)).status, 503);
+    assert.equal((await app.locals.ogcTiles.precompute(base)).length, 10);
+    assert.equal((await fetch(url)).headers.get('x-tile-source'), 'precomputed');
+    assert.equal((await fetch(`${base}/api/export/myforrest.pmtiles`)).status, 200);
+  }, { delayMs: null });
+});
+
+test('Precomputation starts by itself after a tile request', async () => {
+  await withServer(async (base, db, app) => {
+    seed(db);
+    const t = tileOf(47.37, 8.54, 15);
+    const url = `${base}/ogc/tiles/WebMercatorQuad/15/${t.y}/${t.x}`;
+    assert.equal((await fetch(url)).headers.get('x-tile-source'), 'live');
+    await app.locals.idle();
+    assert.equal((await fetch(url)).headers.get('x-tile-source'), 'precomputed');
+    assert.equal((await fetch(`${base}/api/export/myforrest.mbtiles`)).status, 200);
+  });
+});
+
+test('Precomputed tilesets of old base URLs are dropped (at most two names are kept)', async () => {
+  await withServer(async (base, db, app) => {
+    seed(db);
+    for (const b of [base, 'http://b.example', 'http://c.example']) await app.locals.ogcTiles.precompute(b);
+    const kept = new DatabaseSync(path.join(app.locals.dataDirForTests, 'tiles', 'tiles.db'))
+      .prepare('SELECT DISTINCT substr(tileset, 1, instr(tileset, \'|\') - 1) AS base FROM builds ORDER BY base').all().map((r) => r.base);
+    assert.deepEqual(kept, ['http://b.example', 'http://c.example']);
+    assert.equal((await fetch(`${base}/ogc/tiles/WebMercatorQuad/0/0/0`)).headers.get('x-tile-source'), 'live');
+  }, { delayMs: null });
+});
+
+test('Precomputation can be switched off', async () => {
+  await withServer(async (base, db) => {
+    seed(db);
+    const t = tileOf(47.37, 8.54, 15);
+    assert.equal((await fetch(`${base}/ogc/tiles/WebMercatorQuad/15/${t.y}/${t.x}`)).headers.get('x-tile-source'), 'live');
+    assert.equal((await fetch(`${base}/api/export/myforrest.pmtiles`)).status, 404);
+  }, { precompute: false });
 });
