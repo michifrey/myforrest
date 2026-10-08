@@ -1,0 +1,77 @@
+# QGIS Server (FastCGI on 5555) with the project from deploy/qgis-server. The
+# GeoPackage it publishes lives in an emptyDir that the "export" sidecar
+# refreshes from MyForrest every 15 minutes, so no shared volume is needed.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qgis-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: qgis-server }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: qgis-server }
+    spec:
+      enableServiceLinks: false
+      initContainers:
+        # The first export, so QGIS Server starts with data; waits for MyForrest.
+        - name: first-export
+          image: docker.io/curlimages/curl:8.10.1
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              until curl -fsS -o /io/data/myforrest.gpkg http://myforrest:3000/api/export/myforrest.gpkg; do
+                echo "waiting for myforrest"; sleep 5
+              done
+          volumeMounts:
+            - { name: data, mountPath: /io/data }
+      containers:
+        - name: qgis-server
+          image: docker.io/qgis/qgis-server:ltr
+          env:
+            - { name: QGIS_PROJECT_FILE, value: /io/project/myforrest.qgz }
+            - { name: QGIS_SERVER_LOG_LEVEL, value: "1" }
+            - { name: QGIS_SERVER_SERVICE_URL, value: http://localhost:8080/ows/ }
+          ports:
+            - name: fcgi
+              containerPort: 5555
+          volumeMounts:
+            - { name: project, mountPath: /io/project, readOnly: true }
+            - { name: data, mountPath: /io/data, readOnly: true }
+          readinessProbe:
+            tcpSocket: { port: fcgi }
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 1Gi }
+        - name: export
+          image: docker.io/curlimages/curl:8.10.1
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              while true; do
+                sleep 900
+                curl -fsS -o /io/data/myforrest.gpkg.part http://myforrest:3000/api/export/myforrest.gpkg \
+                  && mv /io/data/myforrest.gpkg.part /io/data/myforrest.gpkg
+              done
+          volumeMounts:
+            - { name: data, mountPath: /io/data }
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+      volumes:
+        - name: project
+          configMap: { name: qgis-project }
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qgis-server
+spec:
+  selector: { app.kubernetes.io/name: qgis-server }
+  ports:
+    - name: fcgi
+      port: 5555
+      targetPort: fcgi

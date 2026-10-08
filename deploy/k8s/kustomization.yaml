@@ -1,0 +1,33 @@
+# MyForrest on Kubernetes: the app, QGIS Server and nginx in front, like
+# deploy/qgis-server/docker-compose.yml. See deploy/k8s/README.md.
+#
+# The ConfigMaps take nginx.conf and the QGIS project from deploy/qgis-server,
+# outside this directory, hence:
+#   kubectl kustomize --load-restrictor LoadRestrictionsNone deploy/k8s | kubectl apply -f -
+# (deploy/k8s/start.sh does that, after building and loading the image).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: myforrest
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: myforrest
+resources:
+  - namespace.yaml
+  - myforrest.yaml
+  - qgis-server.yaml
+  - nginx.yaml
+configMapGenerator:
+  - name: nginx-conf
+    files:
+      - default.conf=../qgis-server/nginx.conf
+  - name: qgis-project
+    files:
+      - ../qgis-server/project/myforrest.qgz
+  - name: myforrest-env
+    literals:
+      - PUBLIC_URL=http://localhost:8080
+images:
+  # Built locally with podman and loaded into the cluster (start.sh); never pulled.
+  - name: myforrest
+    newName: localhost/myforrest
+    newTag: dev
