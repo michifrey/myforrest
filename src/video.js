@@ -1,6 +1,7 @@
 'use strict';
 
 const { spawn } = require('node:child_process');
+const sharp = require('sharp');
 const { distanceM } = require('./geo');
 
 /**
@@ -132,6 +133,67 @@ function planByTime(duration, { everyS = 10, maxFrames = 300 } = {}) {
 /** Equirectangular 360° frames are exactly 2:1. */
 const isEquirectangular = (w, h) => w > 0 && h > 0 && Math.abs(w / h - 2) < 0.02;
 
+/* ---------- Sharpness of frames ---------- */
+
+/**
+ * Sharpness of an image: the variance of the Laplacian of its grey values
+ * (512 px wide). Motion blur and missed focus smooth edges and lower it. The
+ * value depends on the scene, so it is only compared within one video.
+ */
+async function sharpness(file) {
+  const { data, info } = await sharp(file).greyscale().resize(512, 512, { fit: 'inside' })
+    .raw().toBuffer({ resolveWithObject: true });
+  const { width: w, height: h } = info;
+  let sum = 0;
+  let sum2 = 0;
+  let n = 0;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      const l = data[i - 1] + data[i + 1] + data[i - w] + data[i + w] - 4 * data[i];
+      sum += l;
+      sum2 += l * l;
+      n++;
+    }
+  }
+  return n ? Math.round((sum2 / n - (sum / n) ** 2) * 10) / 10 : 0;
+}
+
+/**
+ * Picks the sharpest frame around each planned moment. `measure(t)` extracts
+ * the frame at `t` and resolves to { sharpness, ... }; `discard(c)` throws a
+ * candidate away. Frames as sharp as the median so far are kept at once;
+ * blurrier ones get `offsets` tried as well. A frame still below `ratio` ×
+ * the median is unusable (resolves to { blurry: true, best }). The median
+ * needs `warmup` frames; before that every frame is kept.
+ */
+function createFramePicker({ offsets = [-0.25, 0.25], ratio = 0.4, warmup = 3, duration = Infinity } = {}) {
+  const seen = [];
+  const median = () => {
+    const s = [...seen].sort((a, b) => a - b);
+    const m = s.length >> 1;
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  };
+  return {
+    async pick(t, measure, discard = async () => {}) {
+      let best = { ...(await measure(t)), t };
+      const med = seen.length >= warmup ? median() : null;
+      if (med !== null && best.sharpness < med) {
+        for (const dt of offsets) {
+          const t2 = Math.min(Math.max(0, t + dt), duration);
+          if (t2 === best.t) continue;
+          const c = { ...(await measure(t2)), t: t2 };
+          const worse = c.sharpness > best.sharpness ? best : c;
+          if (worse === best) best = c;
+          await discard(worse);
+        }
+      }
+      seen.push(best.sharpness);
+      return { ...best, blurry: med !== null && best.sharpness < ratio * med, median: med };
+    },
+  };
+}
+
 /* ---------- ffmpeg ---------- */
 
 class FfmpegMissingError extends Error {
@@ -195,5 +257,5 @@ function createFfmpeg(bin = process.env.FFMPEG_PATH || 'ffmpeg') {
 
 module.exports = {
   bearing, resample, withDistance, atDistance, planByDistance, planByTime, isEquirectangular,
-  createFfmpeg, FfmpegMissingError,
+  sharpness, createFramePicker, createFfmpeg, FfmpegMissingError,
 };

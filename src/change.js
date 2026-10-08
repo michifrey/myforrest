@@ -11,12 +11,19 @@
  *  - colour: chromaticity, catches green turning brown (drought, bark beetle);
  *  - brightness, weighted down, after a global gain match between the photos.
  * The result is a score in [0, 1] per pixel of A's (downscaled) view.
+ *
+ * 360° panoramas are compared the same way, but B is resampled through the
+ * rotation of the sphere that aligns it (sphere.js), wrapping around the seam,
+ * and at a larger working size because the view covers all directions.
  */
 
 const sharp = require('sharp');
 const { apply, invert } = require('./homography');
+const sphere = require('./sphere');
 
 const WORK_SIZE = 320;
+const PANO_WORK_SIZE = 640; // 640 × 320 for the whole sphere
+const PANO_NADIR = 0.15; // share of the panorama's height at the bottom left out
 const CHANGED = 0.4;
 
 async function loadRGB(file, size) {
@@ -56,20 +63,27 @@ function blur(src, w, h, r) {
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
-/** Samples photo B (bilinear) at every pixel of A's view; returns RGB planes and a validity mask. */
-function warpInto(a, b, hAtoB) {
+/**
+ * Samples photo B (bilinear) at every pixel of A's view; returns RGB planes
+ * and a validity mask. `mapAtoB(u, v)` gives B's normalised point for A's.
+ */
+function warpInto(a, b, mapAtoB, { wrap = false } = {}) {
   const n = a.width * a.height;
   const planes = [new Float32Array(n), new Float32Array(n), new Float32Array(n)];
   const valid = new Uint8Array(n);
   for (let y = 0; y < a.height; y++) {
     for (let x = 0; x < a.width; x++) {
-      const [u, v] = apply(hAtoB, (x + 0.5) / a.width, (y + 0.5) / a.height);
-      const bx = u * b.width - 0.5;
-      const by = v * b.height - 0.5;
-      if (!(bx >= 0 && by >= 0 && bx <= b.width - 1 && by <= b.height - 1)) continue;
+      const [u, v] = mapAtoB((x + 0.5) / a.width, (y + 0.5) / a.height);
+      let bx = u * b.width - 0.5;
+      let by = v * b.height - 0.5;
+      if (wrap) {
+        // Panoramas: around the seam horizontally, clamped at the poles.
+        bx = ((bx % b.width) + b.width) % b.width;
+        by = Math.min(Math.max(by, 0), b.height - 1);
+      } else if (!(bx >= 0 && by >= 0 && bx <= b.width - 1 && by <= b.height - 1)) continue;
       const x0 = Math.floor(bx);
       const y0 = Math.floor(by);
-      const x1 = Math.min(b.width - 1, x0 + 1);
+      const x1 = wrap ? (x0 + 1) % b.width : Math.min(b.width - 1, x0 + 1);
       const y1 = Math.min(b.height - 1, y0 + 1);
       const fx = bx - x0;
       const fy = by - y0;
@@ -161,15 +175,27 @@ function scorePair(A, B, w, h) {
 /**
  * Computes the change score between photo A (`fileA`, the "before" view) and
  * photo B (`fileB`), where `hBtoA` maps B onto A in normalised coordinates.
+ * With `panorama`, both are 360° panoramas and `hBtoA` is the rotation that
+ * maps B's directions onto A's.
  */
-async function computeChange(fileA, fileB, hBtoA) {
-  const hAtoB = invert(hBtoA);
-  if (!hAtoB) throw new Error('Ausrichtung nicht invertierbar');
-  const [a, b] = await Promise.all([loadRGB(fileA, WORK_SIZE), loadRGB(fileB, WORK_SIZE * 1.5)]);
+async function computeChange(fileA, fileB, hBtoA, { panorama = false } = {}) {
+  let mapAtoB;
+  if (panorama) {
+    const rAtoB = sphere.transpose(hBtoA);
+    mapAtoB = (u, v) => sphere.toUV(sphere.rotate(rAtoB, sphere.toVector(u, v)));
+  } else {
+    const hAtoB = invert(hBtoA);
+    if (!hAtoB) throw new Error('Ausrichtung nicht invertierbar');
+    mapAtoB = (u, v) => apply(hAtoB, u, v);
+  }
+  const size = panorama ? PANO_WORK_SIZE : WORK_SIZE;
+  const [a, b] = await Promise.all([loadRGB(fileA, size), loadRGB(fileB, size * 1.5)]);
   const { width: w, height: h } = a;
   const n = w * h;
   const A = [0, 1, 2].map((c) => Float32Array.from({ length: n }, (_, i) => a.data[i * 3 + c] / 255));
-  const { planes: Braw, valid } = warpInto(a, b, hAtoB);
+  const { planes: Braw, valid } = warpInto(a, b, mapAtoB, { wrap: panorama });
+  // The bottom of a panorama shows whoever holds the camera (and the bike or pole): never compared.
+  if (panorama) valid.fill(0, Math.floor(h * (1 - PANO_NADIR)) * w);
 
   let count = 0;
   for (let i = 0; i < n; i++) count += valid[i];

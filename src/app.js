@@ -14,9 +14,11 @@ const { readPhotoMeta, imageExtension } = require('./exif');
 const { assignSpot, refreshSpot, backfillSpotHeadings, HEADING_TOLERANCE_DEG } = require('./spots');
 const { isHeic, heicExif, heicToJpeg } = require('./heic');
 const { createThumbnails } = require('./thumbs');
+const sharp = require('sharp');
 const { TAGS, parseTags } = require('./tags');
 const { identifyPlant } = require('./plantnet');
-const { alignImages, extractFeatures } = require('./align');
+const { alignImages, alignPanoramas, extractFeatures } = require('./align');
+const sphere = require('./sphere');
 const { IDENTITY, multiply, invert } = require('./homography');
 const { computeChange, renderHeatmap } = require('./change');
 const { classifyChange } = require('./classify');
@@ -30,6 +32,9 @@ const {
 } = require('./phenology');
 
 const ACTIVITIES = ['joggen', 'wandern', 'biken', 'sonstiges'];
+/** Without GPano metadata: exactly 2:1 and at least this wide (360° cameras: 5376 px and more). */
+const PANORAMA_MIN_WIDTH = 3000;
+const isPanoramaSize = (w, h) => w >= PANORAMA_MIN_WIDTH && Math.abs(w / h - 2) < 0.02;
 const NEOPHYTE_MIN_SCORE = 0.3;
 const TREE_MIN_SCORE = 0.25;
 
@@ -111,7 +116,10 @@ function createApp({
     activity: p.activity,
     note: p.note,
     tags: tagsOf.all(p.id).map((r) => r.tag),
-    alignment: p.align_h ? { h: JSON.parse(p.align_h), inliers: p.align_inliers } : null,
+    // Photos: a homography onto the spot's frame. 360° panoramas: a rotation of the sphere (`kind`, with yaw and tilt).
+    alignment: p.align_h ? (p.panorama
+      ? { kind: 'rotation', r: JSON.parse(p.align_h), inliers: p.align_inliers, ...sphere.describe(JSON.parse(p.align_h)) }
+      : { h: JSON.parse(p.align_h), inliers: p.align_inliers }) : null,
     change: p.change_json ? JSON.parse(p.change_json) : null,
     context: p.context_json ? JSON.parse(p.context_json) : null,
     ...accounts.photoExtras(p), // uploader, license, hidden
@@ -148,17 +156,22 @@ function createApp({
   };
   const setAlignment = db.prepare('UPDATE photos SET align_h = ?, align_inliers = ? WHERE id = ?');
 
+  /** Photos and 360° panoramas of a spot are aligned (and compared) only among their own kind. */
+  const SAME_KIND = 'COALESCE(panorama, 0) = ?';
+  const kindOf = (p) => (p.panorama ? 1 : 0);
+
   /**
    * Aligns a photo into its spot's common frame (that of the first aligned
-   * photo). Tries the reference photo first, then aligned photos closest in
-   * time, and chains the transforms. Leaves the photo unaligned on failure.
+   * photo of the same kind). Tries the reference photo first, then aligned
+   * photos closest in time, and chains the transforms. Leaves the photo
+   * unaligned on failure. Panoramas are aligned by a rotation (sphere.js).
    */
   async function alignPhoto(photoId, refPhotoId = null) {
     const photo = getPhoto.get(photoId);
     if (!photo) return;
     const aligned = db.prepare(
-      'SELECT * FROM photos WHERE spot_id = ? AND id != ? AND align_h IS NOT NULL',
-    ).all(photo.spot_id, photo.id);
+      `SELECT * FROM photos WHERE spot_id = ? AND id != ? AND align_h IS NOT NULL AND ${SAME_KIND}`,
+    ).all(photo.spot_id, photo.id, kindOf(photo));
     if (!aligned.length) {
       setAlignment.run(JSON.stringify(IDENTITY), null, photo.id);
       return;
@@ -167,9 +180,16 @@ function createApp({
       (b.id === refPhotoId) - (a.id === refPhotoId) ||
       Math.abs(a.taken_at - photo.taken_at) - Math.abs(b.taken_at - photo.taken_at));
     for (const ref of aligned.slice(0, 3)) {
-      const r = await alignImages(path.join(uploadDir, photo.file), path.join(uploadDir, ref.file), {
-        getFeatures: cachedFeatures,
-      });
+      const files = [path.join(uploadDir, photo.file), path.join(uploadDir, ref.file)];
+      if (photo.panorama) {
+        const r = await alignPanoramas(...files, { getFeatures: cachedFeatures });
+        if (r) {
+          setAlignment.run(JSON.stringify(sphere.multiply(JSON.parse(ref.align_h), r.r).map((v) => Math.round(v * 1e9) / 1e9)), r.inliers, photo.id);
+          return;
+        }
+        continue;
+      }
+      const r = await alignImages(...files, { getFeatures: cachedFeatures });
       if (r) {
         setAlignment.run(JSON.stringify(multiply(JSON.parse(ref.align_h), r.h)), r.inliers, photo.id);
         return;
@@ -193,13 +213,13 @@ function createApp({
   const setChange = db.prepare('UPDATE photos SET change_json = ? WHERE id = ?');
   const setContext = db.prepare('UPDATE photos SET context_json = ? WHERE id = ?');
 
-  /** Classifies the change of a photo against the spot's first aligned photo. */
+  /** Classifies the change of a photo against the spot's first aligned photo of the same kind. */
   async function analyzeChange(photoId) {
     const photo = getPhoto.get(photoId);
     if (!photo) return;
     const base = db.prepare(
-      'SELECT * FROM photos WHERE spot_id = ? AND align_h IS NOT NULL ORDER BY taken_at, id LIMIT 1',
-    ).get(photo.spot_id);
+      `SELECT * FROM photos WHERE spot_id = ? AND align_h IS NOT NULL AND ${SAME_KIND} ORDER BY taken_at, id LIMIT 1`,
+    ).get(photo.spot_id, kindOf(photo));
     if (!photo.align_h || !base || base.id === photo.id || base.taken_at > photo.taken_at) {
       setChange.run(null, photoId);
       return;
@@ -370,6 +390,12 @@ function createApp({
   app.locals.idle = () => Promise.all([...pending]);
   // Previews for photos uploaded before they existed.
   background(thumbs.backfill());
+  // Panoramas were once aligned by a homography; their transform is now a rotation. Spots holding a
+  // panorama whose stored matrix is no rotation are aligned again.
+  const isRotation = (m) => m.length === 9 && sphere.multiply(m, sphere.transpose(m)).every((v, i) => Math.abs(v - sphere.IDENTITY[i]) < 1e-6);
+  const staleSpots = [...new Set(db.prepare('SELECT spot_id, align_h FROM photos WHERE panorama = 1 AND align_h IS NOT NULL').all()
+    .filter((r) => !isRotation(JSON.parse(r.align_h))).map((r) => r.spot_id))];
+  if (staleSpots.length) background((async () => { for (const id of staleSpots) await realignSpot(id); })());
 
   const safeAlign = (fn) => fn.catch((err) => console.error('Ausrichtung fehlgeschlagen:', err.message));
 
@@ -587,18 +613,23 @@ function createApp({
           continue;
         }
       }
+      // 360° panorama: as the camera declares it (GPano), else a large 2:1 image.
+      const dims = await sharp(jpeg || buf).metadata().catch(() => ({}));
+      const panorama = meta.projection ? meta.projection === 'equirectangular' : isPanoramaSize(dims.width, dims.height);
+      // A panorama looks everywhere: its heading (centre of the image) says nothing about which spot it belongs to.
+      const heading = panorama ? (meta.poseHeading ?? meta.heading) : meta.heading;
       const file = `${crypto.randomUUID()}.${ext}`;
       if (jpeg) await fsp.writeFile(path.join(uploadDir, file), jpeg);
       else await fsp.rename(f.path, path.join(uploadDir, file));
       const photoId = transaction(db, () => {
         const spotId = targetSpot ? targetSpot.id
-          : assignSpot(db, pos.lat, pos.lon, spotRadiusM, meta.heading, headingToleranceDeg);
+          : assignSpot(db, pos.lat, pos.lon, spotRadiusM, panorama ? null : heading, headingToleranceDeg);
         const id = Number(db.prepare(`
           INSERT INTO photos (spot_id, file, original_name, taken_at, lat, lon, heading, altitude,
-                              location_source, activity, note, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(spotId, file, f.originalname.slice(0, 255), takenAt, pos.lat, pos.lon, meta.heading, meta.altitude,
-          source, activity, note, Date.now()).lastInsertRowid);
+                              location_source, activity, note, created_at, panorama)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(spotId, file, f.originalname.slice(0, 255), takenAt, pos.lat, pos.lon, heading, meta.altitude,
+          source, activity, note, Date.now(), panorama ? 1 : 0).lastInsertRowid);
         setTags(id, tags);
         accounts.stampPhoto(id, owner);
         refreshSpot(db, spotId);
@@ -821,17 +852,18 @@ function createApp({
     const b = getPhoto.get(toId);
     if (!a || !b) return { status: 404, error: 'Foto nicht gefunden' };
     if (a.spot_id !== b.spot_id) return { status: 422, error: 'Fotos gehören zu verschiedenen Spots' };
+    if (kindOf(a) !== kindOf(b)) return { status: 422, error: 'Ein 360°-Panorama lässt sich nicht mit einem normalen Foto vergleichen' };
     if (!a.align_h || !b.align_h) return { status: 422, error: 'Mindestens eines der Fotos ist nicht ausgerichtet' };
     const key = `${a.id}:${b.id}:${a.align_h}:${b.align_h}:${app.locals.learner?.version() ?? ''}`;
     if (!changeCache.has(key)) {
-      const hAinv = invert(JSON.parse(a.align_h));
+      const panorama = Boolean(a.panorama);
+      // B onto A: through the spot's frame (rotations invert by transposing).
+      const hBtoA = panorama
+        ? sphere.multiply(sphere.transpose(JSON.parse(a.align_h)), JSON.parse(b.align_h))
+        : (invert(JSON.parse(a.align_h)) && multiply(invert(JSON.parse(a.align_h)), JSON.parse(b.align_h)));
       const job = (async () => {
-        if (!hAinv) throw new Error('Ausrichtung nicht invertierbar');
-        const result = await computeChange(
-          path.join(uploadDir, a.file),
-          path.join(uploadDir, b.file),
-          multiply(hAinv, JSON.parse(b.align_h)),
-        );
+        if (!hBtoA) throw new Error('Ausrichtung nicht invertierbar');
+        const result = await computeChange(path.join(uploadDir, a.file), path.join(uploadDir, b.file), hBtoA, { panorama });
         // Keep only what the routes need; the per-pixel scores are large.
         return {
           changedFraction: result.changedFraction,
@@ -876,6 +908,48 @@ function createApp({
   app.get('/api/photos/:id/change.png', changeRoute((res, r) => {
     res.type('png').set('Cache-Control', 'private, max-age=300').send(r.png);
   }));
+
+  /*
+   * A 360° panorama turned into the orientation of another panorama of the
+   * spot (`frame`), so both look in the same direction: what the viewer, the
+   * comparison and "stabilise" show instead of a CSS homography.
+   */
+  const alignedCache = new Map();
+  const PANO_VIEW = [2048, 1024];
+  app.get('/api/photos/:id/aligned.jpg', async (req, res, next) => {
+    const id = idParam(req, res);
+    if (id === null) return;
+    const photo = getPhoto.get(id);
+    const frame = getPhoto.get(Number(req.query.frame));
+    if (!photo || !frame) return res.status(404).json({ error: 'Foto nicht gefunden' });
+    if (!photo.panorama || !frame.panorama || photo.spot_id !== frame.spot_id) {
+      return res.status(422).json({ error: 'Nur für 360°-Panoramen desselben Spots' });
+    }
+    if (!photo.align_h || !frame.align_h) return res.status(422).json({ error: 'Mindestens eines der Panoramen ist nicht ausgerichtet' });
+    const key = `${photo.id}:${frame.id}:${photo.align_h}:${frame.align_h}`;
+    const etag = `"${crypto.createHash('sha1').update(key).digest('base64url')}"`;
+    res.set({ 'Cache-Control': 'private, max-age=86400', ETag: etag });
+    if (req.get('if-none-match') === etag) return res.status(304).end();
+    try {
+      if (!alignedCache.has(key)) {
+        const job = (async () => {
+          const [w, h] = PANO_VIEW;
+          const { data } = await sharp(path.join(uploadDir, photo.file)).rotate().resize(w, h, { fit: 'fill' })
+            .removeAlpha().raw().toBuffer({ resolveWithObject: true });
+          // Frame direction d → frame onto the spot frame → back into the photo: Rphotoᵀ · Rframe.
+          const rFrameToPhoto = sphere.multiply(sphere.transpose(JSON.parse(photo.align_h)), JSON.parse(frame.align_h));
+          return sharp(sphere.remap({ data, width: w, height: h }, rFrameToPhoto, w, h), { raw: { width: w, height: h, channels: 3 } })
+            .jpeg({ quality: 85, mozjpeg: true }).toBuffer();
+        })();
+        job.catch(() => alignedCache.delete(key));
+        alignedCache.set(key, job);
+        if (alignedCache.size > 8) alignedCache.delete(alignedCache.keys().next().value);
+      }
+      res.type('jpeg').send(await alignedCache.get(key));
+    } catch (err) {
+      next(err);
+    }
+  });
 
   app.post('/api/photos/:id/identify', async (req, res, next) => {
     const id = idParam(req, res);

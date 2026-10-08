@@ -371,18 +371,23 @@
   let current = null;
   let flat = false;
   const viewer = new PanoViewer(canvas, (v) => {
-    const heading = current?.heading;
+    // A turned panorama looks the way the spot's first panorama does.
+    const heading = img.dataset.heading !== undefined ? Number(img.dataset.heading) : current?.heading;
     badge.querySelector('.pano-dir').textContent = heading === null || heading === undefined
       ? `360° · ${Math.round(v.yaw)}°`
       : `360° · Blick nach ${compass(heading + v.yaw)}`;
   });
   canvas.addEventListener('pointerdown', () => { hint.hidden = true; }, { once: false });
 
+  /** The photo shown in the stage: as original, preview, or turned into the spot's orientation (aligned.jpg). */
+  const alignedSrc = (p, src) => src.startsWith(`/api/photos/${p.id}/aligned.jpg`);
   function currentPhoto() {
     const p = state.spot?.photos?.[state.index];
-    return p && img.getAttribute('src') === p.url ? p : null;
+    const src = img.getAttribute('src') || '';
+    return p && (src === p.url || src === p.largeUrl || alignedSrc(p, src)) ? p : null;
   }
 
+  let currentSrc = null;
   function update() {
     const p = currentPhoto();
     const pano = Boolean(p?.panorama) && viewer.ok;
@@ -392,11 +397,18 @@
     badge.querySelector('[data-pano="toggle"]').textContent = flat ? '360°' : 'Flach';
     badge.querySelector('[data-pano="full"]').hidden = flat;
     badge.querySelector('.pano-dir').hidden = flat;
-    if (pano && !flat && p !== current) {
-      hint.hidden = false;
-      viewer.set({ yaw: 0, pitch: 0 });
-      viewer.load(p.url).catch(() => {});
+    // The full original, or the panorama turned into the spot's orientation.
+    const src = p && alignedSrc(p, img.getAttribute('src')) ? img.getAttribute('src') : p?.url;
+    if (pano && !flat && src !== currentSrc) {
+      // Aligned panoramas of one spot look the same way: keep the view when stepping through them.
+      const keep = current && current.spotId === p.spotId && alignedSrc(p, src) && currentSrc && currentSrc.includes('/aligned.jpg');
+      if (!keep) {
+        hint.hidden = false;
+        viewer.set({ yaw: 0, pitch: 0 });
+      }
+      viewer.load(src).catch(() => {});
     }
+    currentSrc = pano && !flat ? src : null;
     if (!pano) hint.hidden = true;
     current = p;
 

@@ -73,9 +73,15 @@ function assignSpot(db, lat, lon, radiusM, heading = null, toleranceDeg = HEADIN
   return best.id;
 }
 
-/** Circular mean heading of a spot's photos, or null when unknown or inconsistent. */
+const hasPanorama = (db) => db.prepare('PRAGMA table_info(photos)').all().some((c) => c.name === 'panorama');
+
+/**
+ * Circular mean heading of a spot's photos, or null when unknown or
+ * inconsistent. 360° panoramas look everywhere and do not count.
+ */
 function spotHeading(db, spotId) {
-  const hs = db.prepare('SELECT heading FROM photos WHERE spot_id = ? AND heading IS NOT NULL').all(spotId).map((r) => r.heading);
+  const flat = hasPanorama(db) ? ' AND COALESCE(panorama, 0) = 0' : '';
+  const hs = db.prepare(`SELECT heading FROM photos WHERE spot_id = ? AND heading IS NOT NULL${flat}`).all(spotId).map((r) => r.heading);
   const m = circularMean(hs);
   return m && m.r >= MIN_HEADING_AGREEMENT ? m.mean : null;
 }

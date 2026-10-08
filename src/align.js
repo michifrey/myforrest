@@ -13,6 +13,7 @@
 
 const sharp = require('sharp');
 const { apply } = require('./homography');
+const sphere = require('./sphere');
 
 const WORK_SIZE = 800;
 const LEVELS = 3;
@@ -372,4 +373,27 @@ async function alignImages(fileB, fileA, { getFeatures = extractFeatures } = {})
   };
 }
 
-module.exports = { alignImages, extractFeatures };
+const MAX_TILT_DEG = 25; // a repeat panorama held more crooked than this is a wrong match
+
+/**
+ * Aligns 360° panorama B to panorama A (equirectangular): the same features,
+ * but the model is a rotation of the sphere (see sphere.js) instead of a
+ * homography. Returns { r, inliers, matches } with `r` mapping B's
+ * directions onto A's, or null.
+ */
+async function alignPanoramas(fileB, fileA, { getFeatures = extractFeatures } = {}) {
+  const [a, b] = await Promise.all([getFeatures(fileA), getFeatures(fileB)]);
+  const matches = match(b.features, a.features);
+  if (matches.length < MIN_INLIERS) return null;
+  const pairs = matches.map(([ib, ia]) => [
+    sphere.toVector(b.features[ib].x / b.width, b.features[ib].y / b.height),
+    sphere.toVector(a.features[ia].x / a.width, a.features[ia].y / a.height),
+  ]);
+  // 3 px of the work image, as for photos.
+  const result = sphere.ransacRotation(pairs, (3 / a.width) * 2 * Math.PI, mulberry32(42));
+  if (!result || result.inliers < MIN_INLIERS || result.inliers < 0.15 * matches.length) return null;
+  if (sphere.describe(result.R).tilt > MAX_TILT_DEG) return null;
+  return { r: result.R.map((v) => Math.round(v * 1e9) / 1e9), inliers: result.inliers, matches: matches.length };
+}
+
+module.exports = { alignImages, alignPanoramas, extractFeatures };

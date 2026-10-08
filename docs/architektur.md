@@ -12,9 +12,10 @@ src/db.js            SQLite-Schema (spots, photos, photo_tags, identifications, 
 src/spots.js         Gruppierung von Fotos zu Spots (Ort und Blickrichtung)
 src/thumbs.js        Vorschaubilder (WebP, 320 und 1280 px) in data/thumbs
 src/heic.js          HEIC-Erkennung, EXIF aus HEIC, Umwandlung nach JPEG
-src/align.js         Bildregistrierung (ORB-Merkmale, Matching, RANSAC)
+src/align.js         Bildregistrierung (ORB-Merkmale, Matching, RANSAC); Panoramen über eine Drehung der Kugel
 src/homography.js    3×3-Homographien: Verkettung, Inverse
-src/change.js        Veränderungserkennung und Heatmap
+src/sphere.js        360°-Panoramen: Richtungen, Drehung aus Punktpaaren (Horn, RANSAC), Umprojektion über die Naht
+src/change.js        Veränderungserkennung und Heatmap (Fotos und Panoramen)
 src/classify.js      Einordnung der veränderten Regionen (Regeln, gemischt mit dem gelernten Modell)
 src/learn.js         Lernen der Einordnung aus Bestätigungen (Softmax-Regression, Hintergrund-Training)
 src/foliage.js       Nadel-/Laubholzanteil (Heuristik) und Zuordnung von Verfärbungen zu Arten
@@ -44,7 +45,7 @@ src/exif.js          Aufnahmezeit, GPS und Blickrichtung aus den Bilddaten
 src/gpx.js           GPX-Parser
 src/mp4.js           MP4-Boxen lesen: Telemetrie-Spur, Startzeit, Dauer, 360°-Metadaten
 src/gpmf.js          GoPro-Telemetrie (GPMF): GPS5/GPS9, GPSU, SCAL
-src/video.js         Bilder entlang der Strecke planen, Blickrichtung, ffmpeg-Aufruf
+src/video.js         Bilder entlang der Strecke planen, Blickrichtung, Schärfe und Wahl des schärfsten Bildes, ffmpeg-Aufruf
 src/routes/video.js  Video-Upload und Fortschritt (/api/videos)
 src/geo.js           Distanzen und Interpolation auf dem Track
 src/plantnet.js      Anbindung an die Pl@ntNet-API

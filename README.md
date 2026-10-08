@@ -84,6 +84,14 @@ dabei ausgeglichen, hier etwa das Abendlicht im Juni 2024 gegenüber dem Vormitt
 Regionen werden eingeordnet (Windwurf, Auflichtung, Verfärbung, neuer Bewuchs); bestätigt oder korrigiert
 man die Einordnung, lernt die App daraus.
 
+<p align="center"><img src="docs/screenshots/panorama-compare.jpg" width="420" alt="Vorher/Nachher zweier 360°-Panoramen mit markierter Auflichtung"></p>
+
+Das geht auch mit **360°-Panoramen**, aus Videos wie aus Fotos von 360°-Kameras. Statt einer Homographie
+sucht die App die Drehung der Kamera zwischen zwei Besuchen und dreht das spätere Panorama in die
+Blickrichtung des früheren; der Bereich unten, wo die Person mit der Kamera steht, zählt nicht. Hier wurde
+die Kamera 2025 um 70° anders gehalten, und die Heatmap markiert die neue Lücke im Bestand
+(Demo-Panoramen, gerechnet).
+
 ### 4. Wiederholungsfoto mit Overlay
 
 <p>
