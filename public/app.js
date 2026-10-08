@@ -1396,5 +1396,20 @@ async function stormNote(a, b, change, current) {
     $('upload-tags').append(el('label', {}, [el('input', { type: 'checkbox', value: key }), label]));
   }
   $('tag-filter').addEventListener('change', () => loadSpots());
+  // Links from push messages: ?spot=<id> opens a spot, ?filter=satellite shows the spots with early warnings.
+  const openFromUrl = async (href) => {
+    const q = new URL(href, location.href).searchParams;
+    if (q.get('filter') === 'satellite') {
+      $('tag-filter').value = '@satellite';
+      await loadSpots({ fit: true });
+    }
+    const id = Number(q.get('spot'));
+    if (Number.isSafeInteger(id) && id > 0) await openSpot(id).catch(() => {});
+    if (q.has('spot') || q.has('filter')) history.replaceState(null, '', location.pathname);
+  };
+  navigator.serviceWorker?.addEventListener('message', (e) => {
+    if (e.data?.type === 'myforrest-open') openFromUrl(e.data.url);
+  });
   await loadSpots({ fit: true });
+  await openFromUrl(location.href);
 })();

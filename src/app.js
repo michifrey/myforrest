@@ -51,6 +51,8 @@ function createApp({
   routerProfile = process.env.ROUTER_PROFILE || 'hiking-mountain',
   // Vector tile precomputation (routes/ogc-tiles.js): { precompute, delayMs }.
   tileOptions = { precompute: process.env.TILES_PRECOMPUTE !== '0' },
+  // Push messages (routes/push.js): { fetchImpl, allowedHosts, allowHttp } for tests.
+  pushOptions = {},
 } = {}) {
   const uploadDir = path.join(dataDir, 'uploads');
   const tmpDir = path.join(dataDir, 'tmp');
@@ -933,7 +935,9 @@ function createApp({
   require('./routes/protection')(app, { db, accounts });
   require('./routes/ogc')(app, { db, spotRadiusM, dataDir, background, tiles: tileOptions });
   require('./routes/video')(app, { db, uploadDir, tmpDir, spotRadiusM, activities: ACTIVITIES, photoJson, getPhoto, setTags, alignPhoto, analyzeChange, analyzeContext, background, safeAlign });
-  const vegetation = require('./routes/vegetation')(app, { db, uploadDir, background, fetchImpl: weatherFetch, accounts });
+  const push = require('./routes/push')(app, { db, idParam, adminEmail, ...pushOptions });
+  app.locals.push = push;
+  const vegetation = require('./routes/vegetation')(app, { db, uploadDir, background, fetchImpl: weatherFetch, push, accounts });
   Object.assign(tours, require('./routes/tracks')(app, {
     db, spotRadiusM, satelliteAlerts: vegetation.alerts, routerUrl, routerFetch, routerProfile, accounts,
   }));

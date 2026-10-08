@@ -115,7 +115,8 @@
         ...(p.onClick ? { tabindex: 0, role: 'button' } : {}), 'aria-label': `${p.label}: ${p.value}`,
       });
       const show = () => {
-        tip.replaceChildren(el('strong', { text: p.label }), p.value, ...(p.extra ? [el('br'), p.extra] : []));
+        // `extra`: one line of text or several (array), each on its own line.
+        tip.replaceChildren(el('strong', { text: p.label }), p.value, ...[].concat(p.extra || []).filter(Boolean).flatMap((line) => [el('br'), line]));
         tip.hidden = false;
         cross.setAttribute('x1', x(p.t));
         cross.setAttribute('x2', x(p.t));
@@ -204,13 +205,21 @@
       return { from, to, label: `−${d.drop.toFixed(2)}` };
     });
     const sensorsOf = (m) => (m.sensors || ['S2']).map((x) => SENSORS[x] || x).join(', ');
+    /** Landsat months: mapped onto the Sentinel-2 scale (with the measured value), or measured as is. */
+    const harmonised = (m) => {
+      if (m.adjusted === true) {
+        const measured = Object.entries(m.raw || {}).filter(([x, v]) => x !== 'S2' && v[key] !== null).map(([, v]) => ndviText(v[key]));
+        return `an Sentinel-2 angeglichen${measured.length ? ` (gemessen ${measured.join(', ')})` : ''}`;
+      }
+      return m.adjusted === false ? 'nicht angeglichen (zu wenig Überlappung)' : '';
+    };
     const points = months.map((m) => ({
       t: monthMs(m.month),
       v: m[key],
       flag: flagged.has(m.month),
       label: monthLabel(m.month),
       value: `${info.name} ${ndviText(m[key])}`,
-      extra: `${sensorsOf(m)}${key === 'ndvi' ? ` · ${m.scenes} wolkenfreie Szene${m.scenes === 1 ? '' : 'n'}` : ''}`,
+      extra: [[sensorsOf(m), key === 'ndvi' ? `${m.scenes} wolkenfreie Szene${m.scenes === 1 ? '' : 'n'}` : ''].filter(Boolean).join(' · '), harmonised(m)],
     }));
     points.gapMs = 75 * DAY;
     const values = months.map((m) => m[key]);
@@ -220,9 +229,11 @@
     if (bands.length) legend.push(el('span', {}, [el('i', { class: 'swatch-drop' }), 'starker Rückgang zwischen Fotos']));
     legend.push(el('span', {}, [el('i', { class: 'swatch-photo' }), 'Fotodatum']));
     const current = state.spot.photos[state.index] ? Date.parse(state.spot.photos[state.index].takenAt) : null;
-    const landsat = months.some((m) => (m.sensors || []).some((x) => x.startsWith('L')));
+    const landsatMonths = months.filter((m) => m.adjusted !== null && m.adjusted !== undefined);
+    const landsat = landsatMonths.length > 0;
+    const allAdjusted = landsat && landsatMonths.every((m) => m.adjusted);
     return lineChart({
-      title: `Satellit: ${info.title} (Monatswerte${landsat ? ', vor 2017 Landsat' : ''})`,
+      title: `Satellit: ${info.title} (Monatswerte${landsat ? `, vor 2017 Landsat${allAdjusted ? ', angeglichen' : ''}` : ''})`,
       cls: key,
       points,
       domain,
@@ -236,7 +247,7 @@
       caption: `${info.name} im Umkreis des Spots, pro Monat`,
       columns: {
         head: ['Monat', info.name, 'Satellit'],
-        rows: months.map((m) => [m.month, ndviText(m[key]), sensorsOf(m)]),
+        rows: months.map((m) => [m.month, ndviText(m[key]), [sensorsOf(m), harmonised(m)].filter(Boolean).join(', ')]),
       },
     });
   }
@@ -257,24 +268,36 @@
           : 'Die Fotos zeigen dazu (noch) keine eingeordnete Veränderung; der Rückgang kann auch ausserhalb des Bildausschnitts liegen.')
         + stormSentence(d.storm);
       const idx = photos.findIndex((p) => p.id === d.toPhotoId);
+      const basis = calibrationText(d.calibration);
       return el('article', { class: 'irregular', 'data-severity': d.severity }, [
         el('header', {}, [el('h4', { text: `Satellit: ${info.name}-Rückgang` }), el('span', { class: 'sev', text: d.severity })]),
         el('p', { text }),
+        ...(basis ? [el('p', { class: 'hint', text: basis })] : []),
         ...(idx >= 0 ? [el('button', { type: 'button', class: 'link small', text: `Foto vom ${fmtDate(d.toDate)} zeigen`, onclick: () => showPhoto(idx) })] : []),
       ]);
     });
   }
 
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-  /** Where the threshold of a warning comes from and how it did on held-out spots (cross-validation). */
+  /** Where the threshold of a warning or drop comes from and how it did on held-out spots (cross-validation). */
   function calibrationText(c) {
     if (!c) return '';
     const t = ndviText(c.threshold);
+    const ft = c.forestType;
+    const own = c.scope === 'waldtyp';
     const std = c.standard;
-    const vsStandard = std ? ` Der Anfangswert ${ndviText(std.threshold)} hätte ${std.hits} erkannt bei ${plural(std.falseAlarms, 'Fehlalarm', 'Fehlalarmen')}.` : '';
+    const stdName = c.baseline === 'alle-spots' ? 'Die Schwelle aller Spots' : 'Der Anfangswert';
+    const vsStandard = std && std.threshold !== c.threshold ? ` ${stdName} ${ndviText(std.threshold)} hätte ${std.hits} erkannt bei ${plural(std.falseAlarms, 'Fehlalarm', 'Fehlalarmen')}.` : '';
+    // A forest type without a threshold of its own: why the calibrated one of all spots applies.
+    let typeNote = '';
+    if (ft?.type && !own) {
+      typeNote = ft.type === 'misch' || !ft.reason
+        ? ` Für ${ft.label} gilt die Schwelle aller Spots.`
+        : ` Für ${ft.label} allein ${ft.reason === 'nicht-besser' ? 'war eine eigene Schwelle an zurückgehaltenen Spots nicht besser' : 'gibt es noch zu wenige Kontrollen'}; es gilt die Schwelle aller Spots.`;
+    }
     if (c.source === 'kalibriert') {
-      return `Schwelle ${t}, geeicht an ${plural(c.positives, 'bestätigtem Schaden', 'bestätigten Schäden')} und ${plural(c.negatives, 'Kontrolle', 'Kontrollen')} ohne Schaden an ${c.spots} Spots. `
-        + `An zurückgehaltenen Spots geprüft (${c.cv.folds} Teile): ${c.cv.hits} von ${c.positives} Schäden erkannt, ${plural(c.cv.falseAlarms, 'Fehlalarm', 'Fehlalarme')}.${vsStandard}`;
+      return `Schwelle ${t}${own ? ` für ${ft.label}` : ''}, geeicht an ${plural(c.positives, 'bestätigtem Schaden', 'bestätigten Schäden')} und ${plural(c.negatives, 'Kontrolle', 'Kontrollen')} ohne Schaden an ${c.spots} ${own ? `${ft.label}-Spots` : 'Spots'}. `
+        + `An zurückgehaltenen Spots geprüft (${c.cv.folds} Teile): ${c.cv.hits} von ${c.positives} Schäden erkannt, ${plural(c.cv.falseAlarms, 'Fehlalarm', 'Fehlalarme')}.${vsStandard}${typeNote}`;
     }
     if (c.reason === 'nicht-besser') {
       return `Schwelle ${t} ist der Anfangswert: Die an den Kontrollen geeichte Schwelle ${ndviText(c.candidate)} war an zurückgehaltenen Spots nicht besser `
@@ -285,6 +308,17 @@
     }
     return `Schwelle ${t} ist ein Anfangswert. Geeicht wird sie, sobald genug Kontrollen vorliegen, um einen Teil davon zur Prüfung zurückzuhalten `
       + `(mindestens je 5 mit und ohne Schaden pro Prüfung; bisher ${plural(c.positives, 'bestätigter Schaden', 'bestätigte Schäden')} und ${plural(c.negatives, 'Kontrolle', 'Kontrollen')} ohne Schaden).`;
+  }
+
+  /** Forest type of the spot and where it comes from. */
+  function forestTypeText(ft) {
+    if (!ft?.type) return '';
+    const from = {
+      arten: 'aus den erfassten Baumarten',
+      fotos: `aus dem Nadelholzanteil auf den Fotos (${ft.needleShare !== undefined ? pctText(ft.needleShare) : '–'})`,
+      satellit: `aus dem Satelliten: das Grün sinkt im Winter um ${ft.amplitude?.toFixed(2)}`,
+    }[ft.source];
+    return `Waldtyp ${ft.label} (${from}); die Schwellen für Rückgänge werden pro Waldtyp geeicht, sobald genug Kontrollen vorliegen. `;
   }
 
   /** Early warnings: the last months against the same season of earlier years, without new photos. */
@@ -343,6 +377,9 @@
           class: 'hint',
           text: 'NDVI misst das Grün, NDMI das Wasser in den Blättern und Nadeln; ein sinkender NDMI zeigt Trockenstress oft vor der Verfärbung. '
             + 'Sentinel-2 mittelt rund 30 × 30 m um den Spot (NDMI 40 × 40 m), Landsat 30-m-Pixel; das umfasst mehr (und anderes) als der Bildausschnitt. '
+            + (ndviData.monthly.some((m) => m.adjusted !== null && m.adjusted !== undefined)
+              ? 'Landsat-Werte sind auf die Skala von Sentinel-2 umgerechnet, geschätzt aus den Monaten, in denen beide Satelliten dieselben Spots sahen. ' : '')
+            + forestTypeText(ndviData.forestType)
             + `Wolken, Schatten und Schnee sind ausgeblendet. ${ndviData.source || ''}.`,
         }));
         parts.push(...dropCards());

@@ -41,11 +41,6 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 - **Arten und Neophyten**: direkter Upload über die APIs (OAuth-Konto bei iNaturalist bzw. Info Flora),
   Bestätigung der automatischen Bestimmungen durch Menschen vor dem Export und eine Korrektur für
   ungleich verteilten Suchaufwand.
-- **Satellitenkontext verfeinern**:
-  - Sentinel-2 und Landsat in den Überlappungsjahren angleichen.
-  - Die Kalibrierung auch für die Rückgänge zwischen zwei Fotos nutzen und nach Waldtyp (Laub/Nadel)
-    trennen.
-  - Die Frühwarnung als Push-Nachricht an Leute, die den Spot regelmässig besuchen.
 
 ## Phase 4: Betrieb und Geodienste
 
@@ -66,7 +61,10 @@ Aus früheren Versionen dieser Roadmap:
 - Nächtliche Abkühlung in Senken aus Wind und Bewölkung
 - Hotspot-Karten, Ausbreitungsfronten und Datei-Export zu Info Flora / iNaturalist
 - Satellitenkontext: NDMI, Frühwarnung ohne neue Fotos, Landsat vor 2017, Sturm als Kontext
-- Kalibrierung der Frühwarnung an bestätigten Schäden, geprüft mit Kreuzvalidierung nach Spots
+- Kalibrierung der Frühwarnung und der Rückgänge zwischen Fotos an bestätigten Schäden, geprüft mit
+  Kreuzvalidierung nach Spots, getrennt für Laub- und Nadelwald
+- Frühwarnung als Push-Nachricht an Leute, die den Spot regelmässig besuchen oder ihm folgen
+- Angleichung von Landsat an Sentinel-2 aus den Überlappungsjahren
 - Geodienste: OGC API – Features und Tiles (auch im LV95-Kachelgitter, vorberechnet, PMTiles/MBTiles),
   Vektorkarten, QGIS Server, Metadaten für geocat.ch (GM03)
 - Betrieb mit Docker Compose und Kubernetes (podman-Startskript)
