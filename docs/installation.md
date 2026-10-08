@@ -40,6 +40,9 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 | `FFMPEG_PATH`      | `ffmpeg` | ffmpeg für die Bilder aus Videos               |
 | `VIDEO_MAX_MB`     | `4096`   | Maximale Grösse eines Videos                   |
 | `SENTINEL_STAC_URL`| Earth Search | STAC-API für Sentinel-2 L2A; leer = Satellitenkontext aus |
+| `LANDSAT_STAC_URL` | Planetary Computer | STAC-API für Landsat Collection 2 (vor 2017); leer = ohne Landsat |
+| `LANDSAT_TOKEN_URL`| Planetary Computer | Adresse für das anonyme Token, mit dem die Landsat-Links signiert werden |
+| `SATELLITE_WATCH_HOURS` | `24` | Abstand der Frühwarn-Runde über alle Spots in Stunden; `0` = aus |
 | `REQUIRE_LOGIN`    | –        | `1`: Uploads und Änderungen nur mit Konto      |
 | `ADMIN_EMAIL`      | –        | Dieses Konto wird Admin (sonst das erste Konto) |
 | `DETECTOR_URL`     | –        | Externer Objektdetektor (siehe [unten](#externer-detektor)); ohne ihn laufen die eingebauten Heuristiken |

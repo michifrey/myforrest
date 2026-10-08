@@ -2,7 +2,9 @@
 
 /*
  * Vegetation density per photo (green fraction, canopy cover) and the
- * Sentinel-2 NDVI context of a spot, as small multiples on a shared time axis.
+ * satellite context of a spot (NDVI and the moisture index NDMI from
+ * Sentinel-2, Landsat before 2017), as small multiples on a shared time axis,
+ * with drops between photos and early warnings.
  * Uses the globals of app.js (state, api, el, svg, $, fmtDate, showPhoto, openSpot).
  */
 
@@ -16,6 +18,12 @@
   const DAY = 86400000;
   const pctText = (v) => `${Math.round(v * 100)} %`;
   const ndviText = (v) => v.toFixed(2).replace('-', '−');
+  const INDEX = {
+    ndvi: { name: 'NDVI', title: 'NDVI, Grün der Vegetation', what: 'Der NDVI (Grün der Vegetation)' },
+    ndmi: { name: 'NDMI', title: 'NDMI, Feuchte im Kronendach', what: 'Der Feuchteindex NDMI (Wasser im Kronendach)' },
+  };
+  const SENSORS = { S2: 'Sentinel-2', L8: 'Landsat 8', L7: 'Landsat 7', L5: 'Landsat 5' };
+  const monthRange = (a, b) => (a === b ? monthLabel(a) : `${monthLabel(a)} – ${monthLabel(b)}`);
   const monthMs = (ym) => Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1, 15);
   const monthLabel = (ym) => `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
 
@@ -182,63 +190,93 @@
     ];
   }
 
-  function ndviChart(domain) {
-    const months = ndviData.monthly;
+  /** Monthly chart of one satellite index ('ndvi' or 'ndmi'), with its drops between photos. */
+  function indexChart(domain, key) {
+    const months = ndviData.monthly.filter((m) => m[key] !== null && m[key] !== undefined);
+    if (!months.length) return null;
+    const info = INDEX[key];
+    const drops = ndviData.drops.filter((d) => (d.index || 'ndvi') === key);
     const flagged = new Set();
-    const bands = ndviData.drops.map((d) => {
+    const bands = drops.map((d) => {
       const from = Date.parse(d.fromDate);
       const to = Date.parse(d.toDate);
       for (const m of months) if (monthMs(m.month) > from && monthMs(m.month) <= to + 45 * DAY) flagged.add(m.month);
       return { from, to, label: `−${d.drop.toFixed(2)}` };
     });
+    const sensorsOf = (m) => (m.sensors || ['S2']).map((x) => SENSORS[x] || x).join(', ');
     const points = months.map((m) => ({
       t: monthMs(m.month),
-      v: m.ndvi,
+      v: m[key],
       flag: flagged.has(m.month),
       label: monthLabel(m.month),
-      value: `NDVI ${ndviText(m.ndvi)}`,
-      extra: `${m.scenes} wolkenfreie Szene${m.scenes === 1 ? '' : 'n'}`,
+      value: `${info.name} ${ndviText(m[key])}`,
+      extra: `${sensorsOf(m)}${key === 'ndvi' ? ` · ${m.scenes} wolkenfreie Szene${m.scenes === 1 ? '' : 'n'}` : ''}`,
     }));
     points.gapMs = 75 * DAY;
-    const lo = Math.min(0, ...months.map((m) => m.ndvi));
-    const legend = [el('span', {}, [el('i', { class: 'swatch-ndvi' }), 'NDVI Monatswert'])];
+    const values = months.map((m) => m[key]);
+    const yRange = key === 'ndvi' ? [Math.min(0, ...values) < 0 ? -0.2 : 0, 1] : [Math.min(-0.2, ...values), Math.max(0.6, ...values)];
+    const yTicks = key === 'ndvi' ? (yRange[0] < 0 ? [-0.2, 0, 0.5, 1] : [0, 0.5, 1]) : [-0.2, 0, 0.2, 0.4, 0.6];
+    const legend = [el('span', {}, [el('i', { class: `swatch-${key}` }), `${info.name} Monatswert`])];
     if (bands.length) legend.push(el('span', {}, [el('i', { class: 'swatch-drop' }), 'starker Rückgang zwischen Fotos']));
     legend.push(el('span', {}, [el('i', { class: 'swatch-photo' }), 'Fotodatum']));
     const current = state.spot.photos[state.index] ? Date.parse(state.spot.photos[state.index].takenAt) : null;
+    const landsat = months.some((m) => (m.sensors || []).some((x) => x.startsWith('L')));
     return lineChart({
-      title: 'Satellit: NDVI Sentinel-2 (Monatswerte)',
-      cls: 'ndvi',
+      title: `Satellit: ${info.title} (Monatswerte${landsat ? ', vor 2017 Landsat' : ''})`,
+      cls: key,
       points,
       domain,
-      yRange: [lo < 0 ? -0.2 : 0, 1],
-      yTicks: lo < 0 ? [-0.2, 0, 0.5, 1] : [0, 0.5, 1],
+      yRange,
+      yTicks,
       yFormat: (v) => ndviText(v),
       bands,
       marks: state.spot.photos.map((p) => Date.parse(p.takenAt)),
       legend,
       current,
-      caption: 'NDVI aus Sentinel-2 im Umkreis von rund 30 m um den Spot, pro Monat',
+      caption: `${info.name} im Umkreis des Spots, pro Monat`,
       columns: {
-        head: ['Monat', 'NDVI', 'Szenen'],
-        rows: months.map((m) => [m.month, ndviText(m.ndvi), String(m.scenes)]),
+        head: ['Monat', info.name, 'Satellit'],
+        rows: months.map((m) => [m.month, ndviText(m[key]), sensorsOf(m)]),
       },
     });
   }
 
+  /** Storm in the period between two photos, or (`before`) in the months before an early warning. */
+  const stormSentence = (storm, before = false) => (storm ? ` ${before ? 'In den Monaten davor' : 'Im Zeitraum'}: ${storm.text} (${storm.class}).` : '');
+
   function dropCards() {
     const photos = state.spot.photos;
     return ndviData.drops.map((d) => {
+      const info = INDEX[d.index || 'ndvi'];
       const support = d.evidence.map((e) => (e.kind === 'change' ? `${e.label} (${pctText(e.area)} der Ansicht)` : `Beobachtung „${state.config.tags[e.tag] || e.tag}“`));
-      const text = `Der NDVI im Umkreis des Spots fiel zwischen ${fmtDate(d.fromDate)} und ${fmtDate(d.toDate)} von ${ndviText(d.before)} auf ${ndviText(d.after)} `
+      const text = `${info.what} im Umkreis des Spots fiel zwischen ${fmtDate(d.fromDate)} und ${fmtDate(d.toDate)} von ${ndviText(d.before)} auf ${ndviText(d.after)} `
         + `(gleiche Jahreszeit verglichen, −${d.drop.toFixed(2)}). `
+        + (d.index === 'ndmi' ? 'Weniger Wasser im Kronendach deutet auf Trockenstress oder lichtere Kronen. ' : '')
         + (support.length
           ? `Das stützt, was die Fotos zeigen: ${support.join(', ')}.`
-          : 'Die Fotos zeigen dazu (noch) keine eingeordnete Veränderung; der Rückgang kann auch ausserhalb des Bildausschnitts liegen.');
+          : 'Die Fotos zeigen dazu (noch) keine eingeordnete Veränderung; der Rückgang kann auch ausserhalb des Bildausschnitts liegen.')
+        + stormSentence(d.storm);
       const idx = photos.findIndex((p) => p.id === d.toPhotoId);
       return el('article', { class: 'irregular', 'data-severity': d.severity }, [
-        el('header', {}, [el('h4', { text: 'Satellit: NDVI-Rückgang' }), el('span', { class: 'sev', text: d.severity })]),
+        el('header', {}, [el('h4', { text: `Satellit: ${info.name}-Rückgang` }), el('span', { class: 'sev', text: d.severity })]),
         el('p', { text }),
         ...(idx >= 0 ? [el('button', { type: 'button', class: 'link small', text: `Foto vom ${fmtDate(d.toDate)} zeigen`, onclick: () => showPhoto(idx) })] : []),
+      ]);
+    });
+  }
+
+  /** Early warnings: the last months against the same season of earlier years, without new photos. */
+  function alertCards() {
+    return (ndviData.alerts || []).map((a) => {
+      const info = INDEX[a.index];
+      const text = `${info.what} lag ${monthRange(a.since, a.until)} bei ${ndviText(a.now)}, `
+        + `${a.drop.toFixed(2)} unter dem Wert derselben Jahreszeit ${a.baselineYears === 1 ? 'im Vorjahr' : `in den ${a.baselineYears} Vorjahren`} (${ndviText(a.baseline)}).`
+        + (a.index === 'ndmi' ? ' Das kann Trockenstress anzeigen, bevor sich die Kronen verfärben.' : '')
+        + stormSentence(a.storm, true)
+        + (a.visit ? ` Das letzte Foto ist ${a.lastPhoto ? `vom ${fmtDate(a.lastPhoto)}` : 'älter'}: Ein neues Foto würde zeigen, was dahinter steckt.` : '');
+      return el('article', { class: 'irregular early-warning', 'data-severity': a.severity }, [
+        el('header', {}, [el('h4', { text: `Satellit: Frühwarnung ${info.name}` }), el('span', { class: 'sev', text: a.severity })]),
+        el('p', { text }),
       ]);
     });
   }
@@ -248,15 +286,16 @@
     const s = ndviData;
     const out = [];
     if (s.status === 'pending') {
-      out.push(el('p', { class: 'context-loading', text: 'Satellitendaten (Sentinel-2) werden geladen …' }));
+      out.push(el('p', { class: 'context-loading', text: 'Satellitendaten werden geladen …' }));
     } else if (s.status === 'offline' && !s.monthly.length) {
       out.push(el('p', { class: 'context-loading' }, [
         `Satellitendaten derzeit nicht erreichbar${s.error ? ` (${s.error})` : ''}. `,
         el('button', { type: 'button', class: 'link small', text: 'Erneut versuchen', onclick: retryNdvi }),
       ]));
     } else if (!s.monthly.length) {
-      out.push(el('p', { class: 'context-loading', text: 'Keine wolkenfreien Sentinel-2-Aufnahmen für diesen Zeitraum gefunden.' }));
+      out.push(el('p', { class: 'context-loading', text: 'Keine wolkenfreien Satellitenaufnahmen für diesen Zeitraum gefunden.' }));
     }
+    if (s.landsatError) out.push(el('p', { class: 'context-loading', text: `Landsat (vor 2017) derzeit nicht erreichbar (${s.landsatError}); wird später erneut versucht.` }));
     return out;
   }
 
@@ -273,9 +312,15 @@
       }
     }
     if (ndviData && ndviData.status !== 'disabled') {
+      parts.push(...alertCards());
       if (domain && ndviData.monthly.length) {
-        parts.push(ndviChart(domain));
-        parts.push(el('p', { class: 'hint', text: `Sentinel-2 hat 10 m grosse Pixel: Der Wert mittelt rund 30 × 30 m um den Spot und umfasst damit mehr (und anderes) als der Bildausschnitt. Wolken, Schatten und Schnee sind ausgeblendet. ${ndviData.source || ''}.` }));
+        parts.push(...['ndvi', 'ndmi'].map((k) => indexChart(domain, k)).filter(Boolean));
+        parts.push(el('p', {
+          class: 'hint',
+          text: 'NDVI misst das Grün, NDMI das Wasser in den Blättern und Nadeln; ein sinkender NDMI zeigt Trockenstress oft vor der Verfärbung. '
+            + 'Sentinel-2 mittelt rund 30 × 30 m um den Spot (NDMI 40 × 40 m), Landsat 30-m-Pixel; das umfasst mehr (und anderes) als der Bildausschnitt. '
+            + `Wolken, Schatten und Schnee sind ausgeblendet. ${ndviData.source || ''}.`,
+        }));
         parts.push(...dropCards());
       }
       parts.push(...ndviStatus());

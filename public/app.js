@@ -203,7 +203,7 @@ function renderMarkers() {
     const anchor = pinAnchor(s, size);
     const icon = L.divIcon({
       className: 'pin-icon',
-      html: `<div class="pin ${pinKind(s)}${state.spot?.id === s.id ? ' active' : ''}"><b>${s.photoCount}</b>${s.irregularities.length ? '<i class="flag">!</i>' : ''}${s.storm ? `<i class="storm-flag" title="Sturm">${WIND_ICON}</i>` : ''}</div>`,
+      html: `<div class="pin ${pinKind(s)}${state.spot?.id === s.id ? ' active' : ''}"><b>${s.photoCount}</b>${s.irregularities.length ? '<i class="flag">!</i>' : ''}${s.storm ? `<i class="storm-flag" title="Sturm">${WIND_ICON}</i>` : ''}${s.satellite ? `<i class="sat-flag" title="Satellit: Rückgang">${SAT_ICON}</i>` : ''}</div>`,
       iconSize: [size, size],
       iconAnchor: anchor,
       tooltipAnchor: [size / 2 - anchor[0], -size * 1.1 + (size * 1.2 - anchor[1])],
@@ -213,6 +213,7 @@ function renderMarkers() {
       s.change?.fraction >= 0.05 ? `≈ ${Math.round(s.change.fraction * 100)} % verändert${s.change.top ? ` (${s.change.top})` : ''}` : '',
       ...s.irregularities,
       s.storm ? `${s.storm.max.text}${s.storm.count > 1 ? ` (stärkstes von ${s.storm.count} Sturmereignissen)` : ''}` : '',
+      ...(s.satellite?.alerts || []).map((a) => `Satellit: ${a.index.toUpperCase()} seit ${MONTHS[Number(a.since.slice(5, 7)) - 1]} ${a.since.slice(0, 4)} um ${a.drop.toFixed(2)} tiefer als in den Vorjahren${a.visit ? ' – neues Foto lohnt sich' : ''}`),
       s.species.length ? `Baumarten: ${s.species.join(', ')}` : '',
       hasHeading(s) ? headingText(s.heading) : '',
     ].filter(Boolean);
@@ -237,14 +238,19 @@ async function loadSpots({ fit = false } = {}) {
   const filter = $('tag-filter').value;
   const special = filter.startsWith('@') ? filter : null;
   const tag = special ? '' : filter;
-  const [spots, storms] = await Promise.all([
+  const [spots, storms, satellite] = await Promise.all([
     api(`/api/spots${tag ? `?tag=${encodeURIComponent(tag)}` : ''}`),
     api('/api/storms/spots').catch(() => []),
+    api('/api/satellite/alerts').catch(() => []),
   ]);
-  for (const s of spots) s.storm = storms.find((x) => x.spotId === s.id) || null;
+  for (const s of spots) {
+    s.storm = storms.find((x) => x.spotId === s.id) || null;
+    s.satellite = satellite.find((x) => x.spotId === s.id) || null;
+  }
   state.spots = special === '@change' ? spots.filter((s) => s.change?.fraction >= 0.05)
     : special === '@irregular' ? spots.filter((s) => s.irregularities.length)
     : special === '@storm' ? spots.filter((s) => s.storm)
+    : special === '@satellite' ? spots.filter((s) => s.satellite)
       : spots;
   renderMarkers();
   renderStats(!filter);
@@ -1279,6 +1285,8 @@ $('rephoto-file').addEventListener('change', async (e) => {
 
 /* ---------- Storms, frost nights in hollows (routes/climate.js) ---------- */
 
+// A small satellite: body in the middle, two solar panels across the diagonal, a signal arc.
+const SAT_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><g transform="rotate(-45 8 8)" fill="currentColor"><rect x="6.2" y="6.2" width="3.6" height="3.6" rx="0.6"/><rect x="0.4" y="5" width="3.6" height="6" rx="0.6"/><rect x="12" y="5" width="3.6" height="6" rx="0.6"/><path d="M4 8h2.2M9.8 8H12" stroke="currentColor" stroke-width="1.2"/></g><path d="M10.6 13.6a3.2 3.2 0 0 0 3-3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
 const WIND_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 5.5h8.5a2 2 0 1 0-2-2M1 8.5h12a2 2 0 1 1-2 2M1 11.5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const fmtTemp = (v) => `${v.toFixed(1).replace('-', '−')} °C`;
 
@@ -1353,6 +1361,7 @@ async function stormNote(a, b, change, current) {
     el('option', { value: '@change', text: 'Starke Veränderung (≥ 5 %)' }),
     el('option', { value: '@irregular', text: 'Auffälligkeiten' }),
     el('option', { value: '@storm', text: 'Von Sturm betroffen' }),
+    el('option', { value: '@satellite', text: 'Satellit meldet Rückgang' }),
   );
   for (const [key, label] of Object.entries(state.config.tags)) {
     $('tag-filter').append(el('option', { value: key, text: label }));

@@ -21,7 +21,8 @@ src/foliage.js       Nadel-/Laubholzanteil (Heuristik) und Zuordnung von Verfär
 src/detect.js        Objekterkennung: externer Detektor oder Heuristiken (liegende Stämme, Holzpolter)
 src/routes/analysis.js  API der automatischen Auswertung
 src/vegetation.js    Vegetationsdichte pro Foto (Grünanteil, Kronendach-Deckung, Lücken)
-src/sentinel.js      Sentinel-2-NDVI: STAC-Suche, COG-Fenster lesen, Wolkenmaske, Monatsreihe, Rückgänge
+src/sentinel.js      Sentinel-2 NDVI/NDMI: STAC-Suche, COG-Fenster lesen, Wolkenmaske, Monatsreihe, Rückgänge, Frühwarnung
+src/landsat.js       Landsat 5/7/8 (Collection 2) über Planetary Computer: signierte Links, QA-Maske, 30-m-Indizes
 src/utm.js           Umrechnung WGS84 ↔ UTM (Projektion der Sentinel-2-Kacheln)
 src/routes/vegetation.js  API für Vegetationsdichte und NDVI, Hintergrund-Berechnung
 src/weather.js       Wetterdaten und Mittel 1991–2020 von Open-Meteo (mit Cache)

@@ -285,18 +285,53 @@ Jahren in den letzten zehn abgeschlossenen Jahren. Bis zu drei Stationen werden 
 Die Quelle steht im Steckbrief und im Text der Auffälligkeit, z. B. „Referenz: DWD-Station Hinterzarten,
 12 km, 880 m, Mittel 2016–2025 (+2 weitere)“. Ohne passende Station gelten die Gradienten.
 
-### Satellitenkontext (Sentinel-2-NDVI)
+### Satellitenkontext (Sentinel-2 und Landsat)
 
-Zu jedem Spot lädt die App ohne API-Key eine NDVI-Zeitreihe aus
-Sentinel-2 L2A (Copernicus, über die offene STAC-API von Earth Search). Gelesen werden nur die wenigen
-Bytes um den Spot (HTTP-Range-Requests auf die Cloud-Optimized GeoTIFFs von Rot B04, Nahinfrarot B08 und
-der Szenenklassifikation SCL). Wolken, Schatten und Schnee werden pixelweise ausgeblendet, gemittelt wird
-ein Fenster von rund 30 × 30 m (3 × 3 Pixel à 10 m), pro Monat der Median der wolkenfreien Szenen. Die
-Werte werden gecacht und wöchentlich ergänzt. Fällt der NDVI zwischen zwei Fotodaten deutlich (≥ 0,1
-gegenüber derselben Jahreszeit vor dem ersten Foto), erscheint ein Hinweis, zusammen mit dem, was die
-Fotos zeigen (*Windwurf*, *Auflichtung* oder passende Beobachtungen), als unabhängige Bestätigung. Wegen
-der 10-m-Pixel umfasst der Satellitenwert mehr als den Bildausschnitt. Ohne Internetzugang bleibt der
-Bereich leer und wird später erneut versucht.
+Zu jedem Spot lädt die App ohne API-Key Zeitreihen aus Satellitenbildern:
+
+- **NDVI** (Grün der Vegetation) und **NDMI** (Feuchteindex, Wasser in Blättern und Nadeln). Ein sinkender
+  NDMI zeigt Trockenstress oft, bevor sich die Kronen verfärben.
+- **Sentinel-2 L2A** (Copernicus) ab 2017, über die offene STAC-API von Earth Search.
+- **Landsat 5, 7 und 8** (Collection 2, USGS) für die Jahre davor, über Microsoft Planetary Computer. Das
+  brauchen Spots, deren Fotos vor 2018 beginnen. Der Zugang ist anonym, die Links werden mit einem
+  kostenlosen Token signiert.
+
+**So wird gerechnet**
+- Gelesen wird pro Band nur die interne Kachel der Cloud-Optimized GeoTIFFs, in der der Spot liegt
+  (HTTP-Range-Requests). Bei Sentinel-2 sind das rund 1,4 MB pro Band, also etwa 4,4 MB pro Szene mit
+  Rot, Nahinfrarot, SWIR und Szenenklassifikation.
+- Wolken, Schatten und Schnee werden pixelweise ausgeblendet: bei Sentinel-2 mit der
+  Szenenklassifikation, bei Landsat mit den QA-Bits. Die Streifen von Landsat 7 nach 2003 fallen wie Wolken
+  heraus.
+- Gemittelt wird bei Sentinel-2 der NDVI über rund 30 × 30 m (3 × 3 Pixel à 10 m) und der NDMI über
+  rund 40 × 40 m (20-m-Pixel von B11, NIR aus B08). Landsat hat 30-m-Pixel.
+- Pro Monat zählt der Median der wolkenfreien Szenen. Jeder Monat trägt den Satelliten, von dem er
+  stammt. Landsat-NDVI liegt über Wald etwas tiefer als Sentinel-2.
+- Die Werte werden gecacht und wöchentlich ergänzt. Szenen aus der Zeit vor dem NDMI werden nach und nach
+  nachgerechnet.
+
+**Rückgänge zwischen zwei Fotos**: Fällt NDVI (≥ 0,1) oder NDMI (≥ 0,08) zwischen zwei Fotodaten
+gegenüber derselben Jahreszeit vor dem ersten Foto, erscheint ein Hinweis. Dazu kommt, was die Fotos
+zeigen (*Windwurf*, *Auflichtung* oder passende Beobachtungen), als unabhängige Bestätigung. Ab 0,2 (NDVI)
+bzw. 0,15 (NDMI) gilt der Rückgang als stark.
+
+**Frühwarnung ohne neue Fotos**: Einmal täglich aktualisiert der Server die Reihen aller Spots, auch wenn
+niemand den Spot öffnet (`SATELLITE_WATCH_HOURS`, 0 = aus). Er vergleicht die letzten ein bis zwei Monate
+mit derselben Jahreszeit der bis zu fünf Vorjahre (mindestens zwei Vergleichswerte).
+- Liegt ein Index um die oben genannten Schwellen tiefer, bekommt der Spot auf der Karte ein
+  Satelliten-Zeichen. Der Filter *Satellit meldet Rückgang* zeigt diese Spots, und die Spotansicht hat
+  eine Karte *Frühwarnung*.
+- Ist das letzte Foto älter als der Rückgang, schlägt die App vor, den Spot zu besuchen: Ein neues Foto
+  zeigt, was dahinter steckt.
+
+**Sturm als Kontext**: Rückgänge und Frühwarnungen nennen den stärksten Sturm (Böen ab 75 km/h, siehe
+Sturmereignisse) im Zeitraum bzw. in den Monaten davor.
+
+**Grenzen**
+- Wegen der Pixelgrösse umfasst der Satellitenwert mehr (und anderes) als den Bildausschnitt.
+- Die Schwellen der Frühwarnung sind Anfangswerte, nicht an Waldschäden kalibriert.
+- Ohne Internetzugang bleibt der Bereich leer und wird später erneut versucht. Fällt nur Landsat aus,
+  läuft Sentinel-2 weiter.
 
 ## Kartenmodi
 
