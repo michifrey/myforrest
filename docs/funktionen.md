@@ -51,6 +51,12 @@ nächstgelegenen Stelle gezogen. So füllt jede Runde dieselben Spots weiter.
 - **360° wie Street View**: Videos im Seitenverhältnis 2:1 (equirektangulär) oder mit Spherical-Video-
   Metadaten liefern Panoramen. Diese erscheinen im Spot als drehbare 360°-Ansicht (ziehen, Mausrad oder
   Pinch zum Zoomen, Pfeiltasten, Vollbild) mit Himmelsrichtung des Blicks; *Flach* zeigt das ganze Panorama.
+  Auch einzelne 360°-Fotos werden erkannt (siehe *360°-Panoramen* unten).
+- **Unscharfe Bilder**: Pro Stelle misst die App die Schärfe des Bildes (Varianz des Laplace-Filters).
+  Liegt sie unter dem Median der bisherigen Bilder des Videos, probiert sie die Bilder 0,25 s davor und
+  danach und nimmt das schärfste. Bleibt es unter 40 % des Medians (Wackler, Bewegungsunschärfe), wird die
+  Stelle übersprungen und im Ergebnis als *unscharf* aufgeführt. Die ersten drei Bilder dienen als
+  Vergleich und werden immer übernommen.
 - Insta360-Rohdateien (`.insv`, zwei ungestitchte Fischaugen) und GoPro-MAX-Rohdateien (`.360`) werden
   nicht direkt verarbeitet: Sie müssen zuerst in Insta360 Studio bzw. GoPro Player als 360°-MP4
   exportiert werden. Deren GPS steckt nicht im Export, daher den GPX-Track mitschicken.
@@ -138,6 +144,25 @@ ausgerichtet (Merkmalspunkte + RANSAC-Homographie). Im Vorher/Nachher-Vergleich 
 dann deckungsgleich übereinander, und mit *Stabilisiert* wirkt das Durchblättern der Zeitleiste
 wie ein Zeitraffer. Die Originalfotos bleiben unverändert, gespeichert wird nur die Transformation.
 Fotos aus einem ganz anderen Blickwinkel werden erkannt und bleiben unausgerichtet.
+
+### 360°-Panoramen
+
+Panoramen kommen aus 360°-Videos oder als einzelne Fotos von 360°-Kameras (Ricoh Theta, Insta360,
+GoPro MAX, Handy-Apps). Ein Foto gilt als Panorama, wenn es das selbst sagt (XMP `GPano:ProjectionType`
+= `equirectangular`, wie es die Kameras schreiben); ohne diese Angabe, wenn es genau 2:1 und mindestens
+3000 px breit ist. Die Richtung der Bildmitte kommt aus `GPano:PoseHeadingDegrees`.
+- **Spot:** Ein Panorama blickt in alle Richtungen. Es kommt deshalb zum nächsten Spot im Umkreis, egal
+  in welche Richtung die Kamera zeigte, und bestimmt die Richtung des Spots nicht mit.
+- **Ausrichtung:** Zwei Panoramen am selben Ort unterscheiden sich durch eine Drehung der Kamera (wohin sie
+  zeigte, wie schief sie gehalten wurde), nicht durch eine Homographie. Die App sucht dieselben
+  Merkmalspunkte, rechnet sie in Richtungen auf der Kugel um und schätzt daraus die Drehung (RANSAC über die
+  geschlossene Lösung von Horn). Mehr als 25° Schräglage gilt als Fehltreffer. Panoramen werden nur mit
+  Panoramen ausgerichtet und verglichen, Fotos nur mit Fotos, auch wenn beide im selben Spot liegen.
+- **Ansicht:** Mit *Stabilisiert* zeigt die App spätere Panoramen in die Blickrichtung des ersten gedreht,
+  auch in der 360°-Ansicht: Wer sich umsieht und zum nächsten Jahr blättert, schaut weiter auf dieselbe
+  Stelle. Der Server rechnet das gedrehte Bild (2048 × 1024 px).
+- **Veränderung:** Die Heatmap vergleicht das ganze Panorama (640 × 320 px), über die Naht hinweg. Die
+  untersten 15 % (Nadir: Person, Stativ, Velo) zählen nicht.
 
 ### Veränderungs-Heatmap
 

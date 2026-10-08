@@ -69,10 +69,16 @@ function hInv(m) {
   return r.map((v) => v / r[8]);
 }
 
-/** Transform that maps `photo` onto `frame`, or null when either is not aligned. */
+/**
+ * Transform that maps `photo` onto `frame`, or null when either is not
+ * aligned. 360° panoramas are turned on the server instead ({ pano: true },
+ * see showFramed); photos and panoramas never align with each other.
+ */
 function relativeAlignment(photo, frame) {
+  if (Boolean(photo.panorama) !== Boolean(frame.panorama)) return null;
   if (photo.id === frame.id) return IDENTITY;
   if (!photo.alignment || !frame.alignment) return null;
+  if (photo.panorama) return { pano: true };
   return hMul(hInv(frame.alignment.h), photo.alignment.h);
 }
 
@@ -120,8 +126,17 @@ async function showFramed(stage, img, photo, frame, setAspect = true) {
   const size = await imageSize(viewUrl(rel ? frame : photo));
   if (img.dataset.token !== token) return Boolean(rel);
   if (setAspect) stage.style.setProperty('--ar', String(size.w / size.h));
-  img.src = viewUrl(photo);
-  warps.set(img, rel);
+  if (rel?.pano) {
+    // Turned into the frame's orientation (and compass direction) on the server.
+    img.src = `/api/photos/${photo.id}/aligned.jpg?frame=${frame.id}`;
+    img.dataset.heading = frame.heading ?? '';
+    if (frame.heading === null || frame.heading === undefined) delete img.dataset.heading;
+    warps.set(img, null);
+  } else {
+    img.src = viewUrl(photo);
+    delete img.dataset.heading;
+    warps.set(img, rel);
+  }
   applyWarp(img);
   return Boolean(rel);
 }
@@ -386,7 +401,8 @@ function showPhoto(i) {
   state.index = i;
   const p = photos[i];
   const stabilize = $('stabilize').checked && photos.length > 1;
-  const frame = stabilize ? photos.find((x) => x.alignment) : null;
+  // The spot's frame: its first aligned photo, or first aligned panorama for a panorama.
+  const frame = stabilize ? photos.find((x) => x.alignment && Boolean(x.panorama) === Boolean(p.panorama)) : null;
   showFramed($('viewer-stage'), $('viewer-img'), p, frame);
   $('viewer-img').alt = `Spot ${state.spot.id} am ${fmtDate(p.takenAt)}`;
   const parts = [fmtDateTime(p.takenAt), SOURCE_LABEL[p.locationSource]];
@@ -668,7 +684,8 @@ async function updateCompare() {
   $('cmp-heat').disabled = !canCompare;
   $('cmp-status').textContent = !alignOn ? ''
     : aligned ? (a.id === b.id ? '' : 'Deckungsgleich ausgerichtet')
-      : 'Nicht ausrichtbar – Blickwinkel zu verschieden';
+      : Boolean(a.panorama) !== Boolean(b.panorama) ? '360°-Panorama und Foto lassen sich nicht ausrichten'
+        : 'Nicht ausrichtbar – Blickwinkel zu verschieden';
   if (!canCompare) return;
 
   try {

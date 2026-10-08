@@ -13,7 +13,7 @@ const { parseTags } = require('../tags');
 const { assignSpot, refreshSpot } = require('../spots');
 const { readMp4 } = require('../mp4');
 const { gpsTrack } = require('../gpmf');
-const { planByDistance, planByTime, isEquirectangular, createFfmpeg } = require('../video');
+const { planByDistance, planByTime, isEquirectangular, sharpness, createFramePicker, createFfmpeg } = require('../video');
 
 const MAX_FRAMES = 300;
 const JOB_TTL_MS = 60 * 60 * 1000;
@@ -221,15 +221,38 @@ module.exports = function videoRoutes(app, ctx) {
     const skipped = [];
     const touchedSpots = new Set();
     let panorama = panoramaChoice === '1' ? true : panoramaChoice === '0' ? false : null;
-    for (const frame of frames) {
-      const label = `${name} · ${clock(frame.t)}`;
-      const out = path.join(tmpDir, `${crypto.randomUUID()}.jpg`);
+    // Motion blur (shaky bike, fast turns): the sharpest frame within ±0.25 s, blurry ones are dropped.
+    const picker = createFramePicker({ duration: duration > 0.05 ? duration - 0.05 : Infinity });
+    const extract = async (t) => {
+      const file = path.join(tmpDir, `${crypto.randomUUID()}.jpg`);
       try {
-        await ffmpeg.extractFrame(video.path, frame.t, out);
+        await ffmpeg.extractFrame(video.path, t, file);
+        return { file, sharpness: await sharpness(file) };
+      } catch (err) {
+        await fsp.rm(file, { force: true });
+        throw err;
+      }
+    };
+    for (const planned of frames) {
+      let frame = planned;
+      let label = `${name} · ${clock(frame.t)}`;
+      let out;
+      try {
+        const best = await picker.pick(planned.t, extract, (c) => fsp.rm(c.file, { force: true }));
+        out = best.file;
+        // A neighbouring frame was sharper: a quarter second does not move the position noticeably.
+        frame = { ...planned, t: best.t };
+        label = `${name} · ${clock(frame.t)}`;
+        if (best.blurry) {
+          await fsp.rm(out, { force: true });
+          skipped.push({ name: label, reason: 'Bild unscharf (Bewegungsunschärfe), auch in den Nachbarbildern' });
+          job.done++;
+          continue;
+        }
         const meta = await sharp(out).metadata();
         if (panorama === null) panorama = info.spherical || isEquirectangular(meta.width, meta.height);
       } catch (err) {
-        await fsp.rm(out, { force: true });
+        if (out) await fsp.rm(out, { force: true });
         skipped.push({ name: label, reason: `Bild konnte nicht extrahiert werden: ${err.message}` });
         job.done++;
         continue;

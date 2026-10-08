@@ -273,6 +273,24 @@ test('GoPro video with GPMF becomes photos along the route, one spot each', { sk
   }
 });
 
+test('blurry frames are replaced by a sharper neighbour or dropped', { skip: !hasFfmpeg && 'ffmpeg fehlt' }, async () => {
+  const dir = tmp();
+  try {
+    // Walking 30 s; the camera shakes for a second around 16.5 s, too long for a neighbouring frame to help.
+    const file = makeVideo(dir, 'shaky.mp4', { seconds: 30, gpmf: walkNorth(30), extra: ['-vf', "boxblur=8:enable='between(t,15.9,17.3)'"] });
+    await withServer(async (base) => {
+      const body = await (await postVideo(base, file)).json();
+      const blurry = body.skipped.filter((s) => /unscharf/.test(s.reason));
+      assert.equal(blurry.length, 1, JSON.stringify(body.skipped));
+      assert.match(blurry[0].name, /shaky\.mp4 · 0:1[67]$/);
+      assert.equal(body.created.length, body.video.frames - 1);
+      assert.ok(body.created.every((p) => p.videoTime < 15.9 || p.videoTime > 17.3), JSON.stringify(body.created.map((p) => p.videoTime)));
+    });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('360° video (2:1) is marked as panorama; async upload reports progress', { skip: !hasFfmpeg && 'ffmpeg fehlt' }, async () => {
   const dir = tmp();
   try {

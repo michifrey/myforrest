@@ -33,10 +33,21 @@ function altitudeOf(tags) {
   return Math.round((below ? -alt : alt) * 10) / 10;
 }
 
-/** Reads capture time, GPS position, altitude and viewing direction from an image. */
+/**
+ * Reads capture time, GPS position, altitude and viewing direction from an
+ * image, and from its XMP whether it is a 360° panorama (Google's GPano:
+ * `projection` 'equirectangular', `poseHeading` = compass direction of the
+ * panorama's centre).
+ */
 async function readPhotoMeta(buffer, fallbackOffsetMin = 0) {
   let tags = {};
   let gps = null;
+  let xmp = {};
+  try {
+    xmp = (await exifr.parse(buffer, { xmp: true, tiff: false, exif: false, gps: false, ifd0: false })) || {};
+  } catch {
+    // No or broken XMP.
+  }
   try {
     tags = (await exifr.parse(buffer, {
       pick: ['DateTimeOriginal', 'CreateDate', 'OffsetTimeOriginal', 'OffsetTime', 'GPSImgDirection', 'GPSAltitude', 'GPSAltitudeRef'],
@@ -48,7 +59,10 @@ async function readPhotoMeta(buffer, fallbackOffsetMin = 0) {
   }
   const offset = parseOffset(tags.OffsetTimeOriginal) ?? parseOffset(tags.OffsetTime) ?? fallbackOffsetMin;
   const heading = Number(tags.GPSImgDirection);
+  const poseHeading = Number(xmp.PoseHeadingDegrees);
   return {
+    projection: typeof xmp.ProjectionType === 'string' ? xmp.ProjectionType.toLowerCase() : null,
+    poseHeading: Number.isFinite(poseHeading) ? ((poseHeading % 360) + 360) % 360 : null,
     takenAt: exifDateToUtc(tags.DateTimeOriginal || tags.CreateDate, offset),
     lat: gps && Number.isFinite(gps.latitude) ? gps.latitude : null,
     lon: gps && Number.isFinite(gps.longitude) ? gps.longitude : null,

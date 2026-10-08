@@ -5,9 +5,9 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 
 ## Phase 2: Mehr und bessere Fotos
 
-- **Video und 360°**: Insta360-`.insv` direkt lesen (Fischaugen stitchen, GPS aus dem Datei-Trailer),
-  360°-Fotos auch beim Foto-Upload erkennen, Ausrichtung und Veränderungserkennung für Panoramen (statt
-  Homographie), Bilder unscharfer Frames verwerfen.
+- **360°-Rohdateien**: Insta360-`.insv` und GoPro-MAX-`.360` direkt lesen (Fischaugen stitchen, GPS aus dem
+  Datei-Trailer). Braucht Beispieldateien der Kameras und deren Objektivdaten; bis dahin über den Export
+  als 360°-MP4.
 - **Spots aufteilen**: Bestehende Spots mit gemischten Blickrichtungen auf Wunsch aufteilen (neue Fotos
   werden bereits nach Richtung getrennt).
 - **PWA**: Kartenausschnitt einer geplanten Route gezielt für offline vorladen; Push-Benachrichtigung,
@@ -58,7 +58,8 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 
 Aus früheren Versionen dieser Roadmap:
 
-- Video statt Einzelbilder (GoPro mit GPMF, 360°-MP4, GPX)
+- Video statt Einzelbilder (GoPro mit GPMF, 360°-MP4, GPX), unscharfe Bilder werden ersetzt oder verworfen
+- 360°-Fotos beim Upload erkennen, Panoramen über eine Drehung der Kugel ausrichten und vergleichen
 - Sturmereignisse aus Böen mit Windwurf-Funden verknüpfen
 - DWD-Phänologie als Referenz für den Beginn der Herbstfärbung
 - Nächtliche Abkühlung in Senken aus Wind und Bewölkung
