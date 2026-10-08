@@ -72,12 +72,13 @@ function createGeodata({ db, spotRadiusM = 25 }) {
   const hasUsers = () => Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'users'").get());
   const tagsOf = db.prepare('SELECT tag FROM photo_tags WHERE photo_id = ? ORDER BY tag');
 
-  /** Changes whenever photos or identifications change; keys the cache of computed collections. */
+  /** Changes whenever photos (or their spots) or identifications change; keys the cache of computed collections. */
   const version = () => {
-    const p = db.prepare(`SELECT COUNT(*) n, COALESCE(MAX(id), 0) m, COALESCE(SUM(${hasHidden ? 'hidden_at IS NOT NULL' : 0}), 0) h, COALESCE(SUM(${hasProtected ? 'protected' : 0}), 0) pr FROM photos`).get();
+    // `s`: photos moving to another spot (a split) change it too.
+    const p = db.prepare(`SELECT COUNT(*) n, COALESCE(MAX(id), 0) m, COALESCE(SUM(${hasHidden ? 'hidden_at IS NOT NULL' : 0}), 0) h, COALESCE(SUM(${hasProtected ? 'protected' : 0}), 0) pr, COALESCE(SUM(spot_id * (id % 997 + 1)), 0) s FROM photos`).get();
     const i = db.prepare('SELECT COUNT(*) n, COALESCE(MAX(id), 0) m FROM identifications').get();
     const t = db.prepare('SELECT COUNT(*) n FROM photo_tags').get();
-    return `${p.n}:${p.m}:${p.h}:${p.pr}:${i.n}:${i.m}:${t.n}`;
+    return `${p.n}:${p.m}:${p.h}:${p.pr}:${p.s}:${i.n}:${i.m}:${t.n}`;
   };
   const cache = new Map();
 

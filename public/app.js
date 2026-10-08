@@ -359,6 +359,7 @@ async function openSpot(id, photoId) {
     `${fmtDate(photos[0].takenAt)} – ${fmtDate(photos[photos.length - 1].takenAt)} (${years.size} Jahr${years.size === 1 ? '' : 'e'})` +
     (hasHeading(state.spot) ? ` · ${headingText(state.spot.heading)}` : '');
   renderSiblings(state.spot);
+  renderSplit(state.spot);
   const allTags = [...new Set(photos.flatMap((p) => p.tags))].sort();
   $('spot-tags').replaceChildren(...allTags.map(tagChip));
 
@@ -394,6 +395,56 @@ function renderSiblings(spot) {
       text: `Spot ${o.id}${hasHeading(o) ? ` (${compassLabel(o.heading)})` : ''}`,
     })),
   ] : []));
+}
+
+/**
+ * Spots whose photos look in different directions (from before directions
+ * existed) can be split: one spot per direction, each aligned on its own.
+ */
+async function renderSplit(spot) {
+  const row = $('spot-split');
+  row.hidden = true;
+  const directed = spot.photos.filter((p) => p.heading !== null && p.heading !== undefined && !p.panorama);
+  if (hasHeading(spot) || directed.length < 2) return;
+  const plan = await api(`/api/spots/${spot.id}/split`).catch(() => null);
+  if (!plan?.mixed || state.spot?.id !== spot.id) return;
+  const parts = plan.groups.filter((g) => g.photoIds.length)
+    .map((g) => `${g.photoIds.length} ${g.photoIds.length === 1 ? 'Foto' : 'Fotos'} nach ${compassLabel(g.heading)}`);
+  const run = async (body, btn) => {
+    btn.disabled = true;
+    btn.textContent = 'wird aufgeteilt …';
+    try {
+      const r = await api(`/api/spots/${spot.id}/split`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}),
+      });
+      await loadSpots();
+      await openSpot(spot.id);
+      window.pwaNotify?.(`Aufgeteilt: ${r.spots.map((s) => `Spot ${s.id}${hasHeading(s) ? ` (${compassLabel(s.heading)})` : ''}`).join(', ')}.`);
+    } catch (err) {
+      alert(err.message);
+      renderSplit(spot);
+    }
+  };
+  row.replaceChildren(
+    el('span', { text: `Die Fotos blicken in verschiedene Richtungen (${parts.join(', ')}). Aufgeteilt lassen sie sich deckungsgleich vergleichen. ` }),
+    el('button', {
+      type: 'button',
+      class: 'link small',
+      text: `In ${plan.groups.length} Spots aufteilen`,
+      onclick: (e) => confirm(`Spot ${spot.id} in ${plan.groups.length} Spots aufteilen, je einen pro Blickrichtung?`) && run(null, e.currentTarget),
+    }),
+    ' · ',
+    el('button', {
+      type: 'button',
+      class: 'link small',
+      text: 'Nur das gezeigte Foto abtrennen',
+      onclick: (e) => {
+        const current = state.spot.photos[state.index]; // the photo shown now, not when the row was drawn
+        if (current && confirm(`Das Foto vom ${fmtDate(current.takenAt)} in einen eigenen Spot verschieben?`)) run({ photoIds: [current.id] }, e.currentTarget);
+      },
+    }),
+  );
+  row.hidden = false;
 }
 
 function showPhoto(i) {

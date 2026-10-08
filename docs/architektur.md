@@ -9,7 +9,7 @@ Die Routen sind in der [API-Übersicht](api.md) beschrieben.
 server.js            Einstiegspunkt
 src/app.js           Express-App und REST-API
 src/db.js            SQLite-Schema (spots, photos, photo_tags, identifications, region_labels, detections …)
-src/spots.js         Gruppierung von Fotos zu Spots (Ort und Blickrichtung)
+src/spots.js         Gruppierung von Fotos zu Spots (Ort und Blickrichtung), Aufteilen gemischter Spots
 src/thumbs.js        Vorschaubilder (WebP, 320 und 1280 px) in data/thumbs
 src/heic.js          HEIC-Erkennung, EXIF aus HEIC, Umwandlung nach JPEG
 src/align.js         Bildregistrierung (ORB-Merkmale, Matching, RANSAC); Panoramen über eine Drehung der Kugel
