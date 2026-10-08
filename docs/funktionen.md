@@ -785,6 +785,15 @@ Spots sind das automatisch.
   Teil nach `#` geht an keinen Server und in keinen Referer. Mit dem neuen Passwort ist man angemeldet,
   alle anderen Sitzungen des Kontos enden, und die Adresse gilt als bestätigt. So können auch Konten aus
   Google oder GitHub ein Passwort festlegen.
+- *Konto löschen*: Im Konto-Menü unter *Konto löschen …*, bestätigt mit dem Passwort (Konten ohne Passwort
+  tippen ihren Kontonamen ein). Für die eigenen Fotos ist eine ausdrückliche Wahl nötig: **anonym behalten**
+  (sie bleiben für die Zeitreihen der Spots erhalten und heissen danach „Anonym“, die Lizenz bleibt) oder
+  **ebenfalls löschen** (mit Dateien und Vorschaubildern). Mit dem Konto verschwinden Sitzungen auf allen
+  Geräten, Anmeldungen über Google/GitHub, offene Links, gespeicherte Touren, Push-Abos und gefolgte Spots.
+  Fotoaufträge und Meldungen bleiben ohne Namen bestehen. Das Moderationsprotokoll vermerkt nur Konto-Nummer
+  und Anzahlen, nicht Name oder Adresse; frühere Einträge zu Moderationsschritten des Kontos bleiben. Eine
+  Bestätigung geht an die bisherige Adresse, die danach wieder frei ist. Die einzige Administration kann sich
+  nicht löschen, solange es andere Konten gibt – zuerst einem anderen Konto die Rolle geben.
 - *Passwort ändern*: Im Konto-Menü unter *Passwort ändern* mit dem aktuellen und einem neuen Passwort.
   Falsche aktuelle Passwörter zählen wie Fehlversuche beim Anmelden. Die eigene Sitzung bleibt, alle anderen
   Geräte werden abgemeldet, offene Links zum Zurücksetzen verfallen, und das Konto bekommt eine Hinweis-E-Mail

@@ -13,6 +13,11 @@
   Kameramodell). Ausnahmen sind die Vorschaubilder und die aus HEIC umgewandelten JPEGs, die keine
   EXIF-Daten enthalten. Vor einem öffentlichen Betrieb sollten Metadaten entfernt und Personen sowie
   Kennzeichen automatisch verpixelt werden.
+- *Konto löschen* entfernt das Konto sofort aus der Datenbank. Behaltene Fotos sind danach nur noch über
+  den Namen „Anonym“ vom Konto getrennt: Ihre EXIF-Daten (siehe oben) können weiterhin etwa Kameramodell
+  oder einen in der Kamera eingetragenen Namen enthalten. Backups der Datenbank und von `data/uploads`
+  enthalten gelöschte Konten noch, bis sie ersetzt werden; die Aufbewahrungsdauer der Backups gehört in die
+  Datenschutzerklärung.
 - Ausgeblendete Fotos werden nicht mehr ausgeliefert, können aber noch bis zu 7 Tage im Browser-Cache von
   Personen liegen, die sie vorher gesehen haben.
 - Kartendaten © OpenStreetMap-Mitwirkende. Bei stärkerer Nutzung braucht es einen eigenen

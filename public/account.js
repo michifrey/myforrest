@@ -38,6 +38,7 @@ const ROLE_LABEL = { user: 'Mitglied', moderator: 'Moderation', admin: 'Administ
 const ACTION_LABEL = {
   hide: 'ausgeblendet', unhide: 'wieder eingeblendet', dismiss: 'Meldungen verworfen', delete: 'gelöscht', role: 'Rolle geändert',
   protect: 'geschützt', unprotect: 'Schutz aufgehoben', 'pro-verifiziert': 'PRO verifiziert', 'pro-abgelehnt': 'PRO abgelehnt', 'pro-entzogen': 'PRO entzogen',
+  'account-delete': 'Konto gelöscht',
 };
 const PROTECT_REASON = { upload: 'beim Hochladen geschützt', art: 'automatisch: seltene oder geschützte Art', pro: 'von einem PRO-Mitglied geschützt', moderation: 'von der Moderation geschützt' };
 /** Verified PRO members and moderation see protected finds exactly. */
@@ -102,6 +103,7 @@ function renderNav() {
     ...(isMod() ? [item('Moderation', () => openModeration('reported'))] : []),
     ...(u.role === 'admin' ? [item('Konten & Rollen', () => openModeration('users'))] : []),
     item('Abmelden', logout, { class: 'menu-item danger' }),
+    item('Konto löschen …', openDeleteAccount, { class: 'menu-item danger subtle' }),
   );
 }
 
@@ -654,6 +656,99 @@ async function deletePhoto(p) {
     alert(err.message);
   }
 }
+
+/* ---------- Deleting the account ---------- */
+
+const deleteDialog = el('dialog', { id: 'delete-dialog', class: 'auth-dialog', 'aria-labelledby': 'delete-title' });
+deleteDialog.innerHTML = `
+  <form method="dialog" novalidate>
+    <div class="dialog-head">
+      <p class="eyebrow">Konto</p>
+      <h2 id="delete-title">Konto löschen</h2>
+    </div>
+    <p id="delete-what" class="small"></p>
+    <fieldset class="field" id="delete-photos-field"><legend>Deine Fotos</legend>
+      <div class="checks">
+        <label><input type="radio" name="photos" value="anonymize"> <span id="delete-keep"></span></label>
+        <label><input type="radio" name="photos" value="delete"> <span id="delete-all"></span></label>
+      </div>
+    </fieldset>
+    <label class="field" id="delete-password-field"><span>Passwort zur Bestätigung</span>
+      <input name="password" type="password" autocomplete="current-password"></label>
+    <label class="field" id="delete-name-field"><span id="delete-name-label"></span>
+      <input name="name" autocomplete="off"></label>
+    <p id="delete-error" class="auth-error" role="alert" hidden></p>
+    <div class="row end">
+      <button type="button" class="link" id="delete-cancel">Abbrechen</button>
+      <button type="submit" class="btn danger" id="delete-submit">Konto endgültig löschen</button>
+    </div>
+  </form>`;
+document.body.append(deleteDialog);
+const deleteForm = deleteDialog.querySelector('form');
+let deleteInfo = null;
+$('delete-cancel').addEventListener('click', () => deleteDialog.close());
+
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+async function openDeleteAccount() {
+  let info;
+  try {
+    info = await api('/api/auth/account');
+  } catch (err) {
+    alert(err.message);
+    return;
+  }
+  deleteInfo = info;
+  deleteForm.reset();
+  $('delete-error').hidden = true;
+  $('delete-submit').disabled = Boolean(info.blocker);
+  const gone = ['Sitzungen', 'Anmeldungen über Google/GitHub', 'Push-Nachrichten',
+    ...(info.tracks ? [plural(info.tracks, 'gespeicherte Tour', 'gespeicherte Touren')] : [])];
+  $('delete-what').textContent = info.blocker
+    || `Das lässt sich nicht rückgängig machen. Mit dem Konto verschwinden ${gone.slice(0, -1).join(', ')} und ${gone.at(-1)}.`
+      + `${info.requests ? ` ${plural(info.requests, 'offener Fotoauftrag bleibt', 'offene Fotoaufträge bleiben')} ohne Namen bestehen.` : ''}`;
+  $('delete-photos-field').hidden = !info.photos || Boolean(info.blocker);
+  $('delete-keep').textContent = `${plural(info.photos, 'Foto', 'Fotos')} anonym behalten – sie bleiben für die Zeitreihen der Spots erhalten, ohne deinen Namen`;
+  $('delete-all').textContent = `${plural(info.photos, 'Foto', 'Fotos')} ebenfalls löschen`;
+  $('delete-password-field').hidden = info.confirmWith !== 'password' || Boolean(info.blocker);
+  $('delete-name-field').hidden = info.confirmWith !== 'name' || Boolean(info.blocker);
+  $('delete-name-label').textContent = `Zur Bestätigung den Kontonamen «${Account.user.name}» eintippen`;
+  deleteDialog.showModal();
+}
+
+deleteForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = deleteForm;
+  const err = $('delete-error');
+  // Without photos there is nothing to choose.
+  const photos = deleteInfo.photos ? f.photos.value : 'anonymize';
+  if (!photos) {
+    err.textContent = 'Bitte wählen, was mit deinen Fotos geschieht.';
+    err.hidden = false;
+    return;
+  }
+  const submit = $('delete-submit');
+  submit.disabled = true;
+  try {
+    const r = await api('/api/auth/account', {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photos, password: f.password.value, name: f.name.value }),
+    });
+    deleteDialog.close();
+    Account.user = null;
+    Account.csrf = null;
+    renderNav();
+    fillLicenseSelect();
+    await refreshViews();
+    alert(`Dein Konto ist gelöscht.${r.deletedPhotos ? ` ${plural(r.deletedPhotos, 'Foto', 'Fotos')} gelöscht.` : ''}`
+      + `${r.anonymizedPhotos ? ` ${plural(r.anonymizedPhotos, 'Foto bleibt', 'Fotos bleiben')} anonym erhalten.` : ''}`);
+  } catch (error) {
+    err.textContent = error.message;
+    err.hidden = false;
+  } finally {
+    submit.disabled = false;
+  }
+});
 
 /* ---------- PRO membership ---------- */
 

@@ -739,13 +739,10 @@ function createApp({
     res.json(photoJson(getPhoto.get(id)));
   });
 
-  app.delete('/api/photos/:id', async (req, res) => {
-    const id = idParam(req, res);
-    if (id === null) return;
-    const photo = getPhoto.get(id);
-    if (!photo) return res.status(404).json({ error: 'Foto nicht gefunden' });
+  /** Deletes a photo with its files and re-evaluates the rest of its spot. */
+  async function removePhoto(photo) {
     transaction(db, () => {
-      db.prepare('DELETE FROM photos WHERE id = ?').run(id);
+      db.prepare('DELETE FROM photos WHERE id = ?').run(photo.id);
       refreshSpot(db, photo.spot_id);
     });
     await fsp.rm(path.join(uploadDir, photo.file), { force: true });
@@ -758,6 +755,15 @@ function createApp({
         refreshIrregularities(other);
       }
     })());
+  }
+  accountsCtx.removePhoto = removePhoto; // deleting an account with its photos
+
+  app.delete('/api/photos/:id', async (req, res) => {
+    const id = idParam(req, res);
+    if (id === null) return;
+    const photo = getPhoto.get(id);
+    if (!photo) return res.status(404).json({ error: 'Foto nicht gefunden' });
+    await removePhoto(photo);
     res.status(204).end();
   });
 
