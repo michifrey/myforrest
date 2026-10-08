@@ -25,6 +25,7 @@
  */
 
 const { utmFromLatLon, latLonFromUtm } = require('./utm');
+const { sensorMonths, adjust, fitHarmonization } = require('./harmonize');
 
 const STAC_URL = 'https://earth-search.aws.element84.com/v1';
 const COLLECTION = 'sentinel-2-l2a';
@@ -47,6 +48,10 @@ const THRESHOLDS = { ndvi: [NDVI_DROP, NDVI_DROP_STRONG], ndmi: [NDMI_DROP, NDMI
 // Bump when a scene's stored values gain a new index: older rows are evaluated again.
 const INDEX_VERSION = 2;
 const SENTINEL_START = '2017-01-01'; // Earth Search's Sentinel-2 L2A archive; earlier years come from Landsat
+// Landsat is read on into these overlap years so it can be harmonised with Sentinel-2 (src/harmonize.js).
+const OVERLAP_END = '2018-12-31';
+const LANDSAT_PER_MONTH = 1; // clear scenes per Landsat sensor and month
+const LANDSAT_ATTEMPTS = 2;
 
 let geotiffModule = null;
 async function geotiff() {
@@ -275,29 +280,54 @@ const median = (values) => {
 const monthIndex = (ym) => Number(ym.slice(0, 4)) * 12 + Number(ym.slice(5, 7)) - 1;
 
 /**
- * Monthly values from per-scene values: per index the median of the clear
- * scenes of each month. A month appears when it has an NDVI or an NDMI.
+ * Monthly values from per-scene values: per sensor and index the median of
+ * the clear scenes of the month. Sentinel-2 wins where it has a value;
+ * otherwise the Landsat sensors of the month count, mapped onto the
+ * Sentinel-2 scale with `harmonization` (src/harmonize.js) where it has a fit
+ * for the sensor. A month appears when it has an NDVI or an NDMI.
+ * `adjusted`: null when only Sentinel-2 counts, true when every Landsat value
+ * used was adjusted, false when one was used as measured; `raw` keeps the
+ * per-sensor medians.
  */
-function monthlySeries(scenes) {
-  const byMonth = new Map();
-  for (const s of scenes) {
-    const hasNdmi = s.ndmi !== null && s.ndmi !== undefined;
-    if ((s.ndvi === null || s.ndvi === undefined) && !hasNdmi) continue;
-    const m = s.date.slice(0, 7);
-    if (!byMonth.has(m)) byMonth.set(m, []);
-    byMonth.get(m).push(s);
-  }
+function monthlySeries(scenes, harmonization = null) {
+  const months = sensorMonths(scenes);
   const round = (v) => Math.round(v * 1000) / 1000;
-  return [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, list]) => {
-    const ndvi = list.filter((s) => s.ndvi !== null && s.ndvi !== undefined);
-    const ndmi = list.filter((s) => s.ndmi !== null && s.ndmi !== undefined);
+  const datesOf = new Map();
+  for (const s of scenes) {
+    const m = s.date.slice(0, 7);
+    if (months.has(m)) datesOf.set(m, [...(datesOf.get(m) || []), s.date]);
+  }
+  return [...months.keys()].sort().map((month) => {
+    const by = months.get(month);
+    let adjusted = null;
+    let scenesUsed = 0;
+    const pick = (key) => {
+      if (by.S2 && by.S2[key] !== null) {
+        if (key === 'ndvi') scenesUsed += by.S2.scenes;
+        return by.S2[key];
+      }
+      const values = [];
+      for (const sensor of Object.keys(by).filter((x) => x !== 'S2').sort()) {
+        const raw = by[sensor][key];
+        if (raw === null) continue;
+        const fit = harmonization?.[key]?.[sensor] || null;
+        values.push(fit ? adjust(raw, fit) : raw);
+        adjusted = (adjusted ?? true) && Boolean(fit);
+        if (key === 'ndvi') scenesUsed += by[sensor].scenes;
+      }
+      return values.length ? median(values) : null;
+    };
+    const ndvi = pick('ndvi');
+    const ndmi = pick('ndmi');
     return {
       month,
-      ndvi: ndvi.length ? round(median(ndvi.map((s) => s.ndvi))) : null,
-      ndmi: ndmi.length ? round(median(ndmi.map((s) => s.ndmi))) : null,
-      scenes: ndvi.length,
-      dates: list.map((s) => s.date),
-      sensors: [...new Set(list.map((s) => s.sensor || 'S2'))],
+      ndvi: ndvi === null ? null : round(ndvi),
+      ndmi: ndmi === null ? null : round(ndmi),
+      scenes: scenesUsed,
+      dates: datesOf.get(month) || [],
+      sensors: Object.keys(by).sort((a, b) => (a === 'S2' ? -1 : b === 'S2' ? 1 : a.localeCompare(b))),
+      adjusted,
+      raw: Object.fromEntries(Object.entries(by).map(([k, v]) => [k, { ndvi: v.ndvi === null ? null : round(v.ndvi), ndmi: v.ndmi === null ? null : round(v.ndmi) }])),
     };
   });
 }
@@ -335,7 +365,8 @@ function indexDrops(monthly, photos, { key = 'ndvi', threshold = THRESHOLDS[key]
     if (!after.length || !before.length) continue;
     const vBefore = median(before);
     const vAfter = median(after);
-    const drop = vBefore - vAfter;
+    // Rounded before comparing: 0.84 − 0.74 is 0.0999… in floating point and must count as 0.10.
+    const drop = Math.round((vBefore - vAfter) * 1000) / 1000;
     if (drop >= threshold) {
       drops.push({
         index: key,
@@ -495,7 +526,8 @@ function createSentinel({ db, fetchImpl = fetch, stacUrl = STAC_URL, landsat = n
         landsat_error = excluded.landsat_error
     `).run(spotId, spot.lat, spot.lon, p.from, p.to, now(), complete ? 1 : 0, error, landsatError);
 
-    // Sentinel-2 from 2017; Landsat for the years before, when the photos reach back that far.
+    // Sentinel-2 from 2017; Landsat for the years before, when the photos reach back that far, and on through
+    // the overlap years, where both sensors see the spot and can be harmonised.
     let scenes;
     try {
       const from = p.from > SENTINEL_START ? p.from : SENTINEL_START;
@@ -507,7 +539,7 @@ function createSentinel({ db, fetchImpl = fetch, stacUrl = STAC_URL, landsat = n
     let landsatError = null;
     if (landsat && p.from < SENTINEL_START) {
       try {
-        scenes.push(...await landsat.scenes(spot.lat, spot.lon, p.from, isoDate(Date.parse(SENTINEL_START) - DAY)));
+        scenes.push(...await landsat.scenes(spot.lat, spot.lon, p.from, p.to < OVERLAP_END ? p.to : OVERLAP_END));
       } catch (err) {
         // Landsat is extra history: Sentinel-2 goes ahead, Landsat is tried again later.
         landsatError = err.message;
@@ -518,24 +550,28 @@ function createSentinel({ db, fetchImpl = fetch, stacUrl = STAC_URL, landsat = n
     const insert = db.prepare(`
       INSERT OR REPLACE INTO spot_ndvi_scenes (spot_id, scene_id, date, cloud, ndvi, ndmi, sensor, v, clear_fraction)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-    // Per month: lowest cloud cover first, until enough clear scenes or attempts.
+    // Per month and sensor: lowest cloud cover first, until enough clear scenes or attempts. Each Landsat
+    // sensor gets its own scene in a month, so months seen by two sensors pair up for the harmonisation.
     const byMonth = new Map();
     for (const s of scenes) {
-      const m = s.date.slice(0, 7);
-      if (!byMonth.has(m)) byMonth.set(m, []);
-      byMonth.get(m).push(s);
+      const key = `${s.date.slice(0, 7)}|${s.sensor}`;
+      if (!byMonth.has(key)) byMonth.set(key, []);
+      byMonth.get(key).push(s);
     }
     let budget = maxScenes;
     let complete = !landsatError;
     let lastError = null;
     let failures = 0;
     // Newest months first: the recent past matters most for fresh photos and the early warning.
-    for (const month of [...byMonth.keys()].sort().reverse()) {
-      const list = byMonth.get(month).sort((a, b) => (a.cloud ?? 100) - (b.cloud ?? 100));
+    for (const key of [...byMonth.keys()].sort().reverse()) {
+      const list = byMonth.get(key).sort((a, b) => (a.cloud ?? 100) - (b.cloud ?? 100));
+      const sentinel2 = key.endsWith('|S2');
+      const quota = sentinel2 ? SCENES_PER_MONTH : LANDSAT_PER_MONTH;
+      const attempts = sentinel2 ? ATTEMPTS_PER_MONTH : LANDSAT_ATTEMPTS;
       let clear = 0;
       let tried = 0;
       for (const s of list) {
-        if (clear >= SCENES_PER_MONTH || tried >= ATTEMPTS_PER_MONTH) break;
+        if (clear >= quota || tried >= attempts) break;
         tried++;
         const cached = done.get(s.id);
         // Rows of the current version (or scenes without the bands for more) need no new read.
@@ -577,15 +613,38 @@ function createSentinel({ db, fetchImpl = fetch, stacUrl = STAC_URL, landsat = n
       error: st?.error ?? null,
       landsatError: st?.landsat_error ?? null,
       scenesEvaluated: scenes.length,
-      monthly: monthlySeries(scenes),
+      monthly: monthlySeries(scenes, harmonization()),
     };
   }
 
-  return { refresh, needsRefresh, series };
+  /* ---------- Harmonisation of Landsat with Sentinel-2 ---------- */
+
+  db.exec('CREATE TABLE IF NOT EXISTS satellite_harmonization (id INTEGER PRIMARY KEY CHECK (id = 1), json TEXT NOT NULL, computed_at INTEGER NOT NULL)');
+  const allScenes = db.prepare('SELECT spot_id, date, ndvi, ndmi, sensor FROM spot_ndvi_scenes ORDER BY spot_id');
+
+  /** Fits the harmonisation on the month pairs of all spots and stores it. */
+  function harmonize() {
+    const bySpot = new Map();
+    for (const r of allScenes.all()) {
+      if (!bySpot.has(r.spot_id)) bySpot.set(r.spot_id, []);
+      bySpot.get(r.spot_id).push(r);
+    }
+    const fit = fitHarmonization([...bySpot.values()]);
+    db.prepare('INSERT OR REPLACE INTO satellite_harmonization (id, json, computed_at) VALUES (1, ?, ?)').run(JSON.stringify(fit), now());
+    return { ...fit, computedAt: new Date(now()).toISOString() };
+  }
+
+  /** The stored harmonisation (fitted on first use). */
+  function harmonization() {
+    const row = db.prepare('SELECT json, computed_at FROM satellite_harmonization WHERE id = 1').get();
+    return row ? { ...JSON.parse(row.json), computedAt: new Date(row.computed_at).toISOString() } : harmonize();
+  }
+
+  return { refresh, needsRefresh, series, harmonize, harmonization };
 }
 
 module.exports = {
   createSentinel, searchScenes, stacSearch, sceneIndices, readWindow, projectToScene, windowMean, reflectance, normalisedDifference,
   monthlySeries, indexDrops, ndviDrops, anomalyScores, currentAnomalies, sceneOf, reflectanceScale,
-  latLonFromUtm, STAC_URL, NDVI_DROP, NDMI_DROP, THRESHOLDS, SENTINEL_START,
+  latLonFromUtm, STAC_URL, NDVI_DROP, NDMI_DROP, THRESHOLDS, SENTINEL_START, OVERLAP_END,
 };

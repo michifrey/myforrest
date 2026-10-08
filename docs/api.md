@@ -67,10 +67,12 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/export/dwc.csv`        | Funde als Darwin-Core-Occurrence-CSV (Info Flora, GBIF)  |
 | `GET`    | `/api/export/inaturalist.csv` | Funde im CSV-Importformat von iNaturalist               |
 | `GET`    | `/api/spots/:id/vegetation`  | Grünanteil, Kronendach-Deckung, Lückenanteil und GCC pro Foto (`pending`: noch in Berechnung) |
-| `GET`    | `/api/spots/:id/ndvi`        | NDVI und NDMI pro Monat (Sentinel-2, vor 2017 Landsat; `sensors` pro Monat), Rückgänge zwischen Fotodaten (`drops`, mit `index`, Belegen aus den Fotos und Sturm), Frühwarnungen (`alerts`); `status`: `ready`, `pending` (wird geladen), `offline` |
+| `GET`    | `/api/spots/:id/ndvi`        | NDVI und NDMI pro Monat (Sentinel-2, vor 2017 Landsat an Sentinel-2 angeglichen; `sensors`, `adjusted` und die gemessenen Werte `raw` pro Monat), Rückgänge zwischen Fotodaten (`drops`, mit `index`, Belegen aus den Fotos und Sturm), Frühwarnungen (`alerts`); `status`: `ready`, `pending` (wird geladen), `offline` |
 | `POST`   | `/api/spots/:id/ndvi`        | Satellitendaten neu laden                                |
 | `GET`    | `/api/satellite/calibration` | Schwellen der Frühwarnung pro Index: `kalibriert` oder `standard` (mit `reason`), Kontrollen mit und ohne Schaden, Spots, Kreuzvalidierung an zurückgehaltenen Spots (`cv`), Anfangswert zum Vergleich (`standard`), Treffer und Fehlalarme pro Schwelle (`sweep`) |
 | `POST`   | `/api/satellite/calibration` | Sofort neu kalibrieren                                   |
+| `GET`    | `/api/satellite/harmonization` | Angleichung von Landsat an Sentinel-2 pro Index und Satellit (Gerade oder Versatz, Monatspaare, Abstand vorher, Restabweichung) |
+| `POST`   | `/api/satellite/harmonization` | Sofort neu schätzen |
 | `GET`    | `/api/satellite/alerts`      | Frühwarnung: Spots, deren letzte Monate gegenüber derselben Jahreszeit der Vorjahre gefallen sind (Index, seit wann, wie stark, Sturm davor, ob ein Besuch lohnt, `calibration`: verwendete Schwelle) |
 | `GET`    | `/api/photos/:id/regions?to=` | Veränderte Regionen mit entscheidender Quelle (Regel/gelernt), Sicherheit, Nadelholzanteil, vermuteter Art und eigener Bestätigung |
 | `POST`   | `/api/photos/:id/region-labels` | Region bestätigen oder korrigieren (`{ to, index, class }`, `class: null` entfernt die Bestätigung) |

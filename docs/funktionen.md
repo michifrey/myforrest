@@ -294,7 +294,8 @@ Zu jedem Spot lädt die App ohne API-Key Zeitreihen aus Satellitenbildern:
 - **Sentinel-2 L2A** (Copernicus) ab 2017, über die offene STAC-API von Earth Search.
 - **Landsat 5, 7 und 8** (Collection 2, USGS) für die Jahre davor, über Microsoft Planetary Computer. Das
   brauchen Spots, deren Fotos vor 2018 beginnen. Der Zugang ist anonym, die Links werden mit einem
-  kostenlosen Token signiert.
+  kostenlosen Token signiert. Landsat wird bis Ende 2018 gelesen, damit es Jahre gibt, in denen beide
+  Satelliten dieselben Spots sehen.
 
 **So wird gerechnet**
 - Gelesen wird pro Band nur die interne Kachel der Cloud-Optimized GeoTIFFs, in der der Spot liegt
@@ -305,8 +306,22 @@ Zu jedem Spot lädt die App ohne API-Key Zeitreihen aus Satellitenbildern:
   heraus.
 - Gemittelt wird bei Sentinel-2 der NDVI über rund 30 × 30 m (3 × 3 Pixel à 10 m) und der NDMI über
   rund 40 × 40 m (20-m-Pixel von B11, NIR aus B08). Landsat hat 30-m-Pixel.
-- Pro Monat zählt der Median der wolkenfreien Szenen. Jeder Monat trägt den Satelliten, von dem er
-  stammt. Landsat-NDVI liegt über Wald etwas tiefer als Sentinel-2.
+- Pro Monat zählt der Median der wolkenfreien Szenen, Sentinel-2 vor Landsat. Jeder Monat trägt den
+  Satelliten, von dem er stammt. Pro Monat und Landsat-Satellit wird eine eigene Szene gelesen, damit
+  Monate mit zwei Satelliten verglichen werden können.
+
+**Angleichung von Landsat an Sentinel-2**: Die Satelliten messen mit verschiedenen Bändern; Landsat
+misst den NDVI über Wald meist etwas tiefer, und Landsat 5 und 7 weichen von 8 ab. Damit eine Reihe über
+2017 hinweg als eine gelesen werden kann, rechnet der Server Landsat-Werte auf die Skala von Sentinel-2 um.
+- **Schätzung:** Aus allen Monaten, in denen an einem Spot beide Satelliten Werte haben, über alle Spots
+  zusammen, pro Index und Satellit.
+  - Ab 12 Monatspaaren eine robuste Gerade (Theil–Sen), sonst ab 4 Paaren nur ein Versatz.
+  - Eine Gerade mit einer Steigung ausserhalb 0,8–1,25 gilt als unzuverlässig, dann zählt nur der Versatz.
+- **Landsat 8 und 7** werden direkt an Sentinel-2 angeglichen (Überlappung ab 2017). **Landsat 5** endete
+  2011 und hat nie mit Sentinel-2 überlappt; es läuft über Landsat 7 (Überlappung bis 2011).
+- **Ohne genug Überlappung** bleibt ein Satellit ungeändert. Das Diagramm zeigt pro Monat, ob angeglichen
+  wurde und was gemessen war.
+- **Wann:** Die Schätzung wird nach jeder täglichen Runde erneuert, vor der Kalibrierung der Frühwarnung.
 - Die Werte werden gecacht und wöchentlich ergänzt. Szenen aus der Zeit vor dem NDMI werden nach und nach
   nachgerechnet.
 
