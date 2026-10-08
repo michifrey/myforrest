@@ -8,10 +8,14 @@
  *   GET  /api/spots/:id/ndvi         monthly NDVI/NDMI series, drops between photo dates, current anomalies
  *   POST /api/spots/:id/ndvi         fetch the satellite series again
  *   GET  /api/satellite/alerts       spots whose last months dropped against earlier years (early warning)
+ *   GET  /api/satellite/calibration  thresholds of the early warning, calibrated on confirmed damage
+ *   POST /api/satellite/calibration  calibrate again now
  *
  * A watcher refreshes the series of all spots once a day (SATELLITE_WATCH_HOURS,
  * 0 = off), so drops show up without anyone opening the spot or taking a photo.
  * Drops and alerts carry the strongest storm of their period (storms.js).
+ * After each round the early-warning thresholds are calibrated again
+ * (calibration.js) against the damage photographers confirmed.
  *
  * Usage in createApp: `const vegetation = require('./routes/vegetation')(app, ctx)`,
  * with ctx = { db, uploadDir, background, fetchImpl }. Returns { analyzePhoto, backfill };
@@ -23,6 +27,8 @@ const { analyzeVegetation, imageAspect } = require('../vegetation');
 const { createSentinel, indexDrops, currentAnomalies, STAC_URL } = require('../sentinel');
 const { createLandsat, STAC_URL: LANDSAT_STAC_URL } = require('../landsat');
 const { createStorms, likelyStorm, stormText } = require('../storms');
+const { calibrate, maxDropBetween } = require('../calibration');
+const { DAMAGE_TAGS } = require('../geodata');
 
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS photo_vegetation (
@@ -213,11 +219,78 @@ module.exports = function registerVegetation(app, {
     return e ? { date: e.date, gust: e.gust, class: e.class, text: stormText(e) } : null;
   }
 
+  /* ---------- Calibration of the early warning ---------- */
+
+  db.exec('CREATE TABLE IF NOT EXISTS satellite_calibration (id INTEGER PRIMARY KEY CHECK (id = 1), json TEXT NOT NULL, computed_at INTEGER NOT NULL)');
+  const DAMAGE_CLASSES = ['windwurf', 'auflichtung', 'verfaerbung'];
+  const MIN_INTERVAL = 30 * DAY;
+  const hasHidden = db.prepare('PRAGMA table_info(photos)').all().some((c) => c.name === 'hidden_at');
+
+  /**
+   * The ground truth: consecutive visible photos of spots with a satellite
+   * series. Damage = a damage tag new on the later photo, or a region of it
+   * confirmed as windthrow, clearing or discolouration. No damage = neither
+   * a damage tag nor such a region. Damage tags carried over unchanged from
+   * the earlier photo say nothing about the interval and are left out.
+   */
+  function checks() {
+    const tagsOf = db.prepare('SELECT tag FROM photo_tags WHERE photo_id = ?');
+    const confirmed = db.prepare(`SELECT 1 FROM region_labels WHERE photo_id = ? AND class IN (${DAMAGE_CLASSES.map(() => '?').join(',')}) LIMIT 1`);
+    const out = [];
+    for (const { spot_id: spotId } of db.prepare('SELECT spot_id FROM spot_ndvi').all()) {
+      const monthly = sentinel.series(spotId).monthly;
+      if (!monthly.length) continue;
+      const photos = db.prepare(`SELECT id, taken_at FROM photos WHERE spot_id = ? ${hasHidden ? 'AND hidden_at IS NULL' : ''} ORDER BY taken_at, id`).all(spotId);
+      for (let k = 1; k < photos.length; k++) {
+        const a = photos[k - 1];
+        const b = photos[k];
+        if (b.taken_at - a.taken_at < MIN_INTERVAL) continue;
+        const before = new Set(tagsOf.all(a.id).map((r) => r.tag).filter((t) => DAMAGE_TAGS.includes(t)));
+        const after = tagsOf.all(b.id).map((r) => r.tag).filter((t) => DAMAGE_TAGS.includes(t));
+        const newTag = after.some((t) => !before.has(t));
+        const region = Boolean(confirmed.get(b.id, ...DAMAGE_CLASSES));
+        if (after.length && !newTag && !region) continue; // damage seen before already
+        out.push({
+          spotId, fromPhotoId: a.id, toPhotoId: b.id, damage: newTag || region,
+          ndvi: maxDropBetween(monthly, a.taken_at, b.taken_at, 'ndvi'),
+          ndmi: maxDropBetween(monthly, a.taken_at, b.taken_at, 'ndmi'),
+        });
+      }
+    }
+    return out;
+  }
+
+  /** Calibrates on all checks and stores the result. */
+  function recalibrate() {
+    const list = sentinel ? checks() : [];
+    const result = {
+      ...calibrate({
+        ndvi: list.map((c) => ({ drop: c.ndvi, damage: c.damage })),
+        ndmi: list.map((c) => ({ drop: c.ndmi, damage: c.damage })),
+      }),
+      checks: list.length,
+    };
+    db.prepare('INSERT OR REPLACE INTO satellite_calibration (id, json, computed_at) VALUES (1, ?, ?)').run(JSON.stringify(result), now());
+    return { ...result, computedAt: new Date(now()).toISOString() };
+  }
+
+  /** The stored calibration (computed on first use). */
+  function calibration() {
+    const row = db.prepare('SELECT json, computed_at FROM satellite_calibration WHERE id = 1').get();
+    return row ? { ...JSON.parse(row.json), computedAt: new Date(row.computed_at).toISOString() } : recalibrate();
+  }
+
   /** Early warnings of a spot from its cached series: index, since when, how strong, storm, whether to visit. */
-  function alertsOf(spotId, monthly, spot) {
+  function alertsOf(spotId, monthly, spot, cal = calibration()) {
     const last = db.prepare('SELECT MAX(taken_at) AS t FROM photos WHERE spot_id = ?').get(spotId)?.t ?? null;
-    return currentAnomalies(monthly, { now: now() }).map((a) => ({
+    const thresholds = { ndvi: [cal.ndvi.threshold, cal.ndvi.strong], ndmi: [cal.ndmi.threshold, cal.ndmi.strong] };
+    return currentAnomalies(monthly, { now: now(), thresholds }).map((a) => ({
       ...a,
+      // Which threshold raised it, and how well it did on the confirmed checks.
+      calibration: {
+        source: cal[a.index].source, threshold: cal[a.index].threshold, positives: cal[a.index].positives, negatives: cal[a.index].negatives,
+        hits: cal[a.index].at?.tp ?? 0, falseAlarms: cal[a.index].at?.fp ?? 0,
+      },
       lastPhoto: last ? new Date(last).toISOString().slice(0, 10) : null,
       // A photo taken after the drop began would already show it.
       visit: !last || last < monthStart(a.since),
@@ -292,9 +365,13 @@ module.exports = function registerVegetation(app, {
   app.get('/api/satellite/alerts', (req, res) => {
     if (!sentinel) return res.json([]);
     const spots = db.prepare('SELECT s.id, s.lat, s.lon FROM spots s JOIN spot_ndvi n ON n.spot_id = s.id').all();
-    res.json(spots.map((spot) => ({ spotId: spot.id, lat: spot.lat, lon: spot.lon, alerts: alertsOf(spot.id, sentinel.series(spot.id).monthly, spot) }))
+    const cal = calibration();
+    res.json(spots.map((spot) => ({ spotId: spot.id, lat: spot.lat, lon: spot.lon, alerts: alertsOf(spot.id, sentinel.series(spot.id).monthly, spot, cal) }))
       .filter((x) => x.alerts.length));
   });
+
+  app.get('/api/satellite/calibration', (req, res) => res.json(calibration()));
+  app.post('/api/satellite/calibration', (req, res) => res.json(recalibrate()));
 
   /** Refreshes the satellite series of every spot that is due, one after the other. */
   let watching = null;
@@ -308,6 +385,8 @@ module.exports = function registerVegetation(app, {
           await refreshNdvi(id);
           refreshed++;
         }
+        // New series or new photos since the last round: calibrate again.
+        recalibrate();
         return refreshed;
       })().finally(() => { watching = null; });
       background(watching);

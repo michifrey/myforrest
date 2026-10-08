@@ -69,7 +69,9 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/spots/:id/vegetation`  | Grünanteil, Kronendach-Deckung, Lückenanteil und GCC pro Foto (`pending`: noch in Berechnung) |
 | `GET`    | `/api/spots/:id/ndvi`        | NDVI und NDMI pro Monat (Sentinel-2, vor 2017 Landsat; `sensors` pro Monat), Rückgänge zwischen Fotodaten (`drops`, mit `index`, Belegen aus den Fotos und Sturm), Frühwarnungen (`alerts`); `status`: `ready`, `pending` (wird geladen), `offline` |
 | `POST`   | `/api/spots/:id/ndvi`        | Satellitendaten neu laden                                |
-| `GET`    | `/api/satellite/alerts`      | Frühwarnung: Spots, deren letzte Monate gegenüber derselben Jahreszeit der Vorjahre gefallen sind (Index, seit wann, wie stark, Sturm davor, ob ein Besuch lohnt) |
+| `GET`    | `/api/satellite/calibration` | Schwellen der Frühwarnung pro Index: `kalibriert` oder `standard`, Zahl der Kontrollen mit und ohne Schaden, Treffer und Fehlalarme pro Schwelle (`sweep`) |
+| `POST`   | `/api/satellite/calibration` | Sofort neu kalibrieren                                   |
+| `GET`    | `/api/satellite/alerts`      | Frühwarnung: Spots, deren letzte Monate gegenüber derselben Jahreszeit der Vorjahre gefallen sind (Index, seit wann, wie stark, Sturm davor, ob ein Besuch lohnt, `calibration`: verwendete Schwelle) |
 | `GET`    | `/api/photos/:id/regions?to=` | Veränderte Regionen mit entscheidender Quelle (Regel/gelernt), Sicherheit, Nadelholzanteil, vermuteter Art und eigener Bestätigung |
 | `POST`   | `/api/photos/:id/region-labels` | Region bestätigen oder korrigieren (`{ to, index, class }`, `class: null` entfernt die Bestätigung) |
 | `GET`    | `/api/analysis/status`       | Stand des Lernmodells (Beispiele pro Klasse, Genauigkeit) und des Detektors (Bestätigungsquote pro Label) |
