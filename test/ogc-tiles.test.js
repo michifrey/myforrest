@@ -162,7 +162,7 @@ test('OGC API – Tiles: tilesets, TileJSON, MVT tiles for the dataset and per c
     assert.ok(landing.links.some((l) => l.rel === 'http://www.opengis.net/def/rel/ogc/1.0/tilesets-vector'));
     const tmsList = await (await fetch(`${base}/ogc/tileMatrixSets`)).json();
     assert.equal(tmsList.tileMatrixSets[0].id, 'WebMercatorQuad');
-    assert.equal((await fetch(`${base}/ogc/tileMatrixSets/SwissLV95`)).status, 404);
+    assert.equal((await fetch(`${base}/ogc/tileMatrixSets/MarsQuad`)).status, 404);
 
     const list = await (await fetch(`${base}/ogc/tiles`)).json();
     assert.equal(list.tilesets[0].dataType, 'vector');
@@ -171,6 +171,7 @@ test('OGC API – Tiles: tilesets, TileJSON, MVT tiles for the dataset and per c
     assert.deepEqual(ts.vector_layers.map((l) => l.id), ['spread_fronts', 'spots', 'findings']);
     assert.equal(ts.vector_layers[1].fields.photos, 'Number');
     assert.match(ts.tiles[0], /\/ogc\/tiles\/WebMercatorQuad\/\{z\}\/\{y\}\/\{x\}$/);
+    assert.match(ts.links.find((l) => l.rel === 'item').href, /\/WebMercatorQuad\/\{tileMatrix\}\/\{tileRow\}\/\{tileCol\}$/);
     assert.ok(ts.bounds[0] <= 8.54 && ts.bounds[2] >= 8.54 + dLon(80) - 1e-9);
     const z16 = ts.tileMatrixSetLimits.find((l) => l.tileMatrix === '16');
     const t16 = tileOf(47.37, 8.54, 16);
@@ -228,5 +229,69 @@ test('OGC API – Tiles: tilesets, TileJSON, MVT tiles for the dataset and per c
       ['spread_fronts', 'spread_fronts', 'spots', 'spots', 'findings', 'findings']);
     assert.deepEqual(fronts.map((f) => f.properties.recency_class), [4, 2, 0]);
     assert.equal(spot.properties.status, 'schaden');
+  });
+});
+
+test('Swiss LV95 tile grid: swisstopo resolutions, clipping, winding, tiles at the right place', async () => {
+  const lv95 = require('../src/tiles-lv95');
+  const { wgs84ToLv95 } = require('../src/lv95');
+  const tms = lv95.tileMatrixSet();
+  assert.equal(tms.tileMatrices.length, 29);
+  assert.deepEqual(tms.tileMatrices[0].pointOfOrigin, [2420000, 1350000]);
+  assert.deepEqual([tms.tileMatrices[0].cellSize, tms.tileMatrices[28].cellSize], [4000, 0.1]);
+  assert.deepEqual([tms.tileMatrices[0].matrixWidth, tms.tileMatrices[0].matrixHeight], [1, 1]);
+  assert.deepEqual([tms.tileMatrices[20].matrixWidth, tms.tileMatrices[20].matrixHeight], [188, 125]); // 10 m/px
+  assert.deepEqual(lv95.clipRing([[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]], [5, -1, 20, 20]), [[5, 0], [10, 0], [10, 10], [5, 10]]);
+
+  await withServer(async (base, db) => {
+    const spotId = seed(db);
+    const list = await (await fetch(`${base}/ogc/tileMatrixSets`)).json();
+    assert.deepEqual(list.tileMatrixSets.map((t) => t.id), ['WebMercatorQuad', 'SwissLV95']);
+    assert.equal((await (await fetch(`${base}/ogc/tileMatrixSets/SwissLV95`)).json()).crs, 'http://www.opengis.net/def/crs/EPSG/0/2056');
+    const sets = await (await fetch(`${base}/ogc/tiles`)).json();
+    assert.deepEqual(sets.tilesets.map((t) => t.crs), ['http://www.opengis.net/def/crs/EPSG/0/3857', 'http://www.opengis.net/def/crs/EPSG/0/2056']);
+    const ts = await (await fetch(`${base}/ogc/tiles/SwissLV95`)).json();
+    assert.equal(ts.tilejson, undefined, 'TileJSON only for web mercator');
+    assert.equal(ts.vector_layers[0].maxzoom, 28);
+    // GDAL needs a resolvable TMS URI and lists one layer per tileMatrixSetLimits entry.
+    assert.equal(ts.tileMatrixSetURI, `${base}/ogc/tileMatrixSets/SwissLV95`);
+    assert.deepEqual(ts.tileMatrixSetLimits.map((l) => l.tileMatrix), Array.from({ length: 29 }, (_, z) => String(z)));
+    assert.equal(ts.boundingBox.crs, 'http://www.opengis.net/def/crs/EPSG/0/2056');
+    assert.ok(ts.boundingBox.lowerLeft[0] > 2600000 && ts.boundingBox.upperRight[1] < 1350000, 'bounding box in LV95 metres');
+
+    // Zoom 22 = 2.5 m/px, 640 m tiles: the tile containing the spot.
+    const [e, n] = wgs84ToLv95(47.37, 8.54);
+    const col = Math.floor((e - 2420000) / 640);
+    const row = Math.floor((1350000 - n) / 640);
+    const z22 = ts.tileMatrixSetLimits.find((l) => l.tileMatrix === '22');
+    assert.ok(z22.minTileCol <= col && col <= z22.maxTileCol && z22.minTileRow <= row && row <= z22.maxTileRow);
+    const res = await fetch(`${base}/ogc/tiles/SwissLV95/22/${row}/${col}`);
+    assert.equal(res.status, 200);
+    const layers = decodeTile(Buffer.from(await res.arrayBuffer()));
+    const spot = layers.spots.features.find((f) => f.id === spotId);
+    // The point lands where LV95 puts it inside the tile (4096 units over 640 m).
+    const [[px, py]] = spot.geometry[0];
+    assert.ok(Math.abs(px - ((e - 2420000 - col * 640) / 640) * 4096) <= 1 && Math.abs(py - ((1350000 - row * 640 - n) / 640) * 4096) <= 1);
+    // Polygons: exterior rings clockwise on screen (positive area with y down), closed.
+    for (const f of layers.spread_fronts.features) {
+      const ring = f.geometry[0];
+      let a = 0;
+      for (let i = 0; i < ring.length - 1; i++) a += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
+      assert.ok(a > 0, 'exterior ring clockwise');
+      assert.deepEqual(ring[0], ring[ring.length - 1]);
+    }
+    // A tile cut through a front keeps it inside the buffer.
+    const half = await fetch(`${base}/ogc/tiles/SwissLV95/25/${Math.floor((1350000 - n) / 256)}/${Math.floor((e - 2420000) / 256)}`);
+    assert.ok([200, 204].includes(half.status));
+    assert.equal((await fetch(`${base}/ogc/tiles/SwissLV95/0/1/0`)).status, 404, 'zoom 0 has a single tile');
+    assert.equal((await fetch(`${base}/ogc/tiles/SwissLV95/22/0/0`)).status, 204);
+    assert.equal((await fetch(`${base}/ogc/tiles/Mars/1/0/0`)).status, 404);
+    const photos = decodeTile(Buffer.from(await (await fetch(`${base}/ogc/collections/photos/tiles/SwissLV95/22/${row}/${col}`)).arrayBuffer()));
+    assert.deepEqual(Object.keys(photos), ['photos']);
+    // OpenLayers for the LV95 map page.
+    const ol = await fetch(`${base}/vendor/ol/ol.js`);
+    assert.equal(ol.status, 200);
+    assert.equal((await fetch(`${base}/vendor/ol/ol.css`)).status, 200);
+    assert.equal((await fetch(`${base}/vektorkarte-lv95.html`)).status, 200);
   });
 });

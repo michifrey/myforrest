@@ -3,30 +3,65 @@
 /**
  * OGC API – Tiles (Part 1: core, tileset, tilesets-list, dataset and
  * geodata tilesets, Mapbox Vector Tiles) on top of the feature collections
- * of routes/ogc.js:
+ * of routes/ogc.js, in two tile matrix sets:
  *
- *   /ogc/tileMatrixSets[/WebMercatorQuad]          tile matrix set definition
- *   /ogc/tiles[/WebMercatorQuad[/{z}/{y}/{x}]]     whole dataset, one layer per collection
- *   /ogc/collections/{id}/tiles[/WebMercatorQuad[/{z}/{y}/{x}]]   one collection
- *   /ogc/styles/myforrest                          MapLibre style for the dataset tiles
+ *   WebMercatorQuad  web maps (MapLibre, OpenLayers, QGIS XYZ); tilesets double as TileJSON 3.0
+ *   SwissLV95        swisstopo's LV95 grid (EPSG:2056), lines up with map.geo.admin.ch
  *
- * The tileset documents double as TileJSON 3.0 (`tilejson`, `tiles`,
- * `vector_layers`), so MapLibre, OpenLayers and QGIS can use them directly.
+ *   /ogc/tileMatrixSets[/{tms}]                       tile matrix set definitions
+ *   /ogc/tiles[/{tms}[/{z}/{y}/{x}]]                  whole dataset, one layer per collection
+ *   /ogc/collections/{id}/tiles[/{tms}[/{z}/{y}/{x}]] one collection
+ *   /ogc/styles/myforrest                             MapLibre style for the WebMercatorQuad tiles
+ *
  * Empty tiles answer 204 No Content.
  */
 
 const { COLLECTIONS } = require('../geodata');
-const { TMS_ID, TMS_URI, MAX_ZOOM, tileMatrixSet, createIndex, encodeTile, validTile, tileRange } = require('../tiles');
+const mercator = require('../tiles');
+const lv95 = require('../tiles-lv95');
+const { wgs84ToLv95 } = require('../lv95');
 
 const MVT = 'application/vnd.mapbox-vector-tile';
 const TILESETS_REL = 'http://www.opengis.net/def/rel/ogc/1.0/tilesets-vector';
 // Map layers of the dataset tiles; photos are left to their own collection tiles.
 const DATASET_LAYERS = ['spread_fronts', 'spots', 'findings'];
-const ZOOM_RANGE = { min: 0, max: MAX_ZOOM };
 const MVT_TYPE = { INTEGER: 'Number', REAL: 'Number', TEXT: 'String' };
 
 /** Newest fronts first, so older (smaller) outlines are drawn on top of them. */
 const ORDER = { spread_fronts: (a, b) => b.properties.year - a.properties.year };
+
+/** The two tile matrix sets: how to describe them, index features, encode tiles and convert bounds. */
+const TMS = {
+  [mercator.TMS_ID]: {
+    module: mercator,
+    title: 'Google Maps Compatible for the World',
+    crs: 'http://www.opengis.net/def/crs/EPSG/0/3857',
+    range: (bbox, z) => mercator.tileRange(bbox, z),
+    boundingBox: (bbox) => ({ lowerLeft: [bbox[0], bbox[1]], upperRight: [bbox[2], bbox[3]], crs: 'http://www.opengis.net/def/crs/OGC/1.3/CRS84' }),
+    tilejson: true,
+  },
+  [lv95.TMS_ID]: {
+    module: lv95,
+    title: 'Schweizer Landeskoordinaten LV95 (Kachelgitter von swisstopo)',
+    crs: 'http://www.opengis.net/def/crs/EPSG/0/2056',
+    range: (bbox, z) => lv95.tileRange(lv95Bbox(bbox), z),
+    // In LV95, so clients of this grid need no reprojection (the OpenLayers viewer frames the map with it).
+    boundingBox: (bbox) => {
+      const b = lv95Bbox(bbox);
+      return { lowerLeft: [b[0], b[1]], upperRight: [b[2], b[3]], crs: 'http://www.opengis.net/def/crs/EPSG/0/2056' };
+    },
+    tilejson: false,
+  },
+};
+
+/** WGS84 bounds [w, s, e, n] → LV95 bounds [minE, minN, maxE, maxN] over all four corners. */
+function lv95Bbox([w, s, e, n]) {
+  const corners = [[s, w], [s, e], [n, w], [n, e]].map(([lat, lon]) => wgs84ToLv95(lat, lon));
+  return [
+    Math.min(...corners.map((c) => c[0])), Math.min(...corners.map((c) => c[1])),
+    Math.max(...corners.map((c) => c[0])), Math.max(...corners.map((c) => c[1])),
+  ];
+}
 
 function bboxOfFeatures(features) {
   const b = [Infinity, Infinity, -Infinity, -Infinity];
@@ -42,77 +77,95 @@ function bboxOfFeatures(features) {
 
 module.exports = function registerOgcTiles(app, { geodata, baseUrl, link, send, HttpError }) {
   const indexCache = new Map();
-  /** Tile index of a collection, rebuilt when the data changes. */
-  function indexOf(id, base) {
-    const key = `${id}|${base}|${geodata.version()}`;
+  /** Tile index of a collection in a tile matrix set, rebuilt when the data changes. */
+  function indexOf(tmsId, id, base) {
+    const prefix = `${tmsId}|${id}|${base}|`;
+    const key = prefix + geodata.version();
     if (!indexCache.has(key)) {
-      for (const k of indexCache.keys()) if (k.startsWith(`${id}|${base}|`)) indexCache.delete(k);
-      indexCache.set(key, createIndex(geodata.features(id, base), { order: ORDER[id] }));
+      for (const k of indexCache.keys()) if (k.startsWith(prefix)) indexCache.delete(k);
+      indexCache.set(key, TMS[tmsId].module.createIndex(geodata.features(id, base), { order: ORDER[id] }));
     }
     return indexCache.get(key);
   }
 
-  const vectorLayer = (id) => ({
+  const tms = (id) => {
+    if (!TMS[id]) throw new HttpError(404, `Kachelgitter ${id} wird nicht angeboten (möglich: ${Object.keys(TMS).join(', ')})`);
+    return id;
+  };
+
+  const vectorLayer = (id, maxzoom) => ({
     id,
     description: COLLECTIONS[id].title,
-    minzoom: ZOOM_RANGE.min,
-    maxzoom: ZOOM_RANGE.max,
+    minzoom: 0,
+    maxzoom,
     geometry_type: COLLECTIONS[id].geometry === 'POINT' ? 'points' : 'polygons',
     fields: Object.fromEntries(Object.entries(COLLECTIONS[id].fields).map(([k, t]) => [k, MVT_TYPE[t] || 'String'])),
   });
 
-  /** Tileset metadata (OGC API – Tiles) that is also valid TileJSON 3.0. */
-  function tileset(base, layers, path, title) {
+  // Registered grids carry their OGC URI; SwissLV95 is not registered, so its URI is our own definition (resolvable, which GDAL needs).
+  const tmsUri = (base, tmsId) => TMS[tmsId].module.TMS_URI || `${base}/ogc/tileMatrixSets/${tmsId}`;
+
+  /** Tileset metadata (OGC API – Tiles); for WebMercatorQuad also valid TileJSON 3.0. */
+  function tileset(base, tmsId, layers, path, title) {
+    const t = TMS[tmsId];
+    const max = t.module.MAX_ZOOM;
     const bbox = bboxOfFeatures(layers.flatMap((id) => geodata.features(id, base)));
-    const template = `${base}${path}/${TMS_ID}/{z}/{y}/{x}`;
-    return {
+    // OGC API – Tiles names the template variables {tileMatrix}/{tileRow}/{tileCol}; TileJSON uses {z}/{y}/{x}.
+    const template = `${base}${path}/${tmsId}/{tileMatrix}/{tileRow}/{tileCol}`;
+    const out = {
       title,
       dataType: 'vector',
-      crs: 'http://www.opengis.net/def/crs/EPSG/0/3857',
-      tileMatrixSetURI: TMS_URI,
-      tileMatrixSetLimits: [ZOOM_RANGE.min, 8, 12, 16, ZOOM_RANGE.max].filter((z, i, a) => a.indexOf(z) === i).map((z) => {
-        const r = tileRange(bbox, z);
+      crs: t.crs,
+      tileMatrixSetURI: tmsUri(base, tmsId),
+      // Every tile matrix with data; GDAL offers exactly these as layers.
+      tileMatrixSetLimits: Array.from({ length: max + 1 }, (_, z) => {
+        const r = t.range(bbox, z);
         return { tileMatrix: String(z), minTileRow: r.minRow, maxTileRow: r.maxRow, minTileCol: r.minCol, maxTileCol: r.maxCol };
       }),
-      boundingBox: { lowerLeft: [bbox[0], bbox[1]], upperRight: [bbox[2], bbox[3]], crs: 'http://www.opengis.net/def/crs/OGC/1.3/CRS84' },
+      boundingBox: t.boundingBox(bbox),
       layers: layers.map((id) => ({ id, title: COLLECTIONS[id].title, dataType: 'vector', geometryDimension: COLLECTIONS[id].geometry === 'POINT' ? 0 : 2 })),
       links: [
-        link(`${base}${path}/${TMS_ID}`, 'self', 'application/json', title),
-        link(`${base}/ogc/tileMatrixSets/${TMS_ID}`, 'http://www.opengis.net/def/rel/ogc/1.0/tiling-scheme', 'application/json', 'WebMercatorQuad'),
+        link(`${base}${path}/${tmsId}`, 'self', 'application/json', title),
+        link(`${base}/ogc/tileMatrixSets/${tmsId}`, 'http://www.opengis.net/def/rel/ogc/1.0/tiling-scheme', 'application/json', tmsId),
         { href: template, rel: 'item', type: MVT, templated: true, title: 'Kachel (MVT)' },
       ],
+      vector_layers: layers.map((id) => vectorLayer(id, max)),
+    };
+    if (!t.tilejson) return out;
+    return {
+      ...out,
       // TileJSON 3.0
       tilejson: '3.0.0',
       name: title,
       attribution: '© MyForrest-Mitwirkende (Lizenz pro Foto, Standard CC BY-SA 4.0)',
       scheme: 'xyz',
-      tiles: [template],
-      minzoom: ZOOM_RANGE.min,
-      maxzoom: ZOOM_RANGE.max,
+      tiles: [`${base}${path}/${tmsId}/{z}/{y}/{x}`],
+      minzoom: 0,
+      maxzoom: max,
       bounds: bbox,
       center: [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2, 14],
-      vector_layers: layers.map(vectorLayer),
     };
   }
 
   const tilesetsList = (base, path, title) => ({
     links: [link(`${base}${path}`, 'self', 'application/json')],
-    tilesets: [{
-      title,
+    tilesets: Object.entries(TMS).map(([tmsId, t]) => ({
+      title: `${title} (${tmsId})`,
       dataType: 'vector',
-      crs: 'http://www.opengis.net/def/crs/EPSG/0/3857',
-      tileMatrixSetURI: TMS_URI,
+      crs: t.crs,
+      tileMatrixSetURI: tmsUri(base, tmsId),
       links: [
-        link(`${base}${path}/${TMS_ID}`, 'self', 'application/json', `${title} (WebMercatorQuad)`),
-        link(`${base}/ogc/tileMatrixSets/${TMS_ID}`, 'http://www.opengis.net/def/rel/ogc/1.0/tiling-scheme', 'application/json'),
+        link(`${base}${path}/${tmsId}`, 'self', 'application/json', `${title} (${tmsId})`),
+        link(`${base}/ogc/tileMatrixSets/${tmsId}`, 'http://www.opengis.net/def/rel/ogc/1.0/tiling-scheme', 'application/json'),
       ],
-    }],
+    })),
   });
 
-  function sendTile(res, indexes, params) {
+  function sendTile(res, tmsId, indexes, params) {
+    const m = TMS[tmsId].module;
     const [z, y, x] = [params.z, params.y, params.x].map(Number);
-    if (!validTile(z, y, x)) throw new HttpError(404, `Keine Kachel ${params.z}/${params.y}/${params.x} in ${TMS_ID} (Zoom 0–${MAX_ZOOM})`);
-    const pbf = encodeTile(indexes, z, x, y);
+    if (!m.validTile(z, y, x)) throw new HttpError(404, `Keine Kachel ${params.z}/${params.y}/${params.x} in ${tmsId} (Zoom 0–${m.MAX_ZOOM})`);
+    const pbf = m.encodeTile(indexes, z, x, y);
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Cache-Control', 'public, max-age=300');
     if (!pbf) return res.status(204).end();
@@ -124,25 +177,28 @@ module.exports = function registerOgcTiles(app, { geodata, baseUrl, link, send, 
   app.get('/ogc/tileMatrixSets', (req, res) => {
     const base = baseUrl(req);
     res.json({
-      tileMatrixSets: [{
-        id: TMS_ID,
-        title: 'Google Maps Compatible for the World',
-        uri: TMS_URI,
-        links: [link(`${base}/ogc/tileMatrixSets/${TMS_ID}`, 'self', 'application/json')],
-      }],
+      tileMatrixSets: Object.entries(TMS).map(([id, t]) => ({
+        id,
+        title: t.title,
+        ...(t.module.TMS_URI ? { uri: t.module.TMS_URI } : {}),
+        crs: t.crs,
+        links: [link(`${base}/ogc/tileMatrixSets/${id}`, 'self', 'application/json')],
+      })),
     });
   });
-  app.get(`/ogc/tileMatrixSets/${TMS_ID}`, (req, res) => res.json(tileMatrixSet()));
-  app.get('/ogc/tileMatrixSets/:id', (req, res) => res.status(404).json({ code: 'NotFound', description: `Nur ${TMS_ID} wird angeboten` }));
+  app.get('/ogc/tileMatrixSets/:tms', (req, res) => send(res, () => res.json(TMS[tms(req.params.tms)].module.tileMatrixSet())));
 
   /* ---------- Dataset tiles ---------- */
 
   const DATASET_TITLE = 'MyForrest – Ausbreitungsfronten, Spots und Pflanzenfunde';
   app.get('/ogc/tiles', (req, res) => res.json(tilesetsList(baseUrl(req), '/ogc/tiles', DATASET_TITLE)));
-  app.get(`/ogc/tiles/${TMS_ID}`, (req, res) => res.json(tileset(baseUrl(req), DATASET_LAYERS, '/ogc/tiles', DATASET_TITLE)));
-  app.get(`/ogc/tiles/${TMS_ID}/:z/:y/:x`, (req, res) => send(res, () => {
+  app.get('/ogc/tiles/:tms', (req, res) => send(res, () => {
+    res.json(tileset(baseUrl(req), tms(req.params.tms), DATASET_LAYERS, '/ogc/tiles', DATASET_TITLE));
+  }));
+  app.get('/ogc/tiles/:tms/:z/:y/:x', (req, res) => send(res, () => {
+    const tmsId = tms(req.params.tms);
     const base = baseUrl(req);
-    sendTile(res, Object.fromEntries(DATASET_LAYERS.map((id) => [id, indexOf(id, base)])), req.params);
+    sendTile(res, tmsId, Object.fromEntries(DATASET_LAYERS.map((id) => [id, indexOf(tmsId, id, base)])), req.params);
   }));
 
   /* ---------- Collection tiles ---------- */
@@ -155,13 +211,14 @@ module.exports = function registerOgcTiles(app, { geodata, baseUrl, link, send, 
     const id = collection(req.params.id);
     res.json(tilesetsList(baseUrl(req), `/ogc/collections/${id}/tiles`, COLLECTIONS[id].title));
   }));
-  app.get(`/ogc/collections/:id/tiles/${TMS_ID}`, (req, res) => send(res, () => {
+  app.get('/ogc/collections/:id/tiles/:tms', (req, res) => send(res, () => {
     const id = collection(req.params.id);
-    res.json(tileset(baseUrl(req), [id], `/ogc/collections/${id}/tiles`, COLLECTIONS[id].title));
+    res.json(tileset(baseUrl(req), tms(req.params.tms), [id], `/ogc/collections/${id}/tiles`, COLLECTIONS[id].title));
   }));
-  app.get(`/ogc/collections/:id/tiles/${TMS_ID}/:z/:y/:x`, (req, res) => send(res, () => {
+  app.get('/ogc/collections/:id/tiles/:tms/:z/:y/:x', (req, res) => send(res, () => {
     const id = collection(req.params.id);
-    sendTile(res, { [id]: indexOf(id, baseUrl(req)) }, req.params);
+    const tmsId = tms(req.params.tms);
+    sendTile(res, tmsId, { [id]: indexOf(tmsId, id, baseUrl(req)) }, req.params);
   }));
 
   /* ---------- Style ---------- */
@@ -199,7 +256,7 @@ module.exports = function registerOgcTiles(app, { geodata, baseUrl, link, send, 
           maxzoom: 19,
           attribution: '© OpenStreetMap-Mitwirkende',
         },
-        myforrest: { type: 'vector', url: `${base}/ogc/tiles/${TMS_ID}` },
+        myforrest: { type: 'vector', url: `${base}/ogc/tiles/${mercator.TMS_ID}` },
       },
       layers: [
         { id: 'basemap', type: 'raster', source: 'osm', paint: { 'raster-saturation': -0.4, 'raster-opacity': 0.85 } },
