@@ -10,7 +10,9 @@ Einen kürzeren Überblick mit Screenshots gibt das [README](../README.md).
 - [Bildanalyse](#bildanalyse)
 - [Wetter, Klima und Gelände](#wetter-klima-und-gelände)
 - [Kartenmodi](#kartenmodi)
+- [Touren und Fotoaufträge](#touren-und-fotoaufträge)
 - [Pflanzen und Baumarten](#pflanzen-und-baumarten)
+- [Geschützte Funde und PRO-Mitglieder](#geschützte-funde-und-pro-mitglieder)
 - [Konten, Moderation und Lizenzen](#konten-moderation-und-lizenzen)
 
 ## Fotos erfassen und verorten
@@ -593,6 +595,72 @@ Ausgeblendete (moderierte) Fotos erscheinen in keinem Dienst.
    opendata.swiss; die Bedingung muss zur Lizenz der Fotos passen (Standard CC BY-SA 4.0, also mindestens
    Quellenangabe).
 
+## Touren und Fotoaufträge
+
+Der Kartenmodus *Touren & Aufträge* verbindet die eigenen Wege mit den Orten, an denen ein Foto gebraucht
+wird.
+
+### Route zeichnen, aufzeichnen oder importieren
+
+- **Zeichnen**: Jeder Klick auf die Karte setzt einen Wegpunkt; Wegpunkte lassen sich verschieben.
+  *Rückgängig* nimmt den letzten zurück, *Zurück zum Start* schliesst die Runde. Die Länge steht gross im
+  Panel, gelbe Kilometer-Marken zeigen den Verlauf (je nach Zoom alle 1, 2, 5 oder 10 km). Der **Wege-Magnet**
+  (*Magnet: Wegen folgen*, standardmässig an) zieht die Linie zwischen zwei Klicks auf Wege und Pfade, wie bei
+  RunnerMaps. Dafür fragt der Server einen BRouter-Dienst an (Standard `brouter.de`, Profil `hiking-mountain`,
+  anpassbar mit `ROUTER_URL` und `ROUTER_PROFILE`, siehe [Installation](installation.md#umgebungsvariablen));
+  der Browser spricht ihn nie direkt an. Ohne Magnet oder ohne Dienst entstehen gerade Linien.
+- **Aufzeichnen**: Das Handy zeichnet die Strecke per GPS auf (Punkte ab ±40 m Genauigkeit, mindestens 4 m
+  auseinander, mit Zeit und Höhe). Der Bildschirm bleibt dabei an (Wake Lock), denn Browser stoppen GPS
+  für Seiten im Hintergrund. Die Punkte liegen laufend im Browser; nach einem Neuladen lässt sich die
+  Aufzeichnung fortsetzen.
+- **Importieren**: GPX (Tracks, Routen oder Wegpunkte), Garmin TCX, KML (LineString und `gx:Track`) und
+  GeoJSON (LineString, MultiLineString, mit `coordTimes`), bis 14 MB und 20 000 Punkte. FIT-Dateien bitte in
+  Garmin Connect oder Strava als GPX exportieren.
+- **Exportieren**: jede Route als GPX, mit Höhe und Zeit, wo vorhanden.
+
+Die aktuelle Route bleibt im Browser, bis sie gespeichert wird. **Speichern** braucht ein Konto; Touren sind
+privat, bis man sie veröffentlicht. Andere sehen eine öffentliche Tour ohne Zeiten und ohne die ersten und
+letzten 200 m, denn Start und Ziel liegen oft vor der Haustür. *Öffentliche Touren auf der Karte zeigen*
+setzt einen Pin an den Anfang jeder öffentlichen Tour; beim Überfahren erscheint die Strecke, ein Klick lädt
+sie ins Panel.
+
+### Fotos über eine Tour verorten
+
+Fotos ohne GPS (Action-Cam, Kompaktkamera) bekommen ihren Ort aus einer Tour mit Zeitstempeln: Im
+Upload-Dialog steht unter dem GPX-Feld *oder Fotos über eine Tour verorten* mit der aktuellen Route und den
+eigenen gespeicherten Touren. Die Zuordnung ist dieselbe wie beim GPX-Track (Aufnahmezeit, Zeitzone,
+Uhrkorrektur); *Fotos zuordnen* in *Meine Touren* öffnet den Dialog mit der Tour vorausgewählt.
+
+### Fotoaufträge
+
+Ein **Fotoauftrag** bittet um ein Foto von einem Ort: *Neuer Fotoauftrag* im Tab *Aufträge*, dann den Ort
+auf der Karte wählen, beschreiben, was zu sehen sein soll, und optional die Blickrichtung angeben. Im
+Spot-Panel bittet *Neues Foto von diesem Spot anfragen* um ein Wiederholungsfoto in der Blickrichtung des
+Spots. Aufträge erscheinen für alle als gelbe Kamera-Pins auf der Karte, mit einem Kegel in die gewünschte
+Richtung.
+
+Ein Auftrag nennt **keine Zeit und keinen Namen**: Niemand muss sich verabreden oder seinen Weg
+preisgeben. Wer ohnehin vorbeikommt, macht das Foto. Erledigt ist ein Auftrag, sobald ein Foto
+- innerhalb von 40 m (bzw. dem Spot-Radius) entsteht und, wenn beide eine Richtung haben, höchstens 60°
+  davon abweicht,
+- zum angefragten Spot gehört, oder
+- über *Foto dafür hochladen* im Auftrag hochgeladen wird und höchstens 150 m entfernt liegt.
+
+Wer den Auftrag mit Konto erstellt hat, kann ihn zurückziehen; Moderation ebenso. Pro Konto bzw.
+Adresse sind 20 Aufträge pro Stunde möglich.
+
+### Vorschläge entlang der Route
+
+Sobald eine Route steht, listet das Panel unter *Unterwegs fotografieren* in der Reihenfolge der Strecke,
+was in ihrer Nähe (50–500 m, Standard 150 m) einen Halt lohnt, mit Kilometer und Abstand zur Route:
+
+- offene **Fotoaufträge**,
+- Spots mit einer **Satelliten-Frühwarnung** ([Satellitenkontext](#satellitenkontext-sentinel-2-und-landsat)),
+- Spots mit einer Fotoreihe (ab zwei Fotos), die seit über einem Jahr **nicht mehr besucht** wurden.
+
+Die Vorschläge stehen nummeriert auf der Karte. Der Server berechnet sie aus der mitgeschickten Route und
+speichert nichts davon.
+
 ## Pflanzen und Baumarten
 
 ### Pflanzenbestimmung (optional)
@@ -615,6 +683,48 @@ Auffälligkeiten genauer:
 - Verfärbte immergrüne Nadelbäume gelten immer als Warnsignal.
 - Fichte bei Trockenheit oder Hitze löst eine Borkenkäfer-Warnung mit Prüfhinweisen aus.
 - Bei Esche mit Auflichtung oder Verfärbung erscheint ein Hinweis auf das Eschentriebsterben.
+
+## Geschützte Funde und PRO-Mitglieder
+
+Wer eine Orchideenwiese, eine Pilzstelle oder einen Horst veröffentlicht, lockt auch Sammler und
+Neugierige an. Solche **geschützten Funde** sehen deshalb nur **verifizierte PRO-Mitglieder** genau:
+Forstdienste, kantonale Fachstellen, Naturschutzorganisationen und ähnliche.
+
+### Was geschützt ist
+
+Ein Foto wird geschützt,
+- beim Hochladen mit *Geschützter Fund* (Fotos und Videos),
+- automatisch, wenn Pl@ntNet eine sensible Art erkennt (Score ab 0,3): alle einheimischen Orchideen,
+  Enziane, Küchenschellen, Edelweiss, Bärlappe, seltene Farne, Türkenbund und weitere (`src/sensitive.js`,
+  erweiterbar mit `SENSITIVE_SPECIES`). Pilze erkennt Pl@ntNet nicht; Pilzstellen schützt man beim Hochladen,
+- oder nachträglich mit *Schützen* unter dem Foto, durch die Person, die es hochgeladen hat, durch
+  PRO-Mitglieder oder die Moderation. *Schutz aufheben* geht ebenso.
+
+### Wer was sieht
+
+| | Öffentlichkeit | Wer hochgeladen hat | PRO-Mitglieder, Moderation |
+|---|---|---|---|
+| Foto, Spot, genaue Lage | – | ✓ (mit Konto) | ✓ |
+| Karte | schraffiertes 5-km-Quadrat mit Anzahl Funde | Pin mit Schloss | Pin mit Schloss |
+| Arten, Hotspots, Ausbreitung, Export (Darwin Core, iNaturalist) | ohne den Fund | mit | mit |
+| Offene Geodaten (OGC API, Vektorkacheln, GeoPackage, PMTiles) | ohne den Fund | ohne | ohne |
+| Fotoaufträge an geschützten Spots, Vorschläge entlang der Route | – | ✓ | ✓ |
+
+Das Raster ist fest (0,045° × 0,065°, rund 5 × 5 km) und verschiebt sich nicht mit den Daten. Ein Spot
+mit öffentlichen und geschützten Fotos bleibt sichtbar, zeigt öffentlich aber nur die öffentlichen Fotos,
+deren Tags und Veränderungen. Originale und Vorschaubilder geschützter Fotos gehen nur an Berechtigte und
+mit `Cache-Control: private, no-store`, ebenso alle API-Antworten an PRO-Mitglieder; der Service Worker
+speichert solche Antworten nicht auf dem Gerät. Push-Nachrichten der Frühwarnung erreichen nur Konten, die
+den Spot noch sehen dürfen. Ohne Konto hochgeladene geschützte Fotos sieht danach auch die Person nicht
+mehr, die sie hochgeladen hat.
+
+### PRO-Mitglied werden
+
+Im Konto-Menü *PRO-Mitgliedschaft beantragen*: Organisation und Angaben für die Prüfung. Admins sehen offene
+Anträge zuoberst unter *Konten & Rollen* und können sie verifizieren, ablehnen oder PRO später entziehen;
+jede Entscheidung steht im Moderationsprotokoll. PRO ist unabhängig von der Rolle (Mitglied, Moderation,
+Administration). PRO-Mitglieder können Fotoaufträge als *nur für PRO* markieren; Aufträge an geschützten
+Spots sind das automatisch.
 
 ## Konten, Moderation und Lizenzen
 

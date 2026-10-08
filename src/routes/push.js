@@ -130,6 +130,16 @@ module.exports = function registerPush(app, {
     return new Map(rows.map((r) => [r.user, r.days]));
   }
 
+  /** May the account still see the spot (protected finds: PRO, moderation, own photos only)? */
+  const hasProtection = () => db.prepare('PRAGMA table_info(photos)').all().some((c) => c.name === 'protected');
+  function seesSpot(userId, spotId) {
+    if (!hasProtection()) return true;
+    const u = db.prepare('SELECT role, pro_status FROM users WHERE id = ?').get(userId);
+    if (u && (u.role === 'moderator' || u.role === 'admin' || u.pro_status === 'verifiziert')) return true;
+    return Boolean(db.prepare(`SELECT 1 FROM photos WHERE spot_id = ? AND hidden_at IS NULL
+      AND (protected = 0 OR uploader_id = ?) LIMIT 1`).get(spotId, userId));
+  }
+
   /** Accounts that get warnings for a spot, with why: Map userId → 'regelmaessig' | 'folgen'. */
   function recipients(spotId) {
     const out = new Map();
@@ -138,6 +148,8 @@ module.exports = function registerPush(app, {
       if (r.mode === 'stumm') out.delete(r.user_id);
       else out.set(r.user_id, 'folgen');
     }
+    // Followers of a spot that has since been protected learn nothing more about it.
+    for (const user of [...out.keys()]) if (!seesSpot(user, spotId)) out.delete(user);
     return out;
   }
 

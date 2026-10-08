@@ -67,8 +67,21 @@ function parseLicense(value) {
  * Moderators see everything. The alias is a fixed identifier from our own
  * code, never user input.
  */
-function visibleSql(showHidden, alias = 'p') {
-  return showHidden ? '1 = 1' : `${alias}.hidden_at IS NULL`;
+/**
+ * SQL condition for the photo rows (alias `p`) a viewer may see. `view` is
+ * `{ hidden, protected, userId }`: moderators see hidden photos, verified PRO
+ * members and moderators protected ones, and everyone their own protected
+ * uploads. `true`/`false` stand for "everything" and "the public".
+ */
+function visibleSql(view, alias = 'p') {
+  const v = typeof view === 'object' && view !== null ? view : { hidden: Boolean(view), protected: Boolean(view) };
+  const conds = [];
+  if (!v.hidden) conds.push(`${alias}.hidden_at IS NULL`);
+  if (!v.protected) {
+    const own = Number.isSafeInteger(v.userId) ? ` OR ${alias}.uploader_id = ${v.userId}` : '';
+    conds.push(`(COALESCE(${alias}.protected, 0) = 0${own})`);
+  }
+  return conds.length ? conds.join(' AND ') : '1 = 1';
 }
 
 function createModeration(db) {

@@ -203,7 +203,7 @@ function renderMarkers() {
     const anchor = pinAnchor(s, size);
     const icon = L.divIcon({
       className: 'pin-icon',
-      html: `<div class="pin ${pinKind(s)}${state.spot?.id === s.id ? ' active' : ''}"><b>${s.photoCount}</b>${s.irregularities.length ? '<i class="flag">!</i>' : ''}${s.storm ? `<i class="storm-flag" title="Sturm">${WIND_ICON}</i>` : ''}${s.satellite ? `<i class="sat-flag" title="Satellit: Rückgang">${SAT_ICON}</i>` : ''}</div>`,
+      html: `<div class="pin ${pinKind(s)}${state.spot?.id === s.id ? ' active' : ''}"><b>${s.photoCount}</b>${s.irregularities.length ? '<i class="flag">!</i>' : ''}${s.storm ? `<i class="storm-flag" title="Sturm">${WIND_ICON}</i>` : ''}${s.satellite ? `<i class="sat-flag" title="Satellit: Rückgang">${SAT_ICON}</i>` : ''}${s.protectedPhotos ? `<i class="lock-flag" title="Geschützter Fund">${LOCK_ICON}</i>` : ''}</div>`,
       iconSize: [size, size],
       iconAnchor: anchor,
       tooltipAnchor: [size / 2 - anchor[0], -size * 1.1 + (size * 1.2 - anchor[1])],
@@ -216,6 +216,7 @@ function renderMarkers() {
       ...(s.satellite?.alerts || []).map((a) => `Satellit: ${a.index.toUpperCase()} seit ${MONTHS[Number(a.since.slice(5, 7)) - 1]} ${a.since.slice(0, 4)} um ${a.drop.toFixed(2)} tiefer als in den Vorjahren${a.visit ? ' – neues Foto lohnt sich' : ''}`),
       s.species.length ? `Baumarten: ${s.species.join(', ')}` : '',
       hasHeading(s) ? headingText(s.heading) : '',
+      s.protectedPhotos ? `Geschützter Fund: ${s.protectedPhotos === s.photoCount ? 'nur' : `${s.protectedPhotos} Fotos`} für verifizierte PRO-Mitglieder sichtbar` : '',
     ].filter(Boolean);
     const tip = el('div', {}, [
       el('img', { class: 'tip-thumb', src: s.latestThumbUrl || s.latestUrl, alt: '' }),
@@ -227,6 +228,21 @@ function renderMarkers() {
     if (hasHeading(s)) state.markers.addLayer(coneMarker(s));
     state.markers.addLayer(m);
     pins.set(s.id, m);
+  }
+}
+
+/* ---------- Protected finds: a coarse grid for everyone who may not see them ---------- */
+
+const protectedLayer = L.layerGroup().addTo(map);
+async function loadProtectedCells() {
+  let cells = [];
+  try { cells = await api('/api/protected/cells'); } catch { /* older server */ }
+  protectedLayer.clearLayers();
+  for (const c of cells) {
+    const [w, s, e, n] = c.bbox;
+    L.rectangle([[s, w], [n, e]], { className: 'protected-cell', weight: 1.5, interactive: true })
+      .bindTooltip(`${c.spots} geschützte${c.spots === 1 ? 'r Fund' : ' Funde'} in diesem 5-km-Quadrat. Die genaue Lage sehen nur verifizierte PRO-Mitglieder (z. B. Forstdienst, Naturschutzorganisationen), damit seltene Pflanzen und Pilzstellen geschont werden.`, { sticky: true, className: 'protected-tip' })
+      .addTo(protectedLayer);
   }
 }
 
@@ -254,6 +270,7 @@ async function loadSpots({ fit = false } = {}) {
       : spots;
   renderMarkers();
   renderStats(!filter);
+  loadProtectedCells();
   if (fit && state.spots.length) {
     // Keep spots clear of the floating toolbar and (on wide screens) the side panel.
     const wide = window.matchMedia('(min-width: 861px)').matches;
@@ -1001,6 +1018,7 @@ form.addEventListener('submit', async (e) => {
   const created = [];
   const skipped = [];
   const touched = new Set();
+  const requestsDone = new Set();
   let queued = 0;
   const BATCH = 10;
   try {
@@ -1017,12 +1035,15 @@ form.addEventListener('submit', async (e) => {
       for (const name of ['activity', 'note', 'utcOffsetMinutes', 'clockShiftSeconds', 'license']) fd.append(name, form[name].value);
       const tags = [...$('upload-tags').querySelectorAll('input:checked')].map((c) => c.value);
       fd.append('tags', tags.join(','));
+      if (form.protected?.checked) fd.append('protected', '1');
+      if (window.Tours) await Tours.decorateUpload(fd);
 
       const res = await postPhotos(fd);
       queued += res.queued || 0;
       created.push(...res.created);
       skipped.push(...res.skipped);
       res.spots.forEach((s) => touched.add(s));
+      (res.requestsDone || []).forEach((r) => requestsDone.add(r));
     }
   } catch (err) {
     skipped.push({ name: 'Upload', reason: err.message });
@@ -1033,14 +1054,20 @@ form.addEventListener('submit', async (e) => {
 
   const result = [el('p', { text: `${created.length} Foto${created.length === 1 ? '' : 's'} gespeichert, ${touched.size} Spot${touched.size === 1 ? '' : 's'} aktualisiert.` })];
   if (queued) result.push(el('p', { class: 'queued', text: `${queued} Foto${queued === 1 ? ' wartet' : 's warten'} auf Verbindung und ${queued === 1 ? 'wird' : 'werden'} automatisch gesendet.` }));
+  const doneText = window.Tours?.afterUpload([...requestsDone]);
+  if (doneText) result.push(el('p', { class: 'queued', text: doneText }));
   if (skipped.length) {
     result.push(el('ul', { class: 'err' }, skipped.map((s) => el('li', { text: `${s.name}: ${s.reason}` }))));
   }
   $('upload-result').replaceChildren(...result);
   await loadSpots({ fit: created.length > 0 && !state.spot });
   if (created.length) {
-    await openSpot(created[created.length - 1].spotId, created[created.length - 1].id);
-    $('explore').scrollIntoView({ behavior: 'smooth' });
+    try {
+      await openSpot(created[created.length - 1].spotId, created[created.length - 1].id);
+      $('explore').scrollIntoView({ behavior: 'smooth' });
+    } catch {
+      // A protected photo uploaded without an account is not visible to its uploader.
+    }
   }
 });
 
@@ -1287,6 +1314,7 @@ $('rephoto-file').addEventListener('change', async (e) => {
 
 // A small satellite: body in the middle, two solar panels across the diagonal, a signal arc.
 const SAT_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><g transform="rotate(-45 8 8)" fill="currentColor"><rect x="6.2" y="6.2" width="3.6" height="3.6" rx="0.6"/><rect x="0.4" y="5" width="3.6" height="6" rx="0.6"/><rect x="12" y="5" width="3.6" height="6" rx="0.6"/><path d="M4 8h2.2M9.8 8H12" stroke="currentColor" stroke-width="1.2"/></g><path d="M10.6 13.6a3.2 3.2 0 0 0 3-3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
+const LOCK_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7.5" rx="1.5" fill="currentColor"/><path d="M5.2 7V5a2.8 2.8 0 0 1 5.6 0v2" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>';
 const WIND_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 5.5h8.5a2 2 0 1 0-2-2M1 8.5h12a2 2 0 1 1-2 2M1 11.5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const fmtTemp = (v) => `${v.toFixed(1).replace('-', '−')} °C`;
 

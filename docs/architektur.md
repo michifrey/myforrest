@@ -68,12 +68,18 @@ src/routes/ogc-tiles.js  OGC API – Tiles (WebMercatorQuad und SwissLV95) und M
 src/auth.js          Konten, Passwort-Hashing (scrypt), Sitzungen, Rate-Limit
 src/moderation.js    Lizenzen, Meldungen, Ausblenden und Protokoll
 src/routes/accounts.js  Routen für Konten und Moderation, CSRF-Schutz, Rechte auf Fotos
+src/trackfile.js     Touren lesen (GPX, TCX, KML, GeoJSON) und als GPX schreiben
+src/routegeo.js      Länge, Abstand zur Route und Position entlang der Route, Privatzone an den Enden
+src/sensitive.js     Sensible Arten (Orchideen, geschützte Pflanzen), deren Funde automatisch geschützt werden
+src/routes/protection.js  Geschützte Funde als 5-km-Raster für alle ohne PRO-Status
+src/routes/tracks.js Touren, Routing-Proxy, Fotoaufträge (Erfüllung beim Upload) und Vorschläge entlang der Route
 deploy/qgis-server/  Vorlage: MyForrest + QGIS Server (WMS/WMTS/WFS) + nginx per Docker Compose
 Dockerfile           Container für MyForrest (mit ffmpeg)
 docs/                Dokumentation; docs/screenshots/ enthält die Bilder für das README
 public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet die Waldszene,
                      sun.js berechnet Sonnenstand und Einstrahlung, sunmap.js den Kartenmodus „Sonne & Wetter“,
                      hotspots.js den Kartenmodus „Arten & Neophyten“,
+                     tours.js den Kartenmodus „Touren & Aufträge“ (Route zeichnen, aufzeichnen, importieren, Fotoaufträge),
                      video.js den Video-Upload und die 360°-Ansicht,
                      vegetation.js die Diagramme zu Vegetationsdichte und NDVI,
                      account.js Konto-Menü, Lizenz, Melden und Moderation;

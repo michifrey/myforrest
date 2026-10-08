@@ -19,7 +19,7 @@
 
 importScripts('offline-queue.js');
 
-const SHELL_VERSION = 'v6';
+const SHELL_VERSION = 'v8';
 const DATA_VERSION = 'v1';
 const CACHE = {
   shell: `myforrest-shell-${SHELL_VERSION}`,
@@ -44,6 +44,7 @@ const PRECACHE = [
   'sun.js',
   'sunmap.js',
   'hotspots.js',
+  'tours.js',
   'video.js',
   'video.css',
   'vegetation.js',
@@ -112,6 +113,8 @@ async function trim(cache, max) {
 }
 
 async function store(cacheName, request, response, max) {
+  // Protected finds and everything PRO members see are sent with no-store: never kept on the device.
+  if (/no-store/i.test(response.headers.get('Cache-Control') || '')) return;
   const cache = await caches.open(cacheName);
   await cache.put(request, response);
   if (max) await trim(cache, max);

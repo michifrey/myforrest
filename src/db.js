@@ -130,6 +130,9 @@ const MIGRATIONS = [
   ['photos', 'license', "TEXT NOT NULL DEFAULT 'cc-by-sa-4.0'"], // key of LICENSES in src/moderation.js
   ['photos', 'hidden_at', 'INTEGER'], // set when a moderator hides the photo
   ['photos', 'hidden_reason', 'TEXT'],
+  // Protection of sensitive finds (rare plants, fungi): only verified PRO members see them exactly.
+  ['photos', 'protected', 'INTEGER NOT NULL DEFAULT 0'],
+  ['photos', 'protected_reason', 'TEXT'], // 'upload' | 'art' | 'pro' | 'moderation'
 ];
 
 function openDb(file) {

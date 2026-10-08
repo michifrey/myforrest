@@ -58,8 +58,10 @@ const monthStart = (ym) => Date.parse(`${ym}-01T00:00:00Z`);
 module.exports = function registerVegetation(app, {
   db, uploadDir, background, fetchImpl = fetch, stacUrl = process.env.SENTINEL_STAC_URL ?? STAC_URL,
   landsatStacUrl = process.env.LANDSAT_STAC_URL ?? LANDSAT_STAC_URL, landsatTokenUrl = process.env.LANDSAT_TOKEN_URL,
-  watchHours = Number(process.env.SATELLITE_WATCH_HOURS ?? 24), now = () => Date.now(), push = null,
+  watchHours = Number(process.env.SATELLITE_WATCH_HOURS ?? 24), now = () => Date.now(), push = null, accounts = null,
 }) {
+  // Photo rows the request may see (hidden and protected ones only for those allowed); public without accounts.
+  const visibleTo = (req) => (accounts && req ? accounts.visibleSql(req, 'p') : "p.hidden_at IS NULL AND COALESCE(p.protected, 0) = 0");
   db.exec(SCHEMA);
   const landsat = stacUrl && landsatStacUrl
     ? createLandsat({ fetchImpl, stacUrl: landsatStacUrl, ...(landsatTokenUrl ? { tokenUrl: landsatTokenUrl } : {}), now })
@@ -173,7 +175,7 @@ module.exports = function registerVegetation(app, {
     if (id === null) return;
     const pending = staleIds(id);
     if (pending.length) backfill(id, pending);
-    const photos = db.prepare('SELECT id, taken_at FROM photos WHERE spot_id = ? ORDER BY taken_at, id').all(id);
+    const photos = db.prepare(`SELECT id, taken_at FROM photos p WHERE spot_id = ? AND ${visibleTo(req)} ORDER BY taken_at, id`).all(id);
     const pendingSet = new Set(pending);
     res.json({
       pending: pending.length,
@@ -337,8 +339,8 @@ module.exports = function registerVegetation(app, {
     }));
   }
 
-  const ndviJson = (id) => {
-    const photos = db.prepare('SELECT id, taken_at FROM photos WHERE spot_id = ? ORDER BY taken_at, id').all(id)
+  const ndviJson = (id, req = null) => {
+    const photos = db.prepare(`SELECT id, taken_at FROM photos p WHERE spot_id = ? AND ${visibleTo(req)} ORDER BY taken_at, id`).all(id)
       .map((p) => ({ id: p.id, takenAt: new Date(p.taken_at).toISOString() }));
     if (!sentinel) return { status: 'disabled', monthly: [], drops: [], alerts: [], photos };
     const spot = db.prepare('SELECT lat, lon FROM spots WHERE id = ?').get(id);
@@ -387,17 +389,17 @@ module.exports = function registerVegetation(app, {
     const id = idParam(req, res);
     if (id === null) return;
     if (sentinel && sentinel.needsRefresh(id)) refreshNdvi(id);
-    res.json(ndviJson(id));
+    res.json(ndviJson(id, req));
   });
 
   app.post('/api/spots/:id/ndvi', async (req, res, next) => {
     const id = idParam(req, res);
     if (id === null) return;
-    if (!sentinel) return res.json(ndviJson(id));
+    if (!sentinel) return res.json(ndviJson(id, req));
     try {
       db.prepare('UPDATE spot_ndvi SET fetched_at = NULL WHERE spot_id = ?').run(id);
       await refreshNdvi(id);
-      res.json(ndviJson(id));
+      res.json(ndviJson(id, req));
     } catch (err) {
       next(err);
     }
@@ -405,16 +407,17 @@ module.exports = function registerVegetation(app, {
 
   /* ---------- Early warning for all spots ---------- */
 
-  /** Spots with current early warnings: [{ spotId, lat, lon, alerts }]. */
-  function allAlerts() {
+  /** Early warnings of the spots `req` may see (all spots without a request). */
+  function allAlerts(req = null) {
     if (!sentinel) return [];
-    const spots = db.prepare('SELECT s.id, s.lat, s.lon FROM spots s JOIN spot_ndvi n ON n.spot_id = s.id').all();
+    const visible = accounts && req ? accounts.visibleSpotIds(req) : null;
+    const spots = db.prepare('SELECT s.id, s.lat, s.lon FROM spots s JOIN spot_ndvi n ON n.spot_id = s.id').all()
+      .filter((s) => !visible || visible.has(s.id));
     const cal = calibration();
     return spots.map((spot) => ({ spotId: spot.id, lat: spot.lat, lon: spot.lon, alerts: alertsOf(spot.id, sentinel.series(spot.id).monthly, spot, cal) }))
       .filter((x) => x.alerts.length);
   }
-
-  app.get('/api/satellite/alerts', (req, res) => res.json(allAlerts()));
+  app.get('/api/satellite/alerts', (req, res) => res.json(allAlerts(req)));
 
   app.get('/api/satellite/calibration', (req, res) => res.json(calibration()));
   app.get('/api/satellite/harmonization', (req, res) => res.json(sentinel ? sentinel.harmonization() : {}));
@@ -451,5 +454,5 @@ module.exports = function registerVegetation(app, {
     setInterval(watchOnce, watchHours * 3600000).unref?.();
   }
 
-  return { analyzePhoto, backfill };
+  return { analyzePhoto, backfill, alerts: allAlerts };
 };

@@ -33,7 +33,13 @@ window.Account = Account;
 
 const isMod = () => Account.user && (Account.user.role === 'moderator' || Account.user.role === 'admin');
 const ROLE_LABEL = { user: 'Mitglied', moderator: 'Moderation', admin: 'Administration' };
-const ACTION_LABEL = { hide: 'ausgeblendet', unhide: 'wieder eingeblendet', dismiss: 'Meldungen verworfen', delete: 'gelöscht', role: 'Rolle geändert' };
+const ACTION_LABEL = {
+  hide: 'ausgeblendet', unhide: 'wieder eingeblendet', dismiss: 'Meldungen verworfen', delete: 'gelöscht', role: 'Rolle geändert',
+  protect: 'geschützt', unprotect: 'Schutz aufgehoben', 'pro-verifiziert': 'PRO verifiziert', 'pro-abgelehnt': 'PRO abgelehnt', 'pro-entzogen': 'PRO entzogen',
+};
+const PROTECT_REASON = { upload: 'beim Hochladen geschützt', art: 'automatisch: seltene oder geschützte Art', pro: 'von einem PRO-Mitglied geschützt', moderation: 'von der Moderation geschützt' };
+/** Verified PRO members and moderation see protected finds exactly. */
+const seesProtected = () => Boolean(Account.user && (Account.user.pro || isMod()));
 const licenseById = (id) => Account.licenses.find((l) => l.id === id);
 
 const jsonPost = (url, body, method = 'POST') => api(url, {
@@ -76,7 +82,8 @@ function renderNav() {
   );
   const item = (text, onclick, extra = {}) => el('button', { type: 'button', role: 'menuitem', class: 'menu-item', onclick, ...extra }, text);
   menu.replaceChildren(
-    el('div', { class: 'menu-who' }, [el('strong', { text: u.name }), el('span', { class: 'muted small', text: `${u.email} · ${ROLE_LABEL[u.role]}` })]),
+    el('div', { class: 'menu-who' }, [el('strong', { text: u.name }), el('span', { class: 'muted small', text: `${u.email} · ${ROLE_LABEL[u.role]}${u.pro ? ` · PRO (${u.organization})` : ''}` })]),
+    item(u.pro ? 'PRO-Mitgliedschaft' : u.proStatus === 'angefragt' ? 'PRO: Antrag in Prüfung' : 'PRO-Mitgliedschaft beantragen', openPro),
     ...(isMod() ? [item('Moderation', () => openModeration('reported'))] : []),
     ...(u.role === 'admin' ? [item('Konten & Rollen', () => openModeration('users'))] : []),
     item('Abmelden', logout, { class: 'menu-item danger' }),
@@ -276,6 +283,21 @@ Account.photoShown = (p) => {
     parts[1] = el('label', { class: 'credit-lic' }, ['Lizenz: ', sel]);
   }
   const actions = el('span', { class: 'credit-actions' });
+  if (own || seesProtected()) {
+    actions.append(el('button', {
+      type: 'button', class: 'link small', text: p.protected ? 'Schutz aufheben' : 'Schützen',
+      title: p.protected ? 'Foto und Ort wieder für alle sichtbar machen' : 'Genaue Lage nur noch für verifizierte PRO-Mitglieder',
+      onclick: async () => {
+        if (p.protected && !confirm('Schutz aufheben? Foto und genaue Lage werden für alle sichtbar.')) return;
+        try {
+          await jsonPost(`/api/photos/${p.id}`, { protected: !p.protected }, 'PATCH');
+          await refreshViews();
+        } catch (err) {
+          alert(err.message);
+        }
+      },
+    }));
+  }
   if (!own) actions.append(el('button', { type: 'button', class: 'link small', onclick: () => openReport(p), text: 'Melden' }));
   if (isMod()) {
     actions.append(p.hidden
@@ -286,6 +308,9 @@ Account.photoShown = (p) => {
   credit.replaceChildren(...parts);
   if (p.hidden) {
     credit.prepend(el('span', { class: 'hidden-badge', text: p.hiddenReason ? `Ausgeblendet: ${p.hiddenReason}` : 'Ausgeblendet' }));
+  }
+  if (p.protected) {
+    credit.prepend(el('span', { class: 'protected-badge', text: `Geschützter Fund – nur für verifizierte PRO-Mitglieder sichtbar${p.protectedReason ? ` (${PROTECT_REASON[p.protectedReason] || p.protectedReason})` : ''}` }));
   }
   credit.classList.toggle('is-hidden', Boolean(p.hidden));
 
@@ -436,9 +461,32 @@ function renderLog(entries) {
     : el('p', { class: 'muted', text: 'Noch keine Einträge.' }));
 }
 
+const PRO_LABEL = { angefragt: 'beantragt', verifiziert: 'verifiziert', abgelehnt: 'abgelehnt' };
+function proCell(u) {
+  const decide = (decision, text, cls = 'link small') => el('button', {
+    type: 'button', class: cls, text,
+    onclick: async () => {
+      if (decision !== 'verifiziert' && !confirm(`${text}: ${u.name}?`)) return;
+      try {
+        await jsonPost(`/api/users/${u.id}/pro`, { decision });
+        showModTab('users');
+      } catch (err) {
+        alert(err.message);
+      }
+    },
+  });
+  const parts = [el('span', { text: u.proStatus ? `${PRO_LABEL[u.proStatus]}${u.organization ? ` · ${u.organization}` : ''}` : '–' })];
+  if (u.proNote) parts.push(el('span', { class: 'muted small', text: u.proNote }));
+  if (u.proStatus === 'angefragt') parts.push(el('span', { class: 'pro-actions' }, [decide('verifiziert', 'Verifizieren', 'secondary'), decide('abgelehnt', 'Ablehnen')]));
+  if (u.proStatus === 'verifiziert') parts.push(decide('entzogen', 'PRO entziehen', 'link small danger'));
+  return el('td', { class: 'pro-cell' }, parts);
+}
+
 function renderUsers(users) {
+  // Open PRO applications first.
+  users = [...users].sort((a, b) => (b.proStatus === 'angefragt') - (a.proStatus === 'angefragt') || a.id - b.id);
   $('mod-body').replaceChildren(el('table', { class: 'mod-users' }, [
-    el('thead', {}, el('tr', {}, ['Name', 'E-Mail', 'Fotos', 'Rolle'].map((h) => el('th', { text: h })))),
+    el('thead', {}, el('tr', {}, ['Name', 'E-Mail', 'Fotos', 'Rolle', 'PRO'].map((h) => el('th', { text: h })))),
     el('tbody', {}, users.map((u) => {
       const sel = el('select', { 'aria-label': `Rolle von ${u.name}` },
         Object.entries(ROLE_LABEL).map(([k, label]) => el('option', { value: k, text: label })));
@@ -452,7 +500,7 @@ function renderUsers(users) {
           sel.value = u.role;
         }
       });
-      return el('tr', {}, [el('td', { text: u.name }), el('td', { text: u.email }), el('td', { text: String(u.photos) }), el('td', {}, sel)]);
+      return el('tr', {}, [el('td', { text: u.name }), el('td', { text: u.email }), el('td', { text: String(u.photos) }), el('td', {}, sel), proCell(u)]);
     })),
   ]));
 }
@@ -481,6 +529,55 @@ async function deletePhoto(p) {
     alert(err.message);
   }
 }
+
+/* ---------- PRO membership ---------- */
+
+const proDialog = el('dialog', { id: 'pro-dialog', 'aria-labelledby': 'pro-title' });
+document.body.append(proDialog);
+function openPro() {
+  const u = Account.user;
+  const close = el('button', { type: 'button', class: 'link', text: 'Schliessen', onclick: () => proDialog.close() });
+  const intro = el('p', { class: 'muted', text: 'PRO-Mitglieder sind verifizierte Fachleute und Organisationen, etwa Forstdienste, kantonale Fachstellen oder Naturschutzorganisationen. Sie sehen geschützte Funde (seltene Pflanzen, Pilzstellen, Horste) mit genauer Lage. Alle anderen sehen davon nur ein 5-km-Raster, damit solche Orte nicht geplündert oder zertrampelt werden.' });
+  const body = [el('p', { class: 'eyebrow', text: 'PRO-Mitgliedschaft' }), el('h2', { id: 'pro-title', text: u.pro ? `PRO · ${u.organization}` : 'Geschützte Funde sehen' }), intro];
+  if (u.pro) {
+    body.push(el('p', { text: 'Dein Konto ist verifiziert. Du siehst geschützte Funde und kannst Fotos schützen oder den Schutz aufheben.' }), el('div', { class: 'actions' }, close));
+  } else {
+    const msg = el('p', { class: 'auth-error', role: 'alert', hidden: '' });
+    const status = u.proStatus === 'angefragt' ? 'Dein Antrag wird geprüft. Du kannst ihn hier ergänzen.'
+      : u.proStatus === 'abgelehnt' ? 'Dein letzter Antrag wurde abgelehnt. Du kannst einen neuen stellen.' : '';
+    const org = el('input', { id: 'pro-org', required: '', maxlength: '160', placeholder: 'z. B. Forstrevier Adlisberg, WWF Zürich', value: u.organizationRequested || '' });
+    const note = el('textarea', { id: 'pro-note', rows: '3', maxlength: '1000', placeholder: 'Funktion, Kontakt für die Prüfung, Website der Organisation' });
+    const form = el('form', { method: 'dialog', class: 'pro-form' }, [
+      ...(status ? [el('p', { class: 'small', text: status })] : []),
+      el('label', { for: 'pro-org', text: 'Organisation' }), org,
+      el('label', { for: 'pro-note', text: 'Angaben für die Prüfung' }), note,
+      msg,
+      el('div', { class: 'actions' }, [close, el('button', { type: 'submit', class: 'btn primary', text: 'Antrag senden' })]),
+    ]);
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const me = await jsonPost('/api/auth/pro', { organization: org.value, note: note.value });
+        Account.user = { ...Account.user, ...me };
+        renderNav();
+        proDialog.close();
+        alert('Danke! Eine Administratorin oder ein Administrator prüft den Antrag.');
+      } catch (err) {
+        msg.textContent = err.message;
+        msg.hidden = false;
+      }
+    });
+    body.push(form);
+  }
+  proDialog.replaceChildren(...body);
+  proDialog.showModal();
+}
+
+// Upload: without an account, a protected photo is invisible afterwards even to its uploader.
+$('upload-protected')?.addEventListener('change', (e) => {
+  $('upload-protected-hint').textContent = e.target.checked && !Account.user
+    ? 'Ohne Konto siehst du das Foto danach selbst nicht mehr – melde dich an, um deine geschützten Funde zu behalten.' : '';
+});
 
 /* ---------- Init ---------- */
 
