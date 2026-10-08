@@ -15,6 +15,8 @@ const os = require('node:os');
 const { createGeodata, COLLECTIONS, CRS84, LV95, toLv95, bboxOf } = require('../geodata');
 const { writeGeoPackage } = require('../gpkg');
 const { lv95ToWgs84 } = require('../lv95');
+const { metadataRecord } = require('../metadata');
+const { LICENSES, DEFAULT_LICENSE } = require('../moderation');
 
 const CRS_LIST = [CRS84, LV95];
 const CONFORMANCE = [
@@ -68,8 +70,22 @@ function featureTime(f, id) {
   return [t, t];
 }
 
+/** Contact and catalogue settings of the metadata record (docs/installation.md). */
+function metadataFromEnv(env = process.env) {
+  return {
+    organisation: env.METADATA_ORGANISATION || 'MyForrest',
+    email: env.METADATA_EMAIL || env.ADMIN_EMAIL || null,
+    city: env.METADATA_CITY || null,
+    country: env.METADATA_COUNTRY || 'CH',
+    url: env.METADATA_URL || null,
+    uuid: env.METADATA_UUID || null,
+    owsUrl: env.METADATA_OWS_URL || null,
+    opendataTerms: env.METADATA_OPENDATA_TERMS || null,
+  };
+}
+
 module.exports = function registerOgc(app, {
-  db, spotRadiusM, publicUrl = process.env.PUBLIC_URL, dataDir, background, tiles: tileOptions = {},
+  db, spotRadiusM, publicUrl = process.env.PUBLIC_URL, dataDir, background, tiles: tileOptions = {}, metadata = metadataFromEnv(),
 }) {
   const geodata = createGeodata({ db, spotRadiusM });
   const baseUrl = (req) => (publicUrl ? String(publicUrl).replace(/\/+$/, '') : `${req.protocol}://${req.get('host')}`);
@@ -148,6 +164,8 @@ module.exports = function registerOgc(app, {
         link(`${base}/api/export/myforrest.gpkg`, 'enclosure', 'application/geopackage+sqlite3', 'Alles als GeoPackage (LV95)'),
         link(`${base}/api/export/myforrest.pmtiles`, 'enclosure', 'application/vnd.pmtiles', 'Vektorkacheln als PMTiles (WebMercatorQuad)'),
         link(`${base}/api/export/myforrest.mbtiles`, 'enclosure', 'application/vnd.sqlite3', 'Vektorkacheln als MBTiles (WebMercatorQuad)'),
+        link(`${base}/api/metadata/geocat.xml`, 'describedby', 'application/xml', 'Metadaten für geocat.ch (ISO 19139, Profil GM03)'),
+        link(`${base}/api/metadata/iso19139.xml`, 'describedby', 'application/xml', 'Metadaten (ISO 19139)'),
       ],
     });
   });
@@ -277,6 +295,48 @@ module.exports = function registerOgc(app, {
    * Server, GeoServer or a geoportal publishes as WMS/WFS. LV95 by default
    * (Swiss geoportals), `crs=4326` for WGS84.
    */
+  /**
+   * Metadata record of the dataset (src/metadata.js): geocat.xml in the Swiss
+   * profile GM03 (ISO19139.che) to import into geocat.ch, iso19139.xml as plain
+   * ISO 19139 for other catalogues.
+   */
+  function metadataInfo(base) {
+    const feats = ['spots', 'photos', 'spread_fronts'].flatMap((id) => geodata.features(id, base));
+    let bbox = [5.9, 45.8, 10.5, 47.8]; // Switzerland until there is data
+    if (feats.length) {
+      bbox = [Infinity, Infinity, -Infinity, -Infinity];
+      for (const f of feats) {
+        const b = bboxOf(f.geometry);
+        bbox = [Math.min(bbox[0], b[0]), Math.min(bbox[1], b[1]), Math.max(bbox[2], b[2]), Math.max(bbox[3], b[3])];
+      }
+    }
+    const taken = geodata.features('photos', base).map((f) => Date.parse(f.properties.taken_at));
+    const hidden = db.prepare('PRAGMA table_info(photos)').all().some((c) => c.name === 'hidden_at') ? 'WHERE hidden_at IS NULL' : '';
+    const added = db.prepare(`SELECT MIN(created_at) AS first, MAX(created_at) AS last FROM photos ${hidden}`).get();
+    const now = Date.now();
+    return {
+      base,
+      bbox,
+      firstPhoto: taken.length ? Math.min(...taken) : null,
+      lastPhoto: taken.length ? Math.max(...taken) : null,
+      created: added.first ?? now,
+      updated: added.last ?? now,
+    };
+  }
+  for (const [file, profile] of [['geocat.xml', 'che'], ['iso19139.xml', 'iso']]) {
+    app.get(`/api/metadata/${file}`, (req, res) => {
+      const base = baseUrl(req);
+      const license = LICENSES[DEFAULT_LICENSE];
+      res.set('Access-Control-Allow-Origin', '*');
+      res.type('application/xml').send(metadataRecord(metadataInfo(base), {
+        organisation: metadata.organisation, email: metadata.email, city: metadata.city, country: metadata.country, url: metadata.url,
+      }, {
+        profile, uuid: metadata.uuid, owsUrl: metadata.owsUrl, opendataTerms: metadata.opendataTerms,
+        licenseUrl: license.url.replace(/deed\.\w+$/, ''), licenseLabel: license.label,
+      }));
+    });
+  }
+
   app.get('/api/export/myforrest.gpkg', (req, res, next) => {
     const srs = req.query.crs === undefined || req.query.crs === '2056' ? 2056 : req.query.crs === '4326' ? 4326 : null;
     if (!srs) return res.status(400).json({ error: 'crs: 2056 (LV95) oder 4326 (WGS84)' });

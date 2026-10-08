@@ -30,6 +30,13 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 | `PLANTNET_API_KEY` | –        | Aktiviert die Pflanzenbestimmung               |
 | `PUBLIC_URL`       | –        | Öffentliche Adresse für Foto-Links im Export (sonst aus der Anfrage); mit ihr werden die Vektorkacheln schon beim Start vorberechnet |
 | `TILES_PRECOMPUTE` | `1`      | `0`: Vektorkacheln nicht vorberechnen, jede Kachel bei der Anfrage schneiden |
+| `METADATA_ORGANISATION` | `MyForrest` | Verantwortliche Organisation in den Metadaten (geocat.ch) |
+| `METADATA_EMAIL`   | `ADMIN_EMAIL` | Kontakt-E-Mail in den Metadaten |
+| `METADATA_CITY`, `METADATA_COUNTRY` | –, `CH` | Ort und Land des Kontakts |
+| `METADATA_URL`     | App-Adresse | Website der Organisation |
+| `METADATA_UUID`    | aus der Adresse abgeleitet | Feste Kennung des Metadatensatzes |
+| `METADATA_OWS_URL` | –        | Adresse von QGIS Server (z. B. `https://…/ows/`): WMS, WMTS und WFS in den Metadaten |
+| `METADATA_OPENDATA_TERMS` | – | Nutzungsbedingung von opendata.swiss (`terms_by` usw.): markiert den Eintrag für opendata.swiss |
 | `FFMPEG_PATH`      | `ffmpeg` | ffmpeg für die Bilder aus Videos               |
 | `VIDEO_MAX_MB`     | `4096`   | Maximale Grösse eines Videos                   |
 | `SENTINEL_STAC_URL`| Earth Search | STAC-API für Sentinel-2 L2A; leer = Satellitenkontext aus |

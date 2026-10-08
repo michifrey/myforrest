@@ -438,8 +438,39 @@ einbinden.
     wie tileserver-gl oder martin.
   - Solange die Dateien zur aktuellen Datenversion noch berechnet werden, antworten beide mit 503 und
     `Retry-After`.
+- **Metadaten für geocat.ch**: `/api/metadata/geocat.xml` beschreibt den Datensatz nach dem Schweizer
+  Metadatenmodell GM03 (ISO19139.che), dem Format von geocat.ch. `/api/metadata/iso19139.xml` liefert
+  dasselbe als reines ISO 19139 für andere Kataloge.
+  - **Inhalt**:
+    - Titel, Kurztitel, Zusammenfassung, Zweck, Schlagwörter und Entstehung (Lineage) auf Deutsch,
+      Französisch, Italienisch und Englisch.
+    - Ausdehnung und Zeitraum aus den Daten, Erstellungs- und Revisionsdatum aus den Uploads.
+    - Bezugssysteme LV95 und WGS84, Lizenz, Kontakt.
+    - Alle Zugänge mit den Protokollen von geocat.ch: OGC API (`WWW:LINK`), Downloads (`WWW:DOWNLOAD-URL`),
+      Kartenansicht (`MAP:Preview`) und, wenn eingerichtet, WMS/WMTS/WFS von QGIS Server.
+  - **Kennung**: Die Kennung des Datensatzes bleibt für eine Adresse gleich, damit ein erneuter Import den
+    Eintrag aktualisiert statt einen zweiten anzulegen.
+  - **Geprüft** gegen die XML-Schemas von ISO 19139 und ISO19139.che sowie gegen die Schematron-Regeln
+    von geocat.ch (ISO, GM03 und die Regeln des Bundes, die Titel und Zusammenfassung auf Deutsch und
+    Französisch verlangen).
+  - **Einstellungen**: Kontakt und Katalog über die Variablen `METADATA_*`
+    (siehe [Installation](installation.md#umgebungsvariablen)).
 
 Ausgeblendete (moderierte) Fotos erscheinen in keinem Dienst.
+
+### Eintrag auf geocat.ch und opendata.swiss
+
+1. **Angaben setzen**: `PUBLIC_URL` (die Links im Datensatz zeigen sonst auf die Adresse der Anfrage),
+   `METADATA_ORGANISATION` und `METADATA_EMAIL`, bei QGIS Server auch `METADATA_OWS_URL`.
+2. **Konto bei geocat.ch**: Organisationen erhalten ein Konto über das Team von geocat.ch bei swisstopo
+   (geocat.ch → Kontakt). Dort `/api/metadata/geocat.xml` als XML importieren. Nach Änderungen denselben
+   Datensatz erneut importieren; die gleiche Kennung ersetzt den bestehenden Eintrag.
+3. **Weiter auf opendata.swiss**: opendata.swiss übernimmt Einträge aus geocat.ch, die das Schlagwort
+   `opendata.swiss` und Nutzungsbedingungen von opendata.swiss tragen. `METADATA_OPENDATA_TERMS` setzt
+   beides, mit einem der Werte `terms_open`, `terms_by`, `terms_ask` oder `terms_by_ask`. Die
+   Organisation muss auf opendata.swiss eingerichtet sein. Den genauen Ablauf beschreibt das Handbuch von
+   opendata.swiss; die Bedingung muss zur Lizenz der Fotos passen (Standard CC BY-SA 4.0, also mindestens
+   Quellenangabe).
 
 ## Pflanzen und Baumarten
 

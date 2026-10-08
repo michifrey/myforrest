@@ -11,6 +11,8 @@ services:
     build: ../..
     environment:
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8080}
+      # WMS, WMTS and WFS of QGIS Server in the metadata record for geocat.ch (/api/metadata/geocat.xml).
+      METADATA_OWS_URL: ${PUBLIC_URL:-http://localhost:8080}/ows/
     volumes:
       - myforrest-data:/app/data
     restart: unless-stopped
