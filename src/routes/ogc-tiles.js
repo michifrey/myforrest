@@ -14,17 +14,38 @@
  *   /ogc/styles/myforrest                             MapLibre style for the WebMercatorQuad tiles
  *
  * Empty tiles answer 204 No Content.
+ *
+ * Tiles are precomputed (src/tile-cache.js): after the data changes, every
+ * tileset is cut again in the background up to a zoom per grid and stored
+ * gzip-compressed; requests read the stored tile and only deeper zooms (or
+ * tiles of a version still being built) are cut on the fly. The dataset in
+ * WebMercatorQuad is also written as PMTiles and MBTiles for static hosting
+ * and desktop GIS:
+ *
+ *   /api/export/myforrest.pmtiles   one file, read with HTTP range requests
+ *   /api/export/myforrest.mbtiles   SQLite, for QGIS, GDAL, tile servers
  */
 
-const { COLLECTIONS } = require('../geodata');
+const fs = require('node:fs');
+const path = require('node:path');
+const zlib = require('node:zlib');
+const { COLLECTIONS, toLv95, bboxOf } = require('../geodata');
 const mercator = require('../tiles');
 const lv95 = require('../tiles-lv95');
 const { wgs84ToLv95 } = require('../lv95');
+const { createTileCache } = require('../tile-cache');
+const { writePmtiles } = require('../pmtiles');
+const { writeMbtiles } = require('../mbtiles');
 
 const MVT = 'application/vnd.mapbox-vector-tile';
 const TILESETS_REL = 'http://www.opengis.net/def/rel/ogc/1.0/tilesets-vector';
 // Map layers of the dataset tiles; photos are left to their own collection tiles.
 const DATASET_LAYERS = ['spread_fronts', 'spots', 'findings'];
+// Everything that is precomputed: the dataset and each collection on its own.
+const SETS = [['dataset', DATASET_LAYERS], ...Object.keys(COLLECTIONS).map((id) => [id, [id]])];
+const ATTRIBUTION = '© MyForrest-Mitwirkende (Lizenz pro Foto, Standard CC BY-SA 4.0)';
+// Candidate tiles reach this far beyond a feature's bounds (twice the 64/4096 tile buffer), so no tile with data is missed.
+const PAD = 128 / 4096;
 const MVT_TYPE = { INTEGER: 'Number', REAL: 'Number', TEXT: 'String' };
 
 /** Newest fronts first, so older (smaller) outlines are drawn on top of them. */
@@ -37,6 +58,14 @@ const TMS = {
     title: 'Google Maps Compatible for the World',
     crs: 'http://www.opengis.net/def/crs/EPSG/0/3857',
     range: (bbox, z) => mercator.tileRange(bbox, z),
+    // ~0.4 m per pixel in Switzerland; deeper zooms are cut on request (MapLibre overzooms anyway).
+    precomputeZoom: 18,
+    // Feature bounds in the grid's coordinates, and their tile range with padding at zoom z.
+    project: (geometry) => bboxOf(geometry),
+    tilesOf: ([w, s, e, n], z) => {
+      const pad = (360 / 2 ** z) * PAD; // a tile is never taller in degrees than wide
+      return mercator.tileRange([w - pad, s - pad, e + pad, n + pad], z);
+    },
     boundingBox: (bbox) => ({ lowerLeft: [bbox[0], bbox[1]], upperRight: [bbox[2], bbox[3]], crs: 'http://www.opengis.net/def/crs/OGC/1.3/CRS84' }),
     tilejson: true,
   },
@@ -45,6 +74,12 @@ const TMS = {
     title: 'Schweizer Landeskoordinaten LV95 (Kachelgitter von swisstopo)',
     crs: 'http://www.opengis.net/def/crs/EPSG/0/2056',
     range: (bbox, z) => lv95.tileRange(lv95Bbox(bbox), z),
+    precomputeZoom: 26, // 0.5 m per pixel
+    project: (geometry) => bboxOf(toLv95(geometry)),
+    tilesOf: ([w, s, e, n], z) => {
+      const pad = 256 * lv95.RESOLUTIONS[z] * PAD;
+      return lv95.tileRange([w - pad, s - pad, e + pad, n + pad], z);
+    },
     // In LV95, so clients of this grid need no reprojection (the OpenLayers viewer frames the map with it).
     boundingBox: (bbox) => {
       const b = lv95Bbox(bbox);
@@ -75,7 +110,37 @@ function bboxOfFeatures(features) {
   return Number.isFinite(b[0]) ? b : [5.9, 45.8, 10.5, 47.8]; // Switzerland until there is data
 }
 
-module.exports = function registerOgcTiles(app, { geodata, baseUrl, link, send, HttpError }) {
+/** Tiles at zoom z that may hold data: the union of the padded tile ranges of all features. */
+function candidates(t, bboxes, z) {
+  const seen = new Set();
+  const out = [];
+  for (const b of bboxes) {
+    const r = t.tilesOf(b, z);
+    for (let x = r.minCol; x <= r.maxCol; x++) {
+      for (let y = r.minRow; y <= r.maxRow; y++) {
+        const k = `${x}/${y}`;
+        if (!seen.has(k)) { seen.add(k); out.push([x, y]); }
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * dataDir: where tiles.db and the PMTiles/MBTiles exports live; precompute:
+ * false serves every tile on the fly; delayMs: wait after a change before
+ * cutting (uploads come in batches), null: only when precompute() is called; startupBase: precompute for this base
+ * URL right away (PUBLIC_URL); background: tracks the builds (app.locals.idle).
+ */
+module.exports = function registerOgcTiles(app, {
+  geodata, baseUrl, link, send, HttpError, dataDir, precompute = true, delayMs = 10000, startupBase, background = (p) => p,
+}) {
+  const tilesDir = dataDir && path.resolve(dataDir, 'tiles'); // absolute, as res.sendFile wants it
+  let cache = null;
+  if (precompute && dataDir) {
+    fs.mkdirSync(tilesDir, { recursive: true });
+    cache = createTileCache(path.join(tilesDir, 'tiles.db'));
+  }
   const indexCache = new Map();
   /** Tile index of a collection in a tile matrix set, rebuilt when the data changes. */
   function indexOf(tmsId, id, base) {
@@ -137,7 +202,7 @@ module.exports = function registerOgcTiles(app, { geodata, baseUrl, link, send, 
       // TileJSON 3.0
       tilejson: '3.0.0',
       name: title,
-      attribution: '© MyForrest-Mitwirkende (Lizenz pro Foto, Standard CC BY-SA 4.0)',
+      attribution: ATTRIBUTION,
       scheme: 'xyz',
       tiles: [`${base}${path}/${tmsId}/{z}/{y}/{x}`],
       minzoom: 0,
@@ -161,13 +226,114 @@ module.exports = function registerOgcTiles(app, { geodata, baseUrl, link, send, 
     })),
   });
 
-  function sendTile(res, tmsId, indexes, params) {
-    const m = TMS[tmsId].module;
+  /* ---------- Precomputation ---------- */
+
+  const tilesetKey = (base, tmsId, set) => `${base}|${tmsId}|${set}`;
+  const indexesOf = (tmsId, layers, base) => Object.fromEntries(layers.map((id) => [id, indexOf(tmsId, id, base)]));
+  const exportFile = (ext) => path.join(tilesDir, `myforrest.${ext}`);
+  const exportInfoFile = () => path.join(tilesDir, 'export.json');
+  const readExportInfo = () => {
+    try { return JSON.parse(fs.readFileSync(exportInfoFile(), 'utf8')); } catch { return null; }
+  };
+
+  /** PMTiles and MBTiles of the WebMercatorQuad dataset tiles, replaced atomically. */
+  function writeExports(base, version) {
+    const key = tilesetKey(base, mercator.TMS_ID, 'dataset');
+    const tiles = cache.tiles(key, version);
+    const bbox = bboxOfFeatures(DATASET_LAYERS.flatMap((id) => geodata.features(id, base)));
+    const maxzoom = TMS[mercator.TMS_ID].precomputeZoom;
+    const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2, Math.min(14, maxzoom)];
+    const vectorLayers = DATASET_LAYERS.map((id) => vectorLayer(id, maxzoom));
+    const name = 'MyForrest';
+    const description = 'Ausbreitungsfronten, Spots und Pflanzenfunde als Vektorkacheln (WebMercatorQuad)';
+    const tmp = (ext) => `${exportFile(ext)}.part`;
+    fs.writeFileSync(tmp('pmtiles'), writePmtiles(tiles, {
+      minzoom: 0, maxzoom, bounds: bbox, center,
+      metadata: { name, description, attribution: ATTRIBUTION, vector_layers: vectorLayers },
+    }));
+    writeMbtiles(tmp('mbtiles'), tiles, {
+      name, description, attribution: ATTRIBUTION, minzoom: 0, maxzoom, bounds: bbox, center, vector_layers: vectorLayers,
+    });
+    for (const ext of ['pmtiles', 'mbtiles']) fs.renameSync(tmp(ext), exportFile(ext));
+    fs.writeFileSync(exportInfoFile(), JSON.stringify({ base, version, tiles: tiles.length, written_at: new Date().toISOString() }));
+  }
+
+  /** Cuts every tileset that is not current for this base URL, then refreshes the exports. */
+  async function buildAll(base) {
+    const version = geodata.version();
+    const built = [];
+    for (const [tmsId, t] of Object.entries(TMS)) {
+      for (const [set, layers] of SETS) {
+        const key = tilesetKey(base, tmsId, set);
+        if (cache.current(key, version)) continue;
+        const indexes = indexesOf(tmsId, layers, base);
+        const bboxes = layers.flatMap((id) => geodata.features(id, base)).map((f) => t.project(f.geometry));
+        const result = await cache.build(key, version, t.precomputeZoom, (z) => candidates(t, bboxes, z),
+          (z, x, y) => t.module.encodeTile(indexes, z, x, y));
+        if (!result) return built; // shutting down
+        built.push({ tileset: `${tmsId}/${set}`, ...result });
+      }
+    }
+    // Tiles carry links with the base URL, so each base URL has its own tilesets. Keep the current one and the one
+    // before (a server reached under two names), so unknown Host headers cannot fill the disk.
+    const previous = readExportInfo()?.base;
+    cache.keepOnly([`${base}|`, ...(startupBase ? [`${startupBase}|`] : []), ...(previous && previous !== base ? [`${previous}|`] : [])]);
+    const info = readExportInfo();
+    if (built.length || !info || info.base !== base || info.version !== version) writeExports(base, version);
+    // The data changed while cutting: go again for the new version.
+    if (geodata.version() !== version) schedule(base);
+    return built;
+  }
+
+  let chain = Promise.resolve();
+  /** Runs one precomputation after another (never two at once). */
+  function precomputeNow(base) {
+    if (!cache) return Promise.resolve([]);
+    const run = chain.then(() => buildAll(base));
+    chain = run.catch(() => {});
+    return run;
+  }
+
+  const scheduled = new Set();
+  /** Precompute for this base URL after `delayMs` (once, however many requests ask meanwhile). */
+  function schedule(base) {
+    // With PUBLIC_URL set, other names of the server get live tiles only.
+    if (!cache || delayMs === null || scheduled.has(base) || (startupBase && base !== startupBase)) return;
+    scheduled.add(base);
+    const wait = new Promise((resolve) => { setTimeout(resolve, delayMs).unref?.(); });
+    background(wait.then(() => {
+      scheduled.delete(base);
+      return precomputeNow(base);
+    }));
+  }
+  if (cache && startupBase) schedule(startupBase);
+
+  /** A tile from the precomputed store, else cut now (and schedule the precomputation). */
+  function sendTile(req, res, tmsId, set, layers) {
+    const t = TMS[tmsId];
+    const m = t.module;
+    const { params } = req;
     const [z, y, x] = [params.z, params.y, params.x].map(Number);
     if (!m.validTile(z, y, x)) throw new HttpError(404, `Keine Kachel ${params.z}/${params.y}/${params.x} in ${tmsId} (Zoom 0–${m.MAX_ZOOM})`);
-    const pbf = m.encodeTile(indexes, z, x, y);
+    const base = baseUrl(req);
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Cache-Control', 'public, max-age=300');
+    if (cache) {
+      const stored = cache.lookup(tilesetKey(base, tmsId, set), geodata.version(), z, x, y);
+      if (stored !== undefined) {
+        res.set('X-Tile-Source', 'precomputed');
+        if (stored === null) return res.status(204).end();
+        res.vary('Accept-Encoding');
+        if (req.acceptsEncodings('gzip')) {
+          res.set('Content-Encoding', 'gzip');
+          return res.type(MVT).send(stored);
+        }
+        return res.type(MVT).send(zlib.gunzipSync(stored));
+      }
+      if (z <= t.precomputeZoom) schedule(base);
+    }
+    res.set('X-Tile-Source', 'live');
+    const pbf = m.encodeTile(indexesOf(tmsId, layers, base), z, x, y);
     if (!pbf) return res.status(204).end();
     return res.type(MVT).send(pbf);
   }
@@ -196,9 +362,7 @@ module.exports = function registerOgcTiles(app, { geodata, baseUrl, link, send, 
     res.json(tileset(baseUrl(req), tms(req.params.tms), DATASET_LAYERS, '/ogc/tiles', DATASET_TITLE));
   }));
   app.get('/ogc/tiles/:tms/:z/:y/:x', (req, res) => send(res, () => {
-    const tmsId = tms(req.params.tms);
-    const base = baseUrl(req);
-    sendTile(res, tmsId, Object.fromEntries(DATASET_LAYERS.map((id) => [id, indexOf(tmsId, id, base)])), req.params);
+    sendTile(req, res, tms(req.params.tms), 'dataset', DATASET_LAYERS);
   }));
 
   /* ---------- Collection tiles ---------- */
@@ -217,9 +381,27 @@ module.exports = function registerOgcTiles(app, { geodata, baseUrl, link, send, 
   }));
   app.get('/ogc/collections/:id/tiles/:tms/:z/:y/:x', (req, res) => send(res, () => {
     const id = collection(req.params.id);
-    const tmsId = tms(req.params.tms);
-    sendTile(res, tmsId, { [id]: indexOf(tmsId, id, baseUrl(req)) }, req.params);
+    sendTile(req, res, tms(req.params.tms), id, [id]);
   }));
+
+  /* ---------- PMTiles and MBTiles ---------- */
+
+  const EXPORTS = { pmtiles: 'application/vnd.pmtiles', mbtiles: 'application/vnd.sqlite3' };
+  app.get('/api/export/myforrest.:ext(pmtiles|mbtiles)', (req, res) => {
+    const { ext } = req.params;
+    res.set('Access-Control-Allow-Origin', '*');
+    if (!cache) return res.status(404).json({ error: 'Die Vorberechnung der Kacheln ist ausgeschaltet (TILES_PRECOMPUTE=0)' });
+    const base = baseUrl(req);
+    const info = readExportInfo();
+    if (!info || info.base !== base || info.version !== geodata.version() || !fs.existsSync(exportFile(ext))) {
+      schedule(base);
+      res.set('Retry-After', '30');
+      return res.status(503).json({ error: 'Die Kacheln werden gerade berechnet, bitte gleich nochmals versuchen' });
+    }
+    // Range requests (PMTiles clients read single tiles) are handled by sendFile.
+    res.set('Access-Control-Expose-Headers', 'Content-Range, Content-Length, ETag');
+    return res.sendFile(exportFile(ext), { headers: { 'Content-Type': EXPORTS[ext], 'Cache-Control': 'public, max-age=300' } });
+  });
 
   /* ---------- Style ---------- */
 
@@ -277,6 +459,8 @@ module.exports = function registerOgcTiles(app, { geodata, baseUrl, link, send, 
   });
 
   return {
+    precompute: precomputeNow,
+    close: () => cache?.close(),
     conformance: [
       'http://www.opengis.net/spec/ogcapi-tiles-1/1.0/conf/core',
       'http://www.opengis.net/spec/ogcapi-tiles-1/1.0/conf/tileset',

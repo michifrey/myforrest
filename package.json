@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning server.js",
-    "test": "node --disable-warning=ExperimentalWarning --test 'test/*.test.js'"
+    "test": "node --disable-warning=ExperimentalWarning --test 'test/*.test.js'",
+    "tiles": "node --disable-warning=ExperimentalWarning scripts/build-tiles.js"
   },
   "repository": {
     "type": "git",

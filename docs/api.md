@@ -23,6 +23,8 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/ogc/collections[/:id]`       | Collections `spots`, `photos`, `findings`, `spread_fronts` mit Ausdehnung und Koordinatensystemen |
 | `GET`    | `/ogc/collections/:id/items[/:fid]` | GeoJSON; `crs` (CRS84 oder `http://www.opengis.net/def/crs/EPSG/0/2056`), `bbox`, `bbox-crs`, `datetime`, `limit`, `offset` |
 | `GET`    | `/api/export/myforrest.gpkg`   | Alle Collections als GeoPackage (LV95, `?crs=4326` für WGS84) |
+| `GET`    | `/api/export/myforrest.pmtiles` | Vektorkacheln des Datensatzes (WebMercatorQuad, Zoom 0–18) als PMTiles v3; mit Range-Anfragen; 503 während der Berechnung |
+| `GET`    | `/api/export/myforrest.mbtiles` | Dieselben Kacheln als MBTiles 1.3 (SQLite); 503 während der Berechnung |
 | `GET`    | `/ogc/tileMatrixSets[/{tms}]` | Kachelgitter (OGC Two Dimensional Tile Matrix Set): `WebMercatorQuad` und `SwissLV95` (EPSG:2056, Gitter von swisstopo) |
 | `GET`    | `/ogc/tiles[/{tms}]` | Vektorkacheln des Datensatzes: Liste und Tileset (für WebMercatorQuad zugleich TileJSON 3.0; für SwissLV95 mit Ausdehnung in LV95) |
 | `GET`    | `/ogc/tiles/{tms}/{z}/{y}/{x}` | Kachel (MVT) mit den Ebenen `spread_fronts`, `spots`, `findings`; 204 wenn leer |

@@ -116,7 +116,7 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   Erkennung invasiver Neophyten, Artenbestand pro Spot und Export zu Info Flora, GBIF und iNaturalist.
 - **[Offene Geodaten](docs/funktionen.md#offene-geodaten-für-gis-und-geoportale)**: alle Daten als
   OGC API – Features und GeoPackage, in WGS84 oder den Schweizer Landeskoordinaten LV95 wie bei swisstopo,
-  Vektorkacheln (OGC API – Tiles, MVT) in Web Mercator und im Schweizer Kachelgitter LV95 mit MapLibre-Stil und Vektorkarten, dazu ein fertiges QGIS-Projekt für
+  Vektorkacheln (OGC API – Tiles, MVT) in Web Mercator und im Schweizer Kachelgitter LV95, vorberechnet und als PMTiles/MBTiles, mit MapLibre-Stil und Vektorkarten, dazu ein fertiges QGIS-Projekt für
   QGIS Server (WMS/WMTS/WFS) für Geoportale wie map.geo.admin.ch.
 - **[Konten und Moderation](docs/funktionen.md#konten-moderation-und-lizenzen)**: Konten mit Rollen,
   Lizenz pro Foto, Melden und Moderieren.

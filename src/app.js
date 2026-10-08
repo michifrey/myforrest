@@ -44,6 +44,8 @@ function createApp({
   adminEmail = process.env.ADMIN_EMAIL || null,
   rateLimits,
   detectorUrl = process.env.DETECTOR_URL || null, detectorFetch = fetch,
+  // Vector tile precomputation (routes/ogc-tiles.js): { precompute, delayMs }.
+  tileOptions = { precompute: process.env.TILES_PRECOMPUTE !== '0' },
 } = {}) {
   const uploadDir = path.join(dataDir, 'uploads');
   const tmpDir = path.join(dataDir, 'tmp');
@@ -906,7 +908,7 @@ function createApp({
   });
 
   require('./routes/species')(app, { db, spotRadiusM });
-  require('./routes/ogc')(app, { db, spotRadiusM });
+  require('./routes/ogc')(app, { db, spotRadiusM, dataDir, background, tiles: tileOptions });
   require('./routes/video')(app, { db, uploadDir, tmpDir, spotRadiusM, activities: ACTIVITIES, photoJson, getPhoto, setTags, alignPhoto, analyzeChange, analyzeContext, background, safeAlign });
   const vegetation = require('./routes/vegetation')(app, { db, uploadDir, background, fetchImpl: weatherFetch });
   require('./routes/analysis')(app, {
