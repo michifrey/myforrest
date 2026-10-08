@@ -265,6 +265,28 @@
     });
   }
 
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  /** Where the threshold of a warning comes from and how it did on held-out spots (cross-validation). */
+  function calibrationText(c) {
+    if (!c) return '';
+    const t = ndviText(c.threshold);
+    const std = c.standard;
+    const vsStandard = std ? ` Der Anfangswert ${ndviText(std.threshold)} hätte ${std.hits} erkannt bei ${plural(std.falseAlarms, 'Fehlalarm', 'Fehlalarmen')}.` : '';
+    if (c.source === 'kalibriert') {
+      return `Schwelle ${t}, geeicht an ${plural(c.positives, 'bestätigtem Schaden', 'bestätigten Schäden')} und ${plural(c.negatives, 'Kontrolle', 'Kontrollen')} ohne Schaden an ${c.spots} Spots. `
+        + `An zurückgehaltenen Spots geprüft (${c.cv.folds} Teile): ${c.cv.hits} von ${c.positives} Schäden erkannt, ${plural(c.cv.falseAlarms, 'Fehlalarm', 'Fehlalarme')}.${vsStandard}`;
+    }
+    if (c.reason === 'nicht-besser') {
+      return `Schwelle ${t} ist der Anfangswert: Die an den Kontrollen geeichte Schwelle ${ndviText(c.candidate)} war an zurückgehaltenen Spots nicht besser `
+        + `(${c.cv.hits} von ${c.positives} Schäden erkannt, ${plural(c.cv.falseAlarms, 'Fehlalarm', 'Fehlalarme')}).${vsStandard}`;
+    }
+    if (c.reason === 'zu-wenige-spots') {
+      return `Schwelle ${t} ist ein Anfangswert: Die Kontrollen stammen von weniger als 3 Spots, eine Prüfung an zurückgehaltenen Spots ist noch nicht möglich.`;
+    }
+    return `Schwelle ${t} ist ein Anfangswert. Geeicht wird sie, sobald genug Kontrollen vorliegen, um einen Teil davon zur Prüfung zurückzuhalten `
+      + `(mindestens je 5 mit und ohne Schaden pro Prüfung; bisher ${plural(c.positives, 'bestätigter Schaden', 'bestätigte Schäden')} und ${plural(c.negatives, 'Kontrolle', 'Kontrollen')} ohne Schaden).`;
+  }
+
   /** Early warnings: the last months against the same season of earlier years, without new photos. */
   function alertCards() {
     return (ndviData.alerts || []).map((a) => {
@@ -274,12 +296,7 @@
         + (a.index === 'ndmi' ? ' Das kann Trockenstress anzeigen, bevor sich die Kronen verfärben.' : '')
         + stormSentence(a.storm, true)
         + (a.visit ? ` Das letzte Foto ist ${a.lastPhoto ? `vom ${fmtDate(a.lastPhoto)}` : 'älter'}: Ein neues Foto würde zeigen, was dahinter steckt.` : '');
-      const c = a.calibration;
-      const basis = !c ? ''
-        : c.source === 'kalibriert'
-          ? `Schwelle ${ndviText(c.threshold)}, geeicht an ${c.positives} bestätigten Schäden und ${c.negatives} Kontrollen ohne Schaden: `
-            + `${c.hits} der Schäden erkannt, ${c.falseAlarms} Fehlalarm${c.falseAlarms === 1 ? '' : 'e'}.`
-          : `Schwelle ${ndviText(c.threshold)} ist ein Anfangswert. Geeicht wird sie, sobald mindestens 5 bestätigte Schäden und 5 Kontrollen ohne Schaden vorliegen (bisher ${c.positives} und ${c.negatives}).`;
+      const basis = calibrationText(a.calibration);
       return el('article', { class: 'irregular early-warning', 'data-severity': a.severity }, [
         el('header', {}, [el('h4', { text: `Satellit: Frühwarnung ${info.name}` }), el('span', { class: 'sev', text: a.severity })]),
         el('p', { text }),

@@ -265,8 +265,8 @@ module.exports = function registerVegetation(app, {
     const list = sentinel ? checks() : [];
     const result = {
       ...calibrate({
-        ndvi: list.map((c) => ({ drop: c.ndvi, damage: c.damage })),
-        ndmi: list.map((c) => ({ drop: c.ndmi, damage: c.damage })),
+        ndvi: list.map((c) => ({ drop: c.ndvi, damage: c.damage, group: c.spotId })),
+        ndmi: list.map((c) => ({ drop: c.ndmi, damage: c.damage, group: c.spotId })),
       }),
       checks: list.length,
     };
@@ -280,17 +280,24 @@ module.exports = function registerVegetation(app, {
     return row ? { ...JSON.parse(row.json), computedAt: new Date(row.computed_at).toISOString() } : recalibrate();
   }
 
+  /** What a warning says about its threshold (see calibration.js). */
+  function calibrationSummary(c) {
+    return {
+      source: c.source, reason: c.reason, threshold: c.threshold, candidate: c.candidate,
+      positives: c.positives, negatives: c.negatives, spots: c.spots,
+      cv: c.cv ? { folds: c.cv.folds, hits: c.cv.tp, misses: c.cv.fn, falseAlarms: c.cv.fp, f1: c.cv.f1 } : null,
+      standard: c.standard ? { threshold: c.standard.threshold, hits: c.standard.tp, misses: c.standard.fn, falseAlarms: c.standard.fp, f1: c.standard.f1 } : null,
+    };
+  }
+
   /** Early warnings of a spot from its cached series: index, since when, how strong, storm, whether to visit. */
   function alertsOf(spotId, monthly, spot, cal = calibration()) {
     const last = db.prepare('SELECT MAX(taken_at) AS t FROM photos WHERE spot_id = ?').get(spotId)?.t ?? null;
     const thresholds = { ndvi: [cal.ndvi.threshold, cal.ndvi.strong], ndmi: [cal.ndmi.threshold, cal.ndmi.strong] };
     return currentAnomalies(monthly, { now: now(), thresholds }).map((a) => ({
       ...a,
-      // Which threshold raised it, and how well it did on the confirmed checks.
-      calibration: {
-        source: cal[a.index].source, threshold: cal[a.index].threshold, positives: cal[a.index].positives, negatives: cal[a.index].negatives,
-        hits: cal[a.index].at?.tp ?? 0, falseAlarms: cal[a.index].at?.fp ?? 0,
-      },
+      // Which threshold raised it, and how it did on held-out spots (cross-validation) next to the starting value.
+      calibration: calibrationSummary(cal[a.index]),
       lastPhoto: last ? new Date(last).toISOString().slice(0, 10) : null,
       // A photo taken after the drop began would already show it.
       visit: !last || last < monthStart(a.since),

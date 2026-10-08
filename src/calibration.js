@@ -13,8 +13,12 @@
  * alarms; the threshold with the best F1 score wins. With too few checks
  * the starting values stay.
  *
- * The numbers are measured on the same checks the threshold was chosen on,
- * so they are optimistic, the more so the fewer checks there are.
+ * Numbers measured on the checks a threshold was chosen on are optimistic.
+ * So the choice is cross-validated: the spots are split into up to five
+ * groups (checks of one spot are not independent and stay together); for
+ * each group the threshold is chosen on the other groups and tried on the
+ * held-out one. The calibrated threshold is used only when it does at least
+ * as well there as the starting value; otherwise the starting value stays.
  */
 
 const { anomalyScores, THRESHOLDS } = require('./sentinel');
@@ -22,6 +26,8 @@ const { anomalyScores, THRESHOLDS } = require('./sentinel');
 const GRID = Array.from({ length: 28 }, (_, i) => Math.round((0.03 + i * 0.01) * 100) / 100); // 0.03 … 0.30
 const MIN_POSITIVES = 5;
 const MIN_NEGATIVES = 5;
+const MAX_FOLDS = 5;
+const MIN_SPOTS = 3; // fewer spots cannot be split into a meaningful cross-validation
 const DAY = 86400000;
 
 /**
@@ -44,53 +50,115 @@ function maxDropBetween(monthly, from, to, key) {
 /** Hits, misses and false alarms per threshold for samples [{ drop, damage }]. */
 function sweep(samples) {
   return GRID.map((threshold) => {
-    let tp = 0; let fp = 0; let fn = 0; let tn = 0;
+    const counts = { tp: 0, fp: 0, fn: 0, tn: 0 };
     for (const s of samples) {
       const alert = s.drop !== null && s.drop >= threshold;
-      if (s.damage) { if (alert) tp++; else fn++; } else if (alert) fp++; else tn++;
+      if (s.damage) counts[alert ? 'tp' : 'fn']++;
+      else counts[alert ? 'fp' : 'tn']++;
     }
-    const recall = tp + fn ? tp / (tp + fn) : 0;
-    const precision = tp + fp ? tp / (tp + fp) : 0;
-    const f1 = precision + recall ? (2 * precision * recall) / (precision + recall) : 0;
-    const r3 = (v) => Math.round(v * 1000) / 1000;
-    return { threshold, tp, fp, fn, tn, recall: r3(recall), precision: r3(precision), f1: r3(f1) };
+    return { threshold, ...scores(counts) };
   });
 }
 
+const r3 = (v) => Math.round(v * 1000) / 1000;
+/** Recall, precision and F1 of counted hits, misses and false alarms. */
+function scores({ tp, fp, fn, tn }) {
+  const recall = tp + fn ? tp / (tp + fn) : 0;
+  const precision = tp + fp ? tp / (tp + fp) : 0;
+  const f1 = precision + recall ? (2 * precision * recall) / (precision + recall) : 0;
+  return { tp, fp, fn, tn, recall: r3(recall), precision: r3(precision), f1: r3(f1) };
+}
+
 /**
- * Thresholds per index from samples { ndvi: [{ drop, damage }], ndmi: [...] }.
- * The best F1 wins (on ties the higher threshold: fewer false alarms); the
- * "strong" threshold keeps the ratio of the starting values. Without
- * MIN_POSITIVES damaged and MIN_NEGATIVES undamaged checks the starting value
- * stays (source 'standard').
+ * The threshold with the best F1 on these samples (on ties the higher one:
+ * fewer false alarms), or null when there are too few damaged or undamaged
+ * checks or nothing scores.
  */
-function calibrate(samplesByIndex, { minPositives = MIN_POSITIVES, minNegatives = MIN_NEGATIVES } = {}) {
+function chooseThreshold(samples, { minPositives = MIN_POSITIVES, minNegatives = MIN_NEGATIVES } = {}) {
+  const positives = samples.filter((s) => s.damage).length;
+  if (positives < minPositives || samples.length - positives < minNegatives) return null;
+  const best = sweep(samples).reduce((b, r) => (r.f1 > b.f1 || (r.f1 === b.f1 && r.threshold > b.threshold) ? r : b));
+  return best.f1 > 0 ? best.threshold : null;
+}
+
+/**
+ * Grouped k-fold cross-validation by spot: the threshold is chosen on the
+ * other folds (falling back to `fallback` when they are too few) and counted
+ * on the held-out fold. Spots go round-robin into the folds in id order, so
+ * the result is the same on every run. null with fewer than MIN_SPOTS spots.
+ */
+function crossValidate(samples, fallback, opts = {}) {
+  const groups = [...new Set(samples.map((s) => s.group))].sort((a, b) => a - b);
+  if (groups.length < MIN_SPOTS) return null;
+  const k = Math.min(MAX_FOLDS, groups.length);
+  const foldOf = new Map(groups.map((g, i) => [g, i % k]));
+  const counts = { tp: 0, fp: 0, fn: 0, tn: 0 };
+  const thresholds = [];
+  let fitted = 0;
+  for (let f = 0; f < k; f++) {
+    const train = samples.filter((s) => foldOf.get(s.group) !== f);
+    const chosen = chooseThreshold(train, opts);
+    if (chosen !== null) fitted++;
+    const threshold = chosen ?? fallback;
+    thresholds.push(threshold);
+    for (const s of samples.filter((x) => foldOf.get(x.group) === f)) {
+      const alert = s.drop >= threshold;
+      if (s.damage) counts[alert ? 'tp' : 'fn']++;
+      else counts[alert ? 'fp' : 'tn']++;
+    }
+  }
+  // `fitted`: folds whose own training checks were enough to choose a threshold.
+  return { folds: k, fitted, thresholds, ...scores(counts) };
+}
+
+/**
+ * Thresholds per index from samples { ndvi: [{ drop, damage, group }], ndmi: [...] }
+ * (`group`: the spot). The best F1 on all checks is the candidate; it is used
+ * when the cross-validation shows it at least as good as the starting value
+ * on held-out spots. Otherwise the starting value stays, with the reason:
+ * 'zu-wenige-kontrollen' (also when fewer than half of the folds had enough
+ * checks to choose a threshold of their own: then the cross-validation would
+ * mostly measure the starting value), 'zu-wenige-spots' or 'nicht-besser'.
+ * The "strong" threshold keeps the ratio of the starting values.
+ */
+function calibrate(samplesByIndex, opts = {}) {
   const out = {};
   for (const key of ['ndvi', 'ndmi']) {
     const samples = (samplesByIndex[key] || []).filter((s) => s.drop !== null);
     const positives = samples.filter((s) => s.damage).length;
     const negatives = samples.length - positives;
+    const spots = new Set(samples.map((s) => s.group)).size;
     const [defThreshold, defStrong] = THRESHOLDS[key];
     const rows = sweep(samples);
-    const enough = positives >= minPositives && negatives >= minNegatives;
-    const best = enough
-      ? rows.reduce((b, r) => (r.f1 > b.f1 || (r.f1 === b.f1 && r.threshold > b.threshold) ? r : b))
-      : rows.find((r) => r.threshold === defThreshold) || null;
-    const calibrated = enough && best.f1 > 0;
-    const threshold = calibrated ? best.threshold : defThreshold;
+    const candidate = chooseThreshold(samples, opts);
+    const cv = candidate === null ? null : crossValidate(samples, defThreshold, opts);
+    // The starting value is not fitted to these checks: its numbers on all of them are already out-of-sample.
+    const standard = rows.find((r) => r.threshold === defThreshold) || null;
+    let reason = null;
+    if (candidate === null) reason = 'zu-wenige-kontrollen';
+    else if (!cv) reason = 'zu-wenige-spots';
+    else if (cv.fitted * 2 < cv.folds) reason = 'zu-wenige-kontrollen';
+    else if (cv.f1 < (standard?.f1 ?? 0)) reason = 'nicht-besser';
+    const threshold = reason ? defThreshold : candidate;
     out[key] = {
       index: key,
-      source: calibrated ? 'kalibriert' : 'standard',
+      source: reason ? 'standard' : 'kalibriert',
+      reason,
       threshold,
       strong: Math.round(threshold * (defStrong / defThreshold) * 100) / 100,
+      candidate,
       positives,
       negatives,
-      // Hits and false alarms at the threshold in use, on these checks.
+      spots,
+      // On all checks (optimistic for a calibrated threshold), …
       at: rows.find((r) => r.threshold === threshold) || null,
+      // … on held-out spots, and the starting value for comparison.
+      cv,
+      standard,
       sweep: rows,
     };
   }
   return out;
 }
 
-module.exports = { calibrate, sweep, maxDropBetween, GRID, MIN_POSITIVES, MIN_NEGATIVES };
+module.exports = { calibrate, crossValidate, chooseThreshold, sweep, maxDropBetween, GRID, MIN_POSITIVES, MIN_NEGATIVES, MIN_SPOTS };
