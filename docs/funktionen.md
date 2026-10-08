@@ -339,13 +339,27 @@ Ort bestätigt wurde.
 - **Wahl der Schwelle:** Gewählt wird pro Index die Schwelle zwischen 0,03 und 0,30 mit dem besten
   Verhältnis aus erkannten Schäden und Fehlalarmen (F1). Bei Gleichstand zählt die höhere, also die mit
   weniger Fehlalarmen. Die Schwelle für „stark“ behält das Verhältnis der Anfangswerte.
-- **Zu wenige Kontrollen:** Mit weniger als 5 bestätigten Schäden oder 5 Kontrollen ohne Schaden bleibt der
-  Anfangswert.
+- **Kreuzvalidierung:** An denselben Kontrollen gemessen sieht jede gewählte Schwelle zu gut aus. Deshalb
+  wird die Wahl an zurückgehaltenen Spots geprüft.
+  - Die Spots werden in bis zu 5 Teile aufgeteilt. Fotopaare desselben Spots bleiben zusammen, weil sie
+    nicht unabhängig sind.
+  - Für jeden Teil wählt der Server die Schwelle nur an den übrigen Teilen und zählt Treffer und
+    Fehlalarme am zurückgehaltenen Teil.
+  - Die geeichte Schwelle gilt nur, wenn sie dort mindestens so gut abschneidet wie der Anfangswert. Der
+    Anfangswert ist nie an die Kontrollen angepasst; seine Zahlen auf allen Kontrollen sind daher schon
+    ein fairer Vergleich.
+- **Wann der Anfangswert bleibt**, mit Begründung in der Warnkarte:
+  - Weniger als 5 bestätigte Schäden oder 5 Kontrollen ohne Schaden.
+  - Weniger als die Hälfte der Teile hat für sich allein genug Kontrollen, um eine Schwelle zu wählen.
+    Die Prüfung würde dann vor allem den Anfangswert messen.
+  - Die Kontrollen stammen von weniger als 3 Spots.
+  - Die geeichte Schwelle war an zurückgehaltenen Spots nicht besser.
 - **Wann:** Nach jeder täglichen Runde wird neu kalibriert. Die Frühwarnkarte nennt die Schwelle, die
-  Zahl der Kontrollen und wie viele Schäden und Fehlalarme sie darauf ergab.
-- **Ehrlich gelesen:** Diese Zahlen sind an denselben Kontrollen gemessen, an denen die Schwelle gewählt
-  wurde, also optimistisch, umso mehr, je weniger Kontrollen es gibt. „Kein Schaden“ heisst nur, dass
-  niemand einen Schaden markiert hat.
+  Zahl der Kontrollen und Spots, die Treffer und Fehlalarme an zurückgehaltenen Spots und den Vergleich
+  mit dem Anfangswert.
+- **Grenzen:**
+  - Bei wenigen Spots schwanken die Zahlen der Kreuzvalidierung stark.
+  - „Kein Schaden“ heisst nur, dass niemand einen Schaden markiert hat.
 
 **Sturm als Kontext**: Rückgänge und Frühwarnungen nennen den stärksten Sturm (Böen ab 75 km/h, siehe
 Sturmereignisse) im Zeitraum bzw. in den Monaten davor.

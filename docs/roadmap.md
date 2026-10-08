@@ -42,8 +42,6 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
   - Sentinel-2 und Landsat in den Überlappungsjahren angleichen.
   - Die Kalibrierung auch für die Rückgänge zwischen zwei Fotos nutzen und nach Waldtyp (Laub/Nadel)
     trennen.
-  - Die Schwellen an Kontrollen prüfen, die nicht zur Wahl dienten (Kreuzvalidierung), sobald es genug
-    davon gibt.
   - Die Frühwarnung als Push-Nachricht an Leute, die den Spot regelmässig besuchen.
 
 ## Phase 4: Betrieb und Geodienste
@@ -65,7 +63,7 @@ Aus früheren Versionen dieser Roadmap:
 - Nächtliche Abkühlung in Senken aus Wind und Bewölkung
 - Hotspot-Karten, Ausbreitungsfronten und Datei-Export zu Info Flora / iNaturalist
 - Satellitenkontext: NDMI, Frühwarnung ohne neue Fotos, Landsat vor 2017, Sturm als Kontext
-- Kalibrierung der Frühwarnung an bestätigten Schäden
+- Kalibrierung der Frühwarnung an bestätigten Schäden, geprüft mit Kreuzvalidierung nach Spots
 - Geodienste: OGC API – Features und Tiles (auch im LV95-Kachelgitter, vorberechnet, PMTiles/MBTiles),
   Vektorkarten, QGIS Server, Metadaten für geocat.ch (GM03)
 - Betrieb mit Docker Compose und Kubernetes (podman-Startskript)
