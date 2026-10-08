@@ -6,6 +6,8 @@ Dieselbe Zusammenstellung wie [`deploy/qgis-server`](../qgis-server/README.md), 
 - **QGIS Server** mit dem Projekt aus `deploy/qgis-server/project`; ein Begleit-Container holt das
   GeoPackage alle 15 Minuten neu
 - **nginx** davor: `/ows/` geht an QGIS Server, alles andere an MyForrest
+- **BRouter** für den Wege-Magnet ([`deploy/brouter`](../brouter/README.md)), mit Volume (2 Gi) für die Routing-Daten;
+  MyForrest nutzt ihn über `ROUTER_URL=http://brouter:17777/brouter`
 
 ## Starten
 
@@ -40,4 +42,5 @@ kubectl kustomize --load-restrictor LoadRestrictionsNone deploy/k8s | kubectl ap
 
 Die Manifeste sind gegen das Schema von Kubernetes 1.31 geprüft. `start.sh` ist noch nicht gegen einen
 echten Cluster gelaufen. QGIS Server (`qgis/qgis-server:ltr`) ist ein grosses Image, der erste Start
-dauert entsprechend.
+dauert entsprechend. BRouter lädt beim ersten Start seine Routing-Daten (einige hundert MB); seine
+Startprobe wartet dafür bis zu 15 Minuten.

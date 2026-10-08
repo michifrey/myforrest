@@ -6,6 +6,7 @@
 # http://localhost:8080/            MyForrest
 # http://localhost:8080/ogc         OGC API – Features (MyForrest itself)
 # http://localhost:8080/ows/?SERVICE=WMS&REQUEST=GetCapabilities   QGIS Server
+# BRouter (path magnet) runs internally; the first start downloads ≈ 400 MB of routing data.
 services:
   myforrest:
     build: ../..
@@ -13,8 +14,19 @@ services:
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8080}
       # WMS, WMTS and WFS of QGIS Server in the metadata record for geocat.ch (/api/metadata/geocat.xml).
       METADATA_OWS_URL: ${PUBLIC_URL:-http://localhost:8080}/ows/
+      # Path magnet for tours through the own BRouter below instead of brouter.de.
+      ROUTER_URL: http://brouter:17777/brouter
     volumes:
       - myforrest-data:/app/data
+    restart: unless-stopped
+
+  # Routing along paths (deploy/brouter); loads the segments for BBOX on first start.
+  brouter:
+    build: ../brouter
+    environment:
+      BBOX: ${BROUTER_BBOX:-5.9,45.8,10.5,47.9}
+    volumes:
+      - brouter-segments:/segments
     restart: unless-stopped
 
   # Refreshes the GeoPackage QGIS Server publishes (every 15 minutes).
@@ -56,3 +68,4 @@ services:
 volumes:
   myforrest-data:
   gis-export:
+  brouter-segments:

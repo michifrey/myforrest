@@ -270,7 +270,8 @@ steht unter [Installation und Konfiguration](docs/installation.md).
 
 Mit QGIS Server für Geoportale gibt es zwei fertige Zusammenstellungen: Docker Compose unter
 [`deploy/qgis-server`](deploy/qgis-server/README.md) und Kubernetes, etwa ein lokaler Cluster auf podman,
-unter [`deploy/k8s`](deploy/k8s/README.md) (`deploy/k8s/start.sh`).
+unter [`deploy/k8s`](deploy/k8s/README.md) (`deploy/k8s/start.sh`). Beide bringen einen eigenen Routing-Server
+für den Wege-Magnet mit ([`deploy/brouter`](deploy/brouter/README.md)).
 
 ## Dokumentation
 
@@ -283,6 +284,7 @@ unter [`deploy/k8s`](deploy/k8s/README.md) (`deploy/k8s/start.sh`).
 | [REST-API](docs/api.md) | Alle Routen des Servers |
 | [Roadmap](docs/roadmap.md) | Was als Nächstes geplant ist |
 | [QGIS Server](deploy/qgis-server/README.md) und [Kubernetes](deploy/k8s/README.md) | Betrieb mit Geodiensten per Docker Compose oder Kubernetes |
+| [Eigener Routing-Server](deploy/brouter/README.md) | BRouter für den Wege-Magnet, mit Routing-Daten für die Schweiz |
 
 ## Daten und Lizenz
 

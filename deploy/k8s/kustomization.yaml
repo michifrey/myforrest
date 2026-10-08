@@ -16,6 +16,7 @@ resources:
   - myforrest.yaml
   - qgis-server.yaml
   - nginx.yaml
+  - brouter.yaml
 configMapGenerator:
   - name: nginx-conf
     files:
@@ -27,8 +28,13 @@ configMapGenerator:
     literals:
       - PUBLIC_URL=http://localhost:8080
       - METADATA_OWS_URL=http://localhost:8080/ows/
+      # Path magnet through the own BRouter instead of brouter.de.
+      - ROUTER_URL=http://brouter:17777/brouter
 images:
   # Built locally with podman and loaded into the cluster (start.sh); never pulled.
   - name: myforrest
     newName: localhost/myforrest
+    newTag: dev
+  - name: brouter
+    newName: localhost/myforrest-brouter
     newTag: dev
