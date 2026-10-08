@@ -604,6 +604,11 @@ Auffälligkeiten genauer:
   Teil nach `#` geht an keinen Server und in keinen Referer. Mit dem neuen Passwort ist man angemeldet,
   alle anderen Sitzungen des Kontos enden, und die Adresse gilt als bestätigt. So können auch Konten aus
   Google oder GitHub ein Passwort festlegen.
+- *Passwort ändern*: Im Konto-Menü unter *Passwort ändern* mit dem aktuellen und einem neuen Passwort.
+  Falsche aktuelle Passwörter zählen wie Fehlversuche beim Anmelden. Die eigene Sitzung bleibt, alle anderen
+  Geräte werden abgemeldet, offene Links zum Zurücksetzen verfallen, und das Konto bekommt eine Hinweis-E-Mail
+  („Warst du das nicht?“). Konten ohne Passwort (aus Google oder GitHub) sehen stattdessen *Passwort
+  festlegen*, das einen Link zum Zurücksetzen an die eigene Adresse schickt.
 - *Anmelden mit Google oder GitHub*: Ist ein Anbieter eingerichtet (siehe
   [Installation](installation.md#anmelden-mit-google-und-github)), zeigt der Dialog „Mit Google anmelden“
   bzw. „Mit GitHub anmelden“. Der Ablauf ist OAuth 2.0 mit PKCE; `state` und Verifier liegen in einem

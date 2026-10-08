@@ -545,3 +545,46 @@ test('an account from Google can set a password by reset; forgot works with requ
     assert.equal(cross.status, 403);
   });
 });
+
+test('a logged-in account changes its password; other sessions end, a notice is mailed', async () => {
+  await withServer({ rateLimits: { loginPerAccount: 3 } }, async (base, db, mails) => {
+    const anna = client(base);
+    await anna.register('anna@example.org', 'Anna Wald');
+    const phone = client(base);
+    await phone.login('anna@example.org');
+    const change = (c, current, password) => c.req('/api/auth/password/change', { method: 'POST', json: { current, password } });
+
+    assert.equal((await change(client(base), 'geheim-1234', 'neues-passwort-1')).status, 401);
+    assert.equal((await change(anna, 'geheim-1234', 'kurz')).status, 400);
+    const wrong = await change(anna, 'falsch-falsch', 'neues-passwort-1');
+    assert.equal(wrong.status, 403);
+    assert.match((await wrong.json()).error, /aktuelle Passwort/);
+    // Without the CSRF token the session cannot change it.
+    assert.equal((await anna.req('/api/auth/password/change', { method: 'POST', json: { current: 'geheim-1234', password: 'x'.repeat(10) }, csrf: false })).status, 403);
+
+    const ok = await change(anna, 'geheim-1234', 'neues-passwort-1');
+    assert.equal(ok.status, 200);
+    assert.equal((await ok.json()).endedSessions, 1);
+    assert.equal((await (await anna.req('/api/auth/me')).json()).user.name, 'Anna Wald', 'this session stays');
+    assert.equal((await (await phone.req('/api/auth/me')).json()).user, null, 'the other one ended');
+    assert.equal((await client(base).login('anna@example.org')).res.status, 401);
+    assert.equal((await client(base).login('anna@example.org', 'neues-passwort-1')).res.status, 200);
+    assert.match(mails.at(-1).subject, /Passwort geändert/);
+    assert.equal(mails.at(-1).to, 'anna@example.org');
+
+    // Wrong current passwords are limited like logins.
+    for (const attempt of ['falsch-1', 'falsch-2', 'falsch-3']) assert.equal((await change(anna, attempt, 'neues-passwort-2')).status, 403);
+    assert.equal((await change(anna, 'neues-passwort-1', 'neues-passwort-2')).status, 429);
+  });
+});
+
+test('an account without password cannot use change, only the e-mail link', async () => {
+  await withServer({}, async (base, db) => {
+    const cleo = client(base);
+    await cleo.register('cleo@example.org', 'Cleo');
+    db.prepare("UPDATE users SET password_hash = '' WHERE email = 'cleo@example.org'").run(); // like an account from a provider
+    const res = await cleo.req('/api/auth/password/change', { method: 'POST', json: { current: '', password: 'neues-passwort-1' } });
+    assert.equal(res.status, 400);
+    assert.match((await res.json()).error, /kein Passwort/);
+  });
+});

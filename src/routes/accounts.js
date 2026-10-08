@@ -33,6 +33,8 @@
  * `/#reset=<token>` (the fragment never reaches servers or Referer headers);
  * the page then posts the new password to /api/auth/password/reset. The
  * answer to "forgot" is the same whether or not the address has an account.
+ * Logged in, POST /api/auth/password/change takes the current and a new
+ * password; the account gets a notice by e-mail.
  */
 
 const crypto = require('node:crypto');
@@ -356,6 +358,42 @@ module.exports = function registerAccounts(app, ctx) {
       sendReset(req, user);
     }
     res.json({ ok: true });
+  });
+
+  app.post('/api/auth/password/change', async (req, res, next) => {
+    if (!jsonOnly(req, res)) return;
+    if (!req.user) return fail(res, 401, 'Bitte zuerst anmelden');
+    // Wrong current passwords count like failed logins.
+    const accountKey = `${req.ip}|${req.user.email.toLowerCase()}`;
+    const wait = loginPerAccount.blocked(accountKey);
+    if (wait) {
+      return res.set('Retry-After', String(wait)).status(429)
+        .json({ error: `Zu viele Fehlversuche – bitte in ${Math.ceil(wait / 60)} Minuten erneut versuchen` });
+    }
+    try {
+      const r = await auth.changePassword(req.user, req.body?.current, req.body?.password, req.session.tokenHash);
+      if (r.error) {
+        if (r.wrong) loginPerAccount.hit(accountKey);
+        return fail(res, r.status, r.error);
+      }
+      loginPerAccount.reset(accountKey);
+      // A notice, so that a change by somebody else does not go unnoticed (in the background).
+      mailer.send({
+        to: r.user.email,
+        subject: 'MyForrest: Passwort geändert',
+        text: [
+          `Hallo ${r.user.name}`,
+          '',
+          `Das Passwort deines MyForrest-Kontos (${r.user.email}) wurde soeben geändert${r.endedSessions ? '; andere Geräte sind abgemeldet' : ''}.`,
+          '',
+          'Warst du das nicht? Dann setze das Passwort hier sofort neu:',
+          `${baseUrl(req)}/ → Anmelden → Passwort vergessen?`,
+        ].join('\n'),
+      }).catch((err) => console.error(`Hinweis zur Passwortänderung an Konto ${r.user.id} fehlgeschlagen: ${err.message}`));
+      res.json({ user: selfJson(r.user), endedSessions: r.endedSessions });
+    } catch (err) {
+      next(err);
+    }
   });
 
   app.get('/api/auth/password/reset', (req, res) => {

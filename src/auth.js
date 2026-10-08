@@ -333,6 +333,26 @@ function createAuth(db, { adminEmail = null } = {}) {
     return { user: userById.get(r.user.id) };
   }
 
+  /**
+   * Changes the password of a logged-in account after checking the current
+   * one. Every other session of the account ends (the one in `keepTokenHash`
+   * stays), and open reset links stop working.
+   */
+  async function changePassword(user, current, password, keepTokenHash) {
+    if (!hasPassword(user)) return { error: 'Dieses Konto hat noch kein Passwort', status: 400 };
+    if (typeof password !== 'string' || password.length < 8 || password.length > 200) {
+      return { error: 'Das neue Passwort braucht mindestens 8 Zeichen', status: 400 };
+    }
+    if (typeof current !== 'string' || current.length > 200 || !(await verifyPassword(current, user.password_hash))) {
+      return { error: 'Das aktuelle Passwort stimmt nicht', status: 403, wrong: true };
+    }
+    const hash = await hashPassword(password);
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, user.id);
+    db.prepare("DELETE FROM email_tokens WHERE user_id = ? AND purpose = 'reset'").run(user.id);
+    const ended = db.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?').run(user.id, keepTokenHash).changes;
+    return { user: userById.get(user.id), endedSessions: Number(ended) };
+  }
+
   const userByEmail = (email) => (typeof email === 'string' && EMAIL_RE.test(email.trim()) ? db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim()) : null);
 
   const identitiesOf = (userId) => db.prepare('SELECT provider FROM identities WHERE user_id = ? ORDER BY provider').all(userId).map((r) => r.provider);
@@ -391,7 +411,7 @@ function createAuth(db, { adminEmail = null } = {}) {
 
   return {
     register, authenticate, createSession, session, destroySession, identityLogin, identitiesOf, unlinkIdentity,
-    createEmailToken, confirmEmail, checkResetToken, resetPassword, userByEmail,
+    createEmailToken, confirmEmail, checkResetToken, resetPassword, changePassword, userByEmail,
     userById: (id) => userById.get(id),
   };
 }

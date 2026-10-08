@@ -90,6 +90,7 @@ function renderNav() {
       ...(u.emailVerified ? [] : [el('span', { class: 'menu-unverified small', text: 'E-Mail-Adresse noch nicht bestätigt' })]),
     ]),
     ...(u.emailVerified ? [] : [item('Bestätigungslink senden', resendVerification)]),
+    u.hasPassword ? item('Passwort ändern', () => openAuth('change')) : item('Passwort festlegen', setPasswordByMail),
     ...providerItems,
     ...(isMod() ? [item('Moderation', () => openModeration('reported'))] : []),
     ...(u.role === 'admin' ? [item('Konten & Rollen', () => openModeration('users'))] : []),
@@ -117,6 +118,17 @@ async function resendVerification() {
   try {
     const r = await jsonPost('/api/auth/verify/resend');
     alert(VERIFY_MESSAGE[r.verification](Account.user.email));
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+/** Accounts from Google/GitHub have no password: they set one through the reset link. */
+async function setPasswordByMail() {
+  if (!confirm(`Wir schicken dir einen Link an ${Account.user.email}, mit dem du ein Passwort festlegst. Senden?`)) return;
+  try {
+    await jsonPost('/api/auth/password/forgot', { email: Account.user.email });
+    alert('Der Link ist unterwegs. Er ist 1 Stunde gültig.');
   } catch (err) {
     alert(err.message);
   }
@@ -161,8 +173,11 @@ authDialog.innerHTML = `
       <input name="name" autocomplete="nickname" maxlength="40"></label>
     <label class="field" data-modes="login register forgot"><span id="auth-login-label">E-Mail oder Name</span>
       <input name="login" autocomplete="username" required></label>
-    <label class="field" data-modes="login register reset"><span><span id="auth-password-label">Passwort</span>
-      <em data-modes="register reset">mindestens 8 Zeichen</em></span>
+    <input name="username" autocomplete="username" hidden>
+    <label class="field" data-modes="change"><span>Aktuelles Passwort</span>
+      <input name="current" type="password" autocomplete="current-password"></label>
+    <label class="field" data-modes="login register reset change"><span><span id="auth-password-label">Passwort</span>
+      <em data-modes="register reset change">mindestens 8 Zeichen</em></span>
       <input name="password" type="password" autocomplete="current-password" required minlength="8"></label>
     <p class="auth-switch small" data-modes="login"><button type="button" class="link" data-to="forgot">Passwort vergessen?</button></p>
     <p class="auth-switch small" data-modes="forgot"><button type="button" class="link" data-to="login">Zurück zur Anmeldung</button></p>
@@ -184,6 +199,7 @@ const AUTH_MODES = {
   register: { title: 'Konto erstellen', submit: 'Registrieren', login: 'E-Mail', password: 'Passwort' },
   forgot: { title: 'Passwort vergessen', submit: 'Link senden', login: 'E-Mail' },
   reset: { title: 'Neues Passwort', submit: 'Passwort speichern', password: 'Neues Passwort' },
+  change: { title: 'Passwort ändern', submit: 'Passwort ändern', password: 'Neues Passwort' },
 };
 
 function setAuthMode(mode) {
@@ -191,6 +207,8 @@ function setAuthMode(mode) {
   const m = AUTH_MODES[mode];
   authDialog.querySelectorAll('[role="tab"]').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.mode === mode)));
   authDialog.querySelectorAll('[data-modes]').forEach((n) => { n.hidden = !n.dataset.modes.split(' ').includes(mode); });
+  // Hidden, for password managers: the account the new password belongs to.
+  authForm.username.value = mode === 'change' ? Account.user?.email || '' : '';
   if (m.login) $('auth-login-label').textContent = m.login;
   if (m.password) $('auth-password-label').textContent = m.password;
   const byEmail = mode !== 'login';
@@ -249,7 +267,9 @@ authForm.addEventListener('submit', async (e) => {
       register: ['register', { email: f.login.value, name: f.name.value, password: f.password.value }],
       forgot: ['password/forgot', { email: f.login.value }],
       reset: ['password/reset', { token: resetToken, password: f.password.value }],
+      change: ['password/change', { current: f.current.value, password: f.password.value }],
     }[authMode];
+    // fetch() adds the CSRF token of the session (see the top of this file).
     const res = await fetch(`/api/auth/${url}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
@@ -260,6 +280,13 @@ authForm.addEventListener('submit', async (e) => {
       $('auth-error').classList.add('ok');
       $('auth-error').hidden = false;
       submit.hidden = true;
+      return;
+    }
+    if (authMode === 'change') {
+      Account.user = data.user;
+      authDialog.close();
+      renderNav();
+      alert(`Dein Passwort ist geändert.${data.endedSessions ? ' Auf anderen Geräten bist du abgemeldet.' : ''}`);
       return;
     }
     const wasReset = authMode === 'reset';
