@@ -10,6 +10,8 @@
  *   GET  /api/satellite/alerts       spots whose last months dropped against earlier years (early warning)
  *   GET  /api/satellite/calibration  thresholds of the early warning, calibrated on confirmed damage
  *   POST /api/satellite/calibration  calibrate again now
+ *   GET  /api/satellite/harmonization  how Landsat is mapped onto the Sentinel-2 scale (harmonize.js)
+ *   POST /api/satellite/harmonization  fit it again now
  *
  * A watcher refreshes the series of all spots once a day (SATELLITE_WATCH_HOURS,
  * 0 = off), so drops show up without anyone opening the spot or taking a photo.
@@ -378,6 +380,8 @@ module.exports = function registerVegetation(app, {
   });
 
   app.get('/api/satellite/calibration', (req, res) => res.json(calibration()));
+  app.get('/api/satellite/harmonization', (req, res) => res.json(sentinel ? sentinel.harmonization() : {}));
+  app.post('/api/satellite/harmonization', (req, res) => res.json(sentinel ? sentinel.harmonize() : {}));
   app.post('/api/satellite/calibration', (req, res) => res.json(recalibrate()));
 
   /** Refreshes the satellite series of every spot that is due, one after the other. */
@@ -392,7 +396,8 @@ module.exports = function registerVegetation(app, {
           await refreshNdvi(id);
           refreshed++;
         }
-        // New series or new photos since the last round: calibrate again.
+        // New scenes or new photos since the last round: harmonise Landsat again, then calibrate on the result.
+        sentinel.harmonize();
         recalibrate();
         return refreshed;
       })().finally(() => { watching = null; });

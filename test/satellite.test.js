@@ -173,7 +173,8 @@ test('photos from before 2017 get Landsat history; Sentinel-2 covers 2017 onward
     assert.deepEqual(ndvi.monthly.map((m) => [m.month, m.ndvi, m.sensors.join()]), [['2015-07', 0.842, 'L8']]);
     assert.match(ndvi.source, /Landsat/);
     const landsatSearch = log.find((r) => r.url.endsWith('/search')).body;
-    assert.equal(landsatSearch.datetime, '2014-07-15T00:00:00Z/2016-12-31T23:59:59Z');
+    // Landsat reaches into the overlap years with Sentinel-2 (harmonisation).
+    assert.equal(landsatSearch.datetime, '2014-07-15T00:00:00Z/2018-12-31T23:59:59Z');
   });
 });
 

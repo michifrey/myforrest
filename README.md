@@ -123,7 +123,7 @@ oder *Windwurf nach Sturm*, abgestimmt auf die Baumarten am Spot. Im Beispiel li
 schon Ende August, nach einem Sommer mit 29 % des üblichen Regens.
 
 *Vegetation im Zeitverlauf* (rechts) zeigt den Grünanteil aus den Fotos und den NDVI und Feuchteindex
-NDMI aus Sentinel-2, vor 2017 aus Landsat. Fällt ein Index an einem Spot ohne neues Foto deutlich unter
+NDMI aus Sentinel-2, vor 2017 aus Landsat, an Sentinel-2 angeglichen. Fällt ein Index an einem Spot ohne neues Foto deutlich unter
 die Werte derselben Jahreszeit in den Vorjahren, meldet die **Frühwarnung**, dass sich ein Besuch lohnt.
 Hier: ein Fichtenbestand mit Borkenkäfer, dessen letztes Foto vom Juli 2025 stammt. Die Schwellen der
 Frühwarnung eichen sich an bestätigten Schäden.
