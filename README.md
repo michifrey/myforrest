@@ -229,8 +229,16 @@ sich deshalb beim Hochladen als **geschützter Fund** markieren. Erkennt Pl@ntNe
 eine Orchidee oder einen Enzian, wird es automatisch geschützt. Die Öffentlichkeit sieht davon nur ein
 schraffiertes **5-km-Quadrat** (links). Foto, Spot und genaue Lage sehen nur **verifizierte PRO-Mitglieder**
 wie Forstdienste oder Naturschutzorganisationen (rechts, mit Schloss am Pin). PRO beantragt man im
-Konto-Menü, eine Administratorin oder ein Administrator prüft den Antrag. Geschützte Funde fehlen in allen
+Konto-Menü, eine Administratorin oder ein Administrator prüft den Antrag. Die Verifizierung gilt ein Jahr;
+einen Monat vor dem Ablauf erinnert eine E-Mail daran, sie zu bestätigen. Geschützte Funde fehlen in allen
 offenen Geodaten, Kacheln und Exporten für die Öffentlichkeit.
+
+<p align="center"><img src="docs/screenshots/schutzlisten.jpg" width="560" alt="Schutzlisten der Kantone in der Verwaltung"></p>
+
+Neben der eingebauten Liste laden Admins die **Schutzlisten der Kantone** (kantonale
+Naturschutzverordnungen, Rote Liste) als CSV. Eine Art gilt dann dort als geschützt, wo der Spot liegt;
+den Kanton fragt der Server einmal pro Spot bei geo.admin.ch ab. Funde, die schon vorher bestimmt wurden,
+werden beim Laden einer Liste nachträglich geschützt.
 
 ### 12. Konto: E-Mail, Google oder GitHub
 

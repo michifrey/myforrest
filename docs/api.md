@@ -13,6 +13,10 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `POST`   | `/api/videos`                | Video-Upload (multipart: `video`, optional `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `clockShiftSeconds`, `frameDistanceM`, `frameIntervalS`, `panorama` = `auto`/`1`/`0`, `async=1` für Hintergrundverarbeitung) |
 | `GET`    | `/api/videos/jobs/:id`       | Fortschritt und Ergebnis eines Video-Uploads mit `async=1` |
 | `GET`    | `/api/videos/config`         | ffmpeg verfügbar? Standardabstand und -intervall         |
+| `GET`    | `/api/protected-species`     | Geladene Schutzlisten pro Kanton (`canton`, `entries`, `sources`, `loadedAt`) |
+| `GET`    | `/api/protected-species/check?name=&spot=` | Ob eine Art am Spot geschützt ist (`protected`: Liste `eingebaut`, `CH` oder Kanton, Status, Quelle) und der Kanton des Spots |
+| `POST`   | `/api/protected-species/import` | Admins: Schutzliste als CSV (`kanton;art;status;quelle`), ersetzt die Listen dieser Kantone; schützt bereits bestimmte Funde (`protectedPhotos`) |
+| `DELETE` | `/api/protected-species/:canton` | Admins: Liste eines Kantons entfernen |
 | `POST`   | `/api/spots/:id/align`       | Ausrichtung aller Fotos eines Spots neu berechnen        |
 | `GET`    | `/api/spots/:id/split`       | Vorschlag zum Aufteilen nach Blickrichtung: `mixed`, `groups` (`heading`, `photoIds`; die grösste Gruppe zuerst, sie behält den Spot) |
 | `POST`   | `/api/spots/:id/split`       | Spot aufteilen: ohne Body nach Blickrichtung, mit `{ photoIds }` diese Fotos in einen neuen Spot; Antwort `spots` (alle betroffenen Spots), danach neu ausgerichtet |

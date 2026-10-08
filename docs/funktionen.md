@@ -755,10 +755,35 @@ Ein Foto wird geschützt,
 - beim Hochladen mit *Geschützter Fund* (Fotos und Videos),
 - automatisch, wenn Pl@ntNet eine sensible Art erkennt (Score ab 0,3): alle einheimischen Orchideen,
   Enziane, Küchenschellen, Edelweiss, Bärlappe, seltene Farne, Türkenbund und weitere (`src/sensitive.js`,
-  erweiterbar mit `SENSITIVE_SPECIES`). Pilze erkennt Pl@ntNet nicht; Pilzstellen schützt man beim Hochladen,
+  erweiterbar mit `SENSITIVE_SPECIES`), dazu die Arten der geladenen kantonalen Schutzlisten (siehe unten).
+  Pilze erkennt Pl@ntNet nicht; Pilzstellen schützt man beim Hochladen,
 - oder nachträglich mit *Schützen* unter dem Foto, durch die Person, die es hochgeladen hat, durch
-  PRO-Mitglieder oder die Moderation. *Schutz aufheben* geht ebenso.
+  PRO-Mitglieder oder die Moderation. *Schutz aufheben* geht ebenso. Ein so freigegebenes Foto schützt
+  weder eine neue Bestimmung noch eine neue Schutzliste wieder.
 
+### Schutzlisten der Kantone
+
+Was geschützt ist, regelt jeder Kanton selbst (Naturschutzverordnungen, kantonale Rote Listen). Admins laden
+diese Listen unter *Moderation → Schutzlisten* (oder `POST /api/protected-species/import`) als CSV:
+
+```
+kanton;art;status;quelle
+ZH;Anemone sylvestris;geschützt;Kantonale Naturschutzverordnung ZH
+ZH;Dianthus;geschützt (alle Arten);Kantonale Naturschutzverordnung ZH
+CH;Saxifraga mutata;VU;Rote Liste Gefässpflanzen 2016
+```
+
+- `kanton` ist das Kürzel (ZH, BE …) oder `CH` für die ganze Schweiz; `art` eine Art oder eine ganze
+  Gattung. Eine Datei ersetzt die bisherigen Listen der Kantone, die sie enthält.
+- Eine Art gilt als geschützt, wenn sie in der eingebauten Liste, in `CH` oder in der Liste des Kantons
+  steht, in dem der Spot liegt. Den **Kanton** fragt der Server einmal pro Spot bei swisstopo ab
+  (geo.admin.ch, Kantonsgrenzen aus swissBOUNDARIES3D) und speichert ihn. Ist er nicht bekannt (Dienst nicht
+  erreichbar), zählt vorsichtshalber jede kantonale Liste; ausserhalb der Schweiz nur die eingebaute und `CH`.
+- Beim Laden werden Funde, die schon als eine dieser Arten bestimmt sind, nachträglich geschützt.
+- Eine Liste entfernen hebt keinen Schutz auf.
+
+MyForrest bringt keine kantonalen Listen mit: Sie ändern sich, und ihre Nutzung regeln die Kantone bzw.
+Info Flora. Die Listen werden bei der jeweiligen Fachstelle bezogen.
 ### Wer was sieht
 
 | | Öffentlichkeit | Wer hochgeladen hat | PRO-Mitglieder, Moderation |
@@ -784,6 +809,13 @@ Anträge zuoberst unter *Konten & Rollen* und können sie verifizieren, ablehnen
 jede Entscheidung steht im Moderationsprotokoll. PRO ist unabhängig von der Rolle (Mitglied, Moderation,
 Administration). PRO-Mitglieder können Fotoaufträge als *nur für PRO* markieren; Aufträge an geschützten
 Spots sind das automatisch.
+
+**Jährlich bestätigen**: Eine Verifizierung gilt ein Jahr (`PRO_VALID_DAYS`). Ab 60 Tagen vor dem Ablauf
+zeigt das Konto-Menü „PRO läuft am … ab – verlängern“; ein Monat davor und am Ablauf kommt je eine E-Mail.
+Mit *Verlängerung beantragen* bestätigt das Mitglied Organisation und Angaben; Admins sehen den Antrag in der
+Kontenliste zuoberst und verlängern um ein Jahr ab dem bisherigen Ende. Bis dahin gilt die bisherige
+Verifizierung; danach sieht das Konto keine geschützten Funde mehr, bis verlängert ist. Verifizierungen aus
+der Zeit vor der Befristung gelten ein Jahr ab dem Entscheid, mindestens aber noch 30 Tage.
 
 ## Konten, Moderation und Lizenzen
 

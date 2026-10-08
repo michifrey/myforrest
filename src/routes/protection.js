@@ -8,6 +8,10 @@
  *
  *   GET /api/protected/cells   [{ bbox: [w, s, e, n], spots }] for the cells with protected finds
  *                              the viewer cannot see; [] for PRO members and moderation
+ *   GET    /api/protected-species              loaded protection lists per canton
+ *   GET    /api/protected-species/check?name=&spot=  whether (and by which list) a species is protected there
+ *   POST   /api/protected-species/import       admins: CSV `kanton;art;status;quelle` (replaces those cantons)
+ *   DELETE /api/protected-species/:canton      admins: remove a canton's list
  *
  * The grid is fixed in degrees (0.045° latitude × 0.065° longitude, about
  * 5 × 5 km in Central Europe), so a cell never moves with the data.
@@ -16,7 +20,40 @@
 const CELL_LAT = 0.045;
 const CELL_LON = 0.065;
 
-module.exports = function registerProtection(app, { db, accounts }) {
+const express = require('express');
+
+module.exports = function registerProtection(app, { db, accounts, sensitiveLists, cantons, reprotect }) {
+  /** Admins only (a server without accounts, the prototype, stays open). */
+  const adminOnly = (req, res, next) => {
+    const hasUsers = db.prepare('SELECT 1 FROM users LIMIT 1').get();
+    if (hasUsers && req.user?.role !== 'admin') return res.status(403).json({ error: 'Nur für Admins' });
+    return next();
+  };
+
+  app.get('/api/protected-species', (req, res) => res.json(sensitiveLists.status()));
+
+  app.get('/api/protected-species/check', async (req, res) => {
+    const name = String(req.query.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'Parameter "name" fehlt' });
+    const spot = Number(req.query.spot);
+    const canton = Number.isSafeInteger(spot) && spot > 0 ? await cantons.ofSpot(spot) : null;
+    res.json({ name, canton, protected: sensitiveLists.why(name, canton) });
+  });
+
+  app.post('/api/protected-species/import', adminOnly, express.text({ type: () => true, limit: '5mb' }), (req, res) => {
+    try {
+      const result = sensitiveLists.importCsv(typeof req.body === 'string' ? req.body : '', { replace: req.query.replace !== '0' });
+      // Finds already identified as one of these species are protected now.
+      res.json({ ...result, protectedPhotos: reprotect() });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.delete('/api/protected-species/:canton', adminOnly, (req, res) => {
+    res.json({ removed: sensitiveLists.remove(req.params.canton) });
+  });
+
   app.get('/api/protected/cells', (req, res) => {
     if (accounts.canSeeProtected(req)) return res.json([]);
     // Spots with a protected photo that this viewer may not see; spots that are visible anyway are left out.

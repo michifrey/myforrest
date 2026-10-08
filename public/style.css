@@ -1319,3 +1319,8 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 #pro-dialog { max-width: 520px; }
 .pro-cell { display: flex; flex-direction: column; gap: 0.2rem; }
 .pro-actions { display: flex; gap: 0.5rem; align-items: center; }
+
+/* PRO validity and cantonal protection lists (account.js) */
+.pro-cell .danger { color: var(--danger); }
+.pro-renewal { color: var(--gold); font-weight: 600; }
+.lists-import { display: block; margin-top: 0.8rem; }

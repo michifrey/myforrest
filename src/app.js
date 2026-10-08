@@ -29,7 +29,8 @@ const { createElevation } = require('./elevation');
 const registerAccounts = require('./routes/accounts');
 const { createOAuth, providersFromEnv } = require('./oauth');
 const { createMailer } = require('./mail');
-const { isSensitive } = require('./sensitive');
+const { createSensitiveLists } = require('./sensitive');
+const { createCantons } = require('./canton');
 const {
   altitudeShift, aspectShift, coldPoolShift, expectedColourDoy, aspectLabel, aspectFromCompass, COMPASS, LANDFORMS, landform,
 } = require('./phenology');
@@ -93,6 +94,25 @@ function createApp({
     db, requireLogin, requireVerifiedEmail, adminEmail, rateLimits, oauth, mailer, publicUrl: process.env.PUBLIC_URL || null,
   };
   const accounts = registerAccounts(app, accountsCtx);
+  app.locals.remindPro = accounts.remindPro;
+  // Protection lists per canton (src/sensitive.js) and the canton of each spot (src/canton.js).
+  const sensitiveLists = createSensitiveLists(db);
+  const cantons = createCantons({ db, fetchImpl: weatherFetch });
+
+  /**
+   * Protects unprotected photos whose identifications name a sensitive species
+   * there (after a new protection list); photos released by hand stay released.
+   * Returns how many were protected.
+   */
+  function reprotect() {
+    const rows = db.prepare(`SELECT DISTINCT p.id, s.canton, i.scientific_name FROM photos p
+      JOIN spots s ON s.id = p.spot_id JOIN identifications i ON i.photo_id = p.id
+      WHERE COALESCE(p.protected, 0) = 0 AND p.protected_reason IS NULL AND i.score >= ?`).all(NEOPHYTE_MIN_SCORE);
+    const ids = new Set(rows.filter((r) => sensitiveLists.isSensitive(r.scientific_name, r.canton)).map((r) => r.id));
+    const set = db.prepare("UPDATE photos SET protected = 1, protected_reason = 'art' WHERE id = ?");
+    for (const id of ids) set.run(id);
+    return ids.size;
+  }
   // The service worker must never be served stale from the HTTP cache, or app updates would stall.
   app.get('/sw.js', (req, res) => {
     res.set({ 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/' });
@@ -1044,6 +1064,8 @@ function createApp({
     try {
       const organ = ['leaf', 'flower', 'fruit', 'bark', 'habit', 'auto'].includes(req.body?.organ) ? req.body.organ : 'auto';
       const results = await identifyPlant(path.join(uploadDir, photo.file), { apiKey: plantnetKey, organ, fetchImpl });
+      // Cantonal protection lists apply where the spot is (unknown canton: any canton's list counts).
+      const canton = await cantons.ofSpot(photo.spot_id);
       transaction(db, () => {
         db.prepare('DELETE FROM identifications WHERE photo_id = ?').run(id);
         const ins = db.prepare(`
@@ -1054,9 +1076,9 @@ function createApp({
         if (results.some((r) => r.neophyte && r.score >= NEOPHYTE_MIN_SCORE)) {
           db.prepare('INSERT OR IGNORE INTO photo_tags (photo_id, tag) VALUES (?, ?)').run(id, 'neophyt');
         }
-        // Rare and collected species: the find is protected (src/sensitive.js).
-        if (results.some((r) => isSensitive(r.scientificName) && r.score >= NEOPHYTE_MIN_SCORE)) {
-          db.prepare("UPDATE photos SET protected = 1, protected_reason = COALESCE(protected_reason, 'art') WHERE id = ? AND protected = 0").run(id);
+        // Rare and collected species: the find is protected (src/sensitive.js), unless released by hand before.
+        if (results.some((r) => sensitiveLists.isSensitive(r.scientificName, canton) && r.score >= NEOPHYTE_MIN_SCORE)) {
+          db.prepare("UPDATE photos SET protected = 1, protected_reason = 'art' WHERE id = ? AND protected = 0 AND protected_reason IS NULL").run(id);
         }
         // Confidently recognised trees join the spot's species inventory.
         for (const r of results) {
@@ -1072,7 +1094,7 @@ function createApp({
   });
 
   require('./routes/species')(app, { db, spotRadiusM, visibleSql: accounts.visibleSql });
-  require('./routes/protection')(app, { db, accounts });
+  require('./routes/protection')(app, { db, accounts, sensitiveLists, cantons, reprotect });
   require('./routes/ogc')(app, { db, spotRadiusM, dataDir, background, tiles: tileOptions });
   require('./routes/video')(app, { db, uploadDir, tmpDir, spotRadiusM, activities: ACTIVITIES, photoJson, getPhoto, setTags, alignPhoto, analyzeChange, analyzeContext, background, safeAlign });
   const push = require('./routes/push')(app, { db, idParam, adminEmail, ...pushOptions });
