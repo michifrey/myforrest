@@ -45,6 +45,11 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 | `SATELLITE_WATCH_HOURS` | `24` | Abstand der Frühwarn-Runde über alle Spots in Stunden; `0` = aus |
 | `REQUIRE_LOGIN`    | –        | `1`: Uploads und Änderungen nur mit Konto      |
 | `ADMIN_EMAIL`      | –        | Dieses Konto wird Admin (sonst das erste Konto) |
+| `REQUIRE_VERIFIED_EMAIL` | – | `1`: Uploads und Änderungen nur mit bestätigter E-Mail-Adresse (schliesst `REQUIRE_LOGIN` ein) |
+| `SMTP_URL`         | –        | Mailserver für Bestätigungslinks, z. B. `smtps://user:passwort@smtp.example.org` (siehe [unten](#e-mail-versand)); ohne ihn stehen die Links im Server-Log |
+| `MAIL_FROM`        | `MyForrest <no-reply@…>` | Absender der E-Mails |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | – | Aktiviert „Mit Google anmelden“ (siehe [unten](#anmelden-mit-google-und-github)) |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | – | Aktiviert „Mit GitHub anmelden“ |
 | `ROUTER_URL`       | `https://brouter.de/brouter` | Routing-Dienst im Format von [BRouter](https://brouter.de) für den Wege-Magnet beim Zeichnen von Touren; leer (`ROUTER_URL=`) = aus, dann gerade Linien. Für viel Verkehr einen eigenen BRouter betreiben |
 | `SENSITIVE_SPECIES` | – | Weitere Gattungen oder Arten (kommagetrennt), deren Funde automatisch geschützt werden, z. B. `Trollius,Lilium bulbiferum` |
 | `ROUTER_PROFILE`   | `hiking-mountain` | BRouter-Profil für das Routing |
@@ -52,6 +57,46 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 | `VAPID_SUBJECT`    | `mailto:ADMIN_EMAIL` | Kontakt für die Push-Dienste (`mailto:` oder `https:`) |
 | `PUSH_HOSTS`       | –        | Weitere erlaubte Push-Dienste (Hostnamen, kommagetrennt), zusätzlich zu Google, Mozilla, Apple und Microsoft |
 | `DETECTOR_URL`     | –        | Externer Objektdetektor (siehe [unten](#externer-detektor)); ohne ihn laufen die eingebauten Heuristiken |
+
+## E-Mail-Versand
+
+Wer sich mit E-Mail und Passwort registriert, bekommt einen Link zum Bestätigen der Adresse (24 Stunden
+gültig, im Konto-Menü neu anforderbar), und wer das Passwort vergessen hat, einen Link zum Zurücksetzen. Verschickt wird über SMTP, ohne zusätzliche Pakete:
+
+```bash
+SMTP_URL='smtps://wald%40example.org:passwort@smtp.example.org' \
+MAIL_FROM='MyForrest <wald@example.org>' npm start
+```
+
+- `smtps://` verbindet direkt über TLS (Port 465), `smtp://` über STARTTLS (Port 587). Ohne STARTTLS
+  verweigert die App den Versand, ausser auf `localhost` (lokales Relay). Sonderzeichen in Benutzername und
+  Passwort URL-kodieren (`@` → `%40`, `:` → `%3A`).
+- Der Link zeigt auf `PUBLIC_URL` (sonst auf die Adresse der Anfrage) – für den Betrieb also `PUBLIC_URL`
+  setzen.
+- Ohne `SMTP_URL` schreibt die App die E-Mail samt Link ins Server-Log; das reicht zum Ausprobieren.
+- Mit `REQUIRE_VERIFIED_EMAIL=1` können nur Konten mit bestätigter Adresse Fotos beitragen und ändern.
+  Konten aus der Zeit vor dieser Funktion fordern ihren Link im Konto-Menü an.
+
+## Anmelden mit Google und GitHub
+
+Neben E-Mail und Passwort kann man sich mit einem Google- oder GitHub-Konto anmelden oder registrieren.
+Ein Anbieter erscheint im Anmeldedialog, sobald Client-ID und Secret gesetzt sind. Die Rücksprungadresse
+lautet `<PUBLIC_URL>/api/auth/oauth/<anbieter>/callback`; ohne `PUBLIC_URL` wird sie aus der Anfrage
+gebildet. Sie muss beim Anbieter genau so eingetragen sein.
+
+- *Google*: In der [Google Cloud Console](https://console.cloud.google.com/apis/credentials) einen
+  OAuth-Client vom Typ „Webanwendung“ anlegen, als autorisierte Weiterleitungs-URI
+  `https://example.org/api/auth/oauth/google/callback` eintragen. Bereiche: `openid`, `email`, `profile`.
+- *GitHub*: Unter *Settings → Developer settings → [OAuth Apps](https://github.com/settings/developers)*
+  eine App anlegen, *Authorization callback URL* `https://example.org/api/auth/oauth/github/callback`.
+
+```bash
+PUBLIC_URL=https://example.org \
+GOOGLE_CLIENT_ID=… GOOGLE_CLIENT_SECRET=… \
+GITHUB_CLIENT_ID=… GITHUB_CLIENT_SECRET=… npm start
+```
+
+Für lokale Versuche geht auch `http://localhost:3000` als Rücksprungadresse.
 
 ## Externer Detektor
 

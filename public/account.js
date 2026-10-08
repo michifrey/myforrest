@@ -9,9 +9,11 @@ const Account = {
   user: null,
   csrf: null,
   requireLogin: false,
+  requireVerifiedEmail: false,
   licenses: [],
   defaultLicense: 'cc-by-sa-4.0',
   reportReasons: {},
+  providers: [], // identity providers enabled on the server: [{ id, label }]
 };
 window.Account = Account;
 
@@ -81,9 +83,22 @@ function renderNav() {
     el('span', { class: 'account-label', text: u.name }),
   );
   const item = (text, onclick, extra = {}) => el('button', { type: 'button', role: 'menuitem', class: 'menu-item', onclick, ...extra }, text);
+  const linked = u.identities || [];
+  const providerItems = Account.providers.map((p) => (linked.includes(p.id)
+    ? item(`${p.label} trennen`, () => unlinkProvider(p))
+    : el('a', { role: 'menuitem', class: 'menu-item', href: `/api/auth/oauth/${p.id}`, text: `Mit ${p.label} verknüpfen` })));
+  const via = linked.map((id) => Account.providers.find((p) => p.id === id)?.label || id);
   menu.replaceChildren(
-    el('div', { class: 'menu-who' }, [el('strong', { text: u.name }), el('span', { class: 'muted small', text: `${u.email} · ${ROLE_LABEL[u.role]}${u.pro ? ` · PRO (${u.organization})` : ''}` })]),
+    el('div', { class: 'menu-who' }, [
+      el('strong', { text: u.name }),
+      el('span', { class: 'muted small', text: `${u.email}${u.emailVerified ? ' ✓' : ''} · ${ROLE_LABEL[u.role]}${u.pro ? ` · PRO (${u.organization})` : ''}` }),
+      ...(via.length ? [el('span', { class: 'muted small', text: `Anmeldung über ${via.join(', ')}${u.hasPassword ? ' oder Passwort' : ''}` })] : []),
+      ...(u.emailVerified ? [] : [el('span', { class: 'menu-unverified small', text: 'E-Mail-Adresse noch nicht bestätigt' })]),
+    ]),
+    ...(u.emailVerified ? [] : [item('Bestätigungslink senden', resendVerification)]),
     item(u.pro ? 'PRO-Mitgliedschaft' : u.proStatus === 'angefragt' ? 'PRO: Antrag in Prüfung' : 'PRO-Mitgliedschaft beantragen', openPro),
+    u.hasPassword ? item('Passwort ändern', () => openAuth('change')) : item('Passwort festlegen', setPasswordByMail),
+    ...providerItems,
     ...(isMod() ? [item('Moderation', () => openModeration('reported'))] : []),
     ...(u.role === 'admin' ? [item('Konten & Rollen', () => openModeration('users'))] : []),
     item('Abmelden', logout, { class: 'menu-item danger' }),
@@ -99,6 +114,43 @@ menuBtn.addEventListener('click', () => (Account.user ? toggleMenu() : openAuth(
 document.addEventListener('click', (e) => { if (!menu.hidden && !e.target.closest('.account')) toggleMenu(false); });
 menu.addEventListener('keydown', (e) => { if (e.key === 'Escape') { toggleMenu(false); menuBtn.focus(); } });
 menu.addEventListener('click', (e) => { if (e.target.closest('.menu-item')) toggleMenu(false); });
+
+const VERIFY_MESSAGE = {
+  sent: (email) => `Wir haben dir einen Bestätigungslink an ${email} geschickt. Er ist 24 Stunden gültig.`,
+  logged: () => 'Auf diesem Server ist kein E-Mail-Versand eingerichtet; der Bestätigungslink steht im Server-Log.',
+  failed: () => 'Der Bestätigungslink konnte gerade nicht verschickt werden. Im Konto-Menü kannst du ihn später neu anfordern.',
+};
+
+async function resendVerification() {
+  try {
+    const r = await jsonPost('/api/auth/verify/resend');
+    alert(VERIFY_MESSAGE[r.verification](Account.user.email));
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+/** Accounts from Google/GitHub have no password: they set one through the reset link. */
+async function setPasswordByMail() {
+  if (!confirm(`Wir schicken dir einen Link an ${Account.user.email}, mit dem du ein Passwort festlegst. Senden?`)) return;
+  try {
+    await jsonPost('/api/auth/password/forgot', { email: Account.user.email });
+    alert('Der Link ist unterwegs. Er ist 1 Stunde gültig.');
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function unlinkProvider(p) {
+  if (!confirm(`Anmeldung mit ${p.label} von diesem Konto trennen?`)) return;
+  try {
+    const r = await api(`/api/auth/identities/${p.id}`, { method: 'DELETE' });
+    Account.user = r.user;
+    renderNav();
+  } catch (err) {
+    alert(err.message);
+  }
+}
 
 async function logout() {
   await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
@@ -118,17 +170,24 @@ authDialog.innerHTML = `
       <p class="eyebrow">Konto</p>
       <h2 id="auth-title">Anmelden</h2>
     </div>
-    <div class="tabs" role="tablist">
+    <div class="tabs" role="tablist" data-modes="login register">
       <button type="button" role="tab" data-mode="login" aria-selected="true">Anmelden</button>
       <button type="button" role="tab" data-mode="register" aria-selected="false">Registrieren</button>
     </div>
     <p id="auth-intro" class="muted small"></p>
-    <label class="field" data-only="register"><span>Name <em>wird bei deinen Fotos genannt</em></span>
+    <div id="auth-providers" class="auth-providers" hidden></div>
+    <label class="field" data-modes="register"><span>Name <em>wird bei deinen Fotos genannt</em></span>
       <input name="name" autocomplete="nickname" maxlength="40"></label>
-    <label class="field"><span data-label-login="E-Mail oder Name" data-label-register="E-Mail">E-Mail oder Name</span>
+    <label class="field" data-modes="login register forgot"><span id="auth-login-label">E-Mail oder Name</span>
       <input name="login" autocomplete="username" required></label>
-    <label class="field"><span>Passwort <em data-only="register">mindestens 8 Zeichen</em></span>
+    <input name="username" autocomplete="username" hidden>
+    <label class="field" data-modes="change"><span>Aktuelles Passwort</span>
+      <input name="current" type="password" autocomplete="current-password"></label>
+    <label class="field" data-modes="login register reset change"><span><span id="auth-password-label">Passwort</span>
+      <em data-modes="register reset change">mindestens 8 Zeichen</em></span>
       <input name="password" type="password" autocomplete="current-password" required minlength="8"></label>
+    <p class="auth-switch small" data-modes="login"><button type="button" class="link" data-to="forgot">Passwort vergessen?</button></p>
+    <p class="auth-switch small" data-modes="forgot"><button type="button" class="link" data-to="login">Zurück zur Anmeldung</button></p>
     <p id="auth-error" class="auth-error" role="alert" hidden></p>
     <div class="row end">
       <button type="button" class="link" id="auth-cancel">Abbrechen</button>
@@ -139,30 +198,66 @@ document.body.append(authDialog);
 const authForm = authDialog.querySelector('form');
 let authMode = 'login';
 let afterAuth = null;
+let resetToken = null;
+
+// Modes of the dialog: log in, register, ask for a reset link, set a new password from the link.
+const AUTH_MODES = {
+  login: { title: 'Anmelden', submit: 'Anmelden', login: 'E-Mail oder Name', password: 'Passwort' },
+  register: { title: 'Konto erstellen', submit: 'Registrieren', login: 'E-Mail', password: 'Passwort' },
+  forgot: { title: 'Passwort vergessen', submit: 'Link senden', login: 'E-Mail' },
+  reset: { title: 'Neues Passwort', submit: 'Passwort speichern', password: 'Neues Passwort' },
+  change: { title: 'Passwort ändern', submit: 'Passwort ändern', password: 'Neues Passwort' },
+};
 
 function setAuthMode(mode) {
   authMode = mode;
-  const reg = mode === 'register';
+  const m = AUTH_MODES[mode];
   authDialog.querySelectorAll('[role="tab"]').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.mode === mode)));
-  authDialog.querySelectorAll('[data-only="register"]').forEach((n) => { n.hidden = !reg; });
-  const loginLabel = authDialog.querySelector('[data-label-login]');
-  loginLabel.textContent = reg ? loginLabel.dataset.labelRegister : loginLabel.dataset.labelLogin;
-  authForm.login.type = reg ? 'email' : 'text';
-  authForm.login.autocomplete = reg ? 'email' : 'username';
-  authForm.password.autocomplete = reg ? 'new-password' : 'current-password';
-  $('auth-title').textContent = reg ? 'Konto erstellen' : 'Anmelden';
-  $('auth-submit').textContent = reg ? 'Registrieren' : 'Anmelden';
+  authDialog.querySelectorAll('[data-modes]').forEach((n) => { n.hidden = !n.dataset.modes.split(' ').includes(mode); });
+  // Hidden, for password managers: the account the new password belongs to.
+  authForm.username.value = mode === 'change' ? Account.user?.email || '' : '';
+  if (m.login) $('auth-login-label').textContent = m.login;
+  if (m.password) $('auth-password-label').textContent = m.password;
+  const byEmail = mode !== 'login';
+  authForm.login.type = byEmail ? 'email' : 'text';
+  authForm.login.autocomplete = byEmail ? 'email' : 'username';
+  authForm.password.autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+  $('auth-title').textContent = m.title;
+  renderProviders();
+  $('auth-submit').textContent = m.submit;
+  $('auth-submit').hidden = false;
   $('auth-error').hidden = true;
+  $('auth-error').classList.remove('ok');
 }
+const setIntro = (text) => {
+  $('auth-intro').textContent = text;
+  $('auth-intro').hidden = !text;
+};
 authDialog.querySelectorAll('[role="tab"]').forEach((t) => t.addEventListener('click', () => setAuthMode(t.dataset.mode)));
+authDialog.querySelectorAll('[data-to]').forEach((b) => b.addEventListener('click', () => {
+  setAuthMode(b.dataset.to);
+  setIntro(b.dataset.to === 'forgot' ? 'Gib die E-Mail-Adresse deines Kontos an. Wir schicken dir einen Link, mit dem du ein neues Passwort festlegst.' : '');
+  authForm.login.focus();
+}));
+
+/** "Continue with Google/GitHub": a plain link, the server redirects to the provider and back. */
+function renderProviders() {
+  const box = $('auth-providers');
+  box.hidden = !Account.providers.length || !['login', 'register'].includes(authMode);
+  box.replaceChildren(
+    ...Account.providers.map((p) => el('a', {
+      class: `btn secondary provider provider-${p.id}`, href: `/api/auth/oauth/${p.id}`, text: `Mit ${p.label} ${authMode === 'register' ? 'registrieren' : 'anmelden'}`,
+    })),
+    el('p', { class: 'auth-or muted small', text: authMode === 'register' ? 'oder mit E-Mail und Passwort' : 'oder mit E-Mail/Name und Passwort' }),
+  );
+}
 $('auth-cancel').addEventListener('click', () => authDialog.close());
 
 /** Opens the dialog; `then` runs after a successful login (e.g. continue to the upload). */
 function openAuth(mode = 'login', { intro = '', then = null } = {}) {
   authForm.reset();
   setAuthMode(mode);
-  $('auth-intro').textContent = intro;
-  $('auth-intro').hidden = !intro;
+  setIntro(intro);
   afterAuth = then;
   authDialog.showModal();
 }
@@ -171,24 +266,46 @@ Account.openAuth = openAuth;
 authForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = authForm;
-  const reg = authMode === 'register';
   const submit = $('auth-submit');
   submit.disabled = true;
   try {
-    const body = reg
-      ? { email: f.login.value, name: f.name.value, password: f.password.value }
-      : { login: f.login.value, password: f.password.value };
-    const res = await fetch(`/api/auth/${reg ? 'register' : 'login'}`, {
+    const [url, body] = {
+      login: ['login', { login: f.login.value, password: f.password.value }],
+      register: ['register', { email: f.login.value, name: f.name.value, password: f.password.value }],
+      forgot: ['password/forgot', { email: f.login.value }],
+      reset: ['password/reset', { token: resetToken, password: f.password.value }],
+      change: ['password/change', { current: f.current.value, password: f.password.value }],
+    }[authMode];
+    // fetch() adds the CSRF token of the session (see the top of this file).
+    const res = await fetch(`/api/auth/${url}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    if (authMode === 'forgot') {
+      $('auth-error').textContent = `Falls es zu ${f.login.value.trim()} ein Konto gibt, ist ein Link unterwegs. Er ist 1 Stunde gültig – schau auch im Spam-Ordner nach.`;
+      $('auth-error').classList.add('ok');
+      $('auth-error').hidden = false;
+      submit.hidden = true;
+      return;
+    }
+    if (authMode === 'change') {
+      Account.user = data.user;
+      authDialog.close();
+      renderNav();
+      alert(`Dein Passwort ist geändert.${data.endedSessions ? ' Auf anderen Geräten bist du abgemeldet.' : ''}`);
+      return;
+    }
+    const wasReset = authMode === 'reset';
+    resetToken = null;
     Account.user = data.user;
     Account.csrf = data.csrfToken;
     authDialog.close();
     renderNav();
     fillLicenseSelect();
     await refreshViews();
+    if (data.verification) alert(VERIFY_MESSAGE[data.verification](data.user.email));
+    if (wasReset) alert('Dein neues Passwort ist gespeichert. Du bist angemeldet; auf anderen Geräten bist du abgemeldet.');
     const next = afterAuth;
     afterAuth = null;
     next?.();
@@ -200,10 +317,18 @@ authForm.addEventListener('submit', async (e) => {
   }
 });
 
-// With REQUIRE_LOGIN, uploading and repeat photos ask to log in first.
+// With REQUIRE_LOGIN, uploading and repeat photos ask to log in first
+// (and with REQUIRE_VERIFIED_EMAIL, to confirm the address).
 document.addEventListener('click', (e) => {
   const trigger = e.target.closest('#open-upload, #open-camera, [data-action="upload"]');
-  if (!trigger || !Account.requireLogin || Account.user) return;
+  if (!trigger) return;
+  if (Account.user && Account.requireVerifiedEmail && !Account.user.emailVerified) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (confirm('Zum Beitragen von Fotos muss deine E-Mail-Adresse bestätigt sein. Neuen Bestätigungslink senden?')) resendVerification();
+    return;
+  }
+  if (!Account.requireLogin || Account.user) return;
   e.preventDefault();
   e.stopImmediatePropagation();
   openAuth('login', {
@@ -579,6 +704,52 @@ $('upload-protected')?.addEventListener('change', (e) => {
     ? 'Ohne Konto siehst du das Foto danach selbst nicht mehr – melde dich an, um deine geschützten Funde zu behalten.' : '';
 });
 
+/* ---------- Back from Google/GitHub (/?auth=… or /?auth_error=…) ---------- */
+
+/** The link from the reset e-mail: /#reset=<token>. */
+async function resetFromLink() {
+  const m = location.hash.match(/^#reset=([\w-]+)$/);
+  if (!m) return false;
+  history.replaceState(null, '', `${location.pathname}${location.search}`);
+  openAuth('reset');
+  try {
+    const who = await api(`/api/auth/password/reset?token=${encodeURIComponent(m[1])}`);
+    resetToken = m[1];
+    setIntro(`Für das Konto «${who.name}» (${who.email}). Danach bist du auf allen anderen Geräten abgemeldet.`);
+    authForm.password.focus();
+  } catch (err) {
+    setAuthMode('forgot');
+    setIntro('');
+    $('auth-error').textContent = err.message;
+    $('auth-error').hidden = false;
+  }
+  return true;
+}
+
+function authReturn() {
+  if (location.hash.startsWith('#reset=')) return resetFromLink();
+  const q = new URLSearchParams(location.search);
+  const error = q.get('auth_error');
+  const result = q.get('auth');
+  if (!error && !result) return;
+  q.delete('auth_error');
+  q.delete('auth');
+  const provider = Account.providers.find((p) => p.id === q.get('provider'));
+  q.delete('provider');
+  history.replaceState(null, '', `${location.pathname}${q.size ? `?${q}` : ''}${location.hash}`);
+  if (error) {
+    openAuth('login');
+    $('auth-error').textContent = error;
+    $('auth-error').hidden = false;
+  } else if (result === 'verified') {
+    alert('Danke! Deine E-Mail-Adresse ist bestätigt.');
+  } else if (result === 'linked' && provider) {
+    alert(`${provider.label} ist jetzt mit deinem Konto verknüpft.`);
+  } else if (result === 'created' && Account.user) {
+    alert(`Willkommen, ${Account.user.name}! Dein Konto ist angelegt. Deine Fotos werden unter diesem Namen genannt.`);
+  }
+}
+
 /* ---------- Init ---------- */
 
 (async function initAccount() {
@@ -589,14 +760,17 @@ $('upload-protected')?.addEventListener('change', (e) => {
       user: me.user,
       csrf: me.csrfToken,
       requireLogin: me.requireLogin,
+      requireVerifiedEmail: Boolean(me.requireVerifiedEmail),
       licenses: me.licenses,
       defaultLicense: me.defaultLicense,
       reportReasons: me.reportReasons,
+      providers: me.providers || [],
     });
   } catch {
     // Server without accounts: keep the defaults.
   }
   renderNav();
+  authReturn();
   fillLicenseSelect();
   if (state.spot) Account.photoShown(state.spot.photos[state.index]);
   // A moderator sees hidden photos: reload once the session is known.

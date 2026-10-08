@@ -1037,9 +1037,11 @@ summary { cursor: pointer; color: var(--muted); font-weight: 600; font-size: 0.9
 }
 .menu-who { display: grid; padding: 0.5rem 0.7rem 0.6rem; border-bottom: 1px solid var(--border); margin-bottom: 0.3rem; line-height: 1.35; }
 .menu-who .small { overflow-wrap: anywhere; }
+.menu-unverified { color: var(--damage); font-weight: 600; }
 .menu-item { justify-content: flex-start; border: none; border-radius: 10px; background: transparent; padding: 0.55rem 0.7rem; font-weight: 600; }
 .menu-item:hover, .menu-item:focus-visible { background: var(--surface-2); }
 .menu-item.danger { color: var(--danger); }
+a.menu-item { display: flex; color: var(--text); text-decoration: none; font-size: 0.95rem; }
 
 .tabs { display: inline-flex; gap: 0.2rem; padding: 0.2rem; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); flex-wrap: wrap; }
 .tabs button { border: none; background: transparent; padding: 0.4rem 0.95rem; font-size: 0.85rem; }
@@ -1048,8 +1050,13 @@ summary { cursor: pointer; color: var(--muted); font-weight: 600; font-size: 0.9
 .auth-dialog { width: min(440px, calc(100vw - 32px)); }
 .auth-dialog .field input { width: 100%; }
 #auth-intro { margin: 0.8rem 0 0; }
+.auth-providers { display: grid; gap: 0.5rem; margin: 1rem 0 0.2rem; }
+.auth-providers .provider { width: 100%; background: var(--surface-2); font-weight: 600; }
+.auth-providers .provider:hover { border-color: var(--accent); }
+.auth-or { text-align: center; margin: 0.4rem 0 0; }
 .auth-error { color: var(--danger); font-size: 0.9rem; margin: 0.8rem 0 0; }
 .auth-error.ok { color: var(--ok); }
+.auth-switch { margin: 0.5rem 0 0; text-align: right; }
 .field > .license-hint { font-weight: 400; }
 .license-hint a, .photo-credit a { color: var(--accent); }
 

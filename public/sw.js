@@ -195,7 +195,8 @@ self.addEventListener('fetch', (event) => {
   if (!url.pathname.startsWith(scopePath)) return;
   const path = url.pathname.slice(scopePath.length);
 
-  if (path === 'sw.js') return;
+  // Sign-in redirects to Google/GitHub and back must reach the server untouched.
+  if (path === 'sw.js' || path.startsWith('api/auth/oauth/')) return;
   if (path.startsWith('api/')) {
     event.respondWith(networkFirst(event, CACHE.api, { max: LIMIT.api, timeoutMs: API_TIMEOUT_MS }));
   } else if (path.startsWith('uploads/')) {

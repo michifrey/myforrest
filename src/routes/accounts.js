@@ -6,7 +6,8 @@
  *
  *   const accounts = registerAccounts(app, ctx);
  *
- * `ctx` holds `db`, `requireLogin`, `adminEmail`, and later `photoJson`
+ * `ctx` holds `db`, `requireLogin`, `requireVerifiedEmail`, `adminEmail`, `oauth` (src/oauth.js),
+ * `mailer` (src/mail.js), and later `photoJson`
  * (set by app.js once defined). Returns helpers app.js uses to filter hidden
  * photos and to stamp uploads with their uploader and licence.
  *
@@ -17,6 +18,23 @@
  * rejected for such requests and for login/registration, which also only
  * accept `application/json`. Requests without a session cookie carry no
  * authority and are unaffected, so anonymous use works as before.
+ *
+ * Identity providers: GET /api/auth/oauth/:provider redirects to Google or
+ * GitHub, which return to …/callback. That logs in, creates an account, or,
+ * with a session in this browser, links the provider to it; then it
+ * redirects to the start page (`/?auth=ok|created|linked` or `/?auth_error=…`).
+ *
+ * E-mail confirmation: registering sends a link to GET /api/auth/verify,
+ * which confirms the address and redirects to `/?auth=verified`. With
+ * `requireVerifiedEmail`, writes need an account with a confirmed address
+ * (it implies `requireLogin`).
+ *
+ * Forgotten password: POST /api/auth/password/forgot mails a link to
+ * `/#reset=<token>` (the fragment never reaches servers or Referer headers);
+ * the page then posts the new password to /api/auth/password/reset. The
+ * answer to "forgot" is the same whether or not the address has an account.
+ * Logged in, POST /api/auth/password/change takes the current and a new
+ * password; the account gets a notice by e-mail.
  */
 
 const crypto = require('node:crypto');
@@ -24,13 +42,17 @@ const path = require('node:path');
 const {
   SESSION_COOKIE, SESSION_TTL_MS, ROLES, parseCookies, serializeCookie, createLimiter, createAuth, isModerator, canSeeProtected, userJson,
 } = require('../auth');
+const { STATE_COOKIE, STATE_TTL_MS, createOAuth } = require('../oauth');
+const { createMailer } = require('../mail');
 const {
   LICENSES, DEFAULT_LICENSE, REPORT_REASONS, licenseJson, parseLicense, visibleSql, createModeration,
 } = require('../moderation');
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 // Writes that stay open to anonymous visitors even with requireLogin.
-const OPEN_WRITES = [/^\/auth\/(login|register|logout)$/, /^\/photos\/\d+\/report$/];
+const OPEN_WRITES = [/^\/auth\/(login|register|logout|password\/forgot|password\/reset)$/, /^\/photos\/\d+\/report$/];
+// Writes an account with an unconfirmed address may still make with requireVerifiedEmail.
+const UNVERIFIED_WRITES = [/^\/auth\//, ...OPEN_WRITES];
 
 const sameString = (a, b) => {
   const x = Buffer.from(String(a));
@@ -39,13 +61,22 @@ const sameString = (a, b) => {
 };
 
 module.exports = function registerAccounts(app, ctx) {
-  const { db, requireLogin = false, adminEmail = null } = ctx;
+  const { db, adminEmail = null, requireVerifiedEmail = false } = ctx;
+  const requireLogin = Boolean(ctx.requireLogin || requireVerifiedEmail);
   const auth = createAuth(db, { adminEmail });
+  const oauth = ctx.oauth || createOAuth();
+  const mailer = ctx.mailer || createMailer();
+  const publicUrl = ctx.publicUrl || null;
   const mod = createModeration(db);
   const limits = ctx.rateLimits || {};
   const loginPerAccount = createLimiter({ max: limits.loginPerAccount ?? 5, windowMs: 15 * 60 * 1000 });
   const loginPerIp = createLimiter({ max: limits.loginPerIp ?? 30, windowMs: 15 * 60 * 1000 });
+  const oauthPerIp = createLimiter({ max: limits.oauthPerIp ?? 30, windowMs: 15 * 60 * 1000 });
   const registerPerIp = createLimiter({ max: limits.registerPerIp ?? 10, windowMs: 3600 * 1000 });
+  const forgotPerIp = createLimiter({ max: limits.forgotPerIp ?? 10, windowMs: 3600 * 1000 });
+  const forgotPerAddress = createLimiter({ max: limits.forgotPerAddress ?? 3, windowMs: 3600 * 1000 });
+  const resetPerIp = createLimiter({ max: limits.resetPerIp ?? 20, windowMs: 15 * 60 * 1000 });
+  const verifyPerAccount = createLimiter({ max: limits.verifyPerAccount ?? 3, windowMs: 3600 * 1000 });
   const reportPerIp = createLimiter({ max: limits.reportPerIp ?? 30, windowMs: 3600 * 1000 });
 
   const canSeeHidden = (req) => isModerator(req.user);
@@ -85,13 +116,16 @@ module.exports = function registerAccounts(app, ctx) {
 
   app.use('/api', (req, res, next) => {
     if (SAFE_METHODS.has(req.method)) return next();
-    const authRoute = /^\/auth\/(login|register)$/.test(req.path);
+    const authRoute = /^\/auth\/(login|register|password\/forgot|password\/reset)$/.test(req.path);
     if ((req.session || authRoute) && crossOrigin(req)) return fail(res, 403, 'Anfrage von fremder Herkunft abgelehnt');
     if (req.session && !sameString(req.get('x-csrf-token') || '', req.session.csrf)) {
       return fail(res, 403, 'Sicherheitstoken fehlt oder ist abgelaufen – bitte Seite neu laden');
     }
     if (requireLogin && !req.user && !OPEN_WRITES.some((re) => re.test(req.path))) {
       return fail(res, 401, 'Bitte zuerst anmelden');
+    }
+    if (requireVerifiedEmail && req.user && !req.user.email_verified_at && !UNVERIFIED_WRITES.some((re) => re.test(req.path))) {
+      return fail(res, 403, 'Bitte zuerst die E-Mail-Adresse bestätigen (Link in der E-Mail, neu anfordern im Konto-Menü)');
     }
     next();
   });
@@ -191,8 +225,9 @@ module.exports = function registerAccounts(app, ctx) {
   const startSession = (req, res, user) => {
     const { token, csrf } = auth.createSession(user.id);
     res.append('Set-Cookie', serializeCookie(SESSION_COOKIE, token, { maxAge: SESSION_TTL_MS, secure: secure(req) }));
-    return { user: userJson(user, { self: true }), csrfToken: csrf };
+    return { user: selfJson(user), csrfToken: csrf };
   };
+  const selfJson = (user) => (user ? userJson(user, { self: true, identities: auth.identitiesOf(user.id) }) : null);
   const jsonOnly = (req, res) => {
     if (req.is('application/json')) return true;
     fail(res, 415, 'Bitte als JSON senden');
@@ -202,9 +237,11 @@ module.exports = function registerAccounts(app, ctx) {
   app.get('/api/auth/me', (req, res) => {
     res.set('Cache-Control', 'no-store');
     res.json({
-      user: userJson(req.user, { self: true }),
+      user: selfJson(req.user),
       csrfToken: req.session?.csrf ?? null,
       requireLogin,
+      requireVerifiedEmail,
+      providers: oauth.list(),
       licenses: Object.entries(LICENSES).map(([id, l]) => ({ id, ...l })),
       defaultLicense: DEFAULT_LICENSE,
       reportReasons: REPORT_REASONS,
@@ -221,7 +258,8 @@ module.exports = function registerAccounts(app, ctx) {
       if (r.error) return fail(res, r.status || 400, r.error);
       registerPerIp.hit(req.ip);
       if (r.user.role === 'admin') mod.log(r.user, 'role', { targetUserId: r.user.id, detail: 'admin (erstes Konto)' });
-      res.status(201).json(startSession(req, res, r.user));
+      const verification = await sendVerification(req, r.user);
+      res.status(201).json({ ...startSession(req, res, r.user), verification });
     } catch (err) {
       next(err);
     }
@@ -256,6 +294,207 @@ module.exports = function registerAccounts(app, ctx) {
     if (req.session) auth.destroySession(req.session.tokenHash);
     res.append('Set-Cookie', serializeCookie(SESSION_COOKIE, '', { maxAge: 0, secure: secure(req) }));
     res.status(204).end();
+  });
+
+  /* ---------- E-mail confirmation ---------- */
+
+  const origin = (req) => `${secure(req) ? 'https' : 'http'}://${req.get('x-forwarded-host') || req.get('host')}`;
+
+  /** Mails a confirmation link; 'sent', 'logged' (no SMTP configured) or 'failed'. */
+  async function sendVerification(req, user) {
+    const token = auth.createEmailToken(user);
+    const link = `${(publicUrl || origin(req)).replace(/\/+$/, '')}/api/auth/verify?token=${encodeURIComponent(token)}`;
+    try {
+      const r = await mailer.send({
+        to: user.email,
+        subject: 'MyForrest: E-Mail-Adresse bestätigen',
+        text: [
+          `Hallo ${user.name}`,
+          '',
+          'Bitte bestätige deine E-Mail-Adresse für MyForrest mit diesem Link:',
+          '',
+          link,
+          '',
+          'Der Link ist 24 Stunden gültig. Hast du kein Konto angelegt, kannst du diese E-Mail ignorieren.',
+        ].join('\n'),
+      });
+      return r?.logged ? 'logged' : 'sent';
+    } catch (err) {
+      console.error(`Bestätigungs-E-Mail an Konto ${user.id} fehlgeschlagen: ${err.message}`);
+      return 'failed';
+    }
+  }
+
+  app.get('/api/auth/verify', (req, res) => {
+    res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
+    const r = auth.confirmEmail(req.query.token);
+    res.redirect(303, `/?${new URLSearchParams(r.error ? { auth_error: r.error } : { auth: 'verified' })}`);
+  });
+
+  app.post('/api/auth/verify/resend', async (req, res, next) => {
+    if (!req.user) return fail(res, 401, 'Bitte zuerst anmelden');
+    if (req.user.email_verified_at) return fail(res, 400, 'Die E-Mail-Adresse ist schon bestätigt');
+    const wait = verifyPerAccount.blocked(req.user.id);
+    if (wait) {
+      return res.set('Retry-After', String(wait)).status(429)
+        .json({ error: `Schon mehrere Links verschickt – bitte in ${Math.ceil(wait / 60)} Minuten erneut versuchen` });
+    }
+    verifyPerAccount.hit(req.user.id);
+    try {
+      const verification = await sendVerification(req, req.user);
+      if (verification === 'failed') return fail(res, 502, 'Die E-Mail konnte nicht verschickt werden – bitte später erneut versuchen');
+      res.json({ verification });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  /* ---------- Forgotten password ---------- */
+
+  const baseUrl = (req) => (publicUrl || origin(req)).replace(/\/+$/, '');
+
+  async function sendReset(req, user) {
+    const token = auth.createEmailToken(user, 'reset');
+    try {
+      await mailer.send({
+        to: user.email,
+        subject: 'MyForrest: Passwort zurücksetzen',
+        text: [
+          `Hallo ${user.name}`,
+          '',
+          `Für dein MyForrest-Konto (${user.email}) wurde ein neues Passwort angefordert. Mit diesem Link legst du es fest:`,
+          '',
+          `${baseUrl(req)}/#reset=${encodeURIComponent(token)}`,
+          '',
+          'Der Link ist 1 Stunde gültig und funktioniert nur einmal. Danach bist du auf allen Geräten abgemeldet.',
+          'Hast du nichts angefordert, kannst du diese E-Mail ignorieren – dein Passwort bleibt, wie es ist.',
+        ].join('\n'),
+      });
+    } catch (err) {
+      console.error(`E-Mail zum Zurücksetzen an Konto ${user.id} fehlgeschlagen: ${err.message}`);
+    }
+  }
+
+  app.post('/api/auth/password/forgot', (req, res) => {
+    if (!jsonOnly(req, res)) return;
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    if (!email) return fail(res, 400, 'Bitte die E-Mail-Adresse angeben');
+    const wait = forgotPerIp.blocked(req.ip);
+    if (wait) return res.set('Retry-After', String(wait)).status(429).json({ error: 'Zu viele Anfragen – bitte später erneut versuchen' });
+    forgotPerIp.hit(req.ip);
+    // Same answer and timing for known and unknown addresses: the mail goes out in the background.
+    const user = forgotPerAddress.blocked(email) ? null : auth.userByEmail(email);
+    if (user) {
+      forgotPerAddress.hit(email);
+      sendReset(req, user);
+    }
+    res.json({ ok: true });
+  });
+
+  app.post('/api/auth/password/change', async (req, res, next) => {
+    if (!jsonOnly(req, res)) return;
+    if (!req.user) return fail(res, 401, 'Bitte zuerst anmelden');
+    // Wrong current passwords count like failed logins.
+    const accountKey = `${req.ip}|${req.user.email.toLowerCase()}`;
+    const wait = loginPerAccount.blocked(accountKey);
+    if (wait) {
+      return res.set('Retry-After', String(wait)).status(429)
+        .json({ error: `Zu viele Fehlversuche – bitte in ${Math.ceil(wait / 60)} Minuten erneut versuchen` });
+    }
+    try {
+      const r = await auth.changePassword(req.user, req.body?.current, req.body?.password, req.session.tokenHash);
+      if (r.error) {
+        if (r.wrong) loginPerAccount.hit(accountKey);
+        return fail(res, r.status, r.error);
+      }
+      loginPerAccount.reset(accountKey);
+      // A notice, so that a change by somebody else does not go unnoticed (in the background).
+      mailer.send({
+        to: r.user.email,
+        subject: 'MyForrest: Passwort geändert',
+        text: [
+          `Hallo ${r.user.name}`,
+          '',
+          `Das Passwort deines MyForrest-Kontos (${r.user.email}) wurde soeben geändert${r.endedSessions ? '; andere Geräte sind abgemeldet' : ''}.`,
+          '',
+          'Warst du das nicht? Dann setze das Passwort hier sofort neu:',
+          `${baseUrl(req)}/ → Anmelden → Passwort vergessen?`,
+        ].join('\n'),
+      }).catch((err) => console.error(`Hinweis zur Passwortänderung an Konto ${r.user.id} fehlgeschlagen: ${err.message}`));
+      res.json({ user: selfJson(r.user), endedSessions: r.endedSessions });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.get('/api/auth/password/reset', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const r = auth.checkResetToken(req.query.token);
+    if (r.error) return fail(res, 400, r.error);
+    res.json({ name: r.user.name, email: r.user.email });
+  });
+
+  app.post('/api/auth/password/reset', async (req, res, next) => {
+    if (!jsonOnly(req, res)) return;
+    const wait = resetPerIp.blocked(req.ip);
+    if (wait) return res.set('Retry-After', String(wait)).status(429).json({ error: 'Zu viele Fehlversuche – bitte später erneut versuchen' });
+    try {
+      const r = await auth.resetPassword(req.body?.token, req.body?.password);
+      if (r.error) {
+        resetPerIp.hit(req.ip);
+        return fail(res, r.status, r.error);
+      }
+      // Every session of the account has ended, this browser's included: log in afresh.
+      loginPerAccount.reset(`${req.ip}|${r.user.email.toLowerCase()}`);
+      res.json(startSession(req, res, r.user));
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  /* ---------- Identity providers (Google, GitHub) ---------- */
+
+  const stateCookie = (req, value, maxAge) => serializeCookie(STATE_COOKIE, value, {
+    maxAge, secure: secure(req), path: '/api/auth/oauth/',
+  });
+  const backTo = (res, params) => res.redirect(303, `/?${new URLSearchParams(params)}`);
+
+  app.get('/api/auth/oauth/:provider', (req, res) => {
+    const provider = oauth.get(req.params.provider);
+    if (!provider) return fail(res, 404, 'Diese Anmeldung ist nicht eingerichtet');
+    const { url, cookie } = oauth.begin(provider, origin(req));
+    res.set('Cache-Control', 'no-store');
+    res.append('Set-Cookie', stateCookie(req, cookie, STATE_TTL_MS));
+    res.redirect(303, url);
+  });
+
+  app.get('/api/auth/oauth/:provider/callback', async (req, res) => {
+    const provider = oauth.get(req.params.provider);
+    if (!provider) return fail(res, 404, 'Diese Anmeldung ist nicht eingerichtet');
+    res.set('Cache-Control', 'no-store');
+    // The state cookie is single-use.
+    res.append('Set-Cookie', stateCookie(req, '', 0));
+    const wait = oauthPerIp.blocked(req.ip);
+    if (wait) return backTo(res, { auth_error: `Zu viele Anmeldeversuche – bitte in ${Math.ceil(wait / 60)} Minuten erneut versuchen` });
+    let profile;
+    try {
+      profile = await oauth.finish(provider, origin(req), req.query, parseCookies(req.headers.cookie)[STATE_COOKIE]);
+    } catch (err) {
+      oauthPerIp.hit(req.ip);
+      return backTo(res, { auth_error: err.message });
+    }
+    const r = auth.identityLogin(provider.id, profile, req.user);
+    if (r.error) return backTo(res, { auth_error: r.error });
+    if (r.created && r.user.role === 'admin') mod.log(r.user, 'role', { targetUserId: r.user.id, detail: `admin (erstes Konto, ${provider.label})` });
+    if (!req.user) startSession(req, res, r.user);
+    backTo(res, r.linked ? { auth: 'linked', provider: provider.id } : { auth: r.created ? 'created' : 'ok' });
+  });
+
+  app.delete('/api/auth/identities/:provider', (req, res) => {
+    if (!req.user) return fail(res, 401, 'Bitte zuerst anmelden');
+    const r = auth.unlinkIdentity(req.user, req.params.provider);
+    if (r.error) return fail(res, r.status, r.error);
+    res.json({ user: selfJson(auth.userById(req.user.id)) });
   });
 
   /* ---------- Reports (open to everyone) ---------- */
@@ -383,7 +622,7 @@ module.exports = function registerAccounts(app, ctx) {
     proPerUser.hit(String(req.user.id));
     db.prepare("UPDATE users SET pro_status = 'angefragt', organization = ?, pro_note = ?, pro_requested_at = ?, pro_decided_at = NULL, pro_decided_by = NULL WHERE id = ?")
       .run(organization, note, Date.now(), req.user.id);
-    res.json(userJson(auth.userById(req.user.id), { self: true }));
+    res.json(selfJson(auth.userById(req.user.id)));
   });
 
   /** Admins verify or decline a request, or revoke PRO. */

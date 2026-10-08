@@ -25,6 +25,8 @@ const { assess } = require('./irregularities');
 const { TREES, treeInfo, treeJson } = require('./trees');
 const { createElevation } = require('./elevation');
 const registerAccounts = require('./routes/accounts');
+const { createOAuth, providersFromEnv } = require('./oauth');
+const { createMailer } = require('./mail');
 const { isSensitive } = require('./sensitive');
 const {
   altitudeShift, aspectShift, coldPoolShift, expectedColourDoy, aspectLabel, aspectFromCompass, COMPASS, LANDFORMS, landform,
@@ -42,8 +44,13 @@ function createApp({
   fetchImpl = fetch,
   weatherFetch = fetch,
   requireLogin = process.env.REQUIRE_LOGIN === '1',
+  requireVerifiedEmail = process.env.REQUIRE_VERIFIED_EMAIL === '1',
   adminEmail = process.env.ADMIN_EMAIL || null,
   rateLimits,
+  // Sign-in with Google/GitHub (src/oauth.js): { google: { clientId, clientSecret }, github: { … } }.
+  oauthProviders = providersFromEnv(), oauthFetch = fetch,
+  // E-mail for confirmation links (src/mail.js): { send({ to, subject, text }) }; default from SMTP_URL.
+  mailer = createMailer(),
   detectorUrl = process.env.DETECTOR_URL || null, detectorFetch = fetch,
   // Routing along paths for drawn tours (BRouter-compatible, e.g. https://brouter.de/brouter); off when unset.
   // Public BRouter by default (only waypoints are sent, by the server); ROUTER_URL= (empty) turns it off.
@@ -76,7 +83,10 @@ function createApp({
   const trackJson = express.json({ limit: '15mb' });
   app.use((req, res, next) => (/^\/api\/(tracks|route-suggestions)\b/.test(req.path) ? trackJson : smallJson)(req, res, next));
   // Accounts, CSRF, moderation (src/routes/accounts.js); must precede the routes below and /uploads.
-  const accountsCtx = { db, requireLogin, adminEmail, rateLimits };
+  const oauth = createOAuth({ providers: oauthProviders, publicUrl: process.env.PUBLIC_URL || null, fetchImpl: oauthFetch });
+  const accountsCtx = {
+    db, requireLogin, requireVerifiedEmail, adminEmail, rateLimits, oauth, mailer, publicUrl: process.env.PUBLIC_URL || null,
+  };
   const accounts = registerAccounts(app, accountsCtx);
   // The service worker must never be served stale from the HTTP cache, or app updates would stall.
   app.get('/sw.js', (req, res) => {
