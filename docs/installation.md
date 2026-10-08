@@ -50,7 +50,7 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 | `MAIL_FROM`        | `MyForrest <no-reply@…>` | Absender der E-Mails |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | – | Aktiviert „Mit Google anmelden“ (siehe [unten](#anmelden-mit-google-und-github)) |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | – | Aktiviert „Mit GitHub anmelden“ |
-| `ROUTER_URL`       | `https://brouter.de/brouter` | Routing-Dienst im Format von [BRouter](https://brouter.de) für den Wege-Magnet beim Zeichnen von Touren; leer (`ROUTER_URL=`) = aus, dann gerade Linien. Für viel Verkehr einen eigenen BRouter betreiben |
+| `ROUTER_URL`       | `https://brouter.de/brouter` | Routing-Dienst im Format von [BRouter](https://brouter.de) für den Wege-Magnet beim Zeichnen von Touren; leer (`ROUTER_URL=`) = aus, dann gerade Linien. Für den Betrieb einen [eigenen BRouter](../deploy/brouter/README.md) nehmen, z. B. `http://brouter:17777/brouter` |
 | `SENSITIVE_SPECIES` | – | Weitere Gattungen oder Arten (kommagetrennt), deren Funde automatisch geschützt werden, z. B. `Trollius,Lilium bulbiferum` |
 | `ROUTER_PROFILE`   | `hiking-mountain` | BRouter-Profil für das Routing |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | erzeugt | Schlüssel für Web Push (base64url); ohne sie erzeugt der Server beim ersten Start ein Paar und speichert es in der Datenbank |
@@ -150,6 +150,13 @@ Jahr der beginnenden Blattverfärbung).
 unter [`deploy/qgis-server`](../deploy/qgis-server/README.md) eine Vorlage mit Docker Compose: MyForrest,
 QGIS Server, nginx und ein Dienst, der das GeoPackage alle 15 Minuten neu exportiert. Das QGIS-Projekt
 mit den Stilen liegt bei und wird mit `build-project.py` (PyQGIS) neu erzeugt.
+
+## Eigener Routing-Server
+
+Der Wege-Magnet nutzt ohne Einstellung den öffentlichen Dienst `brouter.de`. Einen eigenen BRouter samt
+Routing-Daten für die Schweiz bringt [`deploy/brouter`](../deploy/brouter/README.md) mit: In der
+Docker-Compose-Vorlage und auf Kubernetes läuft er schon mit; allein startet er mit `docker run` und wird
+über `ROUTER_URL=http://localhost:17777/brouter` eingebunden.
 
 ## Weiter
 

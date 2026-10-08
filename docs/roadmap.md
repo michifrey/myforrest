@@ -15,6 +15,8 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 - **Geschützte Funde**: Schutzliste je Kanton (Rote Liste, kantonale Schutzverordnungen) laden, Pilze per
   Bild erkennen, Gültigkeit der PRO-Verifizierung befristen und jährlich bestätigen lassen, Organisationen
   mit mehreren Mitgliedern verwalten.
+- **Eigener Routing-Server**: Image von `deploy/brouter` in einer Registry bauen und gegen echte Routing-Daten
+  prüfen, ein eigenes Waldprofil (Forststrassen und Rückegassen bevorzugen, Wildruhezonen meiden).
 - **Touren**: FIT-Dateien direkt lesen, Höhenprofil der Route, Abgleich mit Strava/Komoot per OAuth,
   Aufzeichnung im Hintergrund (braucht eine native Hülle, Browser stoppen GPS im Hintergrund),
   Benachrichtigung, wenn ein eigener Fotoauftrag erledigt wurde, Ablaufdatum für Aufträge.

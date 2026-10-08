@@ -76,7 +76,8 @@ src/routegeo.js      Länge, Abstand zur Route und Position entlang der Route, P
 src/sensitive.js     Sensible Arten (Orchideen, geschützte Pflanzen), deren Funde automatisch geschützt werden
 src/routes/protection.js  Geschützte Funde als 5-km-Raster für alle ohne PRO-Status
 src/routes/tracks.js Touren, Routing-Proxy, Fotoaufträge (Erfüllung beim Upload) und Vorschläge entlang der Route
-deploy/qgis-server/  Vorlage: MyForrest + QGIS Server (WMS/WMTS/WFS) + nginx per Docker Compose
+deploy/qgis-server/  Vorlage: MyForrest + QGIS Server (WMS/WMTS/WFS) + BRouter + nginx per Docker Compose
+deploy/brouter/      Eigener Routing-Server (BRouter) für den Wege-Magnet, lädt seine Routing-Daten selbst
 Dockerfile           Container für MyForrest (mit ffmpeg)
 docs/                Dokumentation; docs/screenshots/ enthält die Bilder für das README
 public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet die Waldszene,

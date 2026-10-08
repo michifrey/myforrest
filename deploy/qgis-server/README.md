@@ -60,6 +60,10 @@ PUBLIC_URL=https://karten.example.ch docker compose up -d
 Für den Betrieb gehört ein TLS-Zertifikat davor (z. B. Caddy oder Traefik als Reverse Proxy);
 Geoportale laden Dienste nur über HTTPS.
 
+BRouter läuft mit (siehe [`deploy/brouter`](../brouter/README.md)): MyForrest nutzt ihn für den Wege-Magnet
+statt `brouter.de`. Beim ersten Start lädt er die Routing-Daten für die Schweiz; ein anderes Gebiet mit
+`BROUTER_BBOX=West,Süd,Ost,Nord`.
+
 ## 3. In Geoportalen zeigen
 
 - **map.geo.admin.ch**: *Erweiterte Werkzeuge → Import* → die WMS- oder WMTS-Capabilities-URL eingeben.
