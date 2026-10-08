@@ -591,15 +591,23 @@ Auffälligkeiten genauer:
   Passwörter werden mit scrypt und eigenem Salt pro Konto gespeichert. Die Sitzung liegt in einem
   httpOnly-Cookie (SameSite=Lax, 30 Tage); in der Datenbank steht nur ihr SHA-256-Hash. Fehlversuche beim
   Anmelden werden begrenzt (5 pro Konto und IP, 30 pro IP in 15 Minuten).
+- *E-Mail bestätigen*: Nach der Registrierung mit Passwort kommt ein Link per E-Mail (24 Stunden gültig,
+  nur der SHA-256 des Tokens steht in der Datenbank; ein neu angeforderter Link ersetzt den alten, höchstens
+  3 pro Stunde). Bis zur Bestätigung zeigt das Konto-Menü „E-Mail-Adresse noch nicht bestätigt“ und
+  *Bestätigungslink senden*. Mit `REQUIRE_VERIFIED_EMAIL=1` braucht es eine bestätigte Adresse für Uploads
+  und Änderungen. Fällt der Mailserver aus, gelingt die Registrierung trotzdem; der Link lässt sich später
+  neu anfordern.
 - *Anmelden mit Google oder GitHub*: Ist ein Anbieter eingerichtet (siehe
   [Installation](installation.md#anmelden-mit-google-und-github)), zeigt der Dialog „Mit Google anmelden“
   bzw. „Mit GitHub anmelden“. Der Ablauf ist OAuth 2.0 mit PKCE; `state` und Verifier liegen in einem
   kurzlebigen httpOnly-Cookie, ein fremder oder abgelaufener Rücksprung wird abgewiesen. Beim ersten Mal
   entsteht ein Konto ohne Passwort mit der vom Anbieter **bestätigten** E-Mail-Adresse (ohne bestätigte
   Adresse keine Registrierung); der Name kommt vom Anbieter und lässt sich durch eine Zahl eindeutig machen.
-  Gibt es zur Adresse schon ein Konto mit Passwort, wird es nicht automatisch übernommen (sonst könnte, wer
-  ein Konto mit fremder Adresse anlegt, später das Konto der echten Inhaberin mitnutzen): Dann mit Passwort
-  anmelden und im Konto-Menü *Mit Google/GitHub verknüpfen* wählen. Liefert der Anbieter dabei dieselbe
+  Gibt es zur Adresse schon ein Konto mit bestätigter Adresse, meldet der Anbieter direkt dort an und
+  verknüpft sich. Ist die Adresse des Kontos noch nicht bestätigt, wird es nicht automatisch übernommen (sonst
+  könnte, wer ein Konto mit fremder Adresse anlegt, später das Konto der echten Inhaberin mitnutzen): Dann
+  den Bestätigungslink nutzen oder mit Passwort anmelden und im Konto-Menü *Mit Google/GitHub verknüpfen*
+  wählen. Liefert der Anbieter dabei dieselbe
   Adresse, gilt sie als bestätigt (✓ im Konto-Menü). Verknüpfungen lassen sich wieder trennen, ausser es ist
   die einzige Anmeldung des Kontos.
 - *CSRF-Schutz*: Jede schreibende Anfrage mit Sitzungs-Cookie muss das Token der Sitzung im Header

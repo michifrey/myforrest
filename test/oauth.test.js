@@ -39,7 +39,9 @@ function fakeProviders(accounts, challenges) {
 async function withServer(accounts, fn) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'myforrest-oauth-'));
   const challenges = new Set();
+  const mails = [];
   const app = createApp({
+    mailer: { send: async (m) => { mails.push(m); return { sent: true }; } },
     dataDir,
     weatherFetch: noWeather,
     oauthProviders: { google: { clientId: 'gid', clientSecret: 'gsecret' }, github: { clientId: 'hid', clientSecret: 'hsecret' } },
@@ -49,7 +51,7 @@ async function withServer(accounts, fn) {
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
-    await fn(base, challenges);
+    await fn(base, challenges, mails);
   } finally {
     await app.locals.idle();
     server.close();
@@ -155,7 +157,7 @@ test('signing in with Google creates a verified account without password, then l
 });
 
 test('a forged state, an unverified address or a taken address is refused', async () => {
-  await withServer(ACCOUNTS, async (base, challenges) => {
+  await withServer(ACCOUNTS, async (base, challenges, mails) => {
     const forged = await browser(base).signIn('google', 'anna', challenges, { tamper: true });
     assert.match(forged.searchParams.get('auth_error'), /abgelaufen/);
 
@@ -170,6 +172,13 @@ test('a forged state, an unverified address or a taken address is refused', asyn
     assert.equal(reg.status, 201);
     const taken = await browser(base).signIn('google', 'anna', challenges);
     assert.match(taken.searchParams.get('auth_error'), /schon ein Konto/);
+
+    // Once the account has confirmed the address by link, Google signs into it.
+    const token = mails.at(-1).text.match(/token=(\S+)/)[1];
+    await fetch(`${base}/api/auth/verify?token=${token}`, { redirect: 'manual' });
+    const linked = browser(base);
+    assert.equal((await linked.signIn('google', 'anna', challenges)).searchParams.get('auth'), 'linked');
+    assert.equal((await linked.me()).user.name, 'Anna');
   });
 });
 
@@ -198,11 +207,13 @@ test('a logged-in account links and unlinks providers', async () => {
     const steal = await b.signIn('google', 'bert', challenges);
     assert.match(steal.searchParams.get('auth_error'), /anderen Konto/);
 
-    // With a password, the provider can be removed; it no longer logs in.
+    // With a password, the provider can be removed.
     const del = await b.req('/api/auth/identities/github', { method: 'DELETE' });
     assert.equal(del.status, 200);
     assert.deepEqual((await del.json()).user.identities, []);
-    const after = await browser(base).signIn('github', 'hub', challenges);
-    assert.match(after.searchParams.get('auth_error'), /schon ein Konto/);
+    // The address is confirmed now, so signing in with GitHub links it again.
+    const after = browser(base);
+    assert.equal((await after.signIn('github', 'hub', challenges)).searchParams.get('auth'), 'linked');
+    assert.equal((await after.me()).user.name, 'Anna');
   });
 });

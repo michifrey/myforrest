@@ -1037,6 +1037,7 @@ summary { cursor: pointer; color: var(--muted); font-weight: 600; font-size: 0.9
 }
 .menu-who { display: grid; padding: 0.5rem 0.7rem 0.6rem; border-bottom: 1px solid var(--border); margin-bottom: 0.3rem; line-height: 1.35; }
 .menu-who .small { overflow-wrap: anywhere; }
+.menu-unverified { color: var(--damage); font-weight: 600; }
 .menu-item { justify-content: flex-start; border: none; border-radius: 10px; background: transparent; padding: 0.55rem 0.7rem; font-weight: 600; }
 .menu-item:hover, .menu-item:focus-visible { background: var(--surface-2); }
 .menu-item.danger { color: var(--danger); }

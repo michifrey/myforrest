@@ -45,9 +45,31 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 | `SATELLITE_WATCH_HOURS` | `24` | Abstand der Frühwarn-Runde über alle Spots in Stunden; `0` = aus |
 | `REQUIRE_LOGIN`    | –        | `1`: Uploads und Änderungen nur mit Konto      |
 | `ADMIN_EMAIL`      | –        | Dieses Konto wird Admin (sonst das erste Konto) |
+| `REQUIRE_VERIFIED_EMAIL` | – | `1`: Uploads und Änderungen nur mit bestätigter E-Mail-Adresse (schliesst `REQUIRE_LOGIN` ein) |
+| `SMTP_URL`         | –        | Mailserver für Bestätigungslinks, z. B. `smtps://user:passwort@smtp.example.org` (siehe [unten](#e-mail-versand)); ohne ihn stehen die Links im Server-Log |
+| `MAIL_FROM`        | `MyForrest <no-reply@…>` | Absender der E-Mails |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | – | Aktiviert „Mit Google anmelden“ (siehe [unten](#anmelden-mit-google-und-github)) |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | – | Aktiviert „Mit GitHub anmelden“ |
 | `DETECTOR_URL`     | –        | Externer Objektdetektor (siehe [unten](#externer-detektor)); ohne ihn laufen die eingebauten Heuristiken |
+
+## E-Mail-Versand
+
+Wer sich mit E-Mail und Passwort registriert, bekommt einen Link zum Bestätigen der Adresse (24 Stunden
+gültig, im Konto-Menü neu anforderbar). Verschickt wird über SMTP, ohne zusätzliche Pakete:
+
+```bash
+SMTP_URL='smtps://wald%40example.org:passwort@smtp.example.org' \
+MAIL_FROM='MyForrest <wald@example.org>' npm start
+```
+
+- `smtps://` verbindet direkt über TLS (Port 465), `smtp://` über STARTTLS (Port 587). Ohne STARTTLS
+  verweigert die App den Versand, ausser auf `localhost` (lokales Relay). Sonderzeichen in Benutzername und
+  Passwort URL-kodieren (`@` → `%40`, `:` → `%3A`).
+- Der Link zeigt auf `PUBLIC_URL` (sonst auf die Adresse der Anfrage) – für den Betrieb also `PUBLIC_URL`
+  setzen.
+- Ohne `SMTP_URL` schreibt die App die E-Mail samt Link ins Server-Log; das reicht zum Ausprobieren.
+- Mit `REQUIRE_VERIFIED_EMAIL=1` können nur Konten mit bestätigter Adresse Fotos beitragen und ändern.
+  Konten aus der Zeit vor dieser Funktion fordern ihren Link im Konto-Menü an.
 
 ## Anmelden mit Google und GitHub
 

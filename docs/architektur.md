@@ -64,6 +64,7 @@ src/metadata.js      Metadatensatz nach ISO 19139 und GM03 (ISO19139.che) für g
 src/routes/ogc-tiles.js  OGC API – Tiles (WebMercatorQuad und SwissLV95) und MapLibre-Stil
 src/auth.js          Konten, Passwort-Hashing (scrypt), Sitzungen, Rate-Limit
 src/oauth.js         Anmelden mit Google und GitHub (OAuth 2.0 mit PKCE), ohne Abhängigkeiten
+src/mail.js          E-Mail-Versand über SMTP (TLS/STARTTLS, AUTH PLAIN) für Bestätigungslinks
 src/moderation.js    Lizenzen, Meldungen, Ausblenden und Protokoll
 src/routes/accounts.js  Routen für Konten und Moderation, CSRF-Schutz, Rechte auf Fotos
 deploy/qgis-server/  Vorlage: MyForrest + QGIS Server (WMS/WMTS/WFS) + nginx per Docker Compose

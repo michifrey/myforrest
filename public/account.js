@@ -9,6 +9,7 @@ const Account = {
   user: null,
   csrf: null,
   requireLogin: false,
+  requireVerifiedEmail: false,
   licenses: [],
   defaultLicense: 'cc-by-sa-4.0',
   reportReasons: {},
@@ -86,7 +87,9 @@ function renderNav() {
       el('strong', { text: u.name }),
       el('span', { class: 'muted small', text: `${u.email}${u.emailVerified ? ' ✓' : ''} · ${ROLE_LABEL[u.role]}` }),
       ...(via.length ? [el('span', { class: 'muted small', text: `Anmeldung über ${via.join(', ')}${u.hasPassword ? ' oder Passwort' : ''}` })] : []),
+      ...(u.emailVerified ? [] : [el('span', { class: 'menu-unverified small', text: 'E-Mail-Adresse noch nicht bestätigt' })]),
     ]),
+    ...(u.emailVerified ? [] : [item('Bestätigungslink senden', resendVerification)]),
     ...providerItems,
     ...(isMod() ? [item('Moderation', () => openModeration('reported'))] : []),
     ...(u.role === 'admin' ? [item('Konten & Rollen', () => openModeration('users'))] : []),
@@ -103,6 +106,21 @@ menuBtn.addEventListener('click', () => (Account.user ? toggleMenu() : openAuth(
 document.addEventListener('click', (e) => { if (!menu.hidden && !e.target.closest('.account')) toggleMenu(false); });
 menu.addEventListener('keydown', (e) => { if (e.key === 'Escape') { toggleMenu(false); menuBtn.focus(); } });
 menu.addEventListener('click', (e) => { if (e.target.closest('.menu-item')) toggleMenu(false); });
+
+const VERIFY_MESSAGE = {
+  sent: (email) => `Wir haben dir einen Bestätigungslink an ${email} geschickt. Er ist 24 Stunden gültig.`,
+  logged: () => 'Auf diesem Server ist kein E-Mail-Versand eingerichtet; der Bestätigungslink steht im Server-Log.',
+  failed: () => 'Der Bestätigungslink konnte gerade nicht verschickt werden. Im Konto-Menü kannst du ihn später neu anfordern.',
+};
+
+async function resendVerification() {
+  try {
+    const r = await jsonPost('/api/auth/verify/resend');
+    alert(VERIFY_MESSAGE[r.verification](Account.user.email));
+  } catch (err) {
+    alert(err.message);
+  }
+}
 
 async function unlinkProvider(p) {
   if (!confirm(`Anmeldung mit ${p.label} von diesem Konto trennen?`)) return;
@@ -218,6 +236,7 @@ authForm.addEventListener('submit', async (e) => {
     renderNav();
     fillLicenseSelect();
     await refreshViews();
+    if (data.verification) alert(VERIFY_MESSAGE[data.verification](data.user.email));
     const next = afterAuth;
     afterAuth = null;
     next?.();
@@ -229,10 +248,18 @@ authForm.addEventListener('submit', async (e) => {
   }
 });
 
-// With REQUIRE_LOGIN, uploading and repeat photos ask to log in first.
+// With REQUIRE_LOGIN, uploading and repeat photos ask to log in first
+// (and with REQUIRE_VERIFIED_EMAIL, to confirm the address).
 document.addEventListener('click', (e) => {
   const trigger = e.target.closest('#open-upload, #open-camera, [data-action="upload"]');
-  if (!trigger || !Account.requireLogin || Account.user) return;
+  if (!trigger) return;
+  if (Account.user && Account.requireVerifiedEmail && !Account.user.emailVerified) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (confirm('Zum Beitragen von Fotos muss deine E-Mail-Adresse bestätigt sein. Neuen Bestätigungslink senden?')) resendVerification();
+    return;
+  }
+  if (!Account.requireLogin || Account.user) return;
   e.preventDefault();
   e.stopImmediatePropagation();
   openAuth('login', {
@@ -534,6 +561,8 @@ function authReturn() {
     openAuth('login');
     $('auth-error').textContent = error;
     $('auth-error').hidden = false;
+  } else if (result === 'verified') {
+    alert('Danke! Deine E-Mail-Adresse ist bestätigt.');
   } else if (result === 'linked' && provider) {
     alert(`${provider.label} ist jetzt mit deinem Konto verknüpft.`);
   } else if (result === 'created' && Account.user) {
@@ -551,6 +580,7 @@ function authReturn() {
       user: me.user,
       csrf: me.csrfToken,
       requireLogin: me.requireLogin,
+      requireVerifiedEmail: Boolean(me.requireVerifiedEmail),
       licenses: me.licenses,
       defaultLicense: me.defaultLicense,
       reportReasons: me.reportReasons,

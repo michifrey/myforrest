@@ -13,12 +13,14 @@ const noWeather = async () => new Response('offline', { status: 503 });
 
 async function withServer(opts, fn) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'myforrest-acc-'));
-  const app = createApp({ dataDir, weatherFetch: noWeather, ...opts });
+  const mails = [];
+  const mailer = { send: async (m) => { mails.push(m); return { sent: true }; } };
+  const app = createApp({ dataDir, weatherFetch: noWeather, mailer, ...opts });
   const server = app.listen(0);
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
-    await fn(base, app.locals.db);
+    await fn(base, app.locals.db, mails);
   } finally {
     await app.locals.idle();
     server.close();
@@ -357,5 +359,93 @@ test('once accounts exist, only admins may import phenology reference data', asy
     assert.equal((await post()).status, 200, 'open without accounts');
     await fetch(`${base}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'a@b.ch', name: 'Admin', password: 'geheim1234' }) });
     assert.equal((await post()).status, 403, 'anonymous refused once accounts exist');
+  });
+});
+
+/** The token from the last confirmation link mailed to `to`. */
+const linkFor = (mails, to) => {
+  const mail = mails.filter((m) => m.to === to).at(-1);
+  const url = mail.text.match(/https?:\/\/\S+/)[0];
+  return new URL(url);
+};
+
+test('registering mails a confirmation link that verifies the address once', async () => {
+  await withServer({}, async (base, db, mails) => {
+    const anna = client(base);
+    const { body } = await anna.register('anna@example.org', 'Anna Wald');
+    assert.equal(body.verification, 'sent');
+    assert.equal(body.user.emailVerified, false);
+    assert.equal(mails.length, 1);
+    assert.match(mails[0].subject, /bestätigen/);
+    const link = linkFor(mails, 'anna@example.org');
+    assert.equal(link.pathname, '/api/auth/verify');
+    // Only the hash of the token is stored.
+    assert.notEqual(db.prepare('SELECT token_hash FROM email_tokens').get().token_hash, link.searchParams.get('token'));
+
+    // The link works without a session (another device) and only once.
+    const res = await fetch(link, { redirect: 'manual' });
+    assert.equal(res.status, 303);
+    assert.equal(res.headers.get('location'), '/?auth=verified');
+    const me = await (await anna.req('/api/auth/me')).json();
+    assert.equal(me.user.emailVerified, true);
+    const twice = await fetch(link, { redirect: 'manual' });
+    assert.match(new URL(twice.headers.get('location'), base).searchParams.get('auth_error'), /ungültig/);
+
+    // Already confirmed: no new link.
+    assert.equal((await anna.req('/api/auth/verify/resend', { method: 'POST' })).status, 400);
+    const bogus = await fetch(`${base}/api/auth/verify?token=nope`, { redirect: 'manual' });
+    assert.match(bogus.headers.get('location'), /auth_error=/);
+  });
+});
+
+test('a new link replaces the old one, expired links fail, resending is limited', async () => {
+  await withServer({ rateLimits: { verifyPerAccount: 2 } }, async (base, db, mails) => {
+    const ben = client(base);
+    await ben.register('ben@example.org', 'Ben Berg');
+    const first = linkFor(mails, 'ben@example.org');
+    assert.equal((await ben.req('/api/auth/verify/resend', { method: 'POST' })).status, 200);
+    const second = linkFor(mails, 'ben@example.org');
+    assert.notEqual(first.href, second.href);
+    const old = await fetch(first, { redirect: 'manual' });
+    assert.match(old.headers.get('location'), /auth_error=/);
+
+    db.prepare('UPDATE email_tokens SET expires_at = ?').run(Date.now() - 1);
+    const expired = await fetch(second, { redirect: 'manual' });
+    assert.match(new URL(expired.headers.get('location'), base).searchParams.get('auth_error'), /abgelaufen/);
+
+    assert.equal((await ben.req('/api/auth/verify/resend', { method: 'POST' })).status, 200);
+    assert.equal((await ben.req('/api/auth/verify/resend', { method: 'POST' })).status, 429);
+    assert.equal((await client(base).req('/api/auth/verify/resend', { method: 'POST' })).status, 401);
+  });
+});
+
+test('a failing mail server does not block the registration', async () => {
+  const mailer = { send: async () => { throw new Error('SMTP down'); } };
+  await withServer({ mailer }, async (base) => {
+    const { res, body } = await client(base).register('cleo@example.org', 'Cleo');
+    assert.equal(res.status, 201);
+    assert.equal(body.verification, 'failed');
+  });
+});
+
+test('requireVerifiedEmail: writes need a confirmed address', async () => {
+  await withServer({ requireVerifiedEmail: true }, async (base, db, mails) => {
+    const anon = client(base);
+    const me = await (await anon.req('/api/auth/me')).json();
+    assert.equal(me.requireVerifiedEmail, true);
+    assert.equal(me.requireLogin, true);
+    assert.equal((await anon.upload('nogps.jpg', { lat: '47.1', lon: '8.1' })).status, 401);
+
+    const dora = client(base);
+    await dora.register('dora@example.org', 'Dora');
+    let res = await dora.upload('nogps.jpg', { lat: '47.1', lon: '8.1' });
+    assert.equal(res.status, 403);
+    assert.match((await res.json()).error, /bestätigen/);
+    // Account routes stay usable.
+    assert.equal((await dora.req('/api/auth/verify/resend', { method: 'POST' })).status, 200);
+
+    await fetch(linkFor(mails, 'dora@example.org'), { redirect: 'manual' });
+    res = await dora.upload('nogps.jpg', { lat: '47.1', lon: '8.1' });
+    assert.equal(res.status, 201);
   });
 });

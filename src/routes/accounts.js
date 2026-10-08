@@ -6,7 +6,8 @@
  *
  *   const accounts = registerAccounts(app, ctx);
  *
- * `ctx` holds `db`, `requireLogin`, `adminEmail`, `oauth` (src/oauth.js), and later `photoJson`
+ * `ctx` holds `db`, `requireLogin`, `requireVerifiedEmail`, `adminEmail`, `oauth` (src/oauth.js),
+ * `mailer` (src/mail.js), and later `photoJson`
  * (set by app.js once defined). Returns helpers app.js uses to filter hidden
  * photos and to stamp uploads with their uploader and licence.
  *
@@ -22,6 +23,11 @@
  * GitHub, which return to …/callback. That logs in, creates an account, or,
  * with a session in this browser, links the provider to it; then it
  * redirects to the start page (`/?auth=ok|created|linked` or `/?auth_error=…`).
+ *
+ * E-mail confirmation: registering sends a link to GET /api/auth/verify,
+ * which confirms the address and redirects to `/?auth=verified`. With
+ * `requireVerifiedEmail`, writes need an account with a confirmed address
+ * (it implies `requireLogin`).
  */
 
 const crypto = require('node:crypto');
@@ -30,6 +36,7 @@ const {
   SESSION_COOKIE, SESSION_TTL_MS, ROLES, parseCookies, serializeCookie, createLimiter, createAuth, isModerator, userJson,
 } = require('../auth');
 const { STATE_COOKIE, STATE_TTL_MS, createOAuth } = require('../oauth');
+const { createMailer } = require('../mail');
 const {
   LICENSES, DEFAULT_LICENSE, REPORT_REASONS, licenseJson, parseLicense, visibleSql, createModeration,
 } = require('../moderation');
@@ -37,6 +44,8 @@ const {
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 // Writes that stay open to anonymous visitors even with requireLogin.
 const OPEN_WRITES = [/^\/auth\/(login|register|logout)$/, /^\/photos\/\d+\/report$/];
+// Writes an account with an unconfirmed address may still make with requireVerifiedEmail.
+const UNVERIFIED_WRITES = [/^\/auth\//, ...OPEN_WRITES];
 
 const sameString = (a, b) => {
   const x = Buffer.from(String(a));
@@ -45,15 +54,19 @@ const sameString = (a, b) => {
 };
 
 module.exports = function registerAccounts(app, ctx) {
-  const { db, requireLogin = false, adminEmail = null } = ctx;
+  const { db, adminEmail = null, requireVerifiedEmail = false } = ctx;
+  const requireLogin = Boolean(ctx.requireLogin || requireVerifiedEmail);
   const auth = createAuth(db, { adminEmail });
   const oauth = ctx.oauth || createOAuth();
+  const mailer = ctx.mailer || createMailer();
+  const publicUrl = ctx.publicUrl || null;
   const mod = createModeration(db);
   const limits = ctx.rateLimits || {};
   const loginPerAccount = createLimiter({ max: limits.loginPerAccount ?? 5, windowMs: 15 * 60 * 1000 });
   const loginPerIp = createLimiter({ max: limits.loginPerIp ?? 30, windowMs: 15 * 60 * 1000 });
   const oauthPerIp = createLimiter({ max: limits.oauthPerIp ?? 30, windowMs: 15 * 60 * 1000 });
   const registerPerIp = createLimiter({ max: limits.registerPerIp ?? 10, windowMs: 3600 * 1000 });
+  const verifyPerAccount = createLimiter({ max: limits.verifyPerAccount ?? 3, windowMs: 3600 * 1000 });
   const reportPerIp = createLimiter({ max: limits.reportPerIp ?? 30, windowMs: 3600 * 1000 });
 
   const canSeeHidden = (req) => isModerator(req.user);
@@ -92,6 +105,9 @@ module.exports = function registerAccounts(app, ctx) {
     }
     if (requireLogin && !req.user && !OPEN_WRITES.some((re) => re.test(req.path))) {
       return fail(res, 401, 'Bitte zuerst anmelden');
+    }
+    if (requireVerifiedEmail && req.user && !req.user.email_verified_at && !UNVERIFIED_WRITES.some((re) => re.test(req.path))) {
+      return fail(res, 403, 'Bitte zuerst die E-Mail-Adresse bestätigen (Link in der E-Mail, neu anfordern im Konto-Menü)');
     }
     next();
   });
@@ -183,6 +199,7 @@ module.exports = function registerAccounts(app, ctx) {
       user: selfJson(req.user),
       csrfToken: req.session?.csrf ?? null,
       requireLogin,
+      requireVerifiedEmail,
       providers: oauth.list(),
       licenses: Object.entries(LICENSES).map(([id, l]) => ({ id, ...l })),
       defaultLicense: DEFAULT_LICENSE,
@@ -200,7 +217,8 @@ module.exports = function registerAccounts(app, ctx) {
       if (r.error) return fail(res, r.status || 400, r.error);
       registerPerIp.hit(req.ip);
       if (r.user.role === 'admin') mod.log(r.user, 'role', { targetUserId: r.user.id, detail: 'admin (erstes Konto)' });
-      res.status(201).json(startSession(req, res, r.user));
+      const verification = await sendVerification(req, r.user);
+      res.status(201).json({ ...startSession(req, res, r.user), verification });
     } catch (err) {
       next(err);
     }
@@ -237,9 +255,61 @@ module.exports = function registerAccounts(app, ctx) {
     res.status(204).end();
   });
 
-  /* ---------- Identity providers (Google, GitHub) ---------- */
+  /* ---------- E-mail confirmation ---------- */
 
   const origin = (req) => `${secure(req) ? 'https' : 'http'}://${req.get('x-forwarded-host') || req.get('host')}`;
+
+  /** Mails a confirmation link; 'sent', 'logged' (no SMTP configured) or 'failed'. */
+  async function sendVerification(req, user) {
+    const token = auth.createEmailToken(user);
+    const link = `${(publicUrl || origin(req)).replace(/\/+$/, '')}/api/auth/verify?token=${encodeURIComponent(token)}`;
+    try {
+      const r = await mailer.send({
+        to: user.email,
+        subject: 'MyForrest: E-Mail-Adresse bestätigen',
+        text: [
+          `Hallo ${user.name}`,
+          '',
+          'Bitte bestätige deine E-Mail-Adresse für MyForrest mit diesem Link:',
+          '',
+          link,
+          '',
+          'Der Link ist 24 Stunden gültig. Hast du kein Konto angelegt, kannst du diese E-Mail ignorieren.',
+        ].join('\n'),
+      });
+      return r?.logged ? 'logged' : 'sent';
+    } catch (err) {
+      console.error(`Bestätigungs-E-Mail an Konto ${user.id} fehlgeschlagen: ${err.message}`);
+      return 'failed';
+    }
+  }
+
+  app.get('/api/auth/verify', (req, res) => {
+    res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
+    const r = auth.confirmEmail(req.query.token);
+    res.redirect(303, `/?${new URLSearchParams(r.error ? { auth_error: r.error } : { auth: 'verified' })}`);
+  });
+
+  app.post('/api/auth/verify/resend', async (req, res, next) => {
+    if (!req.user) return fail(res, 401, 'Bitte zuerst anmelden');
+    if (req.user.email_verified_at) return fail(res, 400, 'Die E-Mail-Adresse ist schon bestätigt');
+    const wait = verifyPerAccount.blocked(req.user.id);
+    if (wait) {
+      return res.set('Retry-After', String(wait)).status(429)
+        .json({ error: `Schon mehrere Links verschickt – bitte in ${Math.ceil(wait / 60)} Minuten erneut versuchen` });
+    }
+    verifyPerAccount.hit(req.user.id);
+    try {
+      const verification = await sendVerification(req, req.user);
+      if (verification === 'failed') return fail(res, 502, 'Die E-Mail konnte nicht verschickt werden – bitte später erneut versuchen');
+      res.json({ verification });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  /* ---------- Identity providers (Google, GitHub) ---------- */
+
   const stateCookie = (req, value, maxAge) => serializeCookie(STATE_COOKIE, value, {
     maxAge, secure: secure(req), path: '/api/auth/oauth/',
   });

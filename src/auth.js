@@ -12,6 +12,8 @@
  * - Accounts may instead (or in addition) sign in with an identity provider
  *   (src/oauth.js); such logins are stored in `identities`. Accounts created
  *   that way have no password (an empty `password_hash`) and a verified e-mail.
+ * - E-mail addresses of password accounts are confirmed with a link: a random
+ *   token, valid for 24 hours, of which the database again only keeps the SHA-256.
  */
 
 const crypto = require('node:crypto');
@@ -22,6 +24,7 @@ const scryptAsync = promisify(crypto.scrypt);
 const ROLES = ['user', 'moderator', 'admin'];
 const SESSION_COOKIE = 'mf_session';
 const SESSION_TTL_MS = 30 * 24 * 3600 * 1000;
+const VERIFY_TTL_MS = 24 * 3600 * 1000;
 const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 64 };
 
 const SCHEMA = `
@@ -53,6 +56,15 @@ const SCHEMA = `
     PRIMARY KEY (provider, subject)
   );
   CREATE INDEX IF NOT EXISTS identities_user ON identities (user_id);
+
+  CREATE TABLE IF NOT EXISTS email_tokens (
+    token_hash TEXT PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    email      TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS email_tokens_user ON email_tokens (user_id);
 `;
 
 async function hashPassword(password) {
@@ -201,9 +213,10 @@ function createAuth(db, { adminEmail = null } = {}) {
    * of the browser's session, if any: then the identity is linked to it.
    * Otherwise a known identity logs in, and an unknown one with a verified,
    * unused address creates an account. An address that already belongs to
-   * an account is not linked automatically, since nobody has checked that
-   * the account's owner controls it (account pre-hijacking); its owner logs
-   * in with the password and links the provider from the account menu.
+   * an account is linked automatically only once the account has confirmed
+   * it; before that nobody has checked that the account's owner controls it
+   * (account pre-hijacking), so its owner logs in with the password and
+   * links the provider from the account menu.
    */
   function identityLogin(provider, profile, current = null) {
     const known = identityRow.get(provider, profile.subject);
@@ -222,7 +235,12 @@ function createAuth(db, { adminEmail = null } = {}) {
     if (!profile.email || !profile.emailVerified || !EMAIL_RE.test(profile.email) || profile.email.length > 200) {
       return { error: 'Der Anbieter hat keine bestätigte E-Mail-Adresse geliefert', status: 400 };
     }
-    if (db.prepare('SELECT 1 FROM users WHERE email = ?').get(profile.email)) {
+    const sameEmail = db.prepare('SELECT * FROM users WHERE email = ?').get(profile.email);
+    if (sameEmail?.email_verified_at) {
+      linkIdentity(provider, profile, sameEmail.id);
+      return { user: sameEmail, linked: true };
+    }
+    if (sameEmail) {
       return {
         error: 'Zu dieser E-Mail-Adresse gibt es schon ein Konto. Bitte mit Passwort anmelden und die Anmeldung dann im Konto-Menü verknüpfen.',
         status: 409,
@@ -235,6 +253,32 @@ function createAuth(db, { adminEmail = null } = {}) {
     } catch {
       return { error: 'Das Konto konnte nicht angelegt werden – bitte erneut versuchen', status: 409 };
     }
+  }
+
+  /** A new confirmation token for the account's current address (earlier ones stop working). */
+  function createEmailToken(user) {
+    const token = randomToken();
+    const t = Date.now();
+    db.prepare('DELETE FROM email_tokens WHERE user_id = ? OR expires_at < ?').run(user.id, t);
+    db.prepare('INSERT INTO email_tokens (token_hash, user_id, email, created_at, expires_at) VALUES (?, ?, ?, ?, ?)')
+      .run(sha256(token), user.id, user.email, t, t + VERIFY_TTL_MS);
+    return token;
+  }
+
+  /** Confirms the address for a token from the link; returns the account or `{ error }`. */
+  function confirmEmail(token) {
+    if (typeof token !== 'string' || !token || token.length > 100) return { error: 'Der Bestätigungslink ist ungültig' };
+    const row = db.prepare('SELECT * FROM email_tokens WHERE token_hash = ?').get(sha256(token));
+    const user = row ? userById.get(row.user_id) : null;
+    if (!row || !user) return { error: 'Der Bestätigungslink ist ungültig oder wurde schon ersetzt' };
+    if (row.expires_at < Date.now()) {
+      db.prepare('DELETE FROM email_tokens WHERE token_hash = ?').run(row.token_hash);
+      return { error: 'Der Bestätigungslink ist abgelaufen – im Konto-Menü einen neuen anfordern', expired: true };
+    }
+    if (row.email.toLowerCase() !== user.email.toLowerCase()) return { error: 'Der Bestätigungslink gehört zu einer anderen Adresse' };
+    if (!user.email_verified_at) db.prepare('UPDATE users SET email_verified_at = ? WHERE id = ?').run(Date.now(), user.id);
+    db.prepare('DELETE FROM email_tokens WHERE user_id = ?').run(user.id);
+    return { user: userById.get(user.id) };
   }
 
   const identitiesOf = (userId) => db.prepare('SELECT provider FROM identities WHERE user_id = ? ORDER BY provider').all(userId).map((r) => r.provider);
@@ -293,6 +337,7 @@ function createAuth(db, { adminEmail = null } = {}) {
 
   return {
     register, authenticate, createSession, session, destroySession, identityLogin, identitiesOf, unlinkIdentity,
+    createEmailToken, confirmEmail,
     userById: (id) => userById.get(id),
   };
 }
@@ -316,6 +361,6 @@ const userJson = (u, { self = false, identities } = {}) => (u ? {
 } : null);
 
 module.exports = {
-  ROLES, SESSION_COOKIE, SESSION_TTL_MS,
+  ROLES, SESSION_COOKIE, SESSION_TTL_MS, VERIFY_TTL_MS,
   hashPassword, verifyPassword, parseCookies, serializeCookie, createLimiter, createAuth, isModerator, hasPassword, userJson,
 };
