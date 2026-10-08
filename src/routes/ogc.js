@@ -311,7 +311,7 @@ module.exports = function registerOgc(app, {
       }
     }
     const taken = geodata.features('photos', base).map((f) => Date.parse(f.properties.taken_at));
-    const hidden = db.prepare('PRAGMA table_info(photos)').all().some((c) => c.name === 'hidden_at') ? 'WHERE hidden_at IS NULL' : '';
+    const hidden = db.prepare('PRAGMA table_info(photos)').all().some((c) => c.name === 'protected') ? 'WHERE hidden_at IS NULL AND protected = 0' : '';
     const added = db.prepare(`SELECT MIN(created_at) AS first, MAX(created_at) AS last FROM photos ${hidden}`).get();
     const now = Date.now();
     return {

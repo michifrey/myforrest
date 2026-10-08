@@ -105,6 +105,10 @@
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16C4 9 8 4.5 16 4c.4 7.5-4.2 12-12 12zM4 16l7-7"/></svg>
         Arten &amp; Neophyten
       </button>
+      <button type="button" id="tours-toggle" class="pill-btn tours-btn" aria-expanded="false" aria-controls="tourpanel">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="4.5" cy="15.5" r="2"/><circle cx="15.5" cy="4.5" r="2"/><path d="M6.5 15.5h5a3 3 0 0 0 0-6h-3a3 3 0 0 1 0-6h5"/></svg>
+        Touren &amp; Aufträge
+      </button>
       <div class="legend">
         <span><i class="dot ok"></i>Spot</span>
         <span><i class="dot damage"></i>Schäden</span>
@@ -139,6 +143,7 @@
       <p id="sun-source" class="wx-source"></p>
     </section>
     <section id="speciespanel" class="sunpanel sppanel" hidden aria-labelledby="sp-title"></section>
+    <section id="tourpanel" class="sunpanel tourpanel" hidden aria-labelledby="tour-title"></section>
 
     <div id="pick-hint" class="pick-hint" hidden>Klicke auf die Karte, um den Standort zu wählen · <button id="pick-cancel" class="link">Abbrechen</button></div>
 
@@ -225,6 +230,7 @@
         <button id="open-camera" class="primary wide">Wiederholungsfoto aufnehmen</button>
         <input id="rephoto-file" type="file" accept="image/*" capture="environment" hidden>
         <button id="open-compare" class="secondary wide">Vorher / Nachher vergleichen</button>
+        <button id="request-photo" type="button" class="link small request-photo">Neues Foto von diesem Spot anfragen</button>
         <div id="compare" class="compare" hidden>
           <div class="compare-pick">
             <label>Vorher <select id="cmp-a"></select></label>
@@ -401,6 +407,11 @@
         </select>
         <span id="upload-license-hint" class="muted small license-hint"></span>
       </label>
+      <div class="protect-field">
+        <label class="toggle"><input type="checkbox" name="protected" id="upload-protected">
+          Geschützter Fund: genaue Lage nur für verifizierte PRO-Mitglieder (seltene Pflanzen, Pilzstellen, Horste)</label>
+        <p id="upload-protected-hint" class="muted small"></p>
+      </div>
 
       <details>
         <summary>Zeitabgleich für GPX</summary>
@@ -433,8 +444,10 @@
   <script src="video.js"></script>
   <script src="vegetation.js"></script>
   <script src="account.js"></script>
+  <script src="push.js"></script>
   <script src="analysis.js"></script>
   <script src="sunmap.js"></script>
+  <script src="tours.js"></script>
   <script src="offline-queue.js"></script>
   <script src="pwa.js"></script>
 </body>

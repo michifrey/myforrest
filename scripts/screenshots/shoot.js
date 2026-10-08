@@ -1,6 +1,6 @@
 'use strict';
 // Takes the README screenshots from the demo server (see README.md here).
-// Usage: node shoot.js [hero map spot satellite sun species vektor timelapse compare upload mobile]
+// Usage: node shoot.js [hero map spot satellite sun species vektor touren schutz timelapse compare upload mobile]
 const path = require('path');
 const fs = require('fs');
 const { execFileSync } = require('child_process');
@@ -154,6 +154,61 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await settle(page, 1500);
     await page.locator('#upload-dialog').screenshot({ path: out('upload.png') });
     await page.close();
+  }
+
+  if (want('touren')) {
+    // A planned tour along the forest track, past the requests and the bark-beetle stand.
+    const wp = [[47.3660, 8.5652], [47.3700, 8.5690], [47.3733, 8.5722], [47.3760, 8.5760], [47.3768, 8.5795], [47.3741, 8.5826], [47.3716, 8.5858]]
+      .map(([lat, lon]) => ({ lat, lon }));
+    const route = { waypoints: wp, segments: wp.slice(1).map((p, i) => [wp[i], p]), raw: null, kind: 'gezeichnet', name: 'Waldrunde Adlisberg', savedId: null, hasTime: false };
+    const tctx = await desktop(browser);
+    await tctx.addInitScript((r) => { try { localStorage.setItem('myforrest.route.v1', r); } catch {} }, JSON.stringify(route));
+    const page = await explore(tctx);
+    await page.click('#tours-toggle');
+    await settle(page, 2500);
+    await page.evaluate(() => map.fitBounds([[47.3655, 8.5640], [47.3775, 8.5870]], { paddingTopLeft: [430, 60], paddingBottomRight: [460, 40] }));
+    await settle(page, 2500);
+    await page.evaluate(() => document.querySelector('#tour-suggestions')?.scrollIntoView({ block: 'end' }));
+    await settle(page, 800);
+    await page.screenshot({ path: out('touren.jpg'), ...jpg });
+    await page.click('[data-tab="auftraege"]');
+    await settle(page, 1200);
+    // The request on the forest track, opened from the list.
+    await page.locator('#tour-requests .sug-item', { hasText: 'Lichtung' }).click();
+    await settle(page, 1200);
+    await page.screenshot({ path: out('fotoauftraege.jpg'), ...jpg });
+    await tctx.close();
+  }
+
+  if (want('schutz')) {
+    // Public: the protected orchid find only as a 5-km square.
+    let page = await explore(ctx);
+    await page.evaluate(() => map.setView([47.366, 8.628], 13));
+    await settle(page, 2500);
+    const cell = page.locator('path.protected-cell').first();
+    const box = await cell.boundingBox();
+    await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.45);
+    await settle(page, 1000);
+    await page.screenshot({ path: out('schutz-raster.jpg'), ...jpg });
+    await page.close();
+    // A verified PRO member (forest ranger) sees the find with its exact place.
+    const pctx = await desktop(browser);
+    page = await pctx.newPage();
+    await page.goto(`${BASE}/`);
+    await page.evaluate(() => fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: 'revier@example.org', password: 'demo-passwort' }) }));
+    await page.reload();
+    await settle(page, 2500);
+    await page.evaluate(() => document.querySelector('#explore').scrollIntoView());
+    await settle(page, 1500);
+    const orchid = await page.evaluate(() => state.spots.find((s) => s.protectedPhotos)?.id);
+    await page.evaluate((id) => openSpot(id), orchid);
+    await settle(page, 2500);
+    await page.evaluate(() => { map.setView([47.3796, 8.5852], 17, { animate: false }); map.panBy([230, 40], { animate: false }); });
+    await settle(page, 2000);
+    await page.evaluate(() => document.querySelector('#photo-credit')?.scrollIntoView({ block: 'center' }));
+    await settle(page, 1200);
+    await page.screenshot({ path: out('schutz-pro.jpg'), ...jpg });
+    await pctx.close();
   }
 
   await browser.close();

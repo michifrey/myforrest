@@ -1074,6 +1074,17 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 }
 .thumbs button.is-hidden img { opacity: 0.4; filter: grayscale(1); }
 
+/* Push messages for the early warning (push.js) */
+.spot-follow {
+  margin: 0.4rem 0 0; padding: 0.45rem 0.65rem; border-radius: 10px; line-height: 1.45;
+  color: var(--muted); background: var(--surface-2);
+}
+.spot-follow .follow-device { display: block; margin-top: 0.2rem; }
+.spot-follow svg { width: 1rem; height: 1rem; vertical-align: -0.2em; margin-right: 0.3rem; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.spot-follow.is-on { color: var(--text); background: var(--accent-soft); }
+.spot-follow.is-on svg { color: var(--accent); fill: color-mix(in srgb, var(--accent) 25%, transparent); }
+.spot-follow button.link { padding: 0 0.1rem; font-size: inherit; }
+
 .mod-dialog { width: min(820px, calc(100vw - 32px)); }
 .mod-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
 .mod-head .icon { float: none; }
@@ -1183,3 +1194,113 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 @media (max-width: 520px) {
   .src { margin-left: 0; white-space: normal; }
 }
+
+/* ---------- Tours & photo requests (tours.js) ---------- */
+:root { --route: #d8433b; --request: #d39b1c; --public-route: #7b5cc4; }
+@media (prefers-color-scheme: dark) { :root { --route: #ef6b5f; --request: #e3b23c; --public-route: #a58ae6; } }
+.tours-btn svg { stroke: var(--route); }
+.tours-btn svg circle { fill: var(--route); stroke: none; }
+.tour-drawing { cursor: crosshair; }
+.route-line { stroke: var(--route); }
+.public-line { stroke: var(--public-route); opacity: 0.85; }
+.wp {
+  display: block; width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 2.5px solid #222;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35); cursor: grab;
+}
+.wp.start { background: var(--ok); border-color: #fff; }
+.wp.end { background: var(--route); border-color: #fff; }
+.km-mark {
+  display: inline-block; min-width: 20px; padding: 1px 4px; text-align: center;
+  font: 700 0.68rem/1.2 var(--font-body); color: #1b1b1b; background: #ffe45c; border: 1px solid #1b1b1b; border-radius: 3px;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.gps-here { fill: #2f7ae5; fill-opacity: 1; stroke: #fff; stroke-width: 3; }
+
+.tour-km { display: flex; align-items: baseline; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.9rem; }
+.tour-km output { font: 600 2.2rem/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.tour-km #tour-meta { flex-basis: 100%; }
+.tour-modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; margin-top: 0.8rem; }
+.tour-modes > * { text-align: center; padding: 0.55rem 0.4rem; font-size: 0.88rem; }
+.tour-modes [aria-pressed="true"] { background: var(--accent); color: var(--accent-text); }
+.tour-modes .recording { background: var(--route); color: #fff; }
+.file-btn { cursor: pointer; border-radius: 999px; border: 1px solid var(--border); font-weight: 600; }
+.tour-tools { display: flex; flex-wrap: wrap; gap: 0.2rem 0.8rem; margin-top: 0.4rem; }
+.tour-save { display: grid; grid-template-columns: 1fr auto; gap: 0.4rem; margin-top: 0.7rem; }
+.tour-save .toggle, .tour-save button { grid-column: 1 / -1; }
+.tour-status { min-height: 1.2em; margin: 0.5rem 0 0; color: var(--accent); }
+.sug-head { margin-top: 1.1rem; }
+
+.sug-list, .req-list, .tour-list { list-style: none; padding: 0; margin: 0.6rem 0 0; display: grid; gap: 0.4rem; }
+.sug-item {
+  display: flex; gap: 0.6rem; align-items: flex-start; justify-content: flex-start; width: 100%; text-align: left;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.55rem 0.7rem;
+}
+.sug-item:hover { border-color: var(--accent); }
+.sug-text { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.sug-badge {
+  flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  font: 700 0.72rem/1 var(--font-body); color: #fff; background: var(--request); border: 2px solid #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+}
+.sug-badge.satellit { background: var(--neo); }
+.sug-badge.lange_nicht { background: var(--muted); }
+
+.req-icon { background: none; border: none; }
+.req-pin {
+  display: block; width: 26px; height: 26px; border-radius: 50%; background: var(--request); border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35); position: relative;
+}
+/* Camera glyph */
+.req-pin::before { content: ''; position: absolute; left: 6px; top: 8px; width: 10px; height: 7px; border: 2px solid #fff; border-radius: 2px; }
+.req-pin::after { content: ''; position: absolute; left: 9.5px; top: 10.5px; width: 3px; height: 3px; border-radius: 50%; background: #fff; }
+.req-pin.small { width: 22px; height: 22px; flex: none; transform: scale(0.85); }
+.req-pin.small::before { left: 4px; top: 6px; }
+.req-pin.small::after { left: 7.5px; top: 8.5px; }
+.req-dir { position: absolute; left: 13px; top: 13px; }
+.req-dir::before {
+  content: ''; position: absolute; left: -30px; top: -30px; width: 60px; height: 60px; border-radius: 50%;
+  background: conic-gradient(from calc(var(--h) - 25deg), color-mix(in srgb, var(--request) 70%, transparent) 0deg 50deg, transparent 50deg);
+  -webkit-mask: radial-gradient(circle, transparent 35%, #000 36%, transparent 72%);
+  mask: radial-gradient(circle, transparent 35%, #000 36%, transparent 72%);
+}
+.req-popup { display: flex; flex-direction: column; gap: 0.3rem; min-width: 200px; }
+.req-popup p { margin: 0; }
+.req-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-top: 0.4rem; }
+.req-form { display: grid; gap: 0.35rem; margin-top: 0.8rem; padding: 0.8rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.req-form label { font-size: 0.82rem; font-weight: 600; }
+.req-form p { margin: 0; }
+.request-photo { display: block; margin: 0.5rem auto 0; }
+
+.tour-pin {
+  display: block; width: 22px; height: 22px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+  background: var(--public-route); border: 2px solid #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
+}
+.tour-row { display: flex; flex-direction: column; gap: 0.1rem; }
+.tour-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.2rem 0.7rem; margin-top: 0.35rem; }
+.tour-list li { padding: 0.6rem 0.7rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.link.danger { color: var(--danger); }
+
+.upload-tour { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.5rem; font-size: 0.85rem; }
+.upload-request { margin: 0 0 0.6rem; padding: 0.5rem 0.7rem; border-radius: var(--radius); background: color-mix(in srgb, var(--request) 18%, var(--surface)); font-size: 0.88rem; }
+
+/* ---------- Protected finds and PRO membership ---------- */
+:root { --protect: #9b4d16; }
+@media (prefers-color-scheme: dark) { :root { --protect: #e0955a; } }
+.pin .lock-flag {
+  position: absolute; left: -7px; top: -7px; transform: rotate(45deg);
+  width: 18px; height: 18px; border-radius: 50%; background: var(--protect); color: #fff;
+  display: grid; place-items: center; border: 2px solid #fbf8f0;
+}
+.pin .lock-flag svg { width: 10px; height: 10px; }
+.protected-cell { stroke: var(--protect); fill: var(--protect); fill-opacity: 0.12; stroke-dasharray: 6 4; }
+.protected-tip { width: 280px; white-space: normal; }
+.protected-badge {
+  display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600;
+  color: var(--protect); background: color-mix(in srgb, var(--protect) 14%, var(--surface));
+}
+.protect-field { margin-top: 0.6rem; }
+.protect-field p { margin: 0.2rem 0 0; }
+.pro-form { display: grid; gap: 0.4rem; margin-top: 0.6rem; }
+.pro-form label { font-weight: 600; font-size: 0.85rem; }
+#pro-dialog { max-width: 520px; }
+.pro-cell { display: flex; flex-direction: column; gap: 0.2rem; }
+.pro-actions { display: flex; gap: 0.5rem; align-items: center; }

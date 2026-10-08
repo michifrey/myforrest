@@ -66,16 +66,18 @@ const iso = (ms) => new Date(ms).toISOString();
 
 function createGeodata({ db, spotRadiusM = 25 }) {
   const hasHidden = db.prepare('PRAGMA table_info(photos)').all().some((c) => c.name === 'hidden_at');
-  const visible = (alias) => (hasHidden ? `${alias}.hidden_at IS NULL` : '1 = 1');
+  const hasProtected = db.prepare('PRAGMA table_info(photos)').all().some((c) => c.name === 'protected');
+  // Open data never contains hidden photos or protected finds (rare species): these products are public.
+  const visible = (alias) => [hasHidden ? `${alias}.hidden_at IS NULL` : '1 = 1', hasProtected ? `COALESCE(${alias}.protected, 0) = 0` : '1 = 1'].join(' AND ');
   const hasUsers = () => Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'users'").get());
   const tagsOf = db.prepare('SELECT tag FROM photo_tags WHERE photo_id = ? ORDER BY tag');
 
   /** Changes whenever photos or identifications change; keys the cache of computed collections. */
   const version = () => {
-    const p = db.prepare(`SELECT COUNT(*) n, COALESCE(MAX(id), 0) m, COALESCE(SUM(${hasHidden ? 'hidden_at IS NOT NULL' : 0}), 0) h FROM photos`).get();
+    const p = db.prepare(`SELECT COUNT(*) n, COALESCE(MAX(id), 0) m, COALESCE(SUM(${hasHidden ? 'hidden_at IS NOT NULL' : 0}), 0) h, COALESCE(SUM(${hasProtected ? 'protected' : 0}), 0) pr FROM photos`).get();
     const i = db.prepare('SELECT COUNT(*) n, COALESCE(MAX(id), 0) m FROM identifications').get();
     const t = db.prepare('SELECT COUNT(*) n FROM photo_tags').get();
-    return `${p.n}:${p.m}:${p.h}:${i.n}:${i.m}:${t.n}`;
+    return `${p.n}:${p.m}:${p.h}:${p.pr}:${i.n}:${i.m}:${t.n}`;
   };
   const cache = new Map();
 

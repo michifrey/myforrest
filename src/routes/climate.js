@@ -19,7 +19,7 @@ const RETRY_AFTER = 10 * 60000;
 
 module.exports = function registerClimate(app, {
   db, weatherFetch = fetch, phenoFetch = weatherFetch, getPhoto, terrainOf, background = (p) => p, reassessSpot = () => {},
-  now = () => Date.now(),
+  now = () => Date.now(), visibleSpotIds = null,
 }) {
   const storms = createStorms({ db, fetchImpl: weatherFetch, now });
   const nightcool = createNightCool({ db, fetchImpl: weatherFetch, now });
@@ -166,7 +166,9 @@ module.exports = function registerClimate(app, {
     const rows = db.prepare(`
       SELECT s.id, s.lat, s.lon, MIN(p.taken_at) AS first FROM spots s JOIN photos p ON p.spot_id = s.id GROUP BY s.id`).all();
     const out = [];
+    const visible = visibleSpotIds ? visibleSpotIds(req) : null;
     for (const r of rows) {
+      if (visible && !visible.has(r.id)) continue;
       const events = storms.cachedBetween(r.lat, r.lon, r.first, now());
       if (events === null) {
         const key = `${r.lat.toFixed(1)},${r.lon.toFixed(1)}`;

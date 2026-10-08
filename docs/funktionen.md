@@ -10,7 +10,9 @@ Einen kürzeren Überblick mit Screenshots gibt das [README](../README.md).
 - [Bildanalyse](#bildanalyse)
 - [Wetter, Klima und Gelände](#wetter-klima-und-gelände)
 - [Kartenmodi](#kartenmodi)
+- [Touren und Fotoaufträge](#touren-und-fotoaufträge)
 - [Pflanzen und Baumarten](#pflanzen-und-baumarten)
+- [Geschützte Funde und PRO-Mitglieder](#geschützte-funde-und-pro-mitglieder)
 - [Konten, Moderation und Lizenzen](#konten-moderation-und-lizenzen)
 
 ## Fotos erfassen und verorten
@@ -84,7 +86,8 @@ MyForrest lässt sich als App auf den Startbildschirm legen
 vor, sodass die App auch ohne Netz startet. Zuletzt geladene Spots, Fotos und Kartenkacheln bleiben
 offline sichtbar (Kacheln bis ca. 800, Fotos bis 400, jeweils die ältesten werden verdrängt).
 Wer im Wald ohne Empfang fotografiert, verliert nichts: Uploads und Wiederholungsfotos ohne Verbindung
-landen samt Fotos, GPX und Angaben in einer Warteschlange auf dem Gerät (IndexedDB). In der Navigation
+landen samt Fotos, GPX und Angaben in einer Warteschlange auf dem Gerät (IndexedDB). Die installierte App
+empfängt auch die Push-Nachrichten der Satelliten-Frühwarnung (siehe Satellitenkontext). In der Navigation
 steht dann z. B. „3 Fotos warten auf Verbindung“; ein Klick zeigt die wartenden Uploads, die sich
 einzeln oder alle verwerfen lassen. Sobald wieder Netz da ist, werden sie automatisch gesendet: per
 Background Sync auch bei geschlossener App (Chrome/Android), sonst beim nächsten Öffnen oder sobald
@@ -325,10 +328,11 @@ misst den NDVI über Wald meist etwas tiefer, und Landsat 5 und 7 weichen von 8 
 - Die Werte werden gecacht und wöchentlich ergänzt. Szenen aus der Zeit vor dem NDMI werden nach und nach
   nachgerechnet.
 
-**Rückgänge zwischen zwei Fotos**: Fällt NDVI (≥ 0,1) oder NDMI (≥ 0,08) zwischen zwei Fotodaten
-gegenüber derselben Jahreszeit vor dem ersten Foto, erscheint ein Hinweis. Dazu kommt, was die Fotos
-zeigen (*Windwurf*, *Auflichtung* oder passende Beobachtungen), als unabhängige Bestätigung. Ab 0,2 (NDVI)
-bzw. 0,15 (NDMI) gilt der Rückgang als stark.
+**Rückgänge zwischen zwei Fotos**: Fällt NDVI oder NDMI zwischen zwei Fotodaten gegenüber derselben
+Jahreszeit vor dem ersten Foto, erscheint ein Hinweis. Dazu kommt, was die Fotos zeigen (*Windwurf*,
+*Auflichtung* oder passende Beobachtungen), als unabhängige Bestätigung. Die Anfangswerte der Schwellen
+sind 0,1 (NDVI) und 0,08 (NDMI), ab 0,2 bzw. 0,15 gilt der Rückgang als stark; geeicht werden sie wie die
+der Frühwarnung (siehe unten).
 
 **Frühwarnung ohne neue Fotos**: Einmal täglich aktualisiert der Server die Reihen aller Spots, auch wenn
 niemand den Spot öffnet (`SATELLITE_WATCH_HOURS`, 0 = aus). Er vergleicht die letzten ein bis zwei Monate
@@ -339,8 +343,24 @@ mit derselben Jahreszeit der bis zu fünf Vorjahre (mindestens zwei Vergleichswe
 - Ist das letzte Foto älter als der Rückgang, schlägt die App vor, den Spot zu besuchen: Ein neues Foto
   zeigt, was dahinter steckt.
 
-**Kalibrierung an bestätigten Schäden**: Die Schwellen der Frühwarnung eicht der Server an dem, was vor
-Ort bestätigt wurde.
+**Frühwarnung als Push-Nachricht**: Wer einen Spot regelmässig besucht, erfährt von einer neuen
+Frühwarnung auf dem Handy, ohne die App zu öffnen.
+- **Wer:** Konten, die den Spot in den letzten drei Jahren an mindestens zwei Tagen fotografiert haben.
+  Dazu kommt, wer dem Spot folgt (*Spot folgen* in der Spotansicht), und es fällt weg, wer ihn
+  stummgeschaltet hat. Die Spotansicht sagt angemeldeten Personen, ob und warum sie benachrichtigt werden.
+- **Einschalten:** Im Kontomenü *Push-Nachrichten einschalten*, einmal pro Gerät. Der Browser fragt
+  dann um Erlaubnis. *Testnachricht senden* prüft, ob Nachrichten ankommen. Auf iPhone und iPad geht das
+  nur, wenn MyForrest als App auf dem Home-Bildschirm liegt (iOS 16.4 oder neuer).
+- **Was:** Pro Frühwarnung eine Nachricht (Spot, Index, wie stark, seit wann); mehrere neue Warnungen für
+  dieselbe Person kommen gebündelt. Ein Tipp darauf öffnet den Spot. Gesendet wird nur, wenn seit dem
+  Beginn des Rückgangs niemand am Spot fotografiert hat, und jede Warnung nur einmal.
+- **Wann:** Nach der täglichen Runde, nach Angleichung und Kalibrierung.
+- **Technik:** Web Push mit VAPID und verschlüsselter Nachricht (RFC 8291/8292), ohne Fremddienst ausser
+  dem Push-Dienst des Browsers (Google, Mozilla, Apple, Microsoft). Der Server schickt nur an diese
+  Dienste; abgelaufene Abos löscht er.
+
+**Kalibrierung an bestätigten Schäden**: Die Schwellen der Frühwarnung und der Rückgänge zwischen zwei
+Fotos eicht der Server an dem, was vor Ort bestätigt wurde.
 - **Kontrollen:** Jedes Paar aufeinanderfolgender Fotos eines Spots (mindestens 30 Tage auseinander) ist
   eine Kontrolle.
   - *Schaden*, wenn das spätere Foto einen neuen Schadens-Tag trägt (Sturmschaden, Borkenkäfer,
@@ -349,8 +369,11 @@ Ort bestätigt wurde.
   - *Kein Schaden*, wenn beides fehlt.
   - Paare, bei denen derselbe Schadens-Tag schon auf dem früheren Foto stand, sagen nichts über den
     Zeitraum und zählen nicht.
-- **Nachgerechnet:** Für jede Kontrolle rechnet der Server Monat für Monat nach, wie stark die Frühwarnung
-  zwischen den beiden Besuchen ausgeschlagen hätte, jeweils nur mit den Daten, die damals vorlagen.
+- **Nachgerechnet:** Für jede Kontrolle rechnet der Server zwei Werte aus:
+  - Frühwarnung: Monat für Monat, wie stark sie zwischen den beiden Besuchen ausgeschlagen hätte, jeweils
+    nur mit den Daten, die damals vorlagen.
+  - Zwischen den Fotos: der Rückgang zwischen den beiden Fotodaten, so wie ihn die Spotansicht zeigt.
+  Beide werden getrennt geeicht.
 - **Wahl der Schwelle:** Gewählt wird pro Index die Schwelle zwischen 0,03 und 0,30 mit dem besten
   Verhältnis aus erkannten Schäden und Fehlalarmen (F1). Bei Gleichstand zählt die höhere, also die mit
   weniger Fehlalarmen. Die Schwelle für „stark“ behält das Verhältnis der Anfangswerte.
@@ -369,20 +392,32 @@ Ort bestätigt wurde.
     Die Prüfung würde dann vor allem den Anfangswert messen.
   - Die Kontrollen stammen von weniger als 3 Spots.
   - Die geeichte Schwelle war an zurückgehaltenen Spots nicht besser.
-- **Wann:** Nach jeder täglichen Runde wird neu kalibriert. Die Frühwarnkarte nennt die Schwelle, die
-  Zahl der Kontrollen und Spots, die Treffer und Fehlalarme an zurückgehaltenen Spots und den Vergleich
-  mit dem Anfangswert.
+- **Nach Waldtyp:** Laub- und Nadelwald reagieren verschieden. Laubkronen schwanken stärker übers Jahr;
+  Borkenkäfer senken den NDVI von Fichten oft nur wenig, bevor die Bäume absterben. Deshalb wird zusätzlich
+  pro Waldtyp geeicht.
+  - Der **Waldtyp** eines Spots kommt aus den erfassten Baumarten (ab 60 % Nadelbäume Nadelwald, bis 40 %
+    Laubwald, dazwischen Mischwald). Ohne Arten zählt der Nadelholzanteil auf den Fotos. Ohne beides
+    schätzt ihn der Satellit: Sinkt der NDVI vom Sommer zum Winter um mindestens 0,25, ist es Laubwald,
+    um höchstens 0,12 Nadelwald (je mindestens drei Sommer- und Wintermonate).
+  - Ein Waldtyp bekommt seine eigene Schwelle nur, wenn sie an seinen zurückgehaltenen Spots mindestens
+    so gut abschneidet wie die Schwelle aller Spots. Sonst gilt diese, mit Begründung.
+  - Mischwald und Spots ohne bekannten Waldtyp verwenden immer die Schwelle aller Spots.
+- **Wann:** Nach jeder täglichen Runde wird neu kalibriert. Die Karten der Frühwarnung und der Rückgänge
+  nennen die Schwelle, den Waldtyp, für den sie gilt, die Zahl der Kontrollen und Spots, die Treffer und
+  Fehlalarme an zurückgehaltenen Spots und den Vergleich mit dem Anfangswert bzw. der Schwelle aller
+  Spots. Unter den Diagrammen steht, als welcher Waldtyp der Spot gilt und woher das kommt.
 - **Grenzen:**
   - Bei wenigen Spots schwanken die Zahlen der Kreuzvalidierung stark.
   - „Kein Schaden“ heisst nur, dass niemand einen Schaden markiert hat.
+  - Pro Waldtyp braucht es entsprechend mehr bestätigte Schäden; bis dahin gilt die Schwelle aller Spots.
+  - Der Waldtyp aus dem Satelliten erkennt Lärchen (sommergrüne Nadelbäume) als Laubwald.
 
 **Sturm als Kontext**: Rückgänge und Frühwarnungen nennen den stärksten Sturm (Böen ab 75 km/h, siehe
 Sturmereignisse) im Zeitraum bzw. in den Monaten davor.
 
 **Grenzen**
 - Wegen der Pixelgrösse umfasst der Satellitenwert mehr (und anderes) als den Bildausschnitt.
-- Ohne genügend bestätigte Schäden bleiben die Schwellen der Frühwarnung Anfangswerte; die Rückgänge
-  zwischen zwei Fotos verwenden immer die Anfangswerte.
+- Ohne genügend bestätigte Schäden bleiben die Schwellen Anfangswerte.
 - Ohne Internetzugang bleibt der Bereich leer und wird später erneut versucht. Fällt nur Landsat aus,
   läuft Sentinel-2 weiter.
 
@@ -560,6 +595,72 @@ Ausgeblendete (moderierte) Fotos erscheinen in keinem Dienst.
    opendata.swiss; die Bedingung muss zur Lizenz der Fotos passen (Standard CC BY-SA 4.0, also mindestens
    Quellenangabe).
 
+## Touren und Fotoaufträge
+
+Der Kartenmodus *Touren & Aufträge* verbindet die eigenen Wege mit den Orten, an denen ein Foto gebraucht
+wird.
+
+### Route zeichnen, aufzeichnen oder importieren
+
+- **Zeichnen**: Jeder Klick auf die Karte setzt einen Wegpunkt; Wegpunkte lassen sich verschieben.
+  *Rückgängig* nimmt den letzten zurück, *Zurück zum Start* schliesst die Runde. Die Länge steht gross im
+  Panel, gelbe Kilometer-Marken zeigen den Verlauf (je nach Zoom alle 1, 2, 5 oder 10 km). Der **Wege-Magnet**
+  (*Magnet: Wegen folgen*, standardmässig an) zieht die Linie zwischen zwei Klicks auf Wege und Pfade, wie bei
+  RunnerMaps. Dafür fragt der Server einen BRouter-Dienst an (Standard `brouter.de`, Profil `hiking-mountain`,
+  anpassbar mit `ROUTER_URL` und `ROUTER_PROFILE`, siehe [Installation](installation.md#umgebungsvariablen));
+  der Browser spricht ihn nie direkt an. Ohne Magnet oder ohne Dienst entstehen gerade Linien.
+- **Aufzeichnen**: Das Handy zeichnet die Strecke per GPS auf (Punkte ab ±40 m Genauigkeit, mindestens 4 m
+  auseinander, mit Zeit und Höhe). Der Bildschirm bleibt dabei an (Wake Lock), denn Browser stoppen GPS
+  für Seiten im Hintergrund. Die Punkte liegen laufend im Browser; nach einem Neuladen lässt sich die
+  Aufzeichnung fortsetzen.
+- **Importieren**: GPX (Tracks, Routen oder Wegpunkte), Garmin TCX, KML (LineString und `gx:Track`) und
+  GeoJSON (LineString, MultiLineString, mit `coordTimes`), bis 14 MB und 20 000 Punkte. FIT-Dateien bitte in
+  Garmin Connect oder Strava als GPX exportieren.
+- **Exportieren**: jede Route als GPX, mit Höhe und Zeit, wo vorhanden.
+
+Die aktuelle Route bleibt im Browser, bis sie gespeichert wird. **Speichern** braucht ein Konto; Touren sind
+privat, bis man sie veröffentlicht. Andere sehen eine öffentliche Tour ohne Zeiten und ohne die ersten und
+letzten 200 m, denn Start und Ziel liegen oft vor der Haustür. *Öffentliche Touren auf der Karte zeigen*
+setzt einen Pin an den Anfang jeder öffentlichen Tour; beim Überfahren erscheint die Strecke, ein Klick lädt
+sie ins Panel.
+
+### Fotos über eine Tour verorten
+
+Fotos ohne GPS (Action-Cam, Kompaktkamera) bekommen ihren Ort aus einer Tour mit Zeitstempeln: Im
+Upload-Dialog steht unter dem GPX-Feld *oder Fotos über eine Tour verorten* mit der aktuellen Route und den
+eigenen gespeicherten Touren. Die Zuordnung ist dieselbe wie beim GPX-Track (Aufnahmezeit, Zeitzone,
+Uhrkorrektur); *Fotos zuordnen* in *Meine Touren* öffnet den Dialog mit der Tour vorausgewählt.
+
+### Fotoaufträge
+
+Ein **Fotoauftrag** bittet um ein Foto von einem Ort: *Neuer Fotoauftrag* im Tab *Aufträge*, dann den Ort
+auf der Karte wählen, beschreiben, was zu sehen sein soll, und optional die Blickrichtung angeben. Im
+Spot-Panel bittet *Neues Foto von diesem Spot anfragen* um ein Wiederholungsfoto in der Blickrichtung des
+Spots. Aufträge erscheinen für alle als gelbe Kamera-Pins auf der Karte, mit einem Kegel in die gewünschte
+Richtung.
+
+Ein Auftrag nennt **keine Zeit und keinen Namen**: Niemand muss sich verabreden oder seinen Weg
+preisgeben. Wer ohnehin vorbeikommt, macht das Foto. Erledigt ist ein Auftrag, sobald ein Foto
+- innerhalb von 40 m (bzw. dem Spot-Radius) entsteht und, wenn beide eine Richtung haben, höchstens 60°
+  davon abweicht,
+- zum angefragten Spot gehört, oder
+- über *Foto dafür hochladen* im Auftrag hochgeladen wird und höchstens 150 m entfernt liegt.
+
+Wer den Auftrag mit Konto erstellt hat, kann ihn zurückziehen; Moderation ebenso. Pro Konto bzw.
+Adresse sind 20 Aufträge pro Stunde möglich.
+
+### Vorschläge entlang der Route
+
+Sobald eine Route steht, listet das Panel unter *Unterwegs fotografieren* in der Reihenfolge der Strecke,
+was in ihrer Nähe (50–500 m, Standard 150 m) einen Halt lohnt, mit Kilometer und Abstand zur Route:
+
+- offene **Fotoaufträge**,
+- Spots mit einer **Satelliten-Frühwarnung** ([Satellitenkontext](#satellitenkontext-sentinel-2-und-landsat)),
+- Spots mit einer Fotoreihe (ab zwei Fotos), die seit über einem Jahr **nicht mehr besucht** wurden.
+
+Die Vorschläge stehen nummeriert auf der Karte. Der Server berechnet sie aus der mitgeschickten Route und
+speichert nichts davon.
+
 ## Pflanzen und Baumarten
 
 ### Pflanzenbestimmung (optional)
@@ -582,6 +683,48 @@ Auffälligkeiten genauer:
 - Verfärbte immergrüne Nadelbäume gelten immer als Warnsignal.
 - Fichte bei Trockenheit oder Hitze löst eine Borkenkäfer-Warnung mit Prüfhinweisen aus.
 - Bei Esche mit Auflichtung oder Verfärbung erscheint ein Hinweis auf das Eschentriebsterben.
+
+## Geschützte Funde und PRO-Mitglieder
+
+Wer eine Orchideenwiese, eine Pilzstelle oder einen Horst veröffentlicht, lockt auch Sammler und
+Neugierige an. Solche **geschützten Funde** sehen deshalb nur **verifizierte PRO-Mitglieder** genau:
+Forstdienste, kantonale Fachstellen, Naturschutzorganisationen und ähnliche.
+
+### Was geschützt ist
+
+Ein Foto wird geschützt,
+- beim Hochladen mit *Geschützter Fund* (Fotos und Videos),
+- automatisch, wenn Pl@ntNet eine sensible Art erkennt (Score ab 0,3): alle einheimischen Orchideen,
+  Enziane, Küchenschellen, Edelweiss, Bärlappe, seltene Farne, Türkenbund und weitere (`src/sensitive.js`,
+  erweiterbar mit `SENSITIVE_SPECIES`). Pilze erkennt Pl@ntNet nicht; Pilzstellen schützt man beim Hochladen,
+- oder nachträglich mit *Schützen* unter dem Foto, durch die Person, die es hochgeladen hat, durch
+  PRO-Mitglieder oder die Moderation. *Schutz aufheben* geht ebenso.
+
+### Wer was sieht
+
+| | Öffentlichkeit | Wer hochgeladen hat | PRO-Mitglieder, Moderation |
+|---|---|---|---|
+| Foto, Spot, genaue Lage | – | ✓ (mit Konto) | ✓ |
+| Karte | schraffiertes 5-km-Quadrat mit Anzahl Funde | Pin mit Schloss | Pin mit Schloss |
+| Arten, Hotspots, Ausbreitung, Export (Darwin Core, iNaturalist) | ohne den Fund | mit | mit |
+| Offene Geodaten (OGC API, Vektorkacheln, GeoPackage, PMTiles) | ohne den Fund | ohne | ohne |
+| Fotoaufträge an geschützten Spots, Vorschläge entlang der Route | – | ✓ | ✓ |
+
+Das Raster ist fest (0,045° × 0,065°, rund 5 × 5 km) und verschiebt sich nicht mit den Daten. Ein Spot
+mit öffentlichen und geschützten Fotos bleibt sichtbar, zeigt öffentlich aber nur die öffentlichen Fotos,
+deren Tags und Veränderungen. Originale und Vorschaubilder geschützter Fotos gehen nur an Berechtigte und
+mit `Cache-Control: private, no-store`, ebenso alle API-Antworten an PRO-Mitglieder; der Service Worker
+speichert solche Antworten nicht auf dem Gerät. Push-Nachrichten der Frühwarnung erreichen nur Konten, die
+den Spot noch sehen dürfen. Ohne Konto hochgeladene geschützte Fotos sieht danach auch die Person nicht
+mehr, die sie hochgeladen hat.
+
+### PRO-Mitglied werden
+
+Im Konto-Menü *PRO-Mitgliedschaft beantragen*: Organisation und Angaben für die Prüfung. Admins sehen offene
+Anträge zuoberst unter *Konten & Rollen* und können sie verifizieren, ablehnen oder PRO später entziehen;
+jede Entscheidung steht im Moderationsprotokoll. PRO ist unabhängig von der Rolle (Mitglied, Moderation,
+Administration). PRO-Mitglieder können Fotoaufträge als *nur für PRO* markieren; Aufträge an geschützten
+Spots sind das automatisch.
 
 ## Konten, Moderation und Lizenzen
 

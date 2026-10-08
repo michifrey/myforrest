@@ -227,7 +227,15 @@ function closeupSvg(seed, species) {
   for (let k = 0; k < 18; k++) {
     const x = r() * 1200;
     const y = 300 + r() * 1200;
-    if (species === 'balsam') {
+    if (species === 'frauenschuh') {
+      // Lady's slipper: maroon twisted petals around a yellow pouch
+      if (k > 6) continue;
+      const fx = 250 + (k % 3) * 300 + r() * 80;
+      const fy = 500 + Math.floor(k / 3) * 450 + r() * 60;
+      s += `<rect x="${fx}" y="${fy}" width="10" height="700" fill="#5d7f34"/><ellipse cx="${fx - 60}" cy="${fy + 260}" rx="110" ry="40" fill="#4f7a2e" transform="rotate(-30 ${fx} ${fy + 260})"/>`;
+      for (const a of [-50, 50, 180]) s += `<ellipse cx="${fx + 5}" cy="${fy - 70}" rx="22" ry="95" fill="#6b2a2a" transform="rotate(${a} ${fx + 5} ${fy})"/>`;
+      s += `<ellipse cx="${fx + 5}" cy="${fy + 20}" rx="60" ry="70" fill="#f0c62e"/><ellipse cx="${fx + 5}" cy="${fy + 5}" rx="30" ry="18" fill="#c99a14"/>`;
+    } else if (species === 'balsam') {
       s += `<rect x="${x}" y="${y}" width="10" height="600" fill="#7a9a3f"/><ellipse cx="${x + 5}" cy="${y}" rx="${30 + r() * 20}" ry="${22 + r() * 10}" fill="${r() < 0.5 ? '#d65aa0' : '#e889bf'}"/><ellipse cx="${x + 5}" cy="${y + 8}" rx="14" ry="10" fill="#f4c6df"/>`;
     } else {
       s += `<rect x="${x}" y="${y}" width="8" height="600" fill="#6a8a3a"/>`;

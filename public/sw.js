@@ -10,6 +10,8 @@
  * - API GETs: network-first with the last answer as offline fallback.
  * - OpenStreetMap tiles: cache-first with an entry limit.
  * - Background Sync sends uploads queued while offline (see offline-queue.js).
+ * - Push messages (satellite early warnings, src/routes/push.js) are shown as
+ *   notifications; a click opens the spot in an open window or a new one.
  *
  * Bump SHELL_VERSION when the precache list changes; bump DATA_VERSION only to
  * throw away cached photos, API answers and tiles. Old caches are deleted on activate.
@@ -17,7 +19,7 @@
 
 importScripts('offline-queue.js');
 
-const SHELL_VERSION = 'v5';
+const SHELL_VERSION = 'v8';
 const DATA_VERSION = 'v1';
 const CACHE = {
   shell: `myforrest-shell-${SHELL_VERSION}`,
@@ -42,10 +44,12 @@ const PRECACHE = [
   'sun.js',
   'sunmap.js',
   'hotspots.js',
+  'tours.js',
   'video.js',
   'video.css',
   'vegetation.js',
   'account.js',
+  'push.js',
   'analysis.js',
   'offline-queue.js',
   'pwa.js',
@@ -109,6 +113,8 @@ async function trim(cache, max) {
 }
 
 async function store(cacheName, request, response, max) {
+  // Protected finds and everything PRO members see are sent with no-store: never kept on the device.
+  if (/no-store/i.test(response.headers.get('Cache-Control') || '')) return;
   const cache = await caches.open(cacheName);
   await cache.put(request, response);
   if (max) await trim(cache, max);
@@ -218,4 +224,37 @@ self.addEventListener('sync', (event) => {
 
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'myforrest-flush') event.waitUntil(self.offlineQueue.flush());
+});
+
+/* ---------- Push messages ---------- */
+
+self.addEventListener('push', (event) => {
+  let msg = {};
+  try {
+    msg = event.data ? event.data.json() : {};
+  } catch {
+    msg = { body: event.data ? event.data.text() : '' };
+  }
+  event.waitUntil(self.registration.showNotification(msg.title || 'MyForrest', {
+    body: msg.body || '',
+    tag: msg.tag || undefined,
+    icon: new URL('icons/icon-192.png', scopeUrl()).href,
+    badge: new URL('icons/icon-192.png', scopeUrl()).href,
+    data: { url: new URL(msg.url || './', scopeUrl()).href },
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || scopeUrl().href;
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const open = windows.find((w) => w.url.startsWith(scopeUrl().href));
+    if (open) {
+      // The page opens the spot itself (app.js), without a reload.
+      open.postMessage({ type: 'myforrest-open', url });
+      return open.focus();
+    }
+    return self.clients.openWindow(url);
+  })());
 });

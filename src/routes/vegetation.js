@@ -16,20 +16,25 @@
  * A watcher refreshes the series of all spots once a day (SATELLITE_WATCH_HOURS,
  * 0 = off), so drops show up without anyone opening the spot or taking a photo.
  * Drops and alerts carry the strongest storm of their period (storms.js).
- * After each round the early-warning thresholds are calibrated again
- * (calibration.js) against the damage photographers confirmed.
+ * New warnings go out as push messages to the people who visit the spot
+ * regularly (routes/push.js).
+ * After each round the thresholds of the early warning and of the drops
+ * between photos are calibrated again (calibration.js) against the damage
+ * photographers confirmed, on all spots and per forest type (forest-type.js).
  *
  * Usage in createApp: `const vegetation = require('./routes/vegetation')(app, ctx)`,
- * with ctx = { db, uploadDir, background, fetchImpl }. Returns { analyzePhoto, backfill };
+ * with ctx = { db, uploadDir, background, fetchImpl, push }. Returns { analyzePhoto, backfill };
  * `backfill(null, [photoId])` queues a new photo for analysis in the background.
  */
 
 const path = require('node:path');
 const { analyzeVegetation, imageAspect } = require('../vegetation');
-const { createSentinel, indexDrops, currentAnomalies, STAC_URL } = require('../sentinel');
+const { createSentinel, indexDrops, pairDrop, currentAnomalies, STAC_URL } = require('../sentinel');
 const { createLandsat, STAC_URL: LANDSAT_STAC_URL } = require('../landsat');
 const { createStorms, likelyStorm, stormText } = require('../storms');
-const { calibrate, maxDropBetween } = require('../calibration');
+const { calibrateAll, calibrationFor, maxDropBetween } = require('../calibration');
+const { forestType } = require('../forest-type');
+const { treeInfo } = require('../trees');
 const { DAMAGE_TAGS } = require('../geodata');
 
 const SCHEMA = `
@@ -53,8 +58,10 @@ const monthStart = (ym) => Date.parse(`${ym}-01T00:00:00Z`);
 module.exports = function registerVegetation(app, {
   db, uploadDir, background, fetchImpl = fetch, stacUrl = process.env.SENTINEL_STAC_URL ?? STAC_URL,
   landsatStacUrl = process.env.LANDSAT_STAC_URL ?? LANDSAT_STAC_URL, landsatTokenUrl = process.env.LANDSAT_TOKEN_URL,
-  watchHours = Number(process.env.SATELLITE_WATCH_HOURS ?? 24), now = () => Date.now(),
+  watchHours = Number(process.env.SATELLITE_WATCH_HOURS ?? 24), now = () => Date.now(), push = null, accounts = null,
 }) {
+  // Photo rows the request may see (hidden and protected ones only for those allowed); public without accounts.
+  const visibleTo = (req) => (accounts && req ? accounts.visibleSql(req, 'p') : "p.hidden_at IS NULL AND COALESCE(p.protected, 0) = 0");
   db.exec(SCHEMA);
   const landsat = stacUrl && landsatStacUrl
     ? createLandsat({ fetchImpl, stacUrl: landsatStacUrl, ...(landsatTokenUrl ? { tokenUrl: landsatTokenUrl } : {}), now })
@@ -168,7 +175,7 @@ module.exports = function registerVegetation(app, {
     if (id === null) return;
     const pending = staleIds(id);
     if (pending.length) backfill(id, pending);
-    const photos = db.prepare('SELECT id, taken_at FROM photos WHERE spot_id = ? ORDER BY taken_at, id').all(id);
+    const photos = db.prepare(`SELECT id, taken_at FROM photos p WHERE spot_id = ? AND ${visibleTo(req)} ORDER BY taken_at, id`).all(id);
     const pendingSet = new Set(pending);
     res.json({
       pending: pending.length,
@@ -221,7 +228,19 @@ module.exports = function registerVegetation(app, {
     return e ? { date: e.date, gust: e.gust, class: e.class, text: stormText(e) } : null;
   }
 
-  /* ---------- Calibration of the early warning ---------- */
+  /* ---------- Forest type and calibration ---------- */
+
+  /** Laub-, Nadel- or Mischwald from the species, the photos' needle share or the satellite seasons. */
+  function forestTypeOf(spotId, monthly) {
+    const species = db.prepare('SELECT DISTINCT scientific_name FROM spot_species WHERE spot_id = ?').all(spotId)
+      .map((r) => treeInfo(r.scientific_name)).filter(Boolean);
+    let needleShares = [];
+    try {
+      needleShares = db.prepare(`SELECT a.foliage_json FROM photo_analysis a JOIN photos p ON p.id = a.photo_id
+        WHERE p.spot_id = ? AND a.foliage_json IS NOT NULL`).all(spotId).map((r) => JSON.parse(r.foliage_json).needleShare);
+    } catch { /* photo analysis not set up */ }
+    return forestType({ species, needleShares, monthly });
+  }
 
   db.exec('CREATE TABLE IF NOT EXISTS satellite_calibration (id INTEGER PRIMARY KEY CHECK (id = 1), json TEXT NOT NULL, computed_at INTEGER NOT NULL)');
   const DAMAGE_CLASSES = ['windwurf', 'auflichtung', 'verfaerbung'];
@@ -242,6 +261,7 @@ module.exports = function registerVegetation(app, {
     for (const { spot_id: spotId } of db.prepare('SELECT spot_id FROM spot_ndvi').all()) {
       const monthly = sentinel.series(spotId).monthly;
       if (!monthly.length) continue;
+      const type = forestTypeOf(spotId, monthly).type;
       const photos = db.prepare(`SELECT id, taken_at FROM photos WHERE spot_id = ? ${hasHidden ? 'AND hidden_at IS NULL' : ''} ORDER BY taken_at, id`).all(spotId);
       for (let k = 1; k < photos.length; k++) {
         const a = photos[k - 1];
@@ -252,10 +272,13 @@ module.exports = function registerVegetation(app, {
         const newTag = after.some((t) => !before.has(t));
         const region = Boolean(confirmed.get(b.id, ...DAMAGE_CLASSES));
         if (after.length && !newTag && !region) continue; // damage seen before already
+        const iso = (t) => new Date(t).toISOString();
+        const pair = (key) => pairDrop(monthly, iso(a.taken_at), iso(b.taken_at), key)?.drop ?? null;
         out.push({
-          spotId, fromPhotoId: a.id, toPhotoId: b.id, damage: newTag || region,
-          ndvi: maxDropBetween(monthly, a.taken_at, b.taken_at, 'ndvi'),
-          ndmi: maxDropBetween(monthly, a.taken_at, b.taken_at, 'ndmi'),
+          spotId, fromPhotoId: a.id, toPhotoId: b.id, damage: newTag || region, forestType: type,
+          // What the early warning saw during the interval, and the drop between the two photos themselves.
+          warning: { ndvi: maxDropBetween(monthly, a.taken_at, b.taken_at, 'ndvi'), ndmi: maxDropBetween(monthly, a.taken_at, b.taken_at, 'ndmi') },
+          photos: { ndvi: pair('ndvi'), ndmi: pair('ndmi') },
         });
       }
     }
@@ -264,42 +287,50 @@ module.exports = function registerVegetation(app, {
 
   /** Calibrates on all checks and stores the result. */
   function recalibrate() {
-    const list = sentinel ? checks() : [];
-    const result = {
-      ...calibrate({
-        ndvi: list.map((c) => ({ drop: c.ndvi, damage: c.damage, group: c.spotId })),
-        ndmi: list.map((c) => ({ drop: c.ndmi, damage: c.damage, group: c.spotId })),
-      }),
-      checks: list.length,
-    };
+    const result = calibrateAll(sentinel ? checks() : []);
     db.prepare('INSERT OR REPLACE INTO satellite_calibration (id, json, computed_at) VALUES (1, ?, ?)').run(JSON.stringify(result), now());
     return { ...result, computedAt: new Date(now()).toISOString() };
   }
 
-  /** The stored calibration (computed on first use). */
+  /** The stored calibration (computed on first use, and again when stored before forest types). */
   function calibration() {
     const row = db.prepare('SELECT json, computed_at FROM satellite_calibration WHERE id = 1').get();
-    return row ? { ...JSON.parse(row.json), computedAt: new Date(row.computed_at).toISOString() } : recalibrate();
+    return row && JSON.parse(row.json).forestTypes ? { ...JSON.parse(row.json), computedAt: new Date(row.computed_at).toISOString() } : recalibrate();
   }
 
-  /** What a warning says about its threshold (see calibration.js). */
-  function calibrationSummary(c) {
+  /**
+   * What a warning or drop says about its threshold (see calibration.js):
+   * the entry used, and for a forest type without its own threshold why not.
+   */
+  function calibrationSummary({ entry: c, scope, typeEntry }, type) {
     return {
       source: c.source, reason: c.reason, threshold: c.threshold, candidate: c.candidate,
-      positives: c.positives, negatives: c.negatives, spots: c.spots,
+      positives: c.positives, negatives: c.negatives, spots: c.spots, baseline: c.baseline,
+      // 'waldtyp': calibrated for this forest type; 'alle': the threshold of all spots.
+      scope,
+      forestType: type ? { type: type.type, label: type.label, source: type.source, reason: typeEntry?.reason ?? null } : null,
       cv: c.cv ? { folds: c.cv.folds, hits: c.cv.tp, misses: c.cv.fn, falseAlarms: c.cv.fp, f1: c.cv.f1 } : null,
       standard: c.standard ? { threshold: c.standard.threshold, hits: c.standard.tp, misses: c.standard.fn, falseAlarms: c.standard.fp, f1: c.standard.f1 } : null,
     };
   }
 
+  /** The thresholds of a measure at a spot of this forest type, per index. */
+  function thresholdsFor(cal, measure, type) {
+    const sel = Object.fromEntries(['ndvi', 'ndmi'].map((key) => [key, calibrationFor(cal, { measure, type: type?.type, key })]));
+    return {
+      thresholds: Object.fromEntries(Object.entries(sel).map(([k, v]) => [k, [v.entry.threshold, v.entry.strong]])),
+      summary: (key) => calibrationSummary(sel[key], type),
+    };
+  }
+
   /** Early warnings of a spot from its cached series: index, since when, how strong, storm, whether to visit. */
-  function alertsOf(spotId, monthly, spot, cal = calibration()) {
+  function alertsOf(spotId, monthly, spot, cal = calibration(), type = forestTypeOf(spotId, monthly)) {
     const last = db.prepare('SELECT MAX(taken_at) AS t FROM photos WHERE spot_id = ?').get(spotId)?.t ?? null;
-    const thresholds = { ndvi: [cal.ndvi.threshold, cal.ndvi.strong], ndmi: [cal.ndmi.threshold, cal.ndmi.strong] };
+    const { thresholds, summary } = thresholdsFor(cal, 'warning', type);
     return currentAnomalies(monthly, { now: now(), thresholds }).map((a) => ({
       ...a,
-      // Which threshold raised it, and how it did on held-out spots (cross-validation) next to the starting value.
-      calibration: calibrationSummary(cal[a.index]),
+      // Which threshold raised it (forest type or all spots), and how it did on held-out spots next to the fallback.
+      calibration: summary(a.index),
       lastPhoto: last ? new Date(last).toISOString().slice(0, 10) : null,
       // A photo taken after the drop began would already show it.
       visit: !last || last < monthStart(a.since),
@@ -308,14 +339,18 @@ module.exports = function registerVegetation(app, {
     }));
   }
 
-  const ndviJson = (id) => {
-    const photos = db.prepare('SELECT id, taken_at FROM photos WHERE spot_id = ? ORDER BY taken_at, id').all(id)
+  const ndviJson = (id, req = null) => {
+    const photos = db.prepare(`SELECT id, taken_at FROM photos p WHERE spot_id = ? AND ${visibleTo(req)} ORDER BY taken_at, id`).all(id)
       .map((p) => ({ id: p.id, takenAt: new Date(p.taken_at).toISOString() }));
     if (!sentinel) return { status: 'disabled', monthly: [], drops: [], alerts: [], photos };
     const spot = db.prepare('SELECT lat, lon FROM spots WHERE id = ?').get(id);
     const s = sentinel.series(id);
-    const drops = ['ndvi', 'ndmi'].flatMap((key) => indexDrops(s.monthly, photos, { key })).map((d) => ({
+    const cal = calibration();
+    const type = forestTypeOf(id, s.monthly);
+    const { thresholds, summary } = thresholdsFor(cal, 'photos', type);
+    const drops = ['ndvi', 'ndmi'].flatMap((key) => indexDrops(s.monthly, photos, { key, threshold: thresholds[key][0], strong: thresholds[key][1] })).map((d) => ({
       ...d,
+      calibration: summary(d.index),
       evidence: photoEvidence(d.fromPhotoId, d.toPhotoId),
       storm: stormBetween(spot.lat, spot.lon, Date.parse(d.fromDate), Date.parse(d.toDate) + DAY - 1),
     }));
@@ -333,8 +368,9 @@ module.exports = function registerVegetation(app, {
       resolutionM: 10,
       windowM: 30,
       ...s,
+      forestType: type,
       drops,
-      alerts: alertsOf(id, s.monthly, spot),
+      alerts: alertsOf(id, s.monthly, spot, cal, type),
       photos,
     };
   };
@@ -353,17 +389,17 @@ module.exports = function registerVegetation(app, {
     const id = idParam(req, res);
     if (id === null) return;
     if (sentinel && sentinel.needsRefresh(id)) refreshNdvi(id);
-    res.json(ndviJson(id));
+    res.json(ndviJson(id, req));
   });
 
   app.post('/api/spots/:id/ndvi', async (req, res, next) => {
     const id = idParam(req, res);
     if (id === null) return;
-    if (!sentinel) return res.json(ndviJson(id));
+    if (!sentinel) return res.json(ndviJson(id, req));
     try {
       db.prepare('UPDATE spot_ndvi SET fetched_at = NULL WHERE spot_id = ?').run(id);
       await refreshNdvi(id);
-      res.json(ndviJson(id));
+      res.json(ndviJson(id, req));
     } catch (err) {
       next(err);
     }
@@ -371,13 +407,17 @@ module.exports = function registerVegetation(app, {
 
   /* ---------- Early warning for all spots ---------- */
 
-  app.get('/api/satellite/alerts', (req, res) => {
-    if (!sentinel) return res.json([]);
-    const spots = db.prepare('SELECT s.id, s.lat, s.lon FROM spots s JOIN spot_ndvi n ON n.spot_id = s.id').all();
+  /** Early warnings of the spots `req` may see (all spots without a request). */
+  function allAlerts(req = null) {
+    if (!sentinel) return [];
+    const visible = accounts && req ? accounts.visibleSpotIds(req) : null;
+    const spots = db.prepare('SELECT s.id, s.lat, s.lon FROM spots s JOIN spot_ndvi n ON n.spot_id = s.id').all()
+      .filter((s) => !visible || visible.has(s.id));
     const cal = calibration();
-    res.json(spots.map((spot) => ({ spotId: spot.id, lat: spot.lat, lon: spot.lon, alerts: alertsOf(spot.id, sentinel.series(spot.id).monthly, spot, cal) }))
-      .filter((x) => x.alerts.length));
-  });
+    return spots.map((spot) => ({ spotId: spot.id, lat: spot.lat, lon: spot.lon, alerts: alertsOf(spot.id, sentinel.series(spot.id).monthly, spot, cal) }))
+      .filter((x) => x.alerts.length);
+  }
+  app.get('/api/satellite/alerts', (req, res) => res.json(allAlerts(req)));
 
   app.get('/api/satellite/calibration', (req, res) => res.json(calibration()));
   app.get('/api/satellite/harmonization', (req, res) => res.json(sentinel ? sentinel.harmonization() : {}));
@@ -399,6 +439,8 @@ module.exports = function registerVegetation(app, {
         // New scenes or new photos since the last round: harmonise Landsat again, then calibrate on the result.
         sentinel.harmonize();
         recalibrate();
+        // New warnings to the people who visit those spots regularly.
+        if (push) await push.notifyAlerts(allAlerts()).catch((err) => console.warn(`Push der Frühwarnungen: ${err.message}`));
         return refreshed;
       })().finally(() => { watching = null; });
       background(watching);
@@ -412,5 +454,5 @@ module.exports = function registerVegetation(app, {
     setInterval(watchOnce, watchHours * 3600000).unref?.();
   }
 
-  return { analyzePhoto, backfill };
+  return { analyzePhoto, backfill, alerts: allAlerts };
 };

@@ -37,6 +37,16 @@ Der Service Worker braucht HTTPS (oder `localhost`). Nach Änderungen an der Lis
 in `public/sw.js` `SHELL_VERSION` erhöhen; alte Caches werden beim Aktivieren gelöscht. App-Code
 (HTML, JS, CSS) wird immer zuerst aus dem Netz geladen, ein Deployment ist also sofort sichtbar.
 
+## Push-Nachrichten
+
+Push braucht HTTPS wie der Service Worker. Die VAPID-Schlüssel liegen in der Datenbank (Tabelle
+`push_keys`) oder kommen aus `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`. Wechseln die Schlüssel, werden alle
+bestehenden Abos ungültig und müssen auf den Geräten neu eingeschaltet werden; beim Umzug also die
+Datenbank mitnehmen oder die Schlüssel als Umgebungsvariablen setzen. Der Server sendet nur an die
+Push-Dienste der Browser (`fcm.googleapis.com`, `*.push.services.mozilla.com`, `*.push.apple.com`,
+`*.notify.windows.com`, erweiterbar mit `PUSH_HOSTS`). Die Nachricht ist Ende-zu-Ende verschlüsselt; der
+Push-Dienst sieht nur, dass eine Nachricht an ein Gerät geht.
+
 ## Externe Datenquellen und Netzzugang
 
 | Quelle | Wofür | Hosts, die der Server erreichen muss |
@@ -46,6 +56,8 @@ in `public/sw.js` `SHELL_VERSION` erhöhen; alte Caches werden beim Aktivieren g
 | Landsat Collection 2 (USGS) über [Microsoft Planetary Computer](https://planetarycomputer.microsoft.com) | Satellitenkontext vor 2017 und Überlappung 2017–2018 | `planetarycomputer.microsoft.com`, `landsateuwest.blob.core.windows.net` |
 | Deutscher Wetterdienst, Open Data | Phänologie-Referenzdaten ([laden](installation.md#phänologie-referenzdaten-laden)) | `opendata.dwd.de` |
 | [Pl@ntNet](https://my.plantnet.org) (optional, API-Key) | Pflanzenbestimmung | `my-api.plantnet.org` |
+| [BRouter](https://brouter.de) (Standard, `ROUTER_URL`) | Wege-Magnet: gezeichnete Touren folgen den Wegen; der Server schickt nur die Wegpunkte, ohne Konto oder IP der Person | `brouter.de` oder Host aus `ROUTER_URL` |
+| Push-Dienste der Browser (Google, Mozilla, Apple, Microsoft) | Push-Nachrichten der Frühwarnung | `fcm.googleapis.com`, `updates.push.services.mozilla.com`, `web.push.apple.com`, `*.notify.windows.com` |
 | OpenStreetMap | Kartenkacheln (im Browser) | – |
 | swisstopo (geo.admin.ch) | Landeskarte und Luftbild der Vektorkarte LV95 (im Browser) | – |
 

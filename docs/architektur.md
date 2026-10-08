@@ -24,7 +24,10 @@ src/vegetation.js    Vegetationsdichte pro Foto (Grünanteil, Kronendach-Deckung
 src/sentinel.js      Sentinel-2 NDVI/NDMI: STAC-Suche, COG-Fenster lesen, Wolkenmaske, Monatsreihe, Rückgänge, Frühwarnung
 src/landsat.js       Landsat 5/7/8 (Collection 2) über Planetary Computer: signierte Links, QA-Maske, 30-m-Indizes
 src/harmonize.js     Angleichung von Landsat an Sentinel-2 aus den Überlappungsmonaten (Theil–Sen, Landsat 5 über 7)
-src/calibration.js   Kalibrierung der Frühwarnung an bestätigten Schäden (Rückrechnung ohne Blick nach vorn, F1, Kreuzvalidierung nach Spots)
+src/calibration.js   Kalibrierung der Frühwarnung und der Rückgänge zwischen Fotos an bestätigten Schäden (Rückrechnung ohne Blick nach vorn, F1, Kreuzvalidierung nach Spots, pro Waldtyp)
+src/webpush.js       Web Push ohne Abhängigkeiten: VAPID (RFC 8292) und Verschlüsselung aes128gcm (RFC 8291)
+src/routes/push.js   Push-Abos, Spot folgen/stummschalten, Frühwarnungen an regelmässige Besucher
+src/forest-type.js   Waldtyp eines Spots (Laub/Nadel/Misch) aus Baumarten, Nadelholzanteil der Fotos oder dem winterlichen NDVI
 src/utm.js           Umrechnung WGS84 ↔ UTM (Projektion der Sentinel-2-Kacheln)
 src/routes/vegetation.js  API für Vegetationsdichte und NDVI, Hintergrund-Berechnung
 src/weather.js       Wetterdaten und Mittel 1991–2020 von Open-Meteo (mit Cache)
@@ -67,12 +70,18 @@ src/oauth.js         Anmelden mit Google und GitHub (OAuth 2.0 mit PKCE), ohne A
 src/mail.js          E-Mail-Versand über SMTP (TLS/STARTTLS, AUTH PLAIN) für Bestätigungs- und Reset-Links
 src/moderation.js    Lizenzen, Meldungen, Ausblenden und Protokoll
 src/routes/accounts.js  Routen für Konten und Moderation, CSRF-Schutz, Rechte auf Fotos
+src/trackfile.js     Touren lesen (GPX, TCX, KML, GeoJSON) und als GPX schreiben
+src/routegeo.js      Länge, Abstand zur Route und Position entlang der Route, Privatzone an den Enden
+src/sensitive.js     Sensible Arten (Orchideen, geschützte Pflanzen), deren Funde automatisch geschützt werden
+src/routes/protection.js  Geschützte Funde als 5-km-Raster für alle ohne PRO-Status
+src/routes/tracks.js Touren, Routing-Proxy, Fotoaufträge (Erfüllung beim Upload) und Vorschläge entlang der Route
 deploy/qgis-server/  Vorlage: MyForrest + QGIS Server (WMS/WMTS/WFS) + nginx per Docker Compose
 Dockerfile           Container für MyForrest (mit ffmpeg)
 docs/                Dokumentation; docs/screenshots/ enthält die Bilder für das README
 public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet die Waldszene,
                      sun.js berechnet Sonnenstand und Einstrahlung, sunmap.js den Kartenmodus „Sonne & Wetter“,
                      hotspots.js den Kartenmodus „Arten & Neophyten“,
+                     tours.js den Kartenmodus „Touren & Aufträge“ (Route zeichnen, aufzeichnen, importieren, Fotoaufträge),
                      video.js den Video-Upload und die 360°-Ansicht,
                      vegetation.js die Diagramme zu Vegetationsdichte und NDVI,
                      account.js Konto-Menü, Lizenz, Melden und Moderation;

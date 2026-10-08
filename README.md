@@ -45,8 +45,10 @@ Marker melden:
 - **Violetter Satellit:** Einen Rückgang im Satellitenbild, auch ohne neues Foto.
 
 Beim Überfahren eines Markers fasst ein Tooltip alles zusammen: Veränderung, Wetter, Sturm, Satellit,
-Baumarten und Blickrichtung. Oben links lässt sich die Karte nach Beobachtungen und Meldungen filtern,
-daneben schalten *Sonne & Wetter* und *Arten & Neophyten* die beiden Kartenmodi ein (Abschnitte 7 und 8).
+Baumarten und Blickrichtung. Schraffierte Quadrate stehen für geschützte Funde (Abschnitt 11).
+Oben links lässt sich die Karte nach Beobachtungen und Meldungen filtern,
+daneben schalten *Sonne & Wetter*, *Arten & Neophyten* und *Touren & Aufträge* die Kartenmodi ein
+(Abschnitte 7, 8 und 10). Gelbe Kamera-Pins sind Fotoaufträge.
 Rechts stehen Kennzahlen und die zuletzt fotografierten Spots.
 
 ### 2. Zeitreise an einem Spot
@@ -113,7 +115,7 @@ CC BY-SA 4.0). Als installierte App landen Uploads ohne Empfang in einer Wartesc
 
 <p>
   <img src="docs/screenshots/wetter-kontext.jpg" width="49%" alt="Wetter-Kontext einer Aufnahme mit Trockenheit und Hitze">
-  <img src="docs/screenshots/satellite.jpg" width="49%" alt="Vegetation im Zeitverlauf und Satelliten-Frühwarnung">
+  <img src="docs/screenshots/satellite.jpg" width="49%" alt="Satelliten-Frühwarnung und NDVI-Rückgang eines Nadelwald-Spots mit geeichter Schwelle">
 </p>
 
 *Kontext zur Aufnahme* vergleicht die 90 Tage vor jedem Foto mit dem Mittel 1991–2020: Niederschlag,
@@ -124,9 +126,17 @@ schon Ende August, nach einem Sommer mit 29 % des üblichen Regens.
 
 *Vegetation im Zeitverlauf* (rechts) zeigt den Grünanteil aus den Fotos und den NDVI und Feuchteindex
 NDMI aus Sentinel-2, vor 2017 aus Landsat, an Sentinel-2 angeglichen. Fällt ein Index an einem Spot ohne neues Foto deutlich unter
-die Werte derselben Jahreszeit in den Vorjahren, meldet die **Frühwarnung**, dass sich ein Besuch lohnt.
-Hier: ein Fichtenbestand mit Borkenkäfer, dessen letztes Foto vom Juli 2025 stammt. Die Schwellen der
-Frühwarnung eichen sich an bestätigten Schäden.
+die Werte derselben Jahreszeit in den Vorjahren, meldet die **Frühwarnung**, dass sich ein Besuch lohnt;
+fällt er zwischen zwei Fotos, markiert das Diagramm den Zeitraum. Die Schwellen für beides eichen sich an
+bestätigten Schäden, getrennt für Laub- und Nadelwald. Hier: ein Fichten-Tannen-Bestand mit Borkenkäfer.
+Sein NDVI sank nur um 0,07–0,08; die Nadelwald-Schwelle 0,06 erkennt das, die Schwelle aller Spots (0,18)
+hätte an Nadelwald-Spots keinen der bestätigten Schäden gefunden.
+
+<p align="center"><img src="docs/screenshots/push.jpg" width="420" alt="Spotansicht mit Hinweis auf Push-Nachrichten der Frühwarnung"></p>
+
+Wer einen Spot regelmässig besucht (an mindestens zwei Tagen fotografiert) oder ihm folgt, bekommt neue
+Frühwarnungen als **Push-Nachricht** aufs Handy; ein Tipp darauf öffnet den Spot. Eingeschaltet wird das
+einmal pro Gerät im Kontomenü, stummschalten lässt es sich pro Spot.
 
 ### 7. Sonne & Wetter auf der Karte
 
@@ -163,6 +173,41 @@ Ausbreitungsfronten als Vektorkacheln mit MapLibre in Web Mercator, `/vektorkart
 OpenLayers im Schweizer Kachelgitter LV95 auf der Landeskarte von swisstopo, deckungsgleich mit
 map.geo.admin.ch. Ein Klick auf ein Objekt zeigt seine Angaben.
 
+### 10. Touren und Fotoaufträge
+
+<p>
+  <img src="docs/screenshots/touren.jpg" width="49%" alt="Geplante Tour mit Kilometer-Marken und Vorschlägen entlang der Route">
+  <img src="docs/screenshots/fotoauftraege.jpg" width="49%" alt="Fotoaufträge auf der Karte und in der Liste">
+</p>
+
+*Touren & Aufträge* hält fest, wo man unterwegs ist. Eine Route lässt sich auf der Karte **zeichnen**
+(Klick für Klick; der Wege-Magnet zieht die Linie auf Wege und Pfade), mit dem Handy per GPS **aufzeichnen** oder als GPX, TCX, KML
+oder GeoJSON **importieren**. Gelbe Kilometer-Marken zeigen den Verlauf, jede Route geht auch als GPX
+wieder hinaus. Mit Konto lassen sich Touren speichern und veröffentlichen; andere sehen eine öffentliche
+Tour ohne Zeiten und ohne die ersten und letzten 200 m. Über eine Tour mit Zeitstempeln lassen sich im
+Upload auch Fotos ohne GPS verorten.
+
+Ein **Fotoauftrag** (rechts) bittet um ein Foto von einem Ort, etwa «Neue Lichtung am Waldweg, Blick nach
+Nordost», oder um ein neues Foto eines Spots. Er nennt keine Zeit und keinen Namen. Wer eine Route plant,
+sieht unter *Unterwegs fotografieren* (links) in der Reihenfolge der Strecke, was nahe am Weg liegt: offene
+Aufträge, Spots mit Satelliten-Frühwarnung und Fotoreihen, die seit über einem Jahr ruhen. Die Route wird
+dafür nicht gespeichert. Ein Foto am richtigen Ort erledigt den Auftrag automatisch.
+
+### 11. Geschützte Funde für PRO-Mitglieder
+
+<p>
+  <img src="docs/screenshots/schutz-raster.jpg" width="49%" alt="Geschützter Fund öffentlich nur als 5-km-Quadrat">
+  <img src="docs/screenshots/schutz-pro.jpg" width="49%" alt="Dieselbe Stelle für ein verifiziertes PRO-Mitglied mit Foto und genauer Lage">
+</p>
+
+Seltene Pflanzen, Pilzstellen oder Horste sollen nicht geplündert oder zertrampelt werden. Ein Foto lässt
+sich deshalb beim Hochladen als **geschützter Fund** markieren. Erkennt Pl@ntNet eine sensible Art, etwa
+eine Orchidee oder einen Enzian, wird es automatisch geschützt. Die Öffentlichkeit sieht davon nur ein
+schraffiertes **5-km-Quadrat** (links). Foto, Spot und genaue Lage sehen nur **verifizierte PRO-Mitglieder**
+wie Forstdienste oder Naturschutzorganisationen (rechts, mit Schloss am Pin). PRO beantragt man im
+Konto-Menü, eine Administratorin oder ein Administrator prüft den Antrag. Geschützte Funde fehlen in allen
+offenen Geodaten, Kacheln und Exporten für die Öffentlichkeit.
+
 ## Was MyForrest kann
 
 Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen unter
@@ -180,7 +225,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   Foto, Auffälligkeiten wie Trockenheit oder frühe Laubverfärbung, Stürme seit dem letzten Besuch,
   Höhe, Exposition, Kaltluftseen sowie Satellitendaten (NDVI und Feuchteindex NDMI aus Sentinel-2, vor 2017
   Landsat) als unabhängige Bestätigung und als Frühwarnung für Spots ohne neue Fotos, deren Schwellen sich an
-  bestätigten Schäden eichen und an zurückgehaltenen Spots geprüft werden.
+  bestätigten Schäden eichen (getrennt für Laub- und Nadelwald) und an zurückgehaltenen Spots geprüft werden,
+  als Push-Nachricht an alle, die den Spot regelmässig besuchen.
 - **[Kartenmodi](docs/funktionen.md#kartenmodi)**: Sonnenstand, Schatten und Einstrahlung inklusive
   Geländehorizont sowie Hotspots und Ausbreitungsfronten von Neophyten.
 - **[Pflanzen und Baumarten](docs/funktionen.md#pflanzen-und-baumarten)**: Pflanzenbestimmung mit Pl@ntNet,
@@ -193,6 +239,11 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   - Zwei Vektorkarten: MapLibre in Web Mercator, OpenLayers auf der Landeskarte von swisstopo.
   - Metadaten für geocat.ch und opendata.swiss (GM03/ISO 19139).
   - Ein fertiges QGIS-Projekt für QGIS Server (WMS/WMTS/WFS) für Geoportale wie map.geo.admin.ch.
+- **[Touren und Fotoaufträge](docs/funktionen.md#touren-und-fotoaufträge)**: Routen zeichnen, per GPS
+  aufzeichnen oder importieren (GPX, TCX, KML, GeoJSON), als GPX exportieren und speichern; Fotoaufträge
+  ohne Zeit und Namen und Vorschläge entlang der eigenen Route.
+- **[Geschützte Funde](docs/funktionen.md#geschützte-funde-und-pro-mitglieder)**: seltene Arten und Pilzstellen
+  nur für verifizierte PRO-Mitglieder (Forstdienst, Naturschutz), öffentlich nur als 5-km-Raster.
 - **[Konten und Moderation](docs/funktionen.md#konten-moderation-und-lizenzen)**: Konten mit Rollen, Anmeldung mit E-Mail (Bestätigungslink, Passwort ändern und zurücksetzen) oder über Google und GitHub,
   Lizenz pro Foto, Melden und Moderieren.
 

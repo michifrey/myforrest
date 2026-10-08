@@ -149,11 +149,21 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NAME_RE = /^[\p{L}\p{N}][\p{L}\p{N} ._-]{1,38}[\p{L}\p{N}]$/u;
 
 /** Account store bound to a database. */
+// PRO membership (verified organisations such as forest services or nature NGOs), added in place.
+const USER_MIGRATIONS = [
+  ['pro_status', "TEXT CHECK (pro_status IN ('angefragt', 'verifiziert', 'abgelehnt'))"],
+  ['organization', 'TEXT'],
+  ['pro_note', 'TEXT'], // what the applicant wrote
+  ['pro_requested_at', 'INTEGER'],
+  ['pro_decided_at', 'INTEGER'],
+  ['pro_decided_by', 'INTEGER'],
+  ['email_verified_at', 'INTEGER'], // set by the confirmation link, a password reset or an identity provider
+];
+
 function createAuth(db, { adminEmail = null } = {}) {
   db.exec(SCHEMA);
-  if (!db.prepare('PRAGMA table_info(users)').all().some((c) => c.name === 'email_verified_at')) {
-    db.exec('ALTER TABLE users ADD COLUMN email_verified_at INTEGER'); // set when an identity provider confirmed the address
-  }
+  const cols = new Set(db.prepare('PRAGMA table_info(users)').all().map((c) => c.name));
+  for (const [col, type] of USER_MIGRATIONS) if (!cols.has(col)) db.exec(`ALTER TABLE users ADD COLUMN ${col} ${type}`);
   // A precomputed hash so that logins for unknown accounts take as long as real ones.
   let dummyHash = null;
   const dummy = async () => (dummyHash ??= await hashPassword(randomToken()));
@@ -419,22 +429,30 @@ function createAuth(db, { adminEmail = null } = {}) {
 const hasPassword = (user) => String(user?.password_hash || '').startsWith('scrypt$');
 
 const isModerator = (user) => Boolean(user && (user.role === 'moderator' || user.role === 'admin'));
+/** Verified PRO members, moderation and administration see protected finds. */
+const isPro = (user) => Boolean(user && user.pro_status === 'verifiziert');
+const canSeeProtected = (user) => isPro(user) || isModerator(user);
 
 /** Public view of an account (never the e-mail of others or the hash). */
 const userJson = (u, { self = false, identities } = {}) => (u ? {
   id: u.id,
   name: u.name,
   role: u.role,
+  pro: isPro(u),
+  organization: isPro(u) ? u.organization : null,
   ...(self ? {
     email: u.email,
     emailVerified: Boolean(u.email_verified_at),
     hasPassword: hasPassword(u),
     ...(identities ? { identities } : {}),
     defaultLicense: u.default_license,
+    proStatus: u.pro_status || null,
+    organizationRequested: u.organization || null,
   } : {}),
 } : null);
 
 module.exports = {
   ROLES, SESSION_COOKIE, SESSION_TTL_MS, VERIFY_TTL_MS, RESET_TTL_MS,
-  hashPassword, verifyPassword, parseCookies, serializeCookie, createLimiter, createAuth, isModerator, hasPassword, userJson,
+  hashPassword, verifyPassword, parseCookies, serializeCookie, createLimiter, createAuth, isModerator, isPro, canSeeProtected,
+  hasPassword, userJson,
 };
