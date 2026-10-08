@@ -47,10 +47,13 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `POST`   | `/api/photos/:id/context`    | Wetter-Kontext neu laden                                 |
 | `PATCH`  | `/api/photos/:id`            | Tags und Notiz ändern; `license` nur durch den Urheber   |
 | `DELETE` | `/api/photos/:id`            | Foto löschen (Urheber oder Moderation; anonyme Fotos ohne `REQUIRE_LOGIN` frei) |
-| `GET`    | `/api/auth/me`               | Angemeldetes Konto, CSRF-Token, Lizenzen, Meldegründe, `requireLogin` |
+| `GET`    | `/api/auth/me`               | Angemeldetes Konto (mit `identities`, `emailVerified`, `hasPassword`), CSRF-Token, Lizenzen, Meldegründe, `requireLogin`, `providers` |
 | `POST`   | `/api/auth/register`         | Konto anlegen (JSON: `email`, `name`, `password`) und anmelden |
 | `POST`   | `/api/auth/login`            | Anmelden (JSON: `login` = E-Mail oder Name, `password`)  |
 | `POST`   | `/api/auth/logout`           | Abmelden                                                 |
+| `GET`    | `/api/auth/oauth/:provider`  | Anmelden mit `google` oder `github`: leitet zum Anbieter weiter |
+| `GET`    | `/api/auth/oauth/:provider/callback` | Rückkehr vom Anbieter: meldet an, legt ein Konto an oder verknüpft (mit Sitzung); leitet nach `/?auth=ok\|created\|linked` bzw. `/?auth_error=…` |
+| `DELETE` | `/api/auth/identities/:provider` | Anmeldung über einen Anbieter vom eigenen Konto trennen (nicht die einzige) |
 | `POST`   | `/api/photos/:id/report`     | Foto melden (`{ reason, note }`), auch ohne Konto        |
 | `GET`    | `/api/moderation/queue`      | Moderation: offene Meldungen pro Foto und ausgeblendete Fotos |
 | `POST`   | `/api/moderation/photos/:id/hide` | Foto ausblenden (`{ reason }`), erledigt seine Meldungen |

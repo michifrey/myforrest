@@ -193,7 +193,7 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   - Zwei Vektorkarten: MapLibre in Web Mercator, OpenLayers auf der Landeskarte von swisstopo.
   - Metadaten für geocat.ch und opendata.swiss (GM03/ISO 19139).
   - Ein fertiges QGIS-Projekt für QGIS Server (WMS/WMTS/WFS) für Geoportale wie map.geo.admin.ch.
-- **[Konten und Moderation](docs/funktionen.md#konten-moderation-und-lizenzen)**: Konten mit Rollen,
+- **[Konten und Moderation](docs/funktionen.md#konten-moderation-und-lizenzen)**: Konten mit Rollen, Anmeldung mit E-Mail oder über Google und GitHub,
   Lizenz pro Foto, Melden und Moderieren.
 
 ## Schnellstart

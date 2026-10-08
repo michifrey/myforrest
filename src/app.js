@@ -25,6 +25,7 @@ const { assess } = require('./irregularities');
 const { TREES, treeInfo, treeJson } = require('./trees');
 const { createElevation } = require('./elevation');
 const registerAccounts = require('./routes/accounts');
+const { createOAuth, providersFromEnv } = require('./oauth');
 const {
   altitudeShift, aspectShift, coldPoolShift, expectedColourDoy, aspectLabel, aspectFromCompass, COMPASS, LANDFORMS, landform,
 } = require('./phenology');
@@ -43,6 +44,8 @@ function createApp({
   requireLogin = process.env.REQUIRE_LOGIN === '1',
   adminEmail = process.env.ADMIN_EMAIL || null,
   rateLimits,
+  // Sign-in with Google/GitHub (src/oauth.js): { google: { clientId, clientSecret }, github: { … } }.
+  oauthProviders = providersFromEnv(), oauthFetch = fetch,
   detectorUrl = process.env.DETECTOR_URL || null, detectorFetch = fetch,
   // Vector tile precomputation (routes/ogc-tiles.js): { precompute, delayMs }.
   tileOptions = { precompute: process.env.TILES_PRECOMPUTE !== '0' },
@@ -66,7 +69,8 @@ function createApp({
   app.locals.db = db;
   app.use(express.json({ limit: '100kb' }));
   // Accounts, CSRF, moderation (src/routes/accounts.js); must precede the routes below and /uploads.
-  const accountsCtx = { db, requireLogin, adminEmail, rateLimits };
+  const oauth = createOAuth({ providers: oauthProviders, publicUrl: process.env.PUBLIC_URL || null, fetchImpl: oauthFetch });
+  const accountsCtx = { db, requireLogin, adminEmail, rateLimits, oauth };
   const accounts = registerAccounts(app, accountsCtx);
   // The service worker must never be served stale from the HTTP cache, or app updates would stall.
   app.get('/sw.js', (req, res) => {

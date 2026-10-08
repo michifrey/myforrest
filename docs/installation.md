@@ -45,7 +45,30 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 | `SATELLITE_WATCH_HOURS` | `24` | Abstand der Frühwarn-Runde über alle Spots in Stunden; `0` = aus |
 | `REQUIRE_LOGIN`    | –        | `1`: Uploads und Änderungen nur mit Konto      |
 | `ADMIN_EMAIL`      | –        | Dieses Konto wird Admin (sonst das erste Konto) |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | – | Aktiviert „Mit Google anmelden“ (siehe [unten](#anmelden-mit-google-und-github)) |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | – | Aktiviert „Mit GitHub anmelden“ |
 | `DETECTOR_URL`     | –        | Externer Objektdetektor (siehe [unten](#externer-detektor)); ohne ihn laufen die eingebauten Heuristiken |
+
+## Anmelden mit Google und GitHub
+
+Neben E-Mail und Passwort kann man sich mit einem Google- oder GitHub-Konto anmelden oder registrieren.
+Ein Anbieter erscheint im Anmeldedialog, sobald Client-ID und Secret gesetzt sind. Die Rücksprungadresse
+lautet `<PUBLIC_URL>/api/auth/oauth/<anbieter>/callback`; ohne `PUBLIC_URL` wird sie aus der Anfrage
+gebildet. Sie muss beim Anbieter genau so eingetragen sein.
+
+- *Google*: In der [Google Cloud Console](https://console.cloud.google.com/apis/credentials) einen
+  OAuth-Client vom Typ „Webanwendung“ anlegen, als autorisierte Weiterleitungs-URI
+  `https://example.org/api/auth/oauth/google/callback` eintragen. Bereiche: `openid`, `email`, `profile`.
+- *GitHub*: Unter *Settings → Developer settings → [OAuth Apps](https://github.com/settings/developers)*
+  eine App anlegen, *Authorization callback URL* `https://example.org/api/auth/oauth/github/callback`.
+
+```bash
+PUBLIC_URL=https://example.org \
+GOOGLE_CLIENT_ID=… GOOGLE_CLIENT_SECRET=… \
+GITHUB_CLIENT_ID=… GITHUB_CLIENT_SECRET=… npm start
+```
+
+Für lokale Versuche geht auch `http://localhost:3000` als Rücksprungadresse.
 
 ## Externer Detektor
 

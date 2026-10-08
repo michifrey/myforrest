@@ -591,6 +591,17 @@ Auffälligkeiten genauer:
   Passwörter werden mit scrypt und eigenem Salt pro Konto gespeichert. Die Sitzung liegt in einem
   httpOnly-Cookie (SameSite=Lax, 30 Tage); in der Datenbank steht nur ihr SHA-256-Hash. Fehlversuche beim
   Anmelden werden begrenzt (5 pro Konto und IP, 30 pro IP in 15 Minuten).
+- *Anmelden mit Google oder GitHub*: Ist ein Anbieter eingerichtet (siehe
+  [Installation](installation.md#anmelden-mit-google-und-github)), zeigt der Dialog „Mit Google anmelden“
+  bzw. „Mit GitHub anmelden“. Der Ablauf ist OAuth 2.0 mit PKCE; `state` und Verifier liegen in einem
+  kurzlebigen httpOnly-Cookie, ein fremder oder abgelaufener Rücksprung wird abgewiesen. Beim ersten Mal
+  entsteht ein Konto ohne Passwort mit der vom Anbieter **bestätigten** E-Mail-Adresse (ohne bestätigte
+  Adresse keine Registrierung); der Name kommt vom Anbieter und lässt sich durch eine Zahl eindeutig machen.
+  Gibt es zur Adresse schon ein Konto mit Passwort, wird es nicht automatisch übernommen (sonst könnte, wer
+  ein Konto mit fremder Adresse anlegt, später das Konto der echten Inhaberin mitnutzen): Dann mit Passwort
+  anmelden und im Konto-Menü *Mit Google/GitHub verknüpfen* wählen. Liefert der Anbieter dabei dieselbe
+  Adresse, gilt sie als bestätigt (✓ im Konto-Menü). Verknüpfungen lassen sich wieder trennen, ausser es ist
+  die einzige Anmeldung des Kontos.
 - *CSRF-Schutz*: Jede schreibende Anfrage mit Sitzungs-Cookie muss das Token der Sitzung im Header
   `X-CSRF-Token` mitschicken (das Frontend erledigt das automatisch). Einen eigenen Header kann eine fremde
   Seite ohne CORS-Freigabe nicht setzen. Zusätzlich wird ein fremder `Origin` abgewiesen, und Anmeldung

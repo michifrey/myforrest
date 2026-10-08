@@ -9,6 +9,9 @@
  *   database only stores its SHA-256, so a leaked database holds no usable
  *   session. Each session carries its own CSRF token.
  * - Login attempts are rate limited in memory per IP and per account.
+ * - Accounts may instead (or in addition) sign in with an identity provider
+ *   (src/oauth.js); such logins are stored in `identities`. Accounts created
+ *   that way have no password (an empty `password_hash`) and a verified e-mail.
  */
 
 const crypto = require('node:crypto');
@@ -40,6 +43,16 @@ const SCHEMA = `
     expires_at INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS sessions_user ON sessions (user_id);
+
+  CREATE TABLE IF NOT EXISTS identities (
+    provider   TEXT NOT NULL,
+    subject    TEXT NOT NULL,
+    user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    email      TEXT,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (provider, subject)
+  );
+  CREATE INDEX IF NOT EXISTS identities_user ON identities (user_id);
 `;
 
 async function hashPassword(password) {
@@ -79,8 +92,8 @@ function parseCookies(header) {
   return out;
 }
 
-function serializeCookie(name, value, { maxAge, secure } = {}) {
-  const parts = [`${name}=${encodeURIComponent(value)}`, 'Path=/', 'HttpOnly', 'SameSite=Lax'];
+function serializeCookie(name, value, { maxAge, secure, path = '/' } = {}) {
+  const parts = [`${name}=${encodeURIComponent(value)}`, `Path=${path}`, 'HttpOnly', 'SameSite=Lax'];
   if (maxAge !== undefined) parts.push(`Max-Age=${Math.floor(maxAge / 1000)}`);
   if (secure) parts.push('Secure');
   return parts.join('; ');
@@ -121,6 +134,9 @@ const NAME_RE = /^[\p{L}\p{N}][\p{L}\p{N} ._-]{1,38}[\p{L}\p{N}]$/u;
 /** Account store bound to a database. */
 function createAuth(db, { adminEmail = null } = {}) {
   db.exec(SCHEMA);
+  if (!db.prepare('PRAGMA table_info(users)').all().some((c) => c.name === 'email_verified_at')) {
+    db.exec('ALTER TABLE users ADD COLUMN email_verified_at INTEGER'); // set when an identity provider confirmed the address
+  }
   // A precomputed hash so that logins for unknown accounts take as long as real ones.
   let dummyHash = null;
   const dummy = async () => (dummyHash ??= await hashPassword(randomToken()));
@@ -143,19 +159,95 @@ function createAuth(db, { adminEmail = null } = {}) {
       return { error: 'E-Mail-Adresse oder Name ist bereits vergeben', status: 409 };
     }
     const hash = await hashPassword(password);
+    try {
+      return { user: insertUser({ email, name, hash }) };
+    } catch {
+      // Lost a race against a concurrent registration with the same address or name.
+      return { error: 'E-Mail-Adresse oder Name ist bereits vergeben', status: 409 };
+    }
+  }
+
+  function insertUser({ email, name, hash, verifiedAt = null }) {
     // The configured admin address, or else the very first account, becomes admin.
     const isFirst = !db.prepare('SELECT 1 FROM users LIMIT 1').get();
     const role = adminEmail
       ? (email.toLowerCase() === adminEmail.toLowerCase() ? 'admin' : 'user')
       : (isFirst ? 'admin' : 'user');
-    try {
-      const id = Number(db.prepare('INSERT INTO users (email, name, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?)')
-        .run(email, name, hash, role, Date.now()).lastInsertRowid);
-      return { user: userById.get(id) };
-    } catch {
-      // Lost a race against a concurrent registration with the same address or name.
-      return { error: 'E-Mail-Adresse oder Name ist bereits vergeben', status: 409 };
+    const id = Number(db.prepare('INSERT INTO users (email, name, password_hash, role, email_verified_at, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(email, name, hash, role, verifiedAt, Date.now()).lastInsertRowid);
+    return userById.get(id);
+  }
+
+  /** A free display name derived from the provider's name or the e-mail address. */
+  function freeName(wanted, email) {
+    let base = String(wanted || email.split('@')[0]).normalize('NFKC')
+      .replace(/[^\p{L}\p{N} ._-]+/gu, '').replace(/\s+/g, ' ').slice(0, 34)
+      .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+    if (!NAME_RE.test(base)) base = `Waldfreund${base ? ` ${base}` : ''}`.slice(0, 34).trim();
+    for (let i = 1; i < 1000; i += 1) {
+      const name = i === 1 ? base : `${base} ${i}`;
+      if (NAME_RE.test(name) && !db.prepare('SELECT 1 FROM users WHERE name = ?').get(name)) return name;
     }
+    return `Waldfreund ${crypto.randomBytes(3).toString('hex')}`;
+  }
+
+  const identityRow = db.prepare('SELECT * FROM identities WHERE provider = ? AND subject = ?');
+  const linkIdentity = (provider, profile, userId) => db.prepare(
+    'INSERT INTO identities (provider, subject, user_id, email, created_at) VALUES (?, ?, ?, ?, ?)',
+  ).run(provider, profile.subject, userId, profile.email, Date.now());
+
+  /**
+   * Resolves a login through an identity provider. `current` is the account
+   * of the browser's session, if any: then the identity is linked to it.
+   * Otherwise a known identity logs in, and an unknown one with a verified,
+   * unused address creates an account. An address that already belongs to
+   * an account is not linked automatically, since nobody has checked that
+   * the account's owner controls it (account pre-hijacking); its owner logs
+   * in with the password and links the provider from the account menu.
+   */
+  function identityLogin(provider, profile, current = null) {
+    const known = identityRow.get(provider, profile.subject);
+    const verify = (user) => {
+      if (profile.emailVerified && profile.email && !user.email_verified_at && profile.email.toLowerCase() === user.email.toLowerCase()) {
+        db.prepare('UPDATE users SET email_verified_at = ? WHERE id = ?').run(Date.now(), user.id);
+      }
+      return userById.get(user.id);
+    };
+    if (current) {
+      if (known && known.user_id !== current.id) return { error: 'Diese Anmeldung gehört bereits zu einem anderen Konto', status: 409 };
+      if (!known) linkIdentity(provider, profile, current.id);
+      return { user: verify(current), linked: !known };
+    }
+    if (known) return { user: verify(userById.get(known.user_id)) };
+    if (!profile.email || !profile.emailVerified || !EMAIL_RE.test(profile.email) || profile.email.length > 200) {
+      return { error: 'Der Anbieter hat keine bestätigte E-Mail-Adresse geliefert', status: 400 };
+    }
+    if (db.prepare('SELECT 1 FROM users WHERE email = ?').get(profile.email)) {
+      return {
+        error: 'Zu dieser E-Mail-Adresse gibt es schon ein Konto. Bitte mit Passwort anmelden und die Anmeldung dann im Konto-Menü verknüpfen.',
+        status: 409,
+      };
+    }
+    try {
+      const user = insertUser({ email: profile.email, name: freeName(profile.name, profile.email), hash: '', verifiedAt: Date.now() });
+      linkIdentity(provider, profile, user.id);
+      return { user, created: true };
+    } catch {
+      return { error: 'Das Konto konnte nicht angelegt werden – bitte erneut versuchen', status: 409 };
+    }
+  }
+
+  const identitiesOf = (userId) => db.prepare('SELECT provider FROM identities WHERE user_id = ? ORDER BY provider').all(userId).map((r) => r.provider);
+
+  /** Removes a provider login, unless it is the account's only way to sign in. */
+  function unlinkIdentity(user, provider) {
+    const linked = identitiesOf(user.id);
+    if (!linked.includes(provider)) return { error: 'Diese Anmeldung ist nicht verknüpft', status: 404 };
+    if (!hasPassword(user) && linked.length === 1) {
+      return { error: 'Das ist die einzige Anmeldung dieses Kontos – zuerst eine andere verknüpfen', status: 400 };
+    }
+    db.prepare('DELETE FROM identities WHERE user_id = ? AND provider = ?').run(user.id, provider);
+    return {};
   }
 
   /** Checks the credentials; `login` may be the e-mail address or the name. */
@@ -199,20 +291,31 @@ function createAuth(db, { adminEmail = null } = {}) {
 
   const destroySession = (tokenHash) => db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(tokenHash);
 
-  return { register, authenticate, createSession, session, destroySession, userById: (id) => userById.get(id) };
+  return {
+    register, authenticate, createSession, session, destroySession, identityLogin, identitiesOf, unlinkIdentity,
+    userById: (id) => userById.get(id),
+  };
 }
+
+const hasPassword = (user) => String(user?.password_hash || '').startsWith('scrypt$');
 
 const isModerator = (user) => Boolean(user && (user.role === 'moderator' || user.role === 'admin'));
 
 /** Public view of an account (never the e-mail of others or the hash). */
-const userJson = (u, { self = false } = {}) => (u ? {
+const userJson = (u, { self = false, identities } = {}) => (u ? {
   id: u.id,
   name: u.name,
   role: u.role,
-  ...(self ? { email: u.email, defaultLicense: u.default_license } : {}),
+  ...(self ? {
+    email: u.email,
+    emailVerified: Boolean(u.email_verified_at),
+    hasPassword: hasPassword(u),
+    ...(identities ? { identities } : {}),
+    defaultLicense: u.default_license,
+  } : {}),
 } : null);
 
 module.exports = {
   ROLES, SESSION_COOKIE, SESSION_TTL_MS,
-  hashPassword, verifyPassword, parseCookies, serializeCookie, createLimiter, createAuth, isModerator, userJson,
+  hashPassword, verifyPassword, parseCookies, serializeCookie, createLimiter, createAuth, isModerator, hasPassword, userJson,
 };

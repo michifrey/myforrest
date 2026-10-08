@@ -6,7 +6,7 @@
  *
  *   const accounts = registerAccounts(app, ctx);
  *
- * `ctx` holds `db`, `requireLogin`, `adminEmail`, and later `photoJson`
+ * `ctx` holds `db`, `requireLogin`, `adminEmail`, `oauth` (src/oauth.js), and later `photoJson`
  * (set by app.js once defined). Returns helpers app.js uses to filter hidden
  * photos and to stamp uploads with their uploader and licence.
  *
@@ -17,6 +17,11 @@
  * rejected for such requests and for login/registration, which also only
  * accept `application/json`. Requests without a session cookie carry no
  * authority and are unaffected, so anonymous use works as before.
+ *
+ * Identity providers: GET /api/auth/oauth/:provider redirects to Google or
+ * GitHub, which return to …/callback. That logs in, creates an account, or,
+ * with a session in this browser, links the provider to it; then it
+ * redirects to the start page (`/?auth=ok|created|linked` or `/?auth_error=…`).
  */
 
 const crypto = require('node:crypto');
@@ -24,6 +29,7 @@ const path = require('node:path');
 const {
   SESSION_COOKIE, SESSION_TTL_MS, ROLES, parseCookies, serializeCookie, createLimiter, createAuth, isModerator, userJson,
 } = require('../auth');
+const { STATE_COOKIE, STATE_TTL_MS, createOAuth } = require('../oauth');
 const {
   LICENSES, DEFAULT_LICENSE, REPORT_REASONS, licenseJson, parseLicense, visibleSql, createModeration,
 } = require('../moderation');
@@ -41,10 +47,12 @@ const sameString = (a, b) => {
 module.exports = function registerAccounts(app, ctx) {
   const { db, requireLogin = false, adminEmail = null } = ctx;
   const auth = createAuth(db, { adminEmail });
+  const oauth = ctx.oauth || createOAuth();
   const mod = createModeration(db);
   const limits = ctx.rateLimits || {};
   const loginPerAccount = createLimiter({ max: limits.loginPerAccount ?? 5, windowMs: 15 * 60 * 1000 });
   const loginPerIp = createLimiter({ max: limits.loginPerIp ?? 30, windowMs: 15 * 60 * 1000 });
+  const oauthPerIp = createLimiter({ max: limits.oauthPerIp ?? 30, windowMs: 15 * 60 * 1000 });
   const registerPerIp = createLimiter({ max: limits.registerPerIp ?? 10, windowMs: 3600 * 1000 });
   const reportPerIp = createLimiter({ max: limits.reportPerIp ?? 30, windowMs: 3600 * 1000 });
 
@@ -160,8 +168,9 @@ module.exports = function registerAccounts(app, ctx) {
   const startSession = (req, res, user) => {
     const { token, csrf } = auth.createSession(user.id);
     res.append('Set-Cookie', serializeCookie(SESSION_COOKIE, token, { maxAge: SESSION_TTL_MS, secure: secure(req) }));
-    return { user: userJson(user, { self: true }), csrfToken: csrf };
+    return { user: selfJson(user), csrfToken: csrf };
   };
+  const selfJson = (user) => (user ? userJson(user, { self: true, identities: auth.identitiesOf(user.id) }) : null);
   const jsonOnly = (req, res) => {
     if (req.is('application/json')) return true;
     fail(res, 415, 'Bitte als JSON senden');
@@ -171,9 +180,10 @@ module.exports = function registerAccounts(app, ctx) {
   app.get('/api/auth/me', (req, res) => {
     res.set('Cache-Control', 'no-store');
     res.json({
-      user: userJson(req.user, { self: true }),
+      user: selfJson(req.user),
       csrfToken: req.session?.csrf ?? null,
       requireLogin,
+      providers: oauth.list(),
       licenses: Object.entries(LICENSES).map(([id, l]) => ({ id, ...l })),
       defaultLicense: DEFAULT_LICENSE,
       reportReasons: REPORT_REASONS,
@@ -225,6 +235,52 @@ module.exports = function registerAccounts(app, ctx) {
     if (req.session) auth.destroySession(req.session.tokenHash);
     res.append('Set-Cookie', serializeCookie(SESSION_COOKIE, '', { maxAge: 0, secure: secure(req) }));
     res.status(204).end();
+  });
+
+  /* ---------- Identity providers (Google, GitHub) ---------- */
+
+  const origin = (req) => `${secure(req) ? 'https' : 'http'}://${req.get('x-forwarded-host') || req.get('host')}`;
+  const stateCookie = (req, value, maxAge) => serializeCookie(STATE_COOKIE, value, {
+    maxAge, secure: secure(req), path: '/api/auth/oauth/',
+  });
+  const backTo = (res, params) => res.redirect(303, `/?${new URLSearchParams(params)}`);
+
+  app.get('/api/auth/oauth/:provider', (req, res) => {
+    const provider = oauth.get(req.params.provider);
+    if (!provider) return fail(res, 404, 'Diese Anmeldung ist nicht eingerichtet');
+    const { url, cookie } = oauth.begin(provider, origin(req));
+    res.set('Cache-Control', 'no-store');
+    res.append('Set-Cookie', stateCookie(req, cookie, STATE_TTL_MS));
+    res.redirect(303, url);
+  });
+
+  app.get('/api/auth/oauth/:provider/callback', async (req, res) => {
+    const provider = oauth.get(req.params.provider);
+    if (!provider) return fail(res, 404, 'Diese Anmeldung ist nicht eingerichtet');
+    res.set('Cache-Control', 'no-store');
+    // The state cookie is single-use.
+    res.append('Set-Cookie', stateCookie(req, '', 0));
+    const wait = oauthPerIp.blocked(req.ip);
+    if (wait) return backTo(res, { auth_error: `Zu viele Anmeldeversuche – bitte in ${Math.ceil(wait / 60)} Minuten erneut versuchen` });
+    let profile;
+    try {
+      profile = await oauth.finish(provider, origin(req), req.query, parseCookies(req.headers.cookie)[STATE_COOKIE]);
+    } catch (err) {
+      oauthPerIp.hit(req.ip);
+      return backTo(res, { auth_error: err.message });
+    }
+    const r = auth.identityLogin(provider.id, profile, req.user);
+    if (r.error) return backTo(res, { auth_error: r.error });
+    if (r.created && r.user.role === 'admin') mod.log(r.user, 'role', { targetUserId: r.user.id, detail: `admin (erstes Konto, ${provider.label})` });
+    if (!req.user) startSession(req, res, r.user);
+    backTo(res, r.linked ? { auth: 'linked', provider: provider.id } : { auth: r.created ? 'created' : 'ok' });
+  });
+
+  app.delete('/api/auth/identities/:provider', (req, res) => {
+    if (!req.user) return fail(res, 401, 'Bitte zuerst anmelden');
+    const r = auth.unlinkIdentity(req.user, req.params.provider);
+    if (r.error) return fail(res, r.status, r.error);
+    res.json({ user: selfJson(auth.userById(req.user.id)) });
   });
 
   /* ---------- Reports (open to everyone) ---------- */

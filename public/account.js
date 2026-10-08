@@ -12,6 +12,7 @@ const Account = {
   licenses: [],
   defaultLicense: 'cc-by-sa-4.0',
   reportReasons: {},
+  providers: [], // identity providers enabled on the server: [{ id, label }]
 };
 window.Account = Account;
 
@@ -75,8 +76,18 @@ function renderNav() {
     el('span', { class: 'account-label', text: u.name }),
   );
   const item = (text, onclick, extra = {}) => el('button', { type: 'button', role: 'menuitem', class: 'menu-item', onclick, ...extra }, text);
+  const linked = u.identities || [];
+  const providerItems = Account.providers.map((p) => (linked.includes(p.id)
+    ? item(`${p.label} trennen`, () => unlinkProvider(p))
+    : el('a', { role: 'menuitem', class: 'menu-item', href: `/api/auth/oauth/${p.id}`, text: `Mit ${p.label} verknüpfen` })));
+  const via = linked.map((id) => Account.providers.find((p) => p.id === id)?.label || id);
   menu.replaceChildren(
-    el('div', { class: 'menu-who' }, [el('strong', { text: u.name }), el('span', { class: 'muted small', text: `${u.email} · ${ROLE_LABEL[u.role]}` })]),
+    el('div', { class: 'menu-who' }, [
+      el('strong', { text: u.name }),
+      el('span', { class: 'muted small', text: `${u.email}${u.emailVerified ? ' ✓' : ''} · ${ROLE_LABEL[u.role]}` }),
+      ...(via.length ? [el('span', { class: 'muted small', text: `Anmeldung über ${via.join(', ')}${u.hasPassword ? ' oder Passwort' : ''}` })] : []),
+    ]),
+    ...providerItems,
     ...(isMod() ? [item('Moderation', () => openModeration('reported'))] : []),
     ...(u.role === 'admin' ? [item('Konten & Rollen', () => openModeration('users'))] : []),
     item('Abmelden', logout, { class: 'menu-item danger' }),
@@ -92,6 +103,17 @@ menuBtn.addEventListener('click', () => (Account.user ? toggleMenu() : openAuth(
 document.addEventListener('click', (e) => { if (!menu.hidden && !e.target.closest('.account')) toggleMenu(false); });
 menu.addEventListener('keydown', (e) => { if (e.key === 'Escape') { toggleMenu(false); menuBtn.focus(); } });
 menu.addEventListener('click', (e) => { if (e.target.closest('.menu-item')) toggleMenu(false); });
+
+async function unlinkProvider(p) {
+  if (!confirm(`Anmeldung mit ${p.label} von diesem Konto trennen?`)) return;
+  try {
+    const r = await api(`/api/auth/identities/${p.id}`, { method: 'DELETE' });
+    Account.user = r.user;
+    renderNav();
+  } catch (err) {
+    alert(err.message);
+  }
+}
 
 async function logout() {
   await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
@@ -116,6 +138,7 @@ authDialog.innerHTML = `
       <button type="button" role="tab" data-mode="register" aria-selected="false">Registrieren</button>
     </div>
     <p id="auth-intro" class="muted small"></p>
+    <div id="auth-providers" class="auth-providers" hidden></div>
     <label class="field" data-only="register"><span>Name <em>wird bei deinen Fotos genannt</em></span>
       <input name="name" autocomplete="nickname" maxlength="40"></label>
     <label class="field"><span data-label-login="E-Mail oder Name" data-label-register="E-Mail">E-Mail oder Name</span>
@@ -144,10 +167,23 @@ function setAuthMode(mode) {
   authForm.login.autocomplete = reg ? 'email' : 'username';
   authForm.password.autocomplete = reg ? 'new-password' : 'current-password';
   $('auth-title').textContent = reg ? 'Konto erstellen' : 'Anmelden';
+  renderProviders();
   $('auth-submit').textContent = reg ? 'Registrieren' : 'Anmelden';
   $('auth-error').hidden = true;
 }
 authDialog.querySelectorAll('[role="tab"]').forEach((t) => t.addEventListener('click', () => setAuthMode(t.dataset.mode)));
+
+/** "Continue with Google/GitHub": a plain link, the server redirects to the provider and back. */
+function renderProviders() {
+  const box = $('auth-providers');
+  box.hidden = !Account.providers.length;
+  box.replaceChildren(
+    ...Account.providers.map((p) => el('a', {
+      class: `btn secondary provider provider-${p.id}`, href: `/api/auth/oauth/${p.id}`, text: `Mit ${p.label} ${authMode === 'register' ? 'registrieren' : 'anmelden'}`,
+    })),
+    el('p', { class: 'auth-or muted small', text: authMode === 'register' ? 'oder mit E-Mail und Passwort' : 'oder mit E-Mail/Name und Passwort' }),
+  );
+}
 $('auth-cancel').addEventListener('click', () => authDialog.close());
 
 /** Opens the dialog; `then` runs after a successful login (e.g. continue to the upload). */
@@ -482,6 +518,29 @@ async function deletePhoto(p) {
   }
 }
 
+/* ---------- Back from Google/GitHub (/?auth=… or /?auth_error=…) ---------- */
+
+function authReturn() {
+  const q = new URLSearchParams(location.search);
+  const error = q.get('auth_error');
+  const result = q.get('auth');
+  if (!error && !result) return;
+  q.delete('auth_error');
+  q.delete('auth');
+  const provider = Account.providers.find((p) => p.id === q.get('provider'));
+  q.delete('provider');
+  history.replaceState(null, '', `${location.pathname}${q.size ? `?${q}` : ''}${location.hash}`);
+  if (error) {
+    openAuth('login');
+    $('auth-error').textContent = error;
+    $('auth-error').hidden = false;
+  } else if (result === 'linked' && provider) {
+    alert(`${provider.label} ist jetzt mit deinem Konto verknüpft.`);
+  } else if (result === 'created' && Account.user) {
+    alert(`Willkommen, ${Account.user.name}! Dein Konto ist angelegt. Deine Fotos werden unter diesem Namen genannt.`);
+  }
+}
+
 /* ---------- Init ---------- */
 
 (async function initAccount() {
@@ -495,11 +554,13 @@ async function deletePhoto(p) {
       licenses: me.licenses,
       defaultLicense: me.defaultLicense,
       reportReasons: me.reportReasons,
+      providers: me.providers || [],
     });
   } catch {
     // Server without accounts: keep the defaults.
   }
   renderNav();
+  authReturn();
   fillLicenseSelect();
   if (state.spot) Account.photoShown(state.spot.photos[state.index]);
   // A moderator sees hidden photos: reload once the session is known.
