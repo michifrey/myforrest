@@ -226,7 +226,9 @@ map.geo.admin.ch. Ein Klick auf ein Objekt zeigt seine Angaben.
 
 *Touren & Aufträge* hält fest, wo man unterwegs ist. Eine Route lässt sich auf der Karte **zeichnen**
 (Klick für Klick; der Wege-Magnet zieht die Linie auf Wege und Pfade), mit dem Handy per GPS **aufzeichnen** oder als GPX, FIT
-(Sportuhr, Velocomputer), TCX, KML oder GeoJSON **importieren**. Ein **Höhenprofil** zeigt Auf- und Abstieg. Gelbe Kilometer-Marken zeigen den Verlauf, jede Route geht auch als GPX
+(Sportuhr, Velocomputer), TCX, KML oder GeoJSON **importieren**. Ein **Höhenprofil** zeigt Auf- und Abstieg; aus
+FIT-Dateien fasst das Panel auch Puls, Leistung, Schrittfrequenz, Temperatur und die Developer-Felder von
+Zusatzsensoren zusammen (nur für einen selbst sichtbar). Gelbe Kilometer-Marken zeigen den Verlauf, jede Route geht auch als GPX
 wieder hinaus. Mit dem eigenen Routing-Server bevorzugt der Magnet Forststrassen und Rückegassen und führt
 während der Schutzzeit um **Wildruhezonen** herum, die die Karte beim Planen zeigt, ebenso um **Holzerei**: Ein
 Foto mit *Holzschlag* sperrt die Stelle sechs Wochen, der Forstdienst sperrt Wege mit Enddatum. Mit Konto lassen sich Touren speichern und veröffentlichen; andere sehen eine öffentliche
@@ -295,7 +297,7 @@ möglich, ausser der Betrieb verlangt eines (`REQUIRE_LOGIN`) oder eine bestäti
 
 Unter **Mein Profil** stehen die eigenen Beiträge: wie viele Fotos und Spots, wie viele Zeitreihen man
 fortgesetzt und wie viele Fotoaufträge man erledigt hat, und alle eigenen Fotos, das neueste zuerst. Ein Klick
-öffnet den Spot, und über *Name ändern* und *E-Mail ändern* lassen sich Anzeigename und Adresse anpassen (die neue Adresse gilt erst nach ihrem Bestätigungslink). *Meine Daten herunterladen* liefert alles zum Konto als ZIP: Fotos mit Originalen und GeoJSON, Touren als GPX, Aufträge und Meldungen. Das Profil sieht nur, wem es gehört; eine öffentliche Liste aller Fotos einer Person würde
+öffnet den Spot, und über *Name ändern* und *E-Mail ändern* lassen sich Anzeigename und Adresse anpassen (die neue Adresse gilt erst nach ihrem Bestätigungslink). *Meine Daten herunterladen* liefert alles zum Konto als ZIP: Fotos mit Originalen und GeoJSON, Touren als GPX (mit Sensorwerten), Aufträge und Meldungen. Das Profil sieht nur, wem es gehört; eine öffentliche Liste aller Fotos einer Person würde
 zeigen, wo und wann sie regelmässig unterwegs ist.
 
 ### 13. Durchgehen wie Street View

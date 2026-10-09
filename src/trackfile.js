@@ -7,7 +7,7 @@
  * MultiLineString, Features, with optional `coordTimes`), NMEA (dashcams) and FIT (binary, as a Buffer). Points carry
  * `lat`, `lon` and, when known, `ele` (m) and `time` (ms since epoch).
  *
- * parseTrackFile(text, filename?) → { name, format, points, hasTime }
+ * parseTrackFile(text, filename?) → { name, format, points, hasTime, sensors? } (sensors: FIT only, see fit.js)
  * toGpx(track) → GPX 1.1 string
  */
 
@@ -173,7 +173,9 @@ function finish(parsed, format, filename) {
   if (points.length < 2) throw new Error('Die Datei enthält keine Strecke mit mindestens zwei Punkten');
   points = thin(points);
   const fallback = String(filename || '').replace(/\.[^.]+$/, '') || null;
-  return { name: parsed.name || fallback, format, points, hasTime: points.some((p) => p.time !== undefined) };
+  const out = { name: parsed.name || fallback, format, points, hasTime: points.some((p) => p.time !== undefined) };
+  if (parsed.sensors?.length) out.sensors = parsed.sensors;
+  return out;
 }
 
 function toGpx({ name, points, activity }) {

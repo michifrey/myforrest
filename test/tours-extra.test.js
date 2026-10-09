@@ -28,6 +28,33 @@ test('FIT: records with positions, altitude and time, also with compressed times
   assert.throws(() => parseFit(Buffer.from('kein FIT')), /Keine FIT-Datei/);
 });
 
+test('FIT sensors: heart rate, power, cadence as steps for runs, temperature, and developer fields', () => {
+  const pts = run(40).map((p, i) => ({
+    ...p, hr: 130 + (i % 20), cadence: i < 2 ? 0 : 84, temp: 12 + (i % 5) - (i > 30 ? 20 : 0),
+    dev: { Power: 240 + (i % 10), 'Form Power': 60 },
+  }));
+  // The foot pod's "Power" stands for the standard power field (7); "Form Power" is its own.
+  const fit = writeFit(pts, { sport: 1, compressAfter: 25, developer: [{ name: 'Power', units: 'Watts', native: 7 }, { name: 'Form Power', units: 'Watts' }] });
+  const { name, points, sensors } = parseFit(fit);
+  assert.equal(name, 'Lauf');
+  assert.equal(points.length, 40);
+  const by = Object.fromEntries(sensors.map((s) => [s.key, s]));
+  assert.deepEqual(Object.keys(by), ['hr', 'power', 'steps', 'temp', 'dev:Form Power']);
+  assert.deepEqual([by.hr.label, by.hr.max, by.hr.n], ['Puls', 149, 40]);
+  assert.deepEqual([by.steps.label, by.steps.avg, by.steps.n], ['Schrittfrequenz', 168, 38], 'strides × 2, standstill left out');
+  assert.equal(by.temp.min, -8, 'below zero');
+  assert.deepEqual([by.power.label, by.power.unit, by.power.max], ['Leistung', 'W', 249]);
+  assert.deepEqual([by['dev:Form Power'].label, by['dev:Form Power'].unit, by['dev:Form Power'].avg], ['Form Power', 'Watts', 60]);
+  // A watch with its own power: the foot pod's does not count twice.
+  const both = parseFit(writeFit(pts.map((p) => ({ ...p, power: 300 })), { developer: [{ name: 'Power', units: 'Watts', native: 7 }] }));
+  assert.equal(both.sensors.find((s) => s.key === 'power').avg, 300);
+  assert.equal(both.sensors.find((s) => s.key === 'cadence').label, 'Trittfrequenz', 'not a run: as stored');
+  // Without sensors: nothing.
+  assert.deepEqual(parseFit(writeFit(run())).sensors, []);
+  assert.equal(parseTrackFile(writeFit(run()), 'x.fit').sensors, undefined);
+  assert.equal(parseTrackFile(fit, 'x.fit').sensors.length, 5);
+});
+
 test('elevation profile: samples along the route, ascent and descent without noise', () => {
   const pts = run(100).map((p, i) => ({ ...p, ele: 500 + i + (i % 2 ? 1.5 : 0) })); // 99 m up, with 1.5 m jitter
   const s = sampleAlong(pts, 50);
@@ -104,6 +131,29 @@ test('FIT through the API: tour import as base64, and as the track for photos wi
     assert.equal(up.created.length, 1, JSON.stringify(up));
     assert.equal(up.created[0].locationSource, 'gpx');
     assert.ok(Math.abs(up.created[0].lat - (47.36 + 30 * 0.0002)) < 2e-5, `lat ${up.created[0].lat}`);
+  });
+});
+
+test('FIT sensors are kept with an imported tour, for its owner only', async () => {
+  await withServer(async (base) => {
+    const anna = client(base);
+    await anna.register('Anna');
+    const ben = client(base);
+    await ben.register('Benno');
+    const fit = writeFit(run().map((p) => ({ ...p, hr: 140 })), { sport: 1 });
+    const t = await anna.json('/api/tracks/parse', { method: 'POST', json: { base64: fit.toString('base64'), filename: 'lauf.fit' } });
+    assert.deepEqual(t.sensors.map((s) => [s.key, s.avg]), [['hr', 140]]);
+    const points = t.points.map((p) => [p.lat, p.lon, p.ele, p.time]);
+    const saved = await anna.json('/api/tracks', { method: 'POST', json: { name: 'Lauf', kind: 'importiert', visibility: 'oeffentlich', points, sensors: t.sensors } });
+    assert.equal(saved.sensors[0].avg, 140);
+    assert.equal((await anna.json(`/api/tracks/${saved.id}`)).sensors[0].label, 'Puls');
+    assert.equal((await ben.json(`/api/tracks/${saved.id}`)).sensors, null, 'health data: not for others');
+    assert.equal((await ben.json('/api/tracks')).find((x) => x.id === saved.id).sensors, null);
+    // Drawn tours carry none, and junk is dropped.
+    const drawn = await anna.json('/api/tracks', { method: 'POST', json: { kind: 'gezeichnet', points, sensors: t.sensors } });
+    assert.equal(drawn.sensors, null);
+    const junk = await anna.json('/api/tracks', { method: 'POST', json: { kind: 'importiert', points, sensors: [{ key: 'x' }, 'y'] } });
+    assert.equal(junk.sensors, null);
   });
 });
 

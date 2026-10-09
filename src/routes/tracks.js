@@ -5,7 +5,7 @@
  *
  *   POST   /api/tracks/parse            read a GPX/TCX/KML/GeoJSON file ({ text, filename }), nothing is stored
  *   GET    /api/tracks                  public tours (summary, start point) – ?mine=1 for one's own
- *   POST   /api/tracks                  save a tour (login required): { name, kind, activity, visibility, points }
+ *   POST   /api/tracks                  save a tour (login required): { name, kind, activity, visibility, points, sensors? }
  *   GET    /api/tracks/:id              one tour with its points
  *   PATCH  /api/tracks/:id              name, activity, visibility
  *   DELETE /api/tracks/:id
@@ -24,7 +24,8 @@
  * see public tours without times and without the first and last 200 m
  * (start and finish are often at home). Photo requests carry a place, an
  * optional direction and a text, but no time and no public name of the
- * requester. Route suggestions are computed from the route sent with the
+ * requester. Sensor sums of a tour (heart rate, power … from a FIT file)
+ * are health data and go to the owner only. Route suggestions are computed from the route sent with the
  * request and nothing of it is kept.
  *
  * A photo fulfils an open request when it is taken within the request's
@@ -93,6 +94,21 @@ const REQUEST_MIGRATIONS = [
   ['expires_at', 'INTEGER'],
 ];
 const REQUEST_DAYS = [7, 30, 90, 365];
+// Tours: sensor sums from FIT files (owner only).
+const TRACK_MIGRATIONS = [['sensors_json', 'TEXT']];
+
+/** Sensor sums as sent by the client (from /api/tracks/parse) → checked copy, or null. */
+function readSensors(input) {
+  if (!Array.isArray(input) || !input.length) return null;
+  const out = [];
+  for (const s of input.slice(0, 20)) {
+    const n = (v) => (Number.isFinite(Number(v)) ? Math.round(Number(v) * 10) / 10 : null);
+    const e = { key: clean(s?.key, 50), label: clean(s?.label, 40), unit: clean(s?.unit, 12) || '', avg: n(s?.avg), min: n(s?.min), max: n(s?.max), n: Math.max(0, Math.round(Number(s?.n) || 0)) };
+    if (!e.key || !e.label || e.avg === null) continue;
+    out.push(e);
+  }
+  return out.length ? out : null;
+}
 // Open and not run out (SQL condition, ? = now).
 const OPEN_SQL = "status = 'offen' AND (expires_at IS NULL OR expires_at > ?)";
 
@@ -132,6 +148,8 @@ module.exports = function registerTracks(app, ctx) {
   const push = ctx.push || null;
   const closures = createClosures(db);
   db.exec(SCHEMA);
+  const trackCols = new Set(db.prepare('PRAGMA table_info(tracks)').all().map((c) => c.name));
+  for (const [col, type] of TRACK_MIGRATIONS) if (!trackCols.has(col)) db.exec(`ALTER TABLE tracks ADD COLUMN ${col} ${type}`);
   const reqCols = new Set(db.prepare('PRAGMA table_info(photo_requests)').all().map((c) => c.name));
   for (const [col, type] of REQUEST_MIGRATIONS) if (!reqCols.has(col)) db.exec(`ALTER TABLE photo_requests ADD COLUMN ${col} ${type}`);
   // What the request may see; without the accounts module (tests of this file alone): the public view.
@@ -168,6 +186,8 @@ module.exports = function registerTracks(app, ctx) {
       startedAt: own && t.started_at ? new Date(t.started_at).toISOString() : null,
       endedAt: own && t.ended_at ? new Date(t.ended_at).toISOString() : null,
       hasTime: Boolean(t.started_at),
+      // Heart rate and the like: health data, for the owner only.
+      sensors: own && t.sensors_json ? JSON.parse(t.sensors_json) : null,
       owner: t.visibility === 'oeffentlich' ? ownerName.get(t.owner_id)?.name ?? null : null,
       own,
       createdAt: new Date(t.created_at).toISOString(),
@@ -227,11 +247,12 @@ module.exports = function registerTracks(app, ctx) {
     const now = Date.now();
     const id = Number(db.prepare(`
       INSERT INTO tracks (owner_id, name, kind, activity, visibility, points_json, distance_m, start_lat, start_lon,
-                          min_lat, min_lon, max_lat, max_lon, started_at, ended_at, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                          min_lat, min_lon, max_lat, max_lon, started_at, ended_at, created_at, updated_at, sensors_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(req.user.id, clean(b.name, 120) || 'Tour', kind, clean(b.activity, 40), visibility, packPoints(points),
       lengthM(points), points[0].lat, points[0].lon, s, w, n, e,
-      times.length ? Math.min(...times) : null, times.length ? Math.max(...times) : null, now, now).lastInsertRowid);
+      times.length ? Math.min(...times) : null, times.length ? Math.max(...times) : null, now, now,
+      kind === 'importiert' && readSensors(b.sensors) ? JSON.stringify(readSensors(b.sensors)) : null).lastInsertRowid);
     const t = db.prepare('SELECT * FROM tracks WHERE id = ?').get(id);
     res.status(201).json({ ...summary(t, req.user), points });
   });
