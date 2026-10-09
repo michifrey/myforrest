@@ -959,10 +959,13 @@ prüfen lassen muss, gibt es **Organisationen**:
   Geräte werden abgemeldet, offene Links zum Zurücksetzen verfallen, und das Konto bekommt eine Hinweis-E-Mail
   („Warst du das nicht?“). Konten ohne Passwort (aus Google oder GitHub) sehen stattdessen *Passwort
   festlegen*, das einen Link zum Zurücksetzen an die eigene Adresse schickt.
-- *Anmelden mit Google, GitHub, SWITCH edu-ID*: Ist ein Anbieter eingerichtet (siehe
-  [Installation](installation.md#anmelden-über-google-github-und-switch-edu-id)), zeigt der Dialog „Mit Google anmelden“, „Mit GitHub anmelden“,
+- *Anmelden mit Google, GitHub, Microsoft, SWITCH edu-ID*: Ist ein Anbieter eingerichtet (siehe
+  [Installation](installation.md#anmelden-über-google-github-microsoft-und-switch-edu-id)), zeigt der Dialog „Mit Google anmelden“, „Mit GitHub anmelden“,
   „Mit SWITCH edu-ID anmelden“ bzw. den Namen eines weiteren OpenID-Connect-Dienstes. Bei edu-ID und weiteren
-  Diensten liest die App die Endpunkte aus deren Discovery-Dokument und prüft, dass der Aussteller stimmt. Der Ablauf ist OAuth 2.0 mit PKCE; `state` und Verifier liegen in einem
+  Diensten liest die App die Endpunkte aus deren Discovery-Dokument und prüft, dass der Aussteller stimmt.
+  Bei Microsoft kommen die Angaben aus dem ID-Token (Empfänger, Ablauf, Aussteller und Tenant geprüft); die
+  Adresse gilt nur mit dem Anspruch `xms_edov` als bestätigt, sonst könnte ein fremder Tenant fremde Adressen
+  vorgeben. Der Ablauf ist OAuth 2.0 mit PKCE; `state` und Verifier liegen in einem
   kurzlebigen httpOnly-Cookie, ein fremder oder abgelaufener Rücksprung wird abgewiesen. Beim ersten Mal
   entsteht ein Konto ohne Passwort mit der vom Anbieter **bestätigten** E-Mail-Adresse (ohne bestätigte
   Adresse keine Registrierung); der Name kommt vom Anbieter und lässt sich durch eine Zahl eindeutig machen.

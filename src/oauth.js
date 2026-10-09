@@ -13,6 +13,14 @@
  *   (`<issuer>/.well-known/openid-configuration`, fetched once and checked
  *   against the configured issuer), the profile from its userinfo endpoint.
  *   An address counts as verified only with `email_verified: true`.
+ * - Microsoft (personal, work and school accounts): the profile comes from
+ *   the ID token, received directly from the token endpoint over TLS (so,
+ *   as OpenID Connect allows, without checking its signature; audience,
+ *   expiry, issuer and tenant are checked). Microsoft sends no
+ *   `email_verified`, and in other tenants anybody can enter any address
+ *   ("nOAuth"): the address counts as verified only with the optional claim
+ *   `xms_edov` (domain owner verified), which the app registration has to
+ *   add to the ID token together with `email`.
  *
  * A provider is enabled when its client ID and secret are configured. The
  * `state` and the PKCE verifier travel in a short-lived httpOnly cookie bound
@@ -82,6 +90,47 @@ Object.assign(PROVIDERS, {
   oidc: { label: 'OpenID Connect', scope: 'openid email profile', profile: oidcProfile },
 });
 
+const truthy = (v) => v === true || v === 1 || v === '1' || v === 'true';
+
+/** Profile from Microsoft's ID token; throws when the token does not belong to this app and tenant. */
+function microsoftProfile(token, get, provider, tokens) {
+  const parts = String(tokens?.id_token || '').split('.');
+  let c;
+  try {
+    c = JSON.parse(Buffer.from(parts[1] || '', 'base64url').toString('utf8'));
+  } catch {
+    throw new Error('Microsoft hat kein gültiges ID-Token geliefert');
+  }
+  const iss = /^https:\/\/login\.microsoftonline\.com\/([0-9a-f-]{36})\/v2\.0$/.exec(String(c.iss || ''));
+  const aud = Array.isArray(c.aud) ? c.aud : [c.aud];
+  const tenantFixed = /^[0-9a-f-]{36}$/.test(provider.tenant);
+  if (!iss || iss[1] !== c.tid || !aud.includes(provider.clientId) || !(Number(c.exp) * 1000 > Date.now() - 60_000)
+    || (tenantFixed && c.tid !== provider.tenant)) {
+    throw new Error('Microsoft hat ein ID-Token für eine andere Anwendung oder Organisation geliefert');
+  }
+  const email = c.email || null;
+  return {
+    subject: c.sub === undefined ? null : String(c.sub),
+    email,
+    emailVerified: Boolean(email) && truthy(c.xms_edov),
+    name: c.name || c.preferred_username || null,
+  };
+}
+
+// Microsoft: endpoints per tenant ('common' = personal and organisation accounts, 'organizations',
+// 'consumers' or one tenant's id).
+PROVIDERS.microsoft = {
+  label: 'Microsoft',
+  tenant: 'common',
+  scope: 'openid email profile',
+  extraParams: { prompt: 'select_account' },
+  urls: (p) => ({
+    authorizeUrl: `https://login.microsoftonline.com/${encodeURIComponent(p.tenant)}/oauth2/v2.0/authorize`,
+    tokenUrl: `https://login.microsoftonline.com/${encodeURIComponent(p.tenant)}/oauth2/v2.0/token`,
+  }),
+  profile: microsoftProfile,
+};
+
 const base64url = (buf) => Buffer.from(buf).toString('base64url');
 const sameIssuer = (a, b) => String(a || '').replace(/\/+$/, '') === String(b || '').replace(/\/+$/, '');
 
@@ -96,6 +145,7 @@ function createOAuth({ providers = {}, publicUrl = null, fetchImpl = fetch } = {
     if (!PROVIDERS[id] || !conf?.clientId || !conf?.clientSecret) continue;
     const p = { ...PROVIDERS[id], ...Object.fromEntries(Object.entries(conf).filter(([, v]) => v)), id };
     if (p.profile === oidcProfile && !p.issuer && !p.authorizeUrl) continue; // a generic provider needs its issuer
+    if (p.urls && !conf.authorizeUrl) Object.assign(p, p.urls(p));
     enabled[id] = p;
   }
 
@@ -198,7 +248,7 @@ function createOAuth({ providers = {}, publicUrl = null, fetchImpl = fetch } = {
       if (!res.ok || !tokens.access_token) {
         throw new Error(`${provider.label} hat die Anmeldung nicht bestätigt${tokens.error ? ` (${tokens.error})` : ''}`);
       }
-      const profile = await ep.profile(tokens.access_token, getJson, ep);
+      const profile = await ep.profile(tokens.access_token, getJson, ep, tokens);
       if (!profile.subject || profile.subject === 'undefined') throw new Error(`${provider.label} hat kein Konto geliefert`);
       return profile;
     },
@@ -206,9 +256,10 @@ function createOAuth({ providers = {}, publicUrl = null, fetchImpl = fetch } = {
 }
 
 /**
- * Provider configuration from the environment: GOOGLE_, GITHUB_, EDUID_ and
- * OIDC_CLIENT_ID / _CLIENT_SECRET; the generic provider also takes
- * OIDC_ISSUER and OIDC_LABEL (and EDUID_ISSUER may point to a test system).
+ * Provider configuration from the environment: GOOGLE_, GITHUB_, MICROSOFT_,
+ * EDUID_ and OIDC_CLIENT_ID / _CLIENT_SECRET; the generic provider also takes
+ * OIDC_ISSUER and OIDC_LABEL (EDUID_ISSUER may point to a test system), and
+ * MICROSOFT_TENANT limits the accounts (default 'common').
  */
 function providersFromEnv(env = process.env) {
   const out = {};
@@ -220,6 +271,7 @@ function providersFromEnv(env = process.env) {
         clientSecret: env[`${key}_CLIENT_SECRET`],
         issuer: env[`${key}_ISSUER`] || undefined,
         label: env[`${key}_LABEL`] || undefined,
+        tenant: env[`${key}_TENANT`] || undefined,
       };
     }
   }

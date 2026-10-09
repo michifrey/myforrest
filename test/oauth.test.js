@@ -295,3 +295,61 @@ test('generic OpenID Connect provider from issuer and label; a wrong issuer is r
     assert.match(new URL(start.headers.get('location'), base).searchParams.get('auth_error'), /anderen Aussteller/);
   }, { providers, fetch: fakeOidc('https://login.example.org/realms/wald', { reportedIssuer: 'https://evil.example/' }) });
 });
+
+/** A fake Microsoft token endpoint that returns an (unsigned) ID token with the account's claims. */
+function fakeMicrosoft(claimsOf) {
+  const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  const jwt = (claims) => ['{"alg":"RS256"}', JSON.stringify(claims), 'sig'].map((p, i) => (i < 2 ? Buffer.from(p).toString('base64url') : p)).join('.');
+  return (accounts, challenges) => async (url, init = {}) => {
+    const u = new URL(url);
+    if (u.host !== 'login.microsoftonline.com' || !u.pathname.endsWith('/oauth2/v2.0/token')) return json({}, 404);
+    const body = new URLSearchParams(init.body);
+    const challenge = crypto.createHash('sha256').update(body.get('code_verifier') || '').digest('base64url');
+    if (!claimsOf[body.get('code')] || !challenges.has(challenge) || body.get('client_secret') !== 'msecret') return json({ error: 'invalid_grant' }, 400);
+    return json({ access_token: 'at', id_token: jwt(claimsOf[body.get('code')]) });
+  };
+}
+
+const TENANT = '72f988bf-86f1-41af-91ab-2d7cd011db47';
+const CONSUMERS = '9188040d-6c67-4c5b-b112-36a304b66dad';
+const exp = () => Math.floor(Date.now() / 1000) + 600;
+const ms = (over) => ({ iss: `https://login.microsoftonline.com/${over.tid || CONSUMERS}/v2.0`, tid: CONSUMERS, aud: 'mid', exp: exp(), ...over });
+const MS = {
+  outlook: ms({ sub: 'ms-1', email: 'mia@outlook.com', name: 'Mia Bach', xms_edov: '1' }),
+  work: ms({ sub: 'ms-2', tid: TENANT, email: 'ceo@bank.example', name: 'Fremd', iss: `https://login.microsoftonline.com/${TENANT}/v2.0` }),
+  otherApp: ms({ sub: 'ms-3', email: 'x@outlook.com', aud: 'someone-else', xms_edov: true }),
+  wrongIss: ms({ sub: 'ms-4', email: 'y@outlook.com', xms_edov: true, iss: 'https://evil.example/v2.0' }),
+};
+
+test('Microsoft: profile from the ID token; only xms_edov makes the address verified', async () => {
+  const providers = { microsoft: { clientId: 'mid', clientSecret: 'msecret' } };
+  await withServer(MS, async (base, challenges) => {
+    const b = browser(base);
+    const start = await b.req('/api/auth/oauth/microsoft');
+    const auth = new URL(start.headers.get('location'));
+    assert.equal(auth.origin + auth.pathname, 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize');
+
+    assert.equal((await b.signIn('microsoft', 'outlook', challenges)).searchParams.get('auth'), 'created');
+    const me = await b.me();
+    assert.equal(me.user.email, 'mia@outlook.com');
+    assert.equal(me.user.emailVerified, true);
+    assert.deepEqual(me.user.identities, ['microsoft']);
+
+    // An address set by some tenant's admin, without xms_edov: no account (nOAuth).
+    assert.match((await browser(base).signIn('microsoft', 'work', challenges)).searchParams.get('auth_error'), /bestätigte E-Mail/);
+    // Tokens for another app or from another issuer are refused.
+    assert.match((await browser(base).signIn('microsoft', 'otherApp', challenges)).searchParams.get('auth_error'), /andere Anwendung/);
+    assert.match((await browser(base).signIn('microsoft', 'wrongIss', challenges)).searchParams.get('auth_error'), /andere Anwendung/);
+  }, { providers, fetch: fakeMicrosoft(MS) });
+});
+
+test('Microsoft with a fixed tenant accepts only accounts of that organisation', async () => {
+  const providers = { microsoft: { clientId: 'mid', clientSecret: 'msecret', tenant: TENANT } };
+  const claims = { ...MS, work: { ...MS.work, xms_edov: 1 } };
+  await withServer(claims, async (base, challenges) => {
+    const start = await browser(base).req('/api/auth/oauth/microsoft');
+    assert.match(start.headers.get('location'), new RegExp(`/${TENANT}/oauth2/v2.0/authorize`));
+    assert.equal((await browser(base).signIn('microsoft', 'work', challenges)).searchParams.get('auth'), 'created');
+    assert.match((await browser(base).signIn('microsoft', 'outlook', challenges)).searchParams.get('auth_error'), /andere Anwendung oder Organisation/);
+  }, { providers, fetch: fakeMicrosoft(claims) });
+});
