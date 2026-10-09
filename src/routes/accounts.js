@@ -85,6 +85,8 @@ module.exports = function registerAccounts(app, ctx) {
   const forgotPerIp = createLimiter({ max: limits.forgotPerIp ?? 10, windowMs: 3600 * 1000 });
   const forgotPerAddress = createLimiter({ max: limits.forgotPerAddress ?? 3, windowMs: 3600 * 1000 });
   const resetPerIp = createLimiter({ max: limits.resetPerIp ?? 20, windowMs: 15 * 60 * 1000 });
+  const emailChangePerAccount = createLimiter({ max: limits.emailChangePerAccount ?? 3, windowMs: 3600 * 1000 });
+  const renamePerAccount = createLimiter({ max: limits.renamePerAccount ?? 3, windowMs: 24 * 3600 * 1000 });
   const verifyPerAccount = createLimiter({ max: limits.verifyPerAccount ?? 3, windowMs: 3600 * 1000 });
   const reportPerIp = createLimiter({ max: limits.reportPerIp ?? 30, windowMs: 3600 * 1000 });
 
@@ -237,7 +239,11 @@ module.exports = function registerAccounts(app, ctx) {
     res.append('Set-Cookie', serializeCookie(SESSION_COOKIE, token, { maxAge: SESSION_TTL_MS, secure: secure(req) }));
     return { user: selfJson(user), csrfToken: csrf };
   };
-  const selfJson = (user) => (user ? { ...userJson(user, { self: true, identities: auth.identitiesOf(user.id) }), organizations: auth.orgs.of(user.id) } : null);
+  const selfJson = (user) => (user ? {
+    ...userJson(user, { self: true, identities: auth.identitiesOf(user.id) }),
+    organizations: auth.orgs.of(user.id),
+    pendingEmail: auth.pendingEmail(user.id),
+  } : null);
   const jsonOnly = (req, res) => {
     if (req.is('application/json')) return true;
     fail(res, 415, 'Bitte als JSON senden');
@@ -435,6 +441,108 @@ module.exports = function registerAccounts(app, ctx) {
     } catch (err) {
       next(err);
     }
+  });
+
+  /* ---------- Display name ---------- */
+
+  app.patch('/api/auth/me', (req, res) => {
+    if (!jsonOnly(req, res)) return;
+    if (!req.user) return fail(res, 401, 'Bitte zuerst anmelden');
+    if (req.body?.name === undefined) return fail(res, 400, 'Bitte einen neuen Namen angeben (name)');
+    const wait = renamePerAccount.blocked(req.user.id);
+    if (wait) {
+      return res.set('Retry-After', String(wait)).status(429)
+        .json({ error: `Der Name wurde heute schon mehrmals geändert – wieder möglich in ${Math.ceil(wait / 3600)} Stunden` });
+    }
+    const r = auth.rename(req.user, req.body.name);
+    if (r.error) return fail(res, r.status, r.error);
+    renamePerAccount.hit(req.user.id);
+    // The moderation can trace who someone was before (photo credits always show the current name).
+    mod.log(r.user, 'rename', { targetUserId: r.user.id, detail: `${r.previous} → ${r.user.name}` });
+    res.json({ user: selfJson(r.user) });
+  });
+
+  /* ---------- Changing the e-mail address ---------- */
+
+  const notify = (to, subject, lines) => mailer.send({ to, subject, text: lines.join('\n') })
+    .catch((err) => console.error(`E-Mail «${subject}» fehlgeschlagen: ${err.message}`));
+  const masked = (email) => email.replace(/^(.).*(@.*)$/, '$1…$2');
+
+  app.post('/api/auth/email', async (req, res, next) => {
+    if (!jsonOnly(req, res)) return;
+    if (!req.user) return fail(res, 401, 'Bitte zuerst anmelden');
+    const user = req.user;
+    const accountKey = `${req.ip}|${user.email.toLowerCase()}`;
+    const wait = Math.max(loginPerAccount.blocked(accountKey), emailChangePerAccount.blocked(user.id));
+    if (wait) {
+      return res.set('Retry-After', String(wait)).status(429)
+        .json({ error: `Zu viele Versuche – bitte in ${Math.ceil(wait / 60)} Minuten erneut versuchen` });
+    }
+    try {
+      // Same confirmation as for deleting: the password, or the account name without one.
+      const ok = await auth.confirmOwner(user, { password: req.body?.password, name: req.body?.name });
+      if (ok.error) {
+        if (ok.wrong) loginPerAccount.hit(accountKey);
+        return fail(res, ok.status, ok.error);
+      }
+      const r = auth.requestEmailChange(user, req.body?.email);
+      if (r.error) return fail(res, r.status, r.error);
+      emailChangePerAccount.hit(user.id);
+      let verification = 'sent';
+      try {
+        const sent = await mailer.send({
+          to: r.email,
+          subject: 'MyForrest: neue E-Mail-Adresse bestätigen',
+          text: [
+            `Hallo ${user.name}`,
+            '',
+            'Bitte bestätige mit diesem Link, dass dein MyForrest-Konto künftig diese Adresse verwendet:',
+            '',
+            `${baseUrl(req)}/api/auth/email/confirm?token=${encodeURIComponent(r.token)}`,
+            '',
+            'Der Link ist 24 Stunden gültig. Bis dahin bleibt die bisherige Adresse aktiv.',
+            'Hast du nichts angefordert, kannst du diese E-Mail ignorieren.',
+          ].join('\n'),
+        });
+        if (sent?.logged) verification = 'logged';
+      } catch (err) {
+        console.error(`Bestätigung der neuen Adresse für Konto ${user.id} fehlgeschlagen: ${err.message}`);
+        auth.cancelEmailChange(user.id);
+        return fail(res, 502, 'Die E-Mail an die neue Adresse konnte nicht verschickt werden – bitte später erneut versuchen');
+      }
+      // A heads-up to the current address, in case someone else is at the keyboard.
+      notify(user.email, 'MyForrest: Änderung der E-Mail-Adresse angefordert', [
+        `Hallo ${user.name}`,
+        '',
+        `Für dein MyForrest-Konto wurde ein Wechsel auf eine andere E-Mail-Adresse angefordert (${masked(r.email)}).`,
+        'Sie gilt erst, wenn der Link an die neue Adresse geöffnet wird.',
+        '',
+        'Warst du das nicht? Dann melde dich an, ändere dein Passwort und brich die Änderung im Profil ab.',
+      ]);
+      res.json({ pendingEmail: r.email, verification });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.delete('/api/auth/email', (req, res) => {
+    if (!req.user) return fail(res, 401, 'Bitte zuerst anmelden');
+    auth.cancelEmailChange(req.user.id);
+    res.json({ user: selfJson(auth.userById(req.user.id)) });
+  });
+
+  app.get('/api/auth/email/confirm', (req, res) => {
+    res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
+    const r = auth.confirmEmailChange(req.query.token);
+    if (r.error) return res.redirect(303, `/?${new URLSearchParams({ auth_error: r.error })}`);
+    notify(r.previous, 'MyForrest: E-Mail-Adresse geändert', [
+      `Hallo ${r.user.name}`,
+      '',
+      `Dein MyForrest-Konto verwendet ab jetzt eine andere E-Mail-Adresse (${masked(r.user.email)}); an diese Adresse kommt nichts mehr.`,
+      '',
+      'Warst du das nicht? Dann antworte bitte auf diese E-Mail.',
+    ]);
+    res.redirect(303, '/?auth=email-changed');
   });
 
   /* ---------- Deleting the account ---------- */

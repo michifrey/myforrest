@@ -38,7 +38,7 @@ const ROLE_LABEL = { user: 'Mitglied', moderator: 'Moderation', admin: 'Administ
 const ACTION_LABEL = {
   hide: 'ausgeblendet', unhide: 'wieder eingeblendet', dismiss: 'Meldungen verworfen', delete: 'gelöscht', role: 'Rolle geändert',
   protect: 'geschützt', unprotect: 'Schutz aufgehoben', 'pro-verifiziert': 'PRO verifiziert', 'pro-abgelehnt': 'PRO abgelehnt', 'pro-entzogen': 'PRO entzogen',
-  'account-delete': 'Konto gelöscht', 'org-aufgenommen': 'in Organisation aufgenommen', 'org-entfernt': 'aus Organisation entfernt',
+  'account-delete': 'Konto gelöscht', rename: 'Namen geändert', 'org-aufgenommen': 'in Organisation aufgenommen', 'org-entfernt': 'aus Organisation entfernt',
   'org-verlassen': 'Organisation verlassen', 'org-rolle': 'Rolle in Organisation geändert',
 };
 const PROTECT_REASON = { upload: 'beim Hochladen geschützt', art: 'automatisch: seltene oder geschützte Art', pro: 'von einem PRO-Mitglied geschützt', moderation: 'von der Moderation geschützt' };
@@ -723,18 +723,136 @@ profileDialog.innerHTML = `
   <div class="dialog-head mod-head">
     <div>
       <p class="eyebrow">Mein Profil</p>
-      <h2 id="profile-title"></h2>
+      <div class="profile-name">
+        <h2 id="profile-title"></h2>
+        <button type="button" class="link small" id="profile-rename">Name ändern</button>
+      </div>
+      <form id="rename-form" class="rename-form" hidden novalidate>
+        <label class="field"><span>Neuer Anzeigename <em>3–40 Zeichen, wird bei deinen Fotos genannt</em></span>
+          <input name="name" maxlength="40" autocomplete="nickname" required></label>
+        <p class="muted small">Der neue Name steht sofort unter all deinen Fotos. Wer sich mit dem Namen statt der
+          E-Mail-Adresse anmeldet, braucht danach den neuen. Höchstens 3 Änderungen pro Tag.</p>
+        <p id="rename-error" class="auth-error" role="alert" hidden></p>
+        <div class="row">
+          <button type="submit" class="btn primary">Speichern</button>
+          <button type="button" class="link" id="rename-cancel">Abbrechen</button>
+        </div>
+      </form>
+      <p class="profile-email small"><span id="profile-email"></span>
+        <button type="button" class="link small" id="profile-email-change">E-Mail ändern</button></p>
+      <p id="profile-email-pending" class="profile-pending small" hidden></p>
+      <form id="email-form" class="rename-form" hidden novalidate>
+        <label class="field"><span>Neue E-Mail-Adresse</span>
+          <input name="email" type="email" autocomplete="email" maxlength="200" required></label>
+        <label class="field" id="email-password-field"><span>Passwort zur Bestätigung</span>
+          <input name="password" type="password" autocomplete="current-password"></label>
+        <label class="field" id="email-name-field"><span id="email-name-label"></span>
+          <input name="name" autocomplete="off"></label>
+        <p class="muted small">Wir schicken einen Link an die neue Adresse; erst damit gilt sie. Bis dahin bleibt die
+          bisherige aktiv und bekommt einen Hinweis.</p>
+        <p id="email-error" class="auth-error" role="alert" hidden></p>
+        <div class="row">
+          <button type="submit" class="btn primary">Link senden</button>
+          <button type="button" class="link" id="email-cancel">Abbrechen</button>
+        </div>
+      </form>
       <p id="profile-since" class="muted small"></p>
     </div>
-    <button type="button" class="icon" id="profile-close" aria-label="Schliessen">×</button>
+    <button type="button" class="icon" id="profile-close" aria-label="Schliessen" autofocus>×</button>
   </div>
   <div id="profile-stats" class="stats profile-stats"></div>
   <p id="profile-more" class="muted small"></p>
+  <div class="profile-export">
+    <span><b>Meine Daten herunterladen</b> – Konto, Fotos mit Ort und Zeit, Touren als GPX, Fotoaufträge und Meldungen als ZIP</span>
+    <span class="row">
+      <a class="btn secondary small" id="export-full" href="/api/profile/export" download>Mit Originalfotos</a>
+      <a class="btn secondary small" href="/api/profile/export?fotos=0" download>Nur Daten</a>
+    </span>
+  </div>
   <div class="tabs profile-tabs" role="tablist" id="profile-tabs"></div>
   <div id="profile-grid" class="profile-grid" aria-live="polite"></div>
   <div class="row center"><button type="button" class="secondary" id="profile-next" hidden>Weitere Fotos laden</button></div>`;
 document.body.append(profileDialog);
 $('profile-close').addEventListener('click', () => profileDialog.close());
+
+const emailForm = $('email-form');
+/** The address line, and a pending change waiting for its link. */
+function renderEmail() {
+  const u = Account.user;
+  $('profile-email').textContent = `${u.email}${u.emailVerified ? ' ✓' : ' (nicht bestätigt)'}`;
+  const pending = $('profile-email-pending');
+  pending.hidden = !u.pendingEmail;
+  if (u.pendingEmail) {
+    pending.replaceChildren(
+      `Neue Adresse ${u.pendingEmail} wartet auf Bestätigung – bitte den Link in der E-Mail an diese Adresse öffnen. `,
+      el('button', { type: 'button', class: 'link small', text: 'Änderung abbrechen', onclick: cancelEmailChange }),
+    );
+  }
+}
+function showEmailForm(open) {
+  emailForm.hidden = !open;
+  $('profile-email-change').hidden = open;
+  $('email-error').hidden = true;
+  if (!open) return;
+  emailForm.reset();
+  $('email-password-field').hidden = !Account.user.hasPassword;
+  $('email-name-field').hidden = Account.user.hasPassword;
+  $('email-name-label').textContent = `Zur Bestätigung den Kontonamen «${Account.user.name}» eintippen`;
+  emailForm.email.focus();
+}
+async function cancelEmailChange() {
+  try {
+    Account.user = (await api('/api/auth/email', { method: 'DELETE' })).user;
+    renderEmail();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+$('profile-email-change').addEventListener('click', () => showEmailForm(true));
+$('email-cancel').addEventListener('click', () => showEmailForm(false));
+emailForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const r = await jsonPost('/api/auth/email', { email: emailForm.email.value, password: emailForm.password.value, name: emailForm.name.value });
+    Account.user = { ...Account.user, pendingEmail: r.pendingEmail };
+    showEmailForm(false);
+    renderEmail();
+    if (r.verification === 'logged') alert('Auf diesem Server ist kein E-Mail-Versand eingerichtet; der Link steht im Server-Log.');
+  } catch (err) {
+    $('email-error').textContent = err.message;
+    $('email-error').hidden = false;
+  }
+});
+
+const renameForm = $('rename-form');
+function showRename(open) {
+  renameForm.hidden = !open;
+  $('profile-rename').hidden = open;
+  $('rename-error').hidden = true;
+  if (open) {
+    renameForm.name.value = Account.user.name;
+    renameForm.name.focus();
+    renameForm.name.select();
+  }
+}
+$('profile-rename').addEventListener('click', () => showRename(true));
+$('rename-cancel').addEventListener('click', () => showRename(false));
+renameForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const r = await jsonPost('/api/auth/me', { name: renameForm.name.value }, 'PATCH');
+    Account.user = r.user;
+    $('profile-title').textContent = r.user.name;
+    showRename(false);
+    renderNav();
+    fillLicenseSelect();
+    // Photo credits show the current name.
+    await refreshViews();
+  } catch (err) {
+    $('rename-error').textContent = err.message;
+    $('rename-error').hidden = false;
+  }
+});
 let profileFilter = 'alle';
 let profileOffset = 0;
 
@@ -750,6 +868,9 @@ async function openProfile() {
     return;
   }
   $('profile-title').textContent = p.name;
+  showRename(false);
+  showEmailForm(false);
+  renderEmail();
   const span = p.firstAt ? ` · Fotos von ${new Date(p.firstAt).getFullYear()} bis ${new Date(p.lastAt).getFullYear()}` : '';
   $('profile-since').textContent = `Dabei seit ${fmtDate(p.memberSince)}${span}`;
   $('profile-stats').replaceChildren(
@@ -766,6 +887,8 @@ async function openProfile() {
     p.requests.open ? `${p.requests.open === 1 ? '1 eigener Fotoauftrag' : `${p.requests.open} eigene Fotoaufträge`} offen` : '',
   ].filter(Boolean);
   $('profile-more').textContent = parts.join('. ');
+  const mb = p.photoBytes / 1e6;
+  $('export-full').textContent = p.photos ? `Mit Originalfotos (${mb < 1 ? '< 1' : Math.round(mb).toLocaleString('de-CH')} MB)` : 'Mit Originalfotos';
   $('profile-more').hidden = !parts.length;
   const tabs = [['alle', `Alle (${p.photos})`], ...(p.protected ? [['geschuetzt', `Geschützt (${p.protected})`]] : []),
     ...(p.hidden ? [['ausgeblendet', `Ausgeblendet (${p.hidden})`]] : [])];
@@ -1211,6 +1334,8 @@ function authReturn() {
     openAuth('login');
     $('auth-error').textContent = error;
     $('auth-error').hidden = false;
+  } else if (result === 'email-changed' && Account.user) {
+    alert(`Deine E-Mail-Adresse ist jetzt ${Account.user.email}.`);
   } else if (result === 'verified') {
     alert('Danke! Deine E-Mail-Adresse ist bestätigt.');
   } else if (result === 'linked' && provider) {

@@ -1361,6 +1361,18 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 .tile-placeholder { display: grid; place-items: center; height: 100%; padding: 0.8rem; text-align: center; font-size: 0.8rem; color: var(--muted); }
 .profile-empty { grid-column: 1 / -1; display: grid; justify-items: start; gap: 0.6rem; }
 .row.center { justify-content: center; }
+.profile-name { display: flex; align-items: baseline; gap: 0.8rem; flex-wrap: wrap; }
+.rename-form { max-width: 440px; margin: 0.4rem 0 0.6rem; }
+.rename-form .field input { width: 100%; }
+.profile-export {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem 1rem;
+  margin: 1rem 0 0; padding: 0.7rem 0.9rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.85rem;
+}
+.profile-export .row { margin: 0; }
+.btn.small { padding: 0.35rem 0.8rem; font-size: 0.8rem; }
+.btn.secondary { background: var(--surface-2); }
+.profile-email { margin: 0.2rem 0 0; display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: baseline; }
+.profile-pending { margin: 0.4rem 0 0; padding: 0.4rem 0.7rem; border-radius: 10px; background: var(--accent-soft); color: var(--text); }
 
 /* ---------- Drive mode (dashcam, drive.js) ---------- */
 .drive {

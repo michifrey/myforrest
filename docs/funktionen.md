@@ -920,6 +920,26 @@ prüfen lassen muss, gibt es **Organisationen**:
   sich getrennt anzeigen; ausgeblendete erscheinen mit dem Grund, aber ohne Bild, weil ihre Dateien auch der
   Urheberin nicht mehr ausgeliefert werden. Das Profil ist nur für das eigene Konto sichtbar: Eine öffentliche
   Liste aller Fotos einer Person würde ihre regelmässigen Wege und Zeiten verraten.
+- *Meine Daten herunterladen*: Im Profil lädt *Mit Originalfotos* (mit Grössenangabe) oder *Nur Daten* ein
+  ZIP mit allem, was zum Konto gehört: `konto.json` (Name, E-Mail, Rolle, Lizenz, Anmeldungen über
+  Google/GitHub, PRO, Organisationen), `fotos.geojson` (Ort, Zeit, Blickrichtung, Tags, Notiz, Lizenz, Bestimmungen; in QGIS
+  zu öffnen), die Originaldateien unter `fotos/`, die Touren als GPX, Fotoaufträge, eigene Meldungen und
+  gefolgte Spots, dazu eine `LIESMICH.txt`. Nicht enthalten sind der Passwort-Hash, Sitzungen, Push-Schlüssel
+  und Fotos anderer Personen. Das Archiv wird beim Download zusammengestellt und gestreamt, ohne Kompression
+  (Fotos sind schon komprimiert), ab 4 GB als ZIP64; höchstens 5 Exporte pro Stunde. Der Service Worker legt
+  den Download nicht im Cache ab.
+- *E-Mail-Adresse ändern*: Im Profil unter *E-Mail ändern*, bestätigt mit dem Passwort (Konten ohne Passwort
+  tippen ihren Kontonamen ein). Die neue Adresse gilt erst, wenn der Link geöffnet wird, der an sie geht
+  (24 Stunden gültig, einmalig); bis dahin bleibt die bisherige aktiv, bekommt einen Hinweis mit der teilweise
+  verdeckten neuen Adresse, und das Profil zeigt die offene Änderung mit *Änderung abbrechen*. Danach gilt die
+  neue Adresse als bestätigt, offene Bestätigungs- und Reset-Links an die alte verfallen, Sitzungen bleiben,
+  und die alte Adresse erfährt von der Änderung. Höchstens 3 Anfragen pro Stunde; falsche Passwörter zählen
+  wie Fehlversuche beim Anmelden.
+- *Anzeigename ändern*: Im Profil unter *Name ändern*. Es gelten dieselben Regeln wie beim Registrieren
+  (3–40 Zeichen, eindeutig ohne Rücksicht auf Gross-/Kleinschreibung); „Anonym“ und „System“ sind reserviert,
+  weil die App sie selbst anzeigt. Der neue Name steht sofort unter allen eigenen Fotos. Wer sich mit dem Namen
+  statt der E-Mail-Adresse anmeldet, braucht danach den neuen. Höchstens 3 Änderungen pro Tag; jede Änderung
+  steht als „alt → neu“ im Moderationsprotokoll, damit die Moderation Missbrauch nachverfolgen kann.
 - *Konto löschen*: Im Konto-Menü unter *Konto löschen …*, bestätigt mit dem Passwort (Konten ohne Passwort
   tippen ihren Kontonamen ein). Für die eigenen Fotos ist eine ausdrückliche Wahl nötig: **anonym behalten**
   (sie bleiben für die Zeitreihen der Spots erhalten und heissen danach „Anonym“, die Lizenz bleibt) oder
