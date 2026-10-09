@@ -84,8 +84,11 @@ der installierten App, `/?action=fahrt`) zeigt eine dunkle Vollbildansicht für 
 - **Aufnahme**: Die Kamera nach vorn macht alle 2, 3, 5 oder 10 Sekunden ein Bild (Standard 3 s). Das GPS
   zeichnet die Strecke auf (ein Punkt alle 25 m); beim Beenden wird sie als private Tour *Fahrt …* mit der
   Aktivität *Fahrt (Dashcam)* gespeichert, ohne Netz später. Der Bildschirm bleibt an (Wake Lock), weil
-  Browser Kamera und GPS im Hintergrund anhalten. Ein Konto ist nötig.
-- **Auswahl auf dem Gerät** (`public/drive-select.js`): Bei einem Bild alle 3 s kommen an einem Arbeitstag
+  Browser Kamera und GPS im Hintergrund anhalten. Ein Konto ist nötig. In der [Android-App](android.md)
+  laufen Kamera, GPS und Auswahl dagegen im Hintergrund weiter, auch mit gesperrtem Bildschirm oder mit der
+  Navigation im Vordergrund; beenden lässt sich die Fahrt auch in der Benachrichtigung.
+- **Auswahl auf dem Gerät** (`public/drive-select.js`, in der Android-App `DriveSelector.java` mit denselben
+  Regeln und Testfällen): Bei einem Bild alle 3 s kommen an einem Arbeitstag
   rund 10 000 Bilder zusammen, die meisten fast gleich. Vor dem Speichern entscheidet das Handy über jedes:
   - verworfen ohne genaues GPS (über ±50 m), im **Stillstand** (unter 3,6 km/h), wenn es **unscharf** ist
     (Varianz des Laplace-Filters unter 35 % des laufenden Medians) und zwischen zwei behaltenen Bildern;
@@ -959,7 +962,8 @@ wird.
 - **Aufzeichnen**: Das Handy zeichnet die Strecke per GPS auf (Punkte ab ±40 m Genauigkeit, mindestens 4 m
   auseinander, mit Zeit und Höhe). Der Bildschirm bleibt dabei an (Wake Lock), denn Browser stoppen GPS
   für Seiten im Hintergrund. Die Punkte liegen laufend im Browser; nach einem Neuladen lässt sich die
-  Aufzeichnung fortsetzen.
+  Aufzeichnung fortsetzen. In der [Android-App](android.md) läuft die Aufzeichnung im Hintergrund weiter,
+  auch mit gesperrtem Bildschirm oder geschlossener App, und lässt sich in der Benachrichtigung beenden.
 - **Importieren**: GPX (Tracks, Routen oder Wegpunkte), Garmin TCX, KML (LineString und `gx:Track`),
   GeoJSON (LineString, MultiLineString, mit `coordTimes`), NMEA von Dashcams (`.nmea`) und **FIT** direkt
   von Sportuhren und Velocomputern (Garmin, Wahoo, Polar, Coros, Suunto; bis 10 MB), bis 20 000 Punkte. FIT

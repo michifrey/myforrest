@@ -114,7 +114,10 @@ public/offline-queue.js  Warteschlange für Uploads ohne Verbindung (IndexedDB, 
 public/pwa.js        Registrierung, Warteschlangen-Anzeige, Installieren-Knopf, Kamera-Aufnahme im Upload, Erlaubnis für Benachrichtigungen
 public/offline-map.js  Karte und Spots entlang einer Route offline speichern (eigener Cache pro Route)
 public/drive-select.js  Fahrtmodus: welche der Bilder einer Fahrt behalten werden (Spots, Abstand, Stillstand, Schärfe, Differenz-Hash)
-public/drive.js      Fahrtmodus (Handy als Dashcam): Kamera, GPS-Route, Upload über die Warteschlange
+public/drive.js      Fahrtmodus (Handy als Dashcam): Kamera, GPS-Route, Upload über die Warteschlange; in der Android-App nur Anzeige und Upload
+public/native.js     Brücke zur Android-App (nativeApp, im Browser null): Aufzeichnung und Fahrtmodus im Hintergrund
+android/             Android-App (Java, ohne Bibliotheken): WebView mit der Web-App, Dienst im Vordergrund für GPS und Kamera,
+                     DriveSelector.java wie drive-select.js (gemeinsame Testfälle test/fixtures/drive-select-cases.json); siehe android.md
 public/manifest.webmanifest, public/icons/  Web-App-Manifest und App-Icons
 test/                Tests (`npm test`, Node-Testrunner)
 scripts/generate-icons.js  Erzeugt die App-Icons aus dem Logo (`node scripts/generate-icons.js`)

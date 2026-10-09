@@ -5,7 +5,7 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 
 ## Phase 2: Mehr und bessere Fotos
 
-- **Dashcam ausbauen**: Fahrtmodus im Hintergrund (braucht eine native Hülle); das Dashcam-GPS mit echten
+- **Dashcam ausbauen**: das Dashcam-GPS mit echten
   Dateien verschiedener Modelle prüfen (bisher nach den bekannten Formaten mit Testdaten) und weitere Formate
   (z. B. GPS-Spur von Garmin- und Nextbase-Kameras, verschlüsselte Viofo-Daten).
 
@@ -21,10 +21,13 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 - **Eigener Routing-Server**: den ersten Lauf des Image-Workflows und echte Segmente von brouter.de prüfen;
   die Wildruhezonen regelmässig selbst von geo.admin.ch laden statt aus einer Datei; Sperrungen der Forstdienste
   aus ihren eigenen Systemen übernehmen (z. B. Holzschlag-Planung der Kantone).
-- **Touren**: Abgleich mit Strava/Komoot per OAuth (braucht dort registrierte Apps), Aufzeichnung im
-  Hintergrund (braucht eine native Hülle, Browser stoppen GPS im Hintergrund); die Karte kühler Abschnitte
+- **Touren**: Abgleich mit Strava/Komoot per OAuth (braucht dort registrierte Apps); die Karte kühler Abschnitte
   mit Messungen fester Stationen eichen (echte Lufttemperatur statt nur Abweichungen) und nach Jahreszeit und
   Tageszeit trennen (am Mittag im Sommer, in klaren Nächten).
+
+- **Android-App ausbauen**: auf F-Droid bzw. im Play Store veröffentlichen (braucht ein Entwicklerkonto und
+  die Begründung für Kamera und Standort im Hintergrund); Downloads (GPX, Datenexport) und Push-Mitteilungen
+  in der App; dasselbe für iOS (braucht einen Mac mit Xcode und ein Apple-Entwicklerkonto).
 
 - **Landschaften ausbauen**: im Trockengebiet Ausrichtung am Horizont, wo Dünen keine festen Punkte haben,
   und längere Offline-Zeiten; im Gebirge Routing mit SAC-Skala und Gefahrenkarten (Steinschlag, Lawinen);
@@ -70,6 +73,9 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 
 Aus früheren Versionen dieser Roadmap:
 
+- Android-App: die Web-App in einer schlanken Hülle, Fahrtmodus und Tour-Aufzeichnung laufen im Hintergrund
+  weiter (Dienst im Vordergrund mit GPS und Kamera, Auswahl der Fahrtbilder auf dem Gerät mit denselben
+  Testfällen wie im Browser); APK per GitHub-Workflow
 - Doku-Website (Projekt-Wiki) aus `docs/*.md` mit Suche und *Seite bearbeiten*, über GitHub Pages, eigene Domain
   vorbereitet
 

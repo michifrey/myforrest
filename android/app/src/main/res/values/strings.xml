@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="app_name">MyForrest</string>
+  <string name="shortcut_drive">Fahrtmodus</string>
+  <string name="shortcut_drive_long">Fahrtmodus (Dashcam)</string>
+  <string name="shortcut_server">Server wechseln</string>
+</resources>

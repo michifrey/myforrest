@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <style name="Theme.MyForrest" parent="android:Theme.Material.Light.NoActionBar">
+    <item name="android:colorPrimary">#2f5d3a</item>
+    <item name="android:colorPrimaryDark">#1f3d27</item>
+    <item name="android:colorAccent">#c9a227</item>
+    <item name="android:windowBackground">@color/background</item>
+    <item name="android:statusBarColor">#1f3d27</item>
+  </style>
+  <color name="background">#f4f1e8</color>
+</resources>

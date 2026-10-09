@@ -151,6 +151,13 @@ einem Tag mit Tausenden Bildern werden so einige Dutzend, die im Hintergrund hoc
 Screenshot liefert die Testkamera des Browsers das Bild.) In der Zeitreise tragen Bilder aus dem Auto die Marke
 *Fahrt* und lassen sich ausblenden.
 
+<p align="center"><img src="docs/screenshots/android-fahrtmodus.jpg" width="300" alt="Fahrtmodus in der Android-App: die App fotografiert auch bei gesperrtem Bildschirm"></p>
+
+Browser halten Kamera und GPS an, sobald der Bildschirm aus ist. Die **[Android-App](docs/android.md)** zeigt
+dieselbe Web-App und lässt Fahrtmodus und Tour-Aufzeichnung im Hintergrund weiterlaufen, auch mit gesperrtem
+Bildschirm oder mit der Navigation im Vordergrund. Die Auswahl der Bilder trifft dann die App selbst, nach
+denselben Regeln (und Testfällen) wie im Browser; beenden lässt sich die Fahrt auch in der Benachrichtigung.
+
 Vor einer Tour ohne Empfang speichert *Touren & Aufträge → Karte entlang der Route offline speichern* die
 Kartenkacheln eines Korridors um die Route und die Spots daran (mit Vorschaubildern und den Referenzfotos
 für das Kamera-Overlay) auf dem Gerät. Unterwegs zeigt die App Karte und Spots dann auch ohne Netz.
@@ -412,6 +419,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   Organisationen nehmen ihre Mitglieder selbst auf.
 - **[Fahrtmodus](docs/funktionen.md#fahrtmodus-dashcam-im-auto)**: das Handy als Dashcam im Auto, Route
   automatisch, Bilder an Spots und alle 150 m, Stillstand und Doppelte werden schon auf dem Gerät verworfen.
+- **[Android-App](docs/android.md)**: die Web-App als App, Fahrtmodus und Tour-Aufzeichnung laufen im
+  Hintergrund weiter (gesperrter Bildschirm, andere App vorne); APK aus dem GitHub-Workflow.
 - **[Konten und Moderation](docs/funktionen.md#konten-moderation-und-lizenzen)**: Konten mit Rollen, Anmeldung mit E-Mail (Bestätigungslink, Passwort ändern und zurücksetzen, Konto löschen, Profil mit den eigenen Fotos, Export der eigenen Daten) oder über Google, GitHub, Microsoft, SWITCH edu-ID, AGOV und weitere OpenID-Connect-Dienste,
   Lizenz pro Foto, Melden und Moderieren.
 
@@ -444,6 +453,7 @@ entsteht aus `docs/*.md` (MkDocs Material) und wird bei jedem Merge neu veröffe
 | Dokument | Inhalt |
 |----------|--------|
 | [Funktionen im Detail](docs/funktionen.md) | Alle Funktionen mit Verfahren, Schwellenwerten und Grenzen |
+| [Android-App](docs/android.md) | Fahrtmodus und Aufzeichnung im Hintergrund, Installieren, selbst bauen und signieren |
 | [Tech-Onboarding](docs/tech-onboarding.md) | Selbst hosten: Voraussetzungen, Speicherplatz, Lizenzen, Ports, Zertifikate, ausgehende Verbindungen, Checkliste |
 | [Installation und Konfiguration](docs/installation.md) | Voraussetzungen, HTTPS fürs Handy, Umgebungsvariablen, externer Detektor, Phänologie-Daten |
 | [Betrieb, Datenschutz und Datenquellen](docs/betrieb.md) | Hinweise für einen öffentlichen Betrieb, externe Dienste und Quellenangaben |
