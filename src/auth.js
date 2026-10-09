@@ -250,7 +250,8 @@ function createAuth(db, { adminEmail = null } = {}) {
   const userById = { get: (id) => withOrgPro(db, userByIdRow.get(id)) };
   const userByLogin = db.prepare('SELECT * FROM users WHERE email = ? OR name = ?');
 
-  async function register({ email, name, password }) {
+  /** `verified`: the address is already proven (an invitation link sent to it). */
+  async function register({ email, name, password, verified = false }) {
     email = typeof email === 'string' ? email.trim() : '';
     name = cleanName(name);
     if (!EMAIL_RE.test(email) || email.length > 200) return { error: 'Bitte eine gültige E-Mail-Adresse angeben' };
@@ -264,7 +265,7 @@ function createAuth(db, { adminEmail = null } = {}) {
     }
     const hash = await hashPassword(password);
     try {
-      return { user: insertUser({ email, name, hash }) };
+      return { user: insertUser({ email, name, hash, verifiedAt: verified ? Date.now() : null }) };
     } catch {
       // Lost a race against a concurrent registration with the same address or name.
       return { error: 'E-Mail-Adresse oder Name ist bereits vergeben', status: 409 };
