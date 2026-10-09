@@ -71,7 +71,10 @@ public class MainActivity extends Activity {
     progress.setVisibility(View.GONE);
     root.addView(progress, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,
         Math.round(4 * getResources().getDisplayMetrics().density), Gravity.TOP));
-    start = new StartScreen(this, this::connected);
+    start = new StartScreen(this, this::connected, () -> {
+      start.hide();
+      load(getIntent());
+    });
     root.addView(start.view());
     setContentView(root);
 
@@ -91,8 +94,11 @@ public class MainActivity extends Activity {
     web.setWebChromeClient(new Chrome());
 
     server = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_SERVER, BuildConfig.SERVER_URL);
-    if (server == null || server.isEmpty()) start.show(null, null);
-    else load(getIntent());
+    // With a saved server the start screen checks it first: a server that is gone or a wrong address
+    // otherwise only gives a white page.
+    boolean change = "server".equals(getIntent().getStringExtra("action"));
+    if (server == null || server.isEmpty() || change) start.show(server, null);
+    else start.connect(server);
   }
 
   @Override
@@ -134,12 +140,13 @@ public class MainActivity extends Activity {
     start.show(server, null);
   }
 
-  /** The start screen checked the address: remembered, and the page is loaded. */
+  /** The start screen checked the address: remembered, and the page is loaded (with a shortcut's action). */
   private void connected(String address) {
     server = address;
     getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_SERVER, server).apply();
     start.hide();
-    load(null);
+    Intent i = getIntent();
+    load(i != null && "server".equals(i.getStringExtra("action")) ? null : i);
   }
 
   /* ---------- Recording ---------- */
@@ -291,6 +298,12 @@ public class MainActivity extends Activity {
     @Override
     public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
       pageOrigin = origin(Uri.parse(url));
+    }
+
+    @Override
+    public void onReceivedHttpError(WebView view, WebResourceRequest request, android.webkit.WebResourceResponse response) {
+      if (!request.isForMainFrame() || response.getStatusCode() < 500) return;
+      start.show(server, "Der Server antwortet mit einem Fehler (HTTP " + response.getStatusCode() + ").");
     }
 
     @Override
