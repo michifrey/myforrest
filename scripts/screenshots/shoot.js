@@ -1,6 +1,6 @@
 'use strict';
 // Takes the README screenshots from the demo server (see README.md here).
-// Usage: node shoot.js [hero map spot satellite sun species vektor touren schutz konto timelapse compare upload mobile]
+// Usage: node shoot.js [hero map spot satellite sun species vektor touren schutz konto profil timelapse compare upload mobile]
 const path = require('path');
 const fs = require('fs');
 const { execFileSync } = require('child_process');
@@ -237,6 +237,43 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await settle(page, 1000);
     await page.locator('#delete-dialog').screenshot({ path: out('konto-loeschen.png') });
     await kctx.close();
+  }
+
+  if (want('profil')) {
+    // The profile of a member. The demo photos are anonymous: the scene lends the member a selection of
+    // them (newest first) and matching figures, without changing the database.
+    const spots = await (await fetch(`${BASE}/api/spots`)).json();
+    const photos = [];
+    for (const s of spots.slice(0, 14)) {
+      const spot = await (await fetch(`${BASE}/api/spots/${s.id}`)).json();
+      for (const ph of spot.photos.slice(-2)) {
+        photos.push({ id: ph.id, spotId: spot.id, spotPhotos: spot.photos.length, url: ph.url, thumbUrl: ph.thumbUrl, largeUrl: ph.largeUrl,
+          takenAt: ph.takenAt, activity: ph.activity, panorama: ph.panorama, tags: ph.tags, license: ph.license, hidden: false, protected: false });
+      }
+    }
+    photos.sort((a, b) => b.takenAt.localeCompare(a.takenAt));
+    const years = Object.entries(photos.reduce((acc, ph) => ({ ...acc, [ph.takenAt.slice(0, 4)]: (acc[ph.takenAt.slice(0, 4)] || 0) + 1 }), {}))
+      .map(([year, n]) => ({ year: Number(year), photos: n })).sort((a, b) => a.year - b.year);
+    const profile = {
+      name: 'Revierförsterin', memberSince: '2019-04-02T08:00:00.000Z', photos: photos.length,
+      spots: new Set(photos.map((ph) => ph.spotId)).size, repeatSpots: 9, hidden: 0, protected: 0,
+      firstAt: photos.at(-1).takenAt, lastAt: photos[0].takenAt, years,
+      activities: Object.entries(photos.reduce((acc, ph) => ({ ...acc, [ph.activity || 'sonstiges']: (acc[ph.activity || 'sonstiges'] || 0) + 1 }), {}))
+        .map(([activity, n]) => ({ activity, photos: n })).sort((a, b) => b.photos - a.photos),
+      tracks: 3, requests: { open: 1, done: 2, fulfilled: 4 }, followedSpots: 6,
+    };
+    const pctx = await desktop(browser);
+    const page = await pctx.newPage();
+    await page.route('**/api/profile', (r) => r.fulfill({ json: profile }));
+    await page.route('**/api/profile/photos?*', (r) => r.fulfill({ json: { total: photos.length, offset: 0, photos } }));
+    await page.goto(`${BASE}/`);
+    await page.evaluate(() => fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: 'revier@example.org', password: 'demo-passwort' }) }));
+    // Opening /#profil on load opens the profile (a hash change alone does not reload the page).
+    await page.goto(`${BASE}/#profil`);
+    await page.reload();
+    await settle(page, 3500);
+    await page.locator('#profile-dialog').screenshot({ path: out('profil.jpg'), ...jpg });
+    await pctx.close();
   }
 
   await browser.close();

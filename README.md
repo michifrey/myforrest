@@ -250,11 +250,18 @@ werden beim Laden einer Liste nachträglich geschützt.
 
 Ein **Konto** legt man mit E-Mail und Passwort an oder mit einem Klick über **Google** oder **GitHub**
 (links). Nach der Registrierung kommt ein **Bestätigungslink** per E-Mail; bis dahin erinnert das Konto-Menü
-daran (rechts). Ein vergessenes Passwort lässt sich per Link **zurücksetzen**, im Menü **ändern**, und
+daran (Mitte). Ein vergessenes Passwort lässt sich per Link **zurücksetzen**, im Menü **ändern**, und
 Google oder GitHub lassen sich mit einem bestehenden Konto **verknüpfen**. Wer geht, **löscht das Konto**
 selbst und entscheidet dabei, ob die eigenen Fotos anonym bleiben oder mitgelöscht werden (rechts). Uploads ohne Konto bleiben
 möglich, ausser der Betrieb verlangt eines (`REQUIRE_LOGIN`) oder eine bestätigte Adresse
 (`REQUIRE_VERIFIED_EMAIL`).
+
+<p align="center"><img src="docs/screenshots/profil.jpg" width="720" alt="Profilseite mit Zahlen und den eigenen Fotos"></p>
+
+Unter **Mein Profil** stehen die eigenen Beiträge: wie viele Fotos und Spots, wie viele Zeitreihen man
+fortgesetzt und wie viele Fotoaufträge man erledigt hat, und alle eigenen Fotos, das neueste zuerst. Ein Klick
+öffnet den Spot. Das Profil sieht nur, wem es gehört; eine öffentliche Liste aller Fotos einer Person würde
+zeigen, wo und wann sie regelmässig unterwegs ist.
 
 ## Was MyForrest kann
 
@@ -292,7 +299,7 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   ohne Zeit und Namen und Vorschläge entlang der eigenen Route.
 - **[Geschützte Funde](docs/funktionen.md#geschützte-funde-und-pro-mitglieder)**: seltene Arten und Pilzstellen
   nur für verifizierte PRO-Mitglieder (Forstdienst, Naturschutz), öffentlich nur als 5-km-Raster.
-- **[Konten und Moderation](docs/funktionen.md#konten-moderation-und-lizenzen)**: Konten mit Rollen, Anmeldung mit E-Mail (Bestätigungslink, Passwort ändern und zurücksetzen, Konto löschen) oder über Google und GitHub,
+- **[Konten und Moderation](docs/funktionen.md#konten-moderation-und-lizenzen)**: Konten mit Rollen, Anmeldung mit E-Mail (Bestätigungslink, Passwort ändern und zurücksetzen, Konto löschen, Profil mit den eigenen Fotos) oder über Google und GitHub,
   Lizenz pro Foto, Melden und Moderieren.
 
 ## Schnellstart

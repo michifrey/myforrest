@@ -1324,3 +1324,27 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 .pro-cell .danger { color: var(--danger); }
 .pro-renewal { color: var(--gold); font-weight: 600; }
 .lists-import { display: block; margin-top: 0.8rem; }
+
+/* Own profile */
+.profile-dialog { width: min(960px, calc(100vw - 32px)); }
+.profile-stats { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+#profile-more { margin: 0.8rem 0 0; }
+.profile-tabs { margin: 1rem 0 0; }
+.profile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 0.6rem; margin: 1rem 0; }
+.profile-tile {
+  position: relative; display: block; padding: 0; overflow: hidden; border-radius: 12px; aspect-ratio: 4 / 3;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text); text-align: left; cursor: pointer;
+}
+.profile-tile img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.3s; }
+.profile-tile:hover img { transform: scale(1.04); }
+.profile-tile .tile-caption {
+  position: absolute; inset: auto 0 0 0; padding: 1.2rem 0.5rem 0.4rem; font-size: 0.75rem; color: #fff;
+  background: linear-gradient(transparent, rgb(0 0 0 / 0.65));
+}
+.profile-tile .tile-badges { position: absolute; top: 0.4rem; left: 0.4rem; display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.profile-tile .tile-badge { font-size: 0.68rem; font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 999px; background: rgb(0 0 0 / 0.55); color: #fff; }
+.profile-tile.is-hidden { cursor: default; }
+.profile-tile.is-hidden .tile-caption { color: var(--text); background: none; }
+.tile-placeholder { display: grid; place-items: center; height: 100%; padding: 0.8rem; text-align: center; font-size: 0.8rem; color: var(--muted); }
+.profile-empty { grid-column: 1 / -1; display: grid; justify-items: start; gap: 0.6rem; }
+.row.center { justify-content: center; }
