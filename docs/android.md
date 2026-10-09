@@ -17,9 +17,11 @@ wie im Browser. Neue Funktionen kommen deshalb ohne neue App-Version: Die App l�
 
 ## Installieren
 
-1. Die APK herunterladen: *Actions → Android-App →* letzter Lauf auf `main` *→ Artifacts*
-   (`myforrest-release-apk`, oder `myforrest-debug-apk` zum Ausprobieren). Wer selbst baut, siehe unten.
-2. Auf dem Handy öffnen und die Installation aus dieser Quelle erlauben.
+1. Auf dem Handy die neueste Version laden:
+   **[myforrest.apk](https://github.com/michifrey/myforrest/releases/latest/download/myforrest.apk)**
+   (alle Versionen unter [Releases](https://github.com/michifrey/myforrest/releases)). Wer selbst baut, siehe unten.
+2. Die Datei öffnen und die Installation aus dieser Quelle erlauben. Steht im Release *Testversion
+   (Debug-Signatur)*, vor einem Update die alte Version deinstallieren (siehe [Auf GitHub](#auf-github)).
 3. Beim ersten Start fragt die App nach der **Adresse des Servers** (z. B. `https://myforrest.example.org`),
    ausser sie wurde beim Bauen fest eingetragen. Wechseln lässt sie sich später über die Verknüpfung
    *Server wechseln* (lange auf das App-Symbol drücken).
@@ -121,9 +123,18 @@ cd android && ./gradlew test
 ### Auf GitHub
 
 Der Workflow *Android-App* (`.github/workflows/android.yml`) läuft bei Änderungen an `android/`, an
-`public/drive-select.js` oder an den Testfällen: Tests, Debug-APK als Artifact. Auf `main` baut er zusätzlich
-eine signierte Release-APK, wenn diese Einstellungen gesetzt sind (*Settings → Secrets and variables →
-Actions*):
+`public/drive-select.js` oder an den Testfällen (und von Hand: *Actions → Android-App → Run workflow*):
+
+- **Pull Request**: Tests, Debug-APK als Artifact zum Ausprobieren.
+- **`main`**: zusätzlich ein **Release** auf der Seite [Releases](https://github.com/michifrey/myforrest/releases)
+  mit der Datei `myforrest.apk`, Version `1.0.<Laufnummer>`, Tag `android-1.0.<Laufnummer>`. Die neueste ist
+  immer unter `…/releases/latest/download/myforrest.apk` zu haben.
+
+Ohne eigenen Schlüssel enthält das Release die Debug-APK. Die ist bei jedem Lauf mit einem anderen Schlüssel
+signiert, Android lehnt ein Update darüber deshalb ab: erst deinstallieren, dann die neue installieren (die
+Aufzeichnungen auf dem Gerät gehen dabei verloren, hochgeladene Fotos und gespeicherte Touren nicht). Mit
+eigenem Schlüssel ist es eine signierte Release-APK, und Updates gehen direkt. Die Einstellungen dafür
+(*Settings → Secrets and variables → Actions*):
 
 | Name | Art | Inhalt |
 |------|-----|--------|
@@ -133,3 +144,17 @@ Actions*):
 
 Einen Schlüssel erzeugt `keytool -genkeypair -v -keystore release.jks -alias myforrest -keyalg RSA -keysize 4096
 -validity 10000`. Gut aufbewahren: Updates einer installierten App müssen mit demselben Schlüssel signiert sein.
+
+## Und das iPhone?
+
+Auf dem iPhone bleibt MyForrest vorerst die Web-App: in Safari öffnen, *Teilen → Zum Home-Bildschirm*. Eine
+App zum Herunterladen von GitHub gibt es dort nicht, und auch eine eigene App würde nicht alles lösen:
+
+- **Installieren**: iOS installiert Apps nur aus dem App Store, über TestFlight oder für einzeln
+  eingetragene Geräte. Alle Wege brauchen ein Apple-Entwicklerkonto (99 US-Dollar im Jahr) und einen Mac mit
+  Xcode zum Signieren; eine Datei auf der Releases-Seite lässt sich nicht einfach öffnen und installieren.
+- **Fahrtmodus**: iOS erlaubt einer App die Kamera nur, solange sie im Vordergrund ist. Fotografieren mit
+  gesperrtem Bildschirm geht auf dem iPhone grundsätzlich nicht, auch nicht mit einer eigenen App.
+- **Touren aufzeichnen**: Das ginge mit einer App (Standort im Hintergrund ist erlaubt).
+
+Eine iOS-App mit Aufzeichnung im Hintergrund steht in der [Roadmap](roadmap.md).

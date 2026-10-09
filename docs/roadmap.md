@@ -27,7 +27,9 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 
 - **Android-App ausbauen**: auf F-Droid bzw. im Play Store veröffentlichen (braucht ein Entwicklerkonto und
   die Begründung für Kamera und Standort im Hintergrund); Downloads (GPX, Datenexport) und Push-Mitteilungen
-  in der App; dasselbe für iOS (braucht einen Mac mit Xcode und ein Apple-Entwicklerkonto).
+  in der App; eine iOS-App für die Tour-Aufzeichnung im Hintergrund (braucht einen Mac mit Xcode und ein
+  Apple-Entwicklerkonto; den Fahrtmodus mit gesperrtem Bildschirm erlaubt iOS nicht, die Kamera geht dort nur im
+  Vordergrund).
 
 - **Landschaften ausbauen**: im Trockengebiet Ausrichtung am Horizont, wo Dünen keine festen Punkte haben,
   und längere Offline-Zeiten; im Gebirge Routing mit SAC-Skala und Gefahrenkarten (Steinschlag, Lawinen);

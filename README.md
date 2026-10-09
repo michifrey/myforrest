@@ -157,6 +157,8 @@ Browser halten Kamera und GPS an, sobald der Bildschirm aus ist. Die **[Android-
 dieselbe Web-App und lässt Fahrtmodus und Tour-Aufzeichnung im Hintergrund weiterlaufen, auch mit gesperrtem
 Bildschirm oder mit der Navigation im Vordergrund. Die Auswahl der Bilder trifft dann die App selbst, nach
 denselben Regeln (und Testfällen) wie im Browser; beenden lässt sich die Fahrt auch in der Benachrichtigung.
+Die neueste Version liegt immer unter
+**[Releases → myforrest.apk](https://github.com/michifrey/myforrest/releases/latest/download/myforrest.apk)**.
 
 Vor einer Tour ohne Empfang speichert *Touren & Aufträge → Karte entlang der Route offline speichern* die
 Kartenkacheln eines Korridors um die Route und die Spots daran (mit Vorschaubildern und den Referenzfotos
@@ -420,7 +422,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
 - **[Fahrtmodus](docs/funktionen.md#fahrtmodus-dashcam-im-auto)**: das Handy als Dashcam im Auto, Route
   automatisch, Bilder an Spots und alle 150 m, Stillstand und Doppelte werden schon auf dem Gerät verworfen.
 - **[Android-App](docs/android.md)**: die Web-App als App, Fahrtmodus und Tour-Aufzeichnung laufen im
-  Hintergrund weiter (gesperrter Bildschirm, andere App vorne); APK aus dem GitHub-Workflow.
+  Hintergrund weiter (gesperrter Bildschirm, andere App vorne); Download unter
+  [Releases](https://github.com/michifrey/myforrest/releases/latest/download/myforrest.apk).
 - **[Konten und Moderation](docs/funktionen.md#konten-moderation-und-lizenzen)**: Konten mit Rollen, Anmeldung mit E-Mail (Bestätigungslink, Passwort ändern und zurücksetzen, Konto löschen, Profil mit den eigenen Fotos, Export der eigenen Daten) oder über Google, GitHub, Microsoft, SWITCH edu-ID, AGOV und weitere OpenID-Connect-Dienste,
   Lizenz pro Foto, Melden und Moderieren.
 
