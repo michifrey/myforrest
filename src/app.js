@@ -11,7 +11,7 @@ const { openDb, transaction } = require('./db');
 const { distanceM, isValidCoord, positionAt } = require('./geo');
 const { lenientFetch } = require('./lenient-fetch');
 const { createWildlife } = require('./wildlife');
-const { parseGpx } = require('./gpx');
+const { parseTrackPoints } = require('./gpx');
 const { readPhotoMeta, imageExtension } = require('./exif');
 const { assignSpot, refreshSpot, backfillSpotHeadings, planSplit, splitSpot, HEADING_TOLERANCE_DEG } = require('./spots');
 const { isHeic, heicExif, heicToJpeg } = require('./heic');
@@ -670,7 +670,7 @@ function createApp({
     // View direction from the device (drive mode: the course) when the picture has none in its EXIF.
     const sentHeading = b.heading !== undefined && b.heading !== '' && Number.isFinite(Number(b.heading)) ? ((Number(b.heading) % 360) + 360) % 360 : null;
     const nearSpot = (p) => distanceM(p, targetSpot) <= Math.max(4 * spotRadiusM, 100);
-    const track = gpxFile ? parseGpx(await fsp.readFile(gpxFile.path, 'utf8')) : [];
+    const track = gpxFile ? parseTrackPoints(await fsp.readFile(gpxFile.path)) : [];
     if (gpxFile && !track.length) {
       return [400, { error: 'GPX-Datei enthält keine Punkte mit Zeitstempel' }];
     }
@@ -1129,7 +1129,7 @@ function createApp({
   app.locals.push = push;
   const vegetation = require('./routes/vegetation')(app, { db, uploadDir, background, fetchImpl: weatherFetch, push, accounts });
   Object.assign(tours, require('./routes/tracks')(app, {
-    db, spotRadiusM, satelliteAlerts: vegetation.alerts, routerUrl, routerFetch, routerProfile, accounts, wildlife,
+    db, spotRadiusM, satelliteAlerts: vegetation.alerts, routerUrl, routerFetch, routerProfile, accounts, wildlife, elevation: elevationService, push,
   }));
   require('./routes/analysis')(app, {
     db, uploadDir, getPhoto, idParam, background, changeBetween, spotTrees, terrainOf, refreshIrregularities, detectorUrl, detectorFetch,

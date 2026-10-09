@@ -78,7 +78,8 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/auth/oauth/:provider`  | Anmelden mit `google`, `github`, `microsoft`, `eduid`, `agov` oder `oidc`: leitet zum Anbieter weiter |
 | `GET`    | `/api/auth/oauth/:provider/callback` | Rückkehr vom Anbieter: meldet an, legt ein Konto an oder verknüpft (mit Sitzung); leitet nach `/?auth=ok\|created\|linked` bzw. `/?auth_error=…` |
 | `DELETE` | `/api/auth/identities/:provider` | Anmeldung über einen Anbieter vom eigenen Konto trennen (nicht die einzige) |
-| `POST`   | `/api/tracks/parse`          | GPX, TCX, KML oder GeoJSON lesen (`{ text, filename }`), ohne zu speichern: Punkte, Name, Format, Länge |
+| `POST`   | `/api/tracks/parse`          | GPX, TCX, KML, GeoJSON oder NMEA (`{ text, filename }`) bzw. FIT (`{ base64, filename }`) lesen, ohne zu speichern: Punkte, Name, Format, Länge |
+| `POST`   | `/api/route-profile`         | Höhenprofil einer Route (`{ points: [[lat, lon, ele?], …] }`): `samples` (`d`, `ele`), `ascent`, `descent`, `min`, `max`, `source` (`route` = eigene Höhen, `modell` = Höhenmodell) |
 | `GET`    | `/api/tracks`                | Öffentliche Touren (Name, Länge, Start nach der 200-m-Privatzone, Besitzer), `?bbox=w,s,e,n`; `?mine=1` die eigenen |
 | `POST`   | `/api/tracks`                | Tour speichern (Konto nötig): `{ name, kind: gezeichnet\|aufgezeichnet\|importiert, activity, visibility: privat\|oeffentlich, points: [[lat, lon, ele, time], …] }` |
 | `GET`    | `/api/tracks/:id`            | Tour mit Punkten; für andere ohne Zeiten und ohne die ersten und letzten 200 m |
@@ -88,8 +89,8 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/route?points=lat,lon;lat,lon` | Weg zwischen Wegpunkten vom Routing-Dienst (`ROUTER_URL`, Profil `ROUTER_PROFILE`); 501 ohne Dienst. Wildruhezonen in der Schutzzeit gehen als Sperrflächen mit: `wildlifeZones` (umgangen), `insideWildlifeZones` (ein Wegpunkt liegt darin) |
 | `GET`    | `/api/wildlife-zones?bbox=w,s,e,n` | Wildruhezonen in der Schutzzeit als GeoJSON (`name`, `season`), für die Karte; `wildlifeZones` in `/api/config` sagt, ob welche hinterlegt sind |
 | `POST`   | `/api/route-suggestions`     | Fotoaufträge, Spots mit Satelliten-Frühwarnung und lange nicht besuchte Spots nahe einer Route (`{ points, maxDistanceM }`), mit Abstand und Kilometer; die Route wird nicht gespeichert |
-| `GET`    | `/api/photo-requests`        | Offene Fotoaufträge (`?status=alle` auch erledigte), ohne Namen der anfragenden Person |
-| `POST`   | `/api/photo-requests`        | Fotoauftrag: `{ lat, lon, heading?, title, note? }` oder `{ spotId, title }` |
+| `GET`    | `/api/photo-requests`        | Offene, nicht abgelaufene Fotoaufträge (`?status=alle` auch erledigte und abgelaufene, `status: 'abgelaufen'`), mit `expiresAt`, ohne Namen der anfragenden Person |
+| `POST`   | `/api/photo-requests`        | Fotoauftrag: `{ lat, lon, heading?, title, note?, expiresInDays? }` oder `{ spotId, title }`; `expiresInDays` 7, 30, 90 oder 365, leer = bis erledigt. Wer ihn erstellt hat, bekommt beim Erledigen eine Push-Nachricht |
 | `DELETE` | `/api/photo-requests/:id`    | Auftrag zurückziehen (wer ihn erstellt hat, oder Moderation) |
 | `POST`   | `/api/photos/:id/report`     | Foto melden (`{ reason, note }`), auch ohne Konto        |
 | `GET`    | `/api/moderation/queue`      | Moderation: offene Meldungen pro Foto und ausgeblendete Fotos |

@@ -34,7 +34,7 @@
     drawing: true, // clicks on the map add waypoints while the route tab is open
     follow: true, // "Magnet": follow paths whenever the server has a routing service
     route: emptyRoute(),
-    requests: [],
+    requests: [], myRequests: [],
     suggestions: [],
     maxDistanceM: 150,
     picking: false, // choosing the place of a new request
@@ -172,6 +172,80 @@
     drawRoute();
     renderRoute();
     scheduleSuggestions();
+    scheduleProfile();
+  }
+
+  /* ---------- Elevation profile ---------- */
+
+  const profileMarker = L.circleMarker([0, 0], { radius: 6, className: 'profile-here', interactive: false });
+  let profileTimer = null;
+  let profileKey = '';
+  /** Asks for the profile when the route has changed (during a recording at most every 30 s). */
+  function scheduleProfile() {
+    clearTimeout(profileTimer);
+    const pts = routePoints();
+    if (pts.length < 2 || routeLength(pts) < 100) {
+      $('tour-profile').hidden = true;
+      profileKey = '';
+      return;
+    }
+    profileTimer = setTimeout(loadProfile, T.recorder ? 30000 : 600);
+  }
+  async function loadProfile() {
+    const pts = routePoints();
+    const key = `${pts.length}:${pts[0].lat},${pts[0].lon}:${pts.at(-1).lat},${pts.at(-1).lon}`;
+    if (key === profileKey) return;
+    profileKey = key;
+    // At most 2000 points go along; the server samples them anyway.
+    const step = Math.ceil(pts.length / 2000);
+    const sent = pts.filter((_, i) => i % step === 0 || i === pts.length - 1).map((p) => [p.lat, p.lon, Number.isFinite(p.ele) ? p.ele : null]);
+    try {
+      renderProfile(await json('/api/route-profile', { points: sent }), pts);
+    } catch {
+      $('tour-profile').hidden = true;
+    }
+  }
+  function renderProfile(pr, pts) {
+    const box = $('tour-profile');
+    const z = pr.samples.map((s) => s.ele).filter(Number.isFinite);
+    if (z.length < 2) { box.hidden = true; return; }
+    const W = 300;
+    const H = 64;
+    const lo = Math.min(...z);
+    const hi = Math.max(...z, lo + 20); // flat routes do not look like mountains
+    const total = pr.samples.at(-1).d || 1;
+    const x = (d) => (d / total) * W;
+    const y = (e) => H - 4 - ((e - lo) / (hi - lo)) * (H - 10);
+    const line = pr.samples.filter((s) => Number.isFinite(s.ele)).map((s) => `${x(s.d).toFixed(1)},${y(s.ele).toFixed(1)}`);
+    const svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Höhenprofil von ${pr.min} bis ${pr.max} m">`
+      + `<polygon class="profile-area" points="0,${H} ${line.join(' ')} ${W},${H}"/><polyline class="profile-line" points="${line.join(' ')}"/>`
+      + '<line class="profile-cursor" x1="-10" x2="-10" y1="0" y2="64"/></svg>';
+    box.innerHTML = svg;
+    box.append(el('div', { class: 'profile-figures small' }, [
+      el('span', { text: `↑ ${pr.ascent} m` }), el('span', { text: `↓ ${pr.descent} m` }),
+      el('span', { class: 'muted', text: `${pr.min}–${pr.max} m ü. M.${pr.source === 'modell' ? ' · Höhenmodell' : ''}` }),
+    ]));
+    box.hidden = false;
+    // Hover: where on the route, at what height.
+    const svgEl = box.querySelector('svg');
+    const cursor = box.querySelector('.profile-cursor');
+    const cum = cumulative(pts);
+    const at = (d) => {
+      let i = cum.findIndex((c) => c >= d);
+      if (i <= 0) i = Math.max(1, i);
+      const f = (d - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1);
+      return [pts[i - 1].lat + (pts[i].lat - pts[i - 1].lat) * f, pts[i - 1].lon + (pts[i].lon - pts[i - 1].lon) * f];
+    };
+    svgEl.addEventListener('pointermove', (e) => {
+      const r = svgEl.getBoundingClientRect();
+      const d = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * total;
+      const s = pr.samples.reduce((a, b) => (Math.abs(b.d - d) < Math.abs(a.d - d) ? b : a));
+      cursor.setAttribute('x1', x(d)); cursor.setAttribute('x2', x(d));
+      svgEl.setAttribute('aria-label', `km ${(d / 1000).toFixed(1)}: ${Math.round(s.ele)} m ü. M.`);
+      box.title = `km ${(d / 1000).toFixed(1)} · ${Math.round(s.ele)} m ü. M.`;
+      profileMarker.setLatLng(at(d * (cum.at(-1) / total))).addTo(map);
+    });
+    svgEl.addEventListener('pointerleave', () => { profileMarker.remove(); cursor.setAttribute('x1', -10); cursor.setAttribute('x2', -10); });
   }
 
   /* ---------- Drawing on the map ---------- */
@@ -284,7 +358,18 @@
     if (file.size > 14 * 1024 * 1024) return setStatus('Datei zu gross (max. 14 MB).');
     setStatus(`Lese ${file.name} …`);
     try {
-      const t = await json('/api/tracks/parse', { text: await file.text(), filename: file.name });
+      // FIT is binary: sent as base64 (max. 10 MB), everything else as text.
+      const fit = /\.fit$/i.test(file.name);
+      if (fit && file.size > 10 * 1024 * 1024) return setStatus('FIT-Datei zu gross (max. 10 MB).');
+      const body = fit
+        ? { base64: await new Promise((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(String(r.result).split(',')[1] || '');
+          r.onerror = () => reject(r.error);
+          r.readAsDataURL(file);
+        }), filename: file.name }
+        : { text: await file.text(), filename: file.name };
+      const t = await json('/api/tracks/parse', body);
       setRoute({ raw: t.points, kind: 'importiert', name: t.name || file.name, hasTime: t.hasTime });
       setStatus(`${t.points.length} Punkte importiert (${t.format.toUpperCase()}${t.hasTime ? ', mit Zeitstempeln' : ''}).`);
     } catch (err) {
@@ -393,6 +478,11 @@
   const requestMarkers = new Map();
   async function loadRequests() {
     try { T.requests = await api('/api/photo-requests'); } catch { T.requests = []; }
+    // With an account: the own requests also when done or run out.
+    T.myRequests = [];
+    if (window.Account?.user) {
+      try { T.myRequests = (await api('/api/photo-requests?status=alle')).filter((r) => r.own); } catch { /* not shown */ }
+    }
     drawRequests();
     if (T.tab === 'auftraege') renderRequests();
   }
@@ -403,7 +493,7 @@
       el('p', { class: 'eyebrow', text: r.protected ? 'Fotoauftrag · nur PRO' : 'Fotoauftrag' }),
       el('strong', { text: r.title }),
       r.note ? el('p', { class: 'small', text: r.note }) : '',
-      el('p', { class: 'muted small', text: `${dir} · seit ${fmtDate(r.createdAt)}${r.spotId ? ` · Spot ${r.spotId}` : ''}` }),
+      el('p', { class: 'muted small', text: `${dir} · seit ${fmtDate(r.createdAt)}${r.expiresAt ? ` · bis ${fmtDate(r.expiresAt)}` : ''}${r.spotId ? ` · Spot ${r.spotId}` : ''}` }),
       el('div', { class: 'req-actions' }, [
         el('button', { type: 'button', class: 'btn primary', text: 'Foto dafür hochladen', onclick: () => uploadFor(r) }),
         r.spotId ? el('button', { type: 'button', class: 'secondary', text: 'Spot öffnen', onclick: () => openSpot(r.spotId) }) : '',
@@ -465,6 +555,9 @@
         ...(Account.user && (Account.user.pro || ['moderator', 'admin'].includes(Account.user.role)) ? [
           el('label', { class: 'toggle small' }, [el('input', { type: 'checkbox', id: 'req-protected' }), ' Nur für PRO-Mitglieder (geschützter Fund)']),
         ] : []),
+        el('label', { for: 'req-days', text: 'Gültig' }),
+        el('select', { id: 'req-days' }, [['7', '1 Woche'], ['30', '1 Monat'], ['90', '3 Monate'], ['365', '1 Jahr'], ['', 'bis erledigt']]
+          .map(([v, t]) => el('option', { value: v, text: t, ...(v === '90' ? { selected: '' } : {}) }))),
         el('label', { for: 'req-dir', text: 'Blickrichtung' }),
         el('select', { id: 'req-dir' }, [el('option', { value: '', text: d.spotId ? 'wie die bisherigen Fotos' : 'frei' }),
           ...COMPASS.map((c, i) => el('option', { value: String(i * 45), text: `nach ${COMPASS_LONG[c]}` }))]),
@@ -488,6 +581,16 @@
         ]),
       ]),
     ]))));
+    // Own requests that are done or ran out: with a link to the photo.
+    const mine = T.myRequests.filter((r) => r.status !== 'offen');
+    if (mine.length) {
+      items.push(el('h3', { class: 'label', text: 'Deine erledigten und abgelaufenen Aufträge' }));
+      items.push(el('ul', { class: 'req-list' }, mine.slice(0, 20).map((r) => el('li', { class: 'req-mine' }, [
+        el('strong', { text: r.title }),
+        el('span', { class: `muted small${r.status === 'abgelaufen' ? ' req-expired' : ''}`, text: r.status === 'erledigt' ? `erledigt am ${fmtDate(r.doneAt)}` : `abgelaufen am ${fmtDate(r.expiresAt)}` }),
+        ...(r.status === 'erledigt' && r.photoId && r.spotId ? [el('button', { type: 'button', class: 'link small', text: 'Foto ansehen', onclick: () => openSpot(r.spotId, r.photoId) })] : []),
+      ]))));
+    }
     box.replaceChildren(...items);
     $('req-form')?.addEventListener('submit', createRequest);
     $('req-title')?.focus();
@@ -507,6 +610,7 @@
         lat: d.lat, lon: d.lon, spotId: d.spotId, title: $('req-title').value, note: $('req-note').value,
         heading: $('req-dir').value === '' ? null : Number($('req-dir').value),
         protected: Boolean($('req-protected')?.checked),
+        expiresInDays: $('req-days').value === '' ? null : Number($('req-days').value),
       });
       T.draft = null;
       await loadRequests();
@@ -734,12 +838,13 @@
       ]),
       el('section', { id: 'tour-route' }, [
         el('div', { class: 'tour-km' }, [el('output', { id: 'tour-distance', text: '0.00' }), el('span', { text: 'km' }), el('span', { id: 'tour-meta', class: 'muted small' })]),
+        el('div', { id: 'tour-profile', class: 'tour-profile', hidden: '' }),
         el('div', { class: 'tour-modes', role: 'group', 'aria-label': 'Route erfassen' }, [
           el('button', { type: 'button', id: 'tour-draw', class: 'secondary', 'aria-pressed': 'true', text: 'Zeichnen' }),
           el('button', { type: 'button', id: 'tour-record', class: 'secondary', text: 'Aufzeichnen' }),
           el('button', { type: 'button', id: 'tour-drive', class: 'secondary', title: 'Handy als Dashcam im Auto: Bilder und Route automatisch', text: 'Fahrtmodus', onclick: () => window.Drive?.open() }),
           el('label', { class: 'secondary file-btn', for: 'tour-file', text: 'Importieren' }),
-          el('input', { type: 'file', id: 'tour-file', accept: '.gpx,.tcx,.kml,.geojson,.json,.nmea,application/gpx+xml', hidden: '' }),
+          el('input', { type: 'file', id: 'tour-file', accept: '.gpx,.tcx,.kml,.geojson,.json,.nmea,.fit,application/gpx+xml', hidden: '' }),
         ]),
         el('p', { id: 'tour-hint', class: 'muted small' }),
         el('label', { class: 'toggle', id: 'tour-follow-wrap', hidden: '' }, [el('input', { type: 'checkbox', id: 'tour-follow', checked: '' }), ' Magnet: Wegen folgen']),

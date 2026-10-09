@@ -45,6 +45,7 @@ src/elevation.js     Geländehöhe, Hangneigung, Exposition und Geländeform (Co
 src/exif.js          Aufnahmezeit, GPS und Blickrichtung aus den Bilddaten
 src/wildlife.js      Wildruhezonen (GeoJSON, WGS84/LV95, Schutzzeit) als Sperrflächen für BRouter
 src/lenient-fetch.js HTTP-Client für BRouters eigenen Server (Kopfzeilen nur mit \n)
+src/fit.js           FIT-Dateien von Sportuhren und Velocomputern lesen (record-Meldungen, komprimierte Zeitstempel)
 src/dashcam.js       GPS von Dashcams: NMEA-Text und Novatek-freeGPS-Blöcke im Video, NMEA-Dateien
 src/gpx.js           GPX-Parser
 src/mp4.js           MP4-Boxen lesen: Telemetrie-Spur, Startzeit, Dauer, 360°-Metadaten

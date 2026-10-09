@@ -21,9 +21,9 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 - **Eigener Routing-Server**: den ersten Lauf des Image-Workflows und echte Segmente von brouter.de prüfen;
   die Wildruhezonen regelmässig selbst von geo.admin.ch laden statt aus einer Datei; Rückegassen nach
   Holzschlag zeitweise sperren.
-- **Touren**: FIT-Dateien direkt lesen, Höhenprofil der Route, Abgleich mit Strava/Komoot per OAuth,
-  Aufzeichnung im Hintergrund (braucht eine native Hülle, Browser stoppen GPS im Hintergrund),
-  Benachrichtigung, wenn ein eigener Fotoauftrag erledigt wurde, Ablaufdatum für Aufträge.
+- **Touren**: Abgleich mit Strava/Komoot per OAuth (braucht dort registrierte Apps), Aufzeichnung im
+  Hintergrund (braucht eine native Hülle, Browser stoppen GPS im Hintergrund); FIT-Dateien mit Developer-
+  Feldern (z. B. Laufleistung) auswerten.
 
 ## Phase 3: Automatische Auswertung
 
@@ -67,6 +67,8 @@ Aus früheren Versionen dieser Roadmap:
   und ausblendbar
 - Eigener Routing-Server: Waldprofil (Forststrassen und Rückegassen zuerst), Wildruhezonen in der Schutzzeit
   umgehen, BRouter-Image per GitHub-Workflow in der Registry
+- Touren: FIT-Dateien direkt lesen, Höhenprofil der Route, Push-Nachricht bei erledigtem Fotoauftrag,
+  Ablaufdatum für Aufträge
 - Video statt Einzelbilder (GoPro mit GPMF, 360°-MP4, GPX), unscharfe Bilder werden ersetzt oder verworfen
 - 360°-Fotos beim Upload erkennen, Panoramen über eine Drehung der Kugel ausrichten und vergleichen
 - Durchgehen wie Street View: Pfeile entlang der Aufnahme und zu Spots in der Nähe, Blickrichtung bleibt beim Schritt
