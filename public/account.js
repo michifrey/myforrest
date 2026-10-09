@@ -737,6 +737,24 @@ profileDialog.innerHTML = `
           <button type="button" class="link" id="rename-cancel">Abbrechen</button>
         </div>
       </form>
+      <p class="profile-email small"><span id="profile-email"></span>
+        <button type="button" class="link small" id="profile-email-change">E-Mail ändern</button></p>
+      <p id="profile-email-pending" class="profile-pending small" hidden></p>
+      <form id="email-form" class="rename-form" hidden novalidate>
+        <label class="field"><span>Neue E-Mail-Adresse</span>
+          <input name="email" type="email" autocomplete="email" maxlength="200" required></label>
+        <label class="field" id="email-password-field"><span>Passwort zur Bestätigung</span>
+          <input name="password" type="password" autocomplete="current-password"></label>
+        <label class="field" id="email-name-field"><span id="email-name-label"></span>
+          <input name="name" autocomplete="off"></label>
+        <p class="muted small">Wir schicken einen Link an die neue Adresse; erst damit gilt sie. Bis dahin bleibt die
+          bisherige aktiv und bekommt einen Hinweis.</p>
+        <p id="email-error" class="auth-error" role="alert" hidden></p>
+        <div class="row">
+          <button type="submit" class="btn primary">Link senden</button>
+          <button type="button" class="link" id="email-cancel">Abbrechen</button>
+        </div>
+      </form>
       <p id="profile-since" class="muted small"></p>
     </div>
     <button type="button" class="icon" id="profile-close" aria-label="Schliessen" autofocus>×</button>
@@ -755,6 +773,55 @@ profileDialog.innerHTML = `
   <div class="row center"><button type="button" class="secondary" id="profile-next" hidden>Weitere Fotos laden</button></div>`;
 document.body.append(profileDialog);
 $('profile-close').addEventListener('click', () => profileDialog.close());
+
+const emailForm = $('email-form');
+/** The address line, and a pending change waiting for its link. */
+function renderEmail() {
+  const u = Account.user;
+  $('profile-email').textContent = `${u.email}${u.emailVerified ? ' ✓' : ' (nicht bestätigt)'}`;
+  const pending = $('profile-email-pending');
+  pending.hidden = !u.pendingEmail;
+  if (u.pendingEmail) {
+    pending.replaceChildren(
+      `Neue Adresse ${u.pendingEmail} wartet auf Bestätigung – bitte den Link in der E-Mail an diese Adresse öffnen. `,
+      el('button', { type: 'button', class: 'link small', text: 'Änderung abbrechen', onclick: cancelEmailChange }),
+    );
+  }
+}
+function showEmailForm(open) {
+  emailForm.hidden = !open;
+  $('profile-email-change').hidden = open;
+  $('email-error').hidden = true;
+  if (!open) return;
+  emailForm.reset();
+  $('email-password-field').hidden = !Account.user.hasPassword;
+  $('email-name-field').hidden = Account.user.hasPassword;
+  $('email-name-label').textContent = `Zur Bestätigung den Kontonamen «${Account.user.name}» eintippen`;
+  emailForm.email.focus();
+}
+async function cancelEmailChange() {
+  try {
+    Account.user = (await api('/api/auth/email', { method: 'DELETE' })).user;
+    renderEmail();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+$('profile-email-change').addEventListener('click', () => showEmailForm(true));
+$('email-cancel').addEventListener('click', () => showEmailForm(false));
+emailForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const r = await jsonPost('/api/auth/email', { email: emailForm.email.value, password: emailForm.password.value, name: emailForm.name.value });
+    Account.user = { ...Account.user, pendingEmail: r.pendingEmail };
+    showEmailForm(false);
+    renderEmail();
+    if (r.verification === 'logged') alert('Auf diesem Server ist kein E-Mail-Versand eingerichtet; der Link steht im Server-Log.');
+  } catch (err) {
+    $('email-error').textContent = err.message;
+    $('email-error').hidden = false;
+  }
+});
 
 const renameForm = $('rename-form');
 function showRename(open) {
@@ -801,6 +868,8 @@ async function openProfile() {
   }
   $('profile-title').textContent = p.name;
   showRename(false);
+  showEmailForm(false);
+  renderEmail();
   const span = p.firstAt ? ` · Fotos von ${new Date(p.firstAt).getFullYear()} bis ${new Date(p.lastAt).getFullYear()}` : '';
   $('profile-since').textContent = `Dabei seit ${fmtDate(p.memberSince)}${span}`;
   $('profile-stats').replaceChildren(
@@ -1190,6 +1259,8 @@ function authReturn() {
     openAuth('login');
     $('auth-error').textContent = error;
     $('auth-error').hidden = false;
+  } else if (result === 'email-changed' && Account.user) {
+    alert(`Deine E-Mail-Adresse ist jetzt ${Account.user.email}.`);
   } else if (result === 'verified') {
     alert('Danke! Deine E-Mail-Adresse ist bestätigt.');
   } else if (result === 'linked' && provider) {

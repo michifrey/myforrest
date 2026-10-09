@@ -266,7 +266,7 @@ möglich, ausser der Betrieb verlangt eines (`REQUIRE_LOGIN`) oder eine bestäti
 
 Unter **Mein Profil** stehen die eigenen Beiträge: wie viele Fotos und Spots, wie viele Zeitreihen man
 fortgesetzt und wie viele Fotoaufträge man erledigt hat, und alle eigenen Fotos, das neueste zuerst. Ein Klick
-öffnet den Spot, und über *Name ändern* lässt sich der Anzeigename anpassen. *Meine Daten herunterladen* liefert alles zum Konto als ZIP: Fotos mit Originalen und GeoJSON, Touren als GPX, Aufträge und Meldungen. Das Profil sieht nur, wem es gehört; eine öffentliche Liste aller Fotos einer Person würde
+öffnet den Spot, und über *Name ändern* und *E-Mail ändern* lassen sich Anzeigename und Adresse anpassen (die neue Adresse gilt erst nach ihrem Bestätigungslink). *Meine Daten herunterladen* liefert alles zum Konto als ZIP: Fotos mit Originalen und GeoJSON, Touren als GPX, Aufträge und Meldungen. Das Profil sieht nur, wem es gehört; eine öffentliche Liste aller Fotos einer Person würde
 zeigen, wo und wann sie regelmässig unterwegs ist.
 
 ## Was MyForrest kann

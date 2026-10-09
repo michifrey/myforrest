@@ -887,6 +887,13 @@ prüfen lassen muss, gibt es **Organisationen**:
   und Fotos anderer Personen. Das Archiv wird beim Download zusammengestellt und gestreamt, ohne Kompression
   (Fotos sind schon komprimiert), ab 4 GB als ZIP64; höchstens 5 Exporte pro Stunde. Der Service Worker legt
   den Download nicht im Cache ab.
+- *E-Mail-Adresse ändern*: Im Profil unter *E-Mail ändern*, bestätigt mit dem Passwort (Konten ohne Passwort
+  tippen ihren Kontonamen ein). Die neue Adresse gilt erst, wenn der Link geöffnet wird, der an sie geht
+  (24 Stunden gültig, einmalig); bis dahin bleibt die bisherige aktiv, bekommt einen Hinweis mit der teilweise
+  verdeckten neuen Adresse, und das Profil zeigt die offene Änderung mit *Änderung abbrechen*. Danach gilt die
+  neue Adresse als bestätigt, offene Bestätigungs- und Reset-Links an die alte verfallen, Sitzungen bleiben,
+  und die alte Adresse erfährt von der Änderung. Höchstens 3 Anfragen pro Stunde; falsche Passwörter zählen
+  wie Fehlversuche beim Anmelden.
 - *Anzeigename ändern*: Im Profil unter *Name ändern*. Es gelten dieselben Regeln wie beim Registrieren
   (3–40 Zeichen, eindeutig ohne Rücksicht auf Gross-/Kleinschreibung); „Anonym“ und „System“ sind reserviert,
   weil die App sie selbst anzeigt. Der neue Name steht sofort unter allen eigenen Fotos. Wer sich mit dem Namen

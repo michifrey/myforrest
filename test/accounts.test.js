@@ -817,3 +817,77 @@ test('export of the own data as ZIP: account, photos with originals, tours, noth
     assert.equal((await anna.req('/api/profile/export?fotos=0')).status, 429);
   });
 });
+
+test('changing the e-mail address takes effect only through the link to the new address', async () => {
+  await withServer({ rateLimits: { emailChangePerAccount: 2 } }, async (base, db, mails) => {
+    const admin = client(base);
+    await admin.register('admin@example.org', 'Admin');
+    const anna = client(base);
+    await anna.register('anna@example.org', 'Anna Wald');
+    const phone = client(base);
+    await phone.login('anna@example.org');
+    const change = (c, json) => c.req('/api/auth/email', { method: 'POST', json });
+
+    assert.equal((await change(client(base), { email: 'neu@example.org', password: 'geheim-1234' })).status, 401);
+    assert.equal((await change(anna, { email: 'neu@example.org', password: 'falsch-falsch' })).status, 403);
+    assert.equal((await change(anna, { email: 'kaputt', password: 'geheim-1234' })).status, 400);
+    assert.equal((await change(anna, { email: 'ADMIN@example.org', password: 'geheim-1234' })).status, 409);
+    assert.equal((await change(anna, { email: 'anna@example.org', password: 'geheim-1234' })).status, 400);
+
+    const before = mails.length;
+    const res = await change(anna, { email: 'anna.moos@example.org', password: 'geheim-1234' });
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).pendingEmail, 'anna.moos@example.org');
+    const [toNew, toOld] = mails.slice(before);
+    assert.equal(toNew.to, 'anna.moos@example.org');
+    assert.equal(toOld.to, 'anna@example.org', 'the current address gets a heads-up');
+    assert.ok(!toOld.text.includes('anna.moos@example.org'), 'the heads-up masks the new address');
+    let me = await (await anna.req('/api/auth/me')).json();
+    assert.equal(me.user.email, 'anna@example.org', 'nothing changes before the link');
+    assert.equal(me.user.pendingEmail, 'anna.moos@example.org');
+
+    // A reset link for the old address dies with the change.
+    await client(base).req('/api/auth/password/forgot', { method: 'POST', json: { email: 'anna@example.org' } });
+    const resetToken = mails.at(-1).text.match(/#reset=([\w-]+)/)[1];
+
+    const link = new URL(toNew.text.match(/https?:\/\/\S+/)[0]);
+    const done = await fetch(link, { redirect: 'manual' });
+    assert.equal(done.headers.get('location'), '/?auth=email-changed');
+    me = await (await anna.req('/api/auth/me')).json();
+    assert.equal(me.user.email, 'anna.moos@example.org');
+    assert.equal(me.user.emailVerified, true);
+    assert.equal(me.user.pendingEmail, null);
+    assert.equal(mails.at(-1).to, 'anna@example.org');
+    assert.match(mails.at(-1).subject, /E-Mail-Adresse geändert/);
+    assert.equal((await (await phone.req('/api/auth/me')).json()).user.email, 'anna.moos@example.org', 'sessions stay');
+    assert.equal((await client(base).login('anna.moos@example.org')).res.status, 200);
+    assert.equal((await client(base).login('anna@example.org')).res.status, 401);
+    assert.equal((await fetch(link, { redirect: 'manual' })).headers.get('location').includes('auth_error'), true, 'one-time');
+    const reset = await client(base).req('/api/auth/password/reset', { method: 'POST', json: { token: resetToken, password: 'neues-passwort-1' } });
+    assert.equal(reset.status, 400, 'the old reset link no longer works');
+
+    // A pending change can be cancelled; its link then fails.
+    await change(anna, { email: 'dritte@example.org', password: 'geheim-1234' });
+    const third = new URL(mails.find((m) => m.to === 'dritte@example.org').text.match(/https?:\/\/\S+/)[0]);
+    assert.equal((await (await anna.req('/api/auth/email', { method: 'DELETE' })).json()).user.pendingEmail, null);
+    assert.match((await fetch(third, { redirect: 'manual' })).headers.get('location'), /auth_error/);
+    assert.equal((await change(anna, { email: 'vierte@example.org', password: 'geheim-1234' })).status, 429);
+  });
+});
+
+test('an older token table is rebuilt to allow address changes, keeping open links', async () => {
+  const { DatabaseSync } = require('node:sqlite');
+  const { createAuth } = require('../src/auth');
+  const db = new DatabaseSync(':memory:');
+  db.exec(`CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL UNIQUE COLLATE NOCASE, name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'user', default_license TEXT, created_at INTEGER NOT NULL);
+    CREATE TABLE email_tokens (token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+      purpose TEXT NOT NULL CHECK (purpose IN ('verify', 'reset')), email TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL);
+    INSERT INTO users (id, email, name, password_hash, created_at) VALUES (1, 'a@example.org', 'Anna', '', 0);
+    INSERT INTO email_tokens VALUES ('h', 1, 'reset', 'a@example.org', 0, 9999999999999);`);
+  const auth = createAuth(db);
+  assert.match(db.prepare("SELECT sql FROM sqlite_master WHERE name = 'email_tokens'").get().sql, /'email'/);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM email_tokens').get().n, 1, 'open links kept');
+  assert.ok(auth.requestEmailChange(auth.userById(1), 'b@example.org').token);
+  db.close();
+});

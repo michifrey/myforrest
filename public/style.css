@@ -1370,3 +1370,5 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 .profile-export .row { margin: 0; }
 .btn.small { padding: 0.35rem 0.8rem; font-size: 0.8rem; }
 .btn.secondary { background: var(--surface-2); }
+.profile-email { margin: 0.2rem 0 0; display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: baseline; }
+.profile-pending { margin: 0.4rem 0 0; padding: 0.4rem 0.7rem; border-radius: 10px; background: var(--accent-soft); color: var(--text); }

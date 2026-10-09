@@ -54,7 +54,7 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `POST`   | `/api/photos/:id/context`    | Wetter-Kontext neu laden                                 |
 | `PATCH`  | `/api/photos/:id`            | Tags und Notiz ändern; `license` nur durch den Urheber; `protected` (true/false) durch den Urheber, PRO-Mitglieder oder Moderation |
 | `DELETE` | `/api/photos/:id`            | Foto löschen (Urheber oder Moderation; anonyme Fotos ohne `REQUIRE_LOGIN` frei) |
-| `GET`    | `/api/auth/me`               | Angemeldetes Konto (mit `identities`, `emailVerified`, `hasPassword`), CSRF-Token, Lizenzen, Meldegründe, `requireLogin`, `requireVerifiedEmail`, `providers` |
+| `GET`    | `/api/auth/me`               | Angemeldetes Konto (mit `identities`, `emailVerified`, `hasPassword`, `pendingEmail`), CSRF-Token, Lizenzen, Meldegründe, `requireLogin`, `requireVerifiedEmail`, `providers` |
 | `POST`   | `/api/auth/register`         | Konto anlegen (JSON: `email`, `name`, `password`) und anmelden; schickt den Bestätigungslink (`verification`: `sent`, `logged` oder `failed`) |
 | `POST`   | `/api/auth/login`            | Anmelden (JSON: `login` = E-Mail oder Name, `password`)  |
 | `POST`   | `/api/auth/logout`           | Abmelden                                                 |
@@ -64,6 +64,9 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/profile`               | Eigenes Profil: Fotos (`photoBytes` = Grösse der Originale), Spots, fortgesetzte Zeitreihen (`repeatSpots`), Jahre, Aktivitäten, Touren, Fotoaufträge, gefolgte Spots |
 | `GET`    | `/api/profile/photos`        | Eigene Fotos, neueste zuerst (`?offset`, `?limit` bis 200, `?filter=alle\|geschuetzt\|ausgeblendet`); ausgeblendete ohne Bild-URLs |
 | `GET`    | `/api/profile/export`        | Eigene Daten als ZIP (`?fotos=0` ohne Originaldateien); höchstens 5 pro Stunde |
+| `POST`   | `/api/auth/email`            | Neue E-Mail-Adresse anfordern (`{ email, password }` bzw. `name` ohne Passwort); schickt den Link an die neue Adresse |
+| `DELETE` | `/api/auth/email`            | Offene Änderung der E-Mail-Adresse abbrechen |
+| `GET`    | `/api/auth/email/confirm?token=` | Link an die neue Adresse: übernimmt sie, leitet nach `/?auth=email-changed` bzw. `/?auth_error=…` |
 | `PATCH`  | `/api/auth/me`               | Angemeldet: Anzeigename ändern (`{ name }`); höchstens 3 pro Tag |
 | `GET`    | `/api/auth/account`          | Angemeldet: was beim Löschen betroffen wäre (`photos`, `tracks`, `requests`), `confirmWith` (`password` oder `name`), `blocker` |
 | `DELETE` | `/api/auth/account`          | Eigenes Konto löschen (`{ photos: delete\|anonymize, password }` bzw. `name` ohne Passwort) |
