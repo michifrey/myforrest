@@ -91,9 +91,14 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `POST`   | `/api/moderation/photos/:id/unhide` | Foto wieder einblenden                           |
 | `POST`   | `/api/moderation/photos/:id/dismiss` | Meldungen zu einem Foto verwerfen               |
 | `GET`    | `/api/moderation/log`        | Protokoll der Moderation                                 |
-| `GET`    | `/api/users`                 | Admin: Konten mit Rolle, Anzahl Fotos und PRO-Status (`proStatus`, `organization`, `proNote`) |
+| `GET`    | `/api/users`                 | Admin: Konten mit Rolle, Anzahl Fotos, PRO-Status (`proStatus`, `organization`, `proNote`) und Organisationen (`organizations`: `name`, `role`, `valid`) |
 | `POST`   | `/api/auth/pro`              | PRO-Mitgliedschaft beantragen (`{ organization, note }`) |
-| `POST`   | `/api/users/:id/pro`         | Admin: PRO-Antrag entscheiden (`{ decision: 'verifiziert' \| 'abgelehnt' \| 'entzogen', organization? }`) |
+| `POST`   | `/api/users/:id/pro`         | Admin: PRO-Antrag entscheiden (`{ decision: 'verifiziert' \| 'abgelehnt' \| 'entzogen', organization? }`); verifiziert leitet die Person danach die Organisation |
+| `GET`    | `/api/organizations/mine`    | Eigene Organisationen mit Rolle, `validUntil`, `valid` und Mitgliedern (E-Mail-Adressen nur für die Leitung) |
+| `GET`    | `/api/organizations`         | Admin: alle Organisationen mit Mitgliedern |
+| `POST`   | `/api/organizations/:id/members` | Leitung, Admin: Konto aufnehmen (`{ account: Name oder E-Mail, role?: 'mitglied' \| 'leitung' }`); nur Konten mit bestätigter Adresse, nur solange die Organisation gilt; 201 |
+| `PATCH`  | `/api/organizations/:id/members/:userId` | Leitung, Admin: Rolle ändern (`{ role }`); die letzte Person der Leitung bleibt (409) |
+| `DELETE` | `/api/organizations/:id/members/:userId` | Leitung, Admin: Mitglied entfernen; das Mitglied selbst: austreten |
 | `GET`    | `/api/protected/cells`       | Geschützte Funde, die man nicht sehen darf, als 5-km-Quadrate (`bbox`, `spots`); leer für PRO-Mitglieder |
 | `PATCH`  | `/api/users/:id`             | Admin: Rolle setzen (`{ role: 'user' \| 'moderator' \| 'admin' }`) |
 

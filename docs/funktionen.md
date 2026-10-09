@@ -817,6 +817,40 @@ Kontenliste zuoberst und verlängern um ein Jahr ab dem bisherigen Ende. Bis dah
 Verifizierung; danach sieht das Konto keine geschützten Funde mehr, bis verlängert ist. Verifizierungen aus
 der Zeit vor der Befristung gelten ein Jahr ab dem Entscheid, mindestens aber noch 30 Tage.
 
+### Organisationen mit mehreren Mitgliedern
+
+![Organisation mit Leitung und Mitgliedern](screenshots/organisation.jpg)
+
+Damit ein Forstrevier, eine kantonale Fachstelle oder eine Naturschutzorganisation nicht jede Person einzeln
+prüfen lassen muss, gibt es **Organisationen**:
+
+- **Entstehen**: Verifiziert eine Administratorin oder ein Administrator einen PRO-Antrag, leitet die Person
+  die Organisation, die sie im Antrag genannt hat. Gleiche Namen (ohne Rücksicht auf Gross-/Kleinschreibung
+  und Leerzeichen) ergeben dieselbe Organisation; mehrere verifizierte Personen teilen sich dann die Leitung.
+- **Mitglieder aufnehmen**: Im Konto-Menü unter *Organisation* nimmt die Leitung Konten über Namen oder
+  E-Mail-Adresse auf, als *Mitglied* oder in die *Leitung*. Die Person braucht ein Konto mit bestätigter
+  E-Mail-Adresse und bekommt eine Mitteilung per E-Mail. Höchstens 200 Mitglieder pro Organisation,
+  50 Aufnahmen pro Tag und Konto.
+- **Was Mitglieder sehen**: geschützte Funde wie ein PRO-Mitglied, ohne eigenen Antrag; im PRO-Dialog steht
+  „Du siehst geschützte Funde als Mitglied von …“. Die Leitung sieht die E-Mail-Adressen der Mitglieder,
+  Mitglieder nur die Namen.
+- **Wie lange**: Eine Organisation gilt, solange mindestens eine Person der Leitung **selbst verifiziert** ist;
+  ihr Ende ist das späteste Ende dieser Verifizierungen. Die jährliche Bestätigung bleibt also bei der
+  Leitung (siehe oben); die Erinnerung per E-Mail sagt ihr, wie viele Mitglieder davon abhängen. Läuft sie
+  ab oder wird PRO entzogen, sehen auch die Mitglieder nichts mehr, bis verlängert ist. Eine Organisation, die
+  nicht (mehr) gilt, kann niemanden aufnehmen.
+- **Leitung weitergeben, austreten**: Die Leitung macht Mitglieder zur Leitung und umgekehrt und entfernt
+  Mitglieder. Jedes Mitglied kann austreten; die letzte Person der Leitung erst, wenn sie die Leitung
+  weitergegeben hat. Wird die Leitung an jemanden ohne eigene Verifizierung übergeben, gilt die Organisation
+  erst wieder, wenn diese Person PRO beantragt und verifiziert ist. Ohne Mitglieder verschwindet die
+  Organisation.
+- **Admins**: Der Tab *Organisationen* in der Moderation zeigt alle Organisationen mit Mitgliedern; Admins
+  können dort aufnehmen, Rollen ändern und entfernen. Die Kontenliste zeigt bei jedem Konto seine
+  Organisationen („über Organisation“). Aufnahmen, Rollenwechsel, Entfernen und Austritte stehen im
+  Moderationsprotokoll.
+- **Bestehende Verifizierungen**: Beim ersten Start leitet jedes verifizierte Konto die Organisation, die es
+  angegeben hat.
+
 ## Konten, Moderation und Lizenzen
 
 ### Benutzerkonten, Moderation und Lizenz pro Foto
@@ -847,7 +881,7 @@ der Zeit vor der Befristung gelten ein Jahr ab dem Entscheid, mindestens aber no
   Liste aller Fotos einer Person würde ihre regelmässigen Wege und Zeiten verraten.
 - *Meine Daten herunterladen*: Im Profil lädt *Mit Originalfotos* (mit Grössenangabe) oder *Nur Daten* ein
   ZIP mit allem, was zum Konto gehört: `konto.json` (Name, E-Mail, Rolle, Lizenz, Anmeldungen über
-  Google/GitHub, PRO), `fotos.geojson` (Ort, Zeit, Blickrichtung, Tags, Notiz, Lizenz, Bestimmungen; in QGIS
+  Google/GitHub, PRO, Organisationen), `fotos.geojson` (Ort, Zeit, Blickrichtung, Tags, Notiz, Lizenz, Bestimmungen; in QGIS
   zu öffnen), die Originaldateien unter `fotos/`, die Touren als GPX, Fotoaufträge, eigene Meldungen und
   gefolgte Spots, dazu eine `LIESMICH.txt`. Nicht enthalten sind der Passwort-Hash, Sitzungen, Push-Schlüssel
   und Fotos anderer Personen. Das Archiv wird beim Download zusammengestellt und gestreamt, ohne Kompression

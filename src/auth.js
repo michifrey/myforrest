@@ -20,6 +20,7 @@
 
 const crypto = require('node:crypto');
 const { promisify } = require('node:util');
+const { createOrganizations, withOrgPro } = require('./orgs');
 
 const scryptAsync = promisify(crypto.scrypt);
 
@@ -191,7 +192,10 @@ function createAuth(db, { adminEmail = null } = {}) {
   let dummyHash = null;
   const dummy = async () => (dummyHash ??= await hashPassword(randomToken()));
 
-  const userById = db.prepare('SELECT * FROM users WHERE id = ?');
+  const orgs = createOrganizations(db);
+  const userByIdRow = db.prepare('SELECT * FROM users WHERE id = ?');
+  // With what the account has through organisations (org_pro_until, org_name).
+  const userById = { get: (id) => withOrgPro(db, userByIdRow.get(id)) };
   const userByLogin = db.prepare('SELECT * FROM users WHERE email = ? OR name = ?');
 
   async function register({ email, name, password }) {
@@ -493,7 +497,7 @@ function createAuth(db, { adminEmail = null } = {}) {
       return null;
     }
     const { token_hash: tokenHash, csrf_token: csrf, expires_at: expiresAt, ...user } = row;
-    return { tokenHash, csrf, expiresAt, user };
+    return { tokenHash, csrf, expiresAt, user: withOrgPro(db, user) };
   }
 
   const destroySession = (tokenHash) => db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(tokenHash);
@@ -501,7 +505,7 @@ function createAuth(db, { adminEmail = null } = {}) {
   return {
     register, authenticate, createSession, session, destroySession, identityLogin, identitiesOf, unlinkIdentity,
     createEmailToken, confirmEmail, checkResetToken, resetPassword, changePassword, userByEmail,
-    confirmOwner, deleteBlocker, deleteUser, rename,
+    confirmOwner, deleteBlocker, deleteUser, rename, orgs,
     userById: (id) => userById.get(id),
   };
 }
@@ -509,8 +513,13 @@ function createAuth(db, { adminEmail = null } = {}) {
 const hasPassword = (user) => String(user?.password_hash || '').startsWith('scrypt$');
 
 const isModerator = (user) => Boolean(user && (user.role === 'moderator' || user.role === 'admin'));
-/** Verified PRO members (whose verification has not run out), moderation and administration see protected finds. */
-const isPro = (user, now = Date.now()) => Boolean(user && user.pro_status === 'verifiziert' && (!user.pro_valid_until || user.pro_valid_until > now));
+/** Verified personally, and not run out. */
+const ownPro = (user, now = Date.now()) => Boolean(user && user.pro_status === 'verifiziert' && (!user.pro_valid_until || user.pro_valid_until > now));
+/**
+ * Verified PRO members (whose verification has not run out) and members of a
+ * verified organisation (src/orgs.js), moderation and administration see protected finds.
+ */
+const isPro = (user, now = Date.now()) => ownPro(user, now) || Boolean(user?.org_pro_until && user.org_pro_until > now);
 /** PRO verified once but run out: renew to see protected finds again. */
 const proExpired = (user, now = Date.now()) => Boolean(user && user.pro_status === 'verifiziert' && user.pro_valid_until && user.pro_valid_until <= now);
 /** A PRO member may ask for renewal from PRO_RENEW_DAYS before the end, and after it. */
@@ -524,7 +533,7 @@ const userJson = (u, { self = false, identities } = {}) => (u ? {
   name: u.name,
   role: u.role,
   pro: isPro(u),
-  organization: isPro(u) ? u.organization : null,
+  organization: ownPro(u) ? u.organization : isPro(u) ? u.org_name : null,
   ...(self ? {
     email: u.email,
     emailVerified: Boolean(u.email_verified_at),
@@ -537,6 +546,9 @@ const userJson = (u, { self = false, identities } = {}) => (u ? {
     proExpired: proExpired(u),
     proRenewable: mayRenewPro(u),
     proRenewalRequestedAt: iso(u.pro_renewal_requested_at),
+    // PRO only through an organisation (not verified personally).
+    proViaOrganization: isPro(u) && !ownPro(u),
+    orgProUntil: iso(u.org_pro_until),
   } : {}),
 } : null);
 

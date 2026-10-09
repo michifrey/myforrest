@@ -793,6 +793,7 @@ test('export of the own data as ZIP: account, photos with originals, tours, noth
     const konto = JSON.parse(files['konto.json']);
     assert.equal(konto.email, 'anna@example.org');
     assert.equal(konto.passwort, 'gesetzt (nicht exportiert)');
+    assert.deepEqual(konto.organisationen, []);
     assert.ok(!files['konto.json'].toString().includes('scrypt$'), 'no password hash');
 
     const geo = JSON.parse(files['fotos.geojson']);

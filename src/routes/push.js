@@ -29,6 +29,7 @@
 
 const { generateVapidKeys, sendNotification } = require('../webpush');
 const { canSeeProtected } = require('../auth');
+const { withOrgPro } = require('../orgs');
 
 const REGULAR_DAYS = 2;
 const REGULAR_YEARS = 3;
@@ -135,7 +136,7 @@ module.exports = function registerPush(app, {
   const hasProtection = () => db.prepare('PRAGMA table_info(photos)').all().some((c) => c.name === 'protected');
   function seesSpot(userId, spotId) {
     if (!hasProtection()) return true;
-    const u = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+    const u = withOrgPro(db, db.prepare('SELECT * FROM users WHERE id = ?').get(userId));
     if (canSeeProtected(u)) return true;
     return Boolean(db.prepare(`SELECT 1 FROM photos WHERE spot_id = ? AND hidden_at IS NULL
       AND (protected = 0 OR uploader_id = ?) LIMIT 1`).get(spotId, userId));

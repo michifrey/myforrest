@@ -234,7 +234,7 @@ module.exports = function registerAccounts(app, ctx) {
     res.append('Set-Cookie', serializeCookie(SESSION_COOKIE, token, { maxAge: SESSION_TTL_MS, secure: secure(req) }));
     return { user: selfJson(user), csrfToken: csrf };
   };
-  const selfJson = (user) => (user ? userJson(user, { self: true, identities: auth.identitiesOf(user.id) }) : null);
+  const selfJson = (user) => (user ? { ...userJson(user, { self: true, identities: auth.identitiesOf(user.id) }), organizations: auth.orgs.of(user.id) } : null);
   const jsonOnly = (req, res) => {
     if (req.is('application/json')) return true;
     fail(res, 415, 'Bitte als JSON senden');
@@ -693,6 +693,7 @@ module.exports = function registerAccounts(app, ctx) {
         proValidUntil: u.pro_status === 'verifiziert' && u.pro_valid_until ? new Date(u.pro_valid_until).toISOString() : null,
         proExpired: proExpired(u),
         proRenewalRequestedAt: u.pro_renewal_requested_at ? new Date(u.pro_renewal_requested_at).toISOString() : null,
+        organizations: auth.orgs.of(u.id),
       })));
   });
 
@@ -750,8 +751,12 @@ module.exports = function registerAccounts(app, ctx) {
       pro_renewal_requested_at = NULL, pro_reminded_at = NULL WHERE id = ?`)
       .run(decision === 'entzogen' ? null : decision, organization || null, now, req.user.id, validUntil, id);
     mod.log(req.user, `pro-${decision}`, { targetUserId: id, detail: organization || null });
+    // The verified applicant leads the organisation and may add colleagues.
+    if (decision === 'verifiziert') auth.orgs.verified(id, organization, req.user.id);
     res.json(userJson(auth.userById(id)));
   });
+
+  require('./organizations')(app, { db, auth, mod, mailer, publicUrl, limits, fail, adminOnly });
 
   /* ---------- Reminders before PRO runs out ---------- */
 
@@ -780,6 +785,7 @@ module.exports = function registerAccounts(app, ctx) {
             ended
               ? `Die PRO-Verifizierung deines Kontos (${u.organization}) ist am ${fmt(u.pro_valid_until)} abgelaufen. Geschützte Funde siehst du erst wieder, wenn sie verlängert ist.`
               : `Die PRO-Verifizierung deines Kontos (${u.organization}) gilt bis ${fmt(u.pro_valid_until)}. Sie wird jedes Jahr bestätigt.`,
+            ...(auth.orgs.dependants(u.id) ? [`Du leitest eine Organisation: ihre ${auth.orgs.dependants(u.id)} weiteren Mitglieder sehen geschützte Funde nur, solange eine Person der Leitung verifiziert ist.`] : []),
             '',
             `Bitte bestätige deine Angaben: ${link} → Konto-Menü → PRO-Mitgliedschaft → Verlängern.`,
           ].join('\n'),

@@ -34,7 +34,8 @@ const json = (v) => `${JSON.stringify(v, null, 2)}\n`;
 const README = `MyForrest – Export deiner Daten
 ================================
 
-konto.json           Dein Konto: Name, E-Mail, Rolle, Lizenz, Anmeldungen über Google/GitHub, PRO
+konto.json           Dein Konto: Name, E-Mail, Rolle, Lizenz, Anmeldungen über Google/GitHub, PRO,
+                     Mitgliedschaften in Organisationen
 fotos.geojson        Deine Fotos mit Ort, Zeit, Blickrichtung, Tags, Notiz, Lizenz und Bestimmungen
                      (GeoJSON, WGS84; in QGIS oder geojson.io zu öffnen)
 fotos/               Die Originaldateien, wie hochgeladen (inklusive ihrer EXIF-Daten)
@@ -160,6 +161,8 @@ module.exports = function profileRoutes(app, { db, thumbs, accounts, uploadDir, 
         passwort: String(user.password_hash || '').startsWith('scrypt$') ? 'gesetzt (nicht exportiert)' : 'keins',
         anmeldungen: identities.map((i) => ({ anbieter: i.provider, email: i.email, verknuepftAm: iso(i.created_at) })),
         pro: user.pro_status ? { status: user.pro_status, organisation: user.organization, angefragtAm: iso(user.pro_requested_at) } : null,
+        organisationen: db.prepare(`SELECT o.name, m.role, m.added_at FROM org_members m JOIN organizations o ON o.id = m.org_id
+          WHERE m.user_id = ? ORDER BY o.name`).all(user.id).map((m) => ({ name: m.name, rolle: m.role, seit: iso(m.added_at) })),
       }));
       await zip.add('fotos.geojson', json({
         type: 'FeatureCollection',
