@@ -260,7 +260,7 @@ möglich, ausser der Betrieb verlangt eines (`REQUIRE_LOGIN`) oder eine bestäti
 
 Unter **Mein Profil** stehen die eigenen Beiträge: wie viele Fotos und Spots, wie viele Zeitreihen man
 fortgesetzt und wie viele Fotoaufträge man erledigt hat, und alle eigenen Fotos, das neueste zuerst. Ein Klick
-öffnet den Spot, und über *Name ändern* lässt sich der Anzeigename anpassen. Das Profil sieht nur, wem es gehört; eine öffentliche Liste aller Fotos einer Person würde
+öffnet den Spot, und über *Name ändern* lässt sich der Anzeigename anpassen. *Meine Daten herunterladen* liefert alles zum Konto als ZIP: Fotos mit Originalen und GeoJSON, Touren als GPX, Aufträge und Meldungen. Das Profil sieht nur, wem es gehört; eine öffentliche Liste aller Fotos einer Person würde
 zeigen, wo und wann sie regelmässig unterwegs ist.
 
 ## Was MyForrest kann
@@ -299,7 +299,7 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   ohne Zeit und Namen und Vorschläge entlang der eigenen Route.
 - **[Geschützte Funde](docs/funktionen.md#geschützte-funde-und-pro-mitglieder)**: seltene Arten und Pilzstellen
   nur für verifizierte PRO-Mitglieder (Forstdienst, Naturschutz), öffentlich nur als 5-km-Raster.
-- **[Konten und Moderation](docs/funktionen.md#konten-moderation-und-lizenzen)**: Konten mit Rollen, Anmeldung mit E-Mail (Bestätigungslink, Passwort ändern und zurücksetzen, Konto löschen, Profil mit den eigenen Fotos) oder über Google und GitHub,
+- **[Konten und Moderation](docs/funktionen.md#konten-moderation-und-lizenzen)**: Konten mit Rollen, Anmeldung mit E-Mail (Bestätigungslink, Passwort ändern und zurücksetzen, Konto löschen, Profil mit den eigenen Fotos, Export der eigenen Daten) oder über Google und GitHub,
   Lizenz pro Foto, Melden und Moderieren.
 
 ## Schnellstart

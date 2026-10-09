@@ -740,3 +740,79 @@ test('changing the display name: rules, credits, login by the new name, log, lim
     assert.equal((await client(base).register('x@example.org', 'System')).res.status, 400);
   });
 });
+
+/** Reads a stored (uncompressed) ZIP: { name: Buffer }, checking each CRC. */
+function readZip(buf) {
+  const zlib = require('node:zlib');
+  const eocd = buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  const count = buf.readUInt16LE(eocd + 10);
+  let p = buf.readUInt32LE(eocd + 16);
+  const files = {};
+  for (let i = 0; i < count; i += 1) {
+    assert.equal(buf.readUInt32LE(p), 0x02014b50);
+    const crc = buf.readUInt32LE(p + 16);
+    const size = buf.readUInt32LE(p + 20);
+    const nameLen = buf.readUInt16LE(p + 28);
+    const extraLen = buf.readUInt16LE(p + 30);
+    const local = buf.readUInt32LE(p + 42);
+    const name = buf.subarray(p + 46, p + 46 + nameLen).toString('utf8');
+    const start = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
+    files[name] = buf.subarray(start, start + size);
+    assert.equal(zlib.crc32(files[name]), crc, `CRC of ${name}`);
+    p += 46 + nameLen + extraLen;
+  }
+  return files;
+}
+
+test('export of the own data as ZIP: account, photos with originals, tours, nothing of others', async () => {
+  await withServer({ rateLimits: { exportPerAccount: 3 } }, async (base, db) => {
+    const admin = client(base);
+    await admin.register('admin@example.org', 'Admin');
+    const anna = client(base);
+    await anna.register('anna@example.org', 'Anna Wald');
+    const mine = (await (await anna.upload('nogps.jpg', { lat: '47.1', lon: '8.1', activity: 'wandern' })).json()).created[0];
+    const theirs = (await (await admin.upload('nogps.jpg', { lat: '47.1', lon: '8.1' })).json()).created[0];
+    const track = await anna.req('/api/tracks', { method: 'POST', json: {
+      name: 'Runde Adlisberg', kind: 'gezeichnet', visibility: 'privat', points: [[47.37, 8.57, null, null], [47.38, 8.58, null, null]],
+    } });
+    assert.equal(track.status, 201);
+    await anna.req(`/api/photos/${theirs.id}/report`, { method: 'POST', json: { reason: 'spam' } });
+
+    assert.equal((await client(base).req('/api/profile/export')).status, 401);
+    const profile = await (await anna.req('/api/profile')).json();
+    assert.equal(profile.photoBytes, fs.statSync(path.join(__dirname, 'fixtures', 'nogps.jpg')).size);
+
+    const res = await anna.req('/api/profile/export');
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('content-type'), 'application/zip');
+    assert.match(res.headers.get('content-disposition'), /attachment; filename="myforrest-export-\d{4}-\d{2}-\d{2}\.zip"/);
+    const files = readZip(Buffer.from(await res.arrayBuffer()));
+    const names = Object.keys(files);
+    for (const n of ['LIESMICH.txt', 'konto.json', 'fotos.geojson', 'fotoauftraege.json', 'meldungen.json', 'gefolgte-spots.json']) assert.ok(names.includes(n), n);
+
+    const konto = JSON.parse(files['konto.json']);
+    assert.equal(konto.email, 'anna@example.org');
+    assert.equal(konto.passwort, 'gesetzt (nicht exportiert)');
+    assert.ok(!files['konto.json'].toString().includes('scrypt$'), 'no password hash');
+
+    const geo = JSON.parse(files['fotos.geojson']);
+    assert.equal(geo.features.length, 1, 'only own photos');
+    assert.equal(geo.features[0].properties.id, mine.id);
+    assert.equal(geo.features[0].properties.aktivitaet, 'wandern');
+    const original = files[geo.features[0].properties.datei];
+    assert.ok(original, 'the original is in the archive');
+    assert.deepEqual(original, fs.readFileSync(path.join(__dirname, 'fixtures', 'nogps.jpg')));
+
+    const gpx = names.find((n) => n.startsWith('touren/'));
+    assert.match(gpx, /^touren\/\d+_Runde-Adlisberg\.gpx$/);
+    assert.match(files[gpx].toString(), /<trkpt lat="47\.3700000" lon="8\.5700000">/);
+    assert.equal(JSON.parse(files['meldungen.json'])[0].foto, theirs.id);
+
+    // Without the originals; then the hourly limit.
+    const light = readZip(Buffer.from(await (await anna.req('/api/profile/export?fotos=0')).arrayBuffer()));
+    assert.ok(!Object.keys(light).some((n) => n.startsWith('fotos/')));
+    assert.equal(JSON.parse(light['fotos.geojson']).features[0].properties.datei, null);
+    await anna.req('/api/profile/export?fotos=0');
+    assert.equal((await anna.req('/api/profile/export?fotos=0')).status, 429);
+  });
+});

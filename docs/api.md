@@ -61,8 +61,9 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/auth/verify?token=`    | Link aus der Bestätigungs-E-Mail: bestätigt die Adresse, leitet nach `/?auth=verified` bzw. `/?auth_error=…` |
 | `POST`   | `/api/auth/verify/resend`    | Neuen Bestätigungslink senden (angemeldet, Adresse unbestätigt; 3 pro Stunde) |
 | `POST`   | `/api/auth/password/forgot`  | Link zum Zurücksetzen an `{ email }` schicken; antwortet immer `{ ok: true }` |
-| `GET`    | `/api/profile`               | Eigenes Profil: Fotos, Spots, fortgesetzte Zeitreihen (`repeatSpots`), Jahre, Aktivitäten, Touren, Fotoaufträge, gefolgte Spots |
+| `GET`    | `/api/profile`               | Eigenes Profil: Fotos (`photoBytes` = Grösse der Originale), Spots, fortgesetzte Zeitreihen (`repeatSpots`), Jahre, Aktivitäten, Touren, Fotoaufträge, gefolgte Spots |
 | `GET`    | `/api/profile/photos`        | Eigene Fotos, neueste zuerst (`?offset`, `?limit` bis 200, `?filter=alle\|geschuetzt\|ausgeblendet`); ausgeblendete ohne Bild-URLs |
+| `GET`    | `/api/profile/export`        | Eigene Daten als ZIP (`?fotos=0` ohne Originaldateien); höchstens 5 pro Stunde |
 | `PATCH`  | `/api/auth/me`               | Angemeldet: Anzeigename ändern (`{ name }`); höchstens 3 pro Tag |
 | `GET`    | `/api/auth/account`          | Angemeldet: was beim Löschen betroffen wäre (`photos`, `tracks`, `requests`), `confirmWith` (`password` oder `name`), `blocker` |
 | `DELETE` | `/api/auth/account`          | Eigenes Konto löschen (`{ photos: delete\|anonymize, password }` bzw. `name` ohne Passwort) |

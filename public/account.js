@@ -736,6 +736,13 @@ profileDialog.innerHTML = `
   </div>
   <div id="profile-stats" class="stats profile-stats"></div>
   <p id="profile-more" class="muted small"></p>
+  <div class="profile-export">
+    <span><b>Meine Daten herunterladen</b> – Konto, Fotos mit Ort und Zeit, Touren als GPX, Fotoaufträge und Meldungen als ZIP</span>
+    <span class="row">
+      <a class="btn secondary small" id="export-full" href="/api/profile/export" download>Mit Originalfotos</a>
+      <a class="btn secondary small" href="/api/profile/export?fotos=0" download>Nur Daten</a>
+    </span>
+  </div>
   <div class="tabs profile-tabs" role="tablist" id="profile-tabs"></div>
   <div id="profile-grid" class="profile-grid" aria-live="polite"></div>
   <div class="row center"><button type="button" class="secondary" id="profile-next" hidden>Weitere Fotos laden</button></div>`;
@@ -803,6 +810,8 @@ async function openProfile() {
     p.requests.open ? `${p.requests.open === 1 ? '1 eigener Fotoauftrag' : `${p.requests.open} eigene Fotoaufträge`} offen` : '',
   ].filter(Boolean);
   $('profile-more').textContent = parts.join('. ');
+  const mb = p.photoBytes / 1e6;
+  $('export-full').textContent = p.photos ? `Mit Originalfotos (${mb < 1 ? '< 1' : Math.round(mb).toLocaleString('de-CH')} MB)` : 'Mit Originalfotos';
   $('profile-more').hidden = !parts.length;
   const tabs = [['alle', `Alle (${p.photos})`], ...(p.protected ? [['geschuetzt', `Geschützt (${p.protected})`]] : []),
     ...(p.hidden ? [['ausgeblendet', `Ausgeblendet (${p.hidden})`]] : [])];

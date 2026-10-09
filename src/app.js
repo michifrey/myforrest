@@ -1094,7 +1094,7 @@ function createApp({
   });
 
   require('./routes/species')(app, { db, spotRadiusM, visibleSql: accounts.visibleSql });
-  require('./routes/profile')(app, { db, thumbs, accounts });
+  require('./routes/profile')(app, { db, thumbs, accounts, uploadDir, rateLimits });
   require('./routes/protection')(app, { db, accounts, sensitiveLists, cantons, reprotect });
   require('./routes/ogc')(app, { db, spotRadiusM, dataDir, background, tiles: tileOptions });
   require('./routes/video')(app, { db, uploadDir, tmpDir, spotRadiusM, activities: ACTIVITIES, photoJson, getPhoto, setTags, alignPhoto, analyzeChange, analyzeContext, background, safeAlign });

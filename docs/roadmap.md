@@ -16,7 +16,7 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 - **Touren**: FIT-Dateien direkt lesen, Höhenprofil der Route, Abgleich mit Strava/Komoot per OAuth,
   Aufzeichnung im Hintergrund (braucht eine native Hülle, Browser stoppen GPS im Hintergrund),
   Benachrichtigung, wenn ein eigener Fotoauftrag erledigt wurde, Ablaufdatum für Aufträge.
-- **Konten ausbauen**: Export der eigenen Daten, E-Mail-Adresse ändern (mit
+- **Konten ausbauen**: E-Mail-Adresse ändern (mit
   Bestätigung der neuen Adresse); weitere Anmeldedienste wie SwitchEdu-ID oder Microsoft; Rate-Limits
   dauerhaft speichern statt im Arbeitsspeicher.
 
@@ -76,4 +76,4 @@ Aus früheren Versionen dieser Roadmap:
 - Geodienste: OGC API – Features und Tiles (auch im LV95-Kachelgitter, vorberechnet, PMTiles/MBTiles),
   Vektorkarten, QGIS Server, Metadaten für geocat.ch (GM03)
 - Betrieb mit Docker Compose und Kubernetes (podman-Startskript)
-- Konten: Anmelden mit Google und GitHub, E-Mail bestätigen, Passwort zurücksetzen und ändern, Konto löschen, Profilseite mit eigenen Fotos, Anzeigename ändern
+- Konten: Anmelden mit Google und GitHub, E-Mail bestätigen, Passwort zurücksetzen und ändern, Konto löschen, Profilseite mit eigenen Fotos, Anzeigename ändern, Export der eigenen Daten

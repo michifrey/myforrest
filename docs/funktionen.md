@@ -845,6 +845,14 @@ der Zeit vor der Befristung gelten ein Jahr ab dem Entscheid, mindestens aber no
   sich getrennt anzeigen; ausgeblendete erscheinen mit dem Grund, aber ohne Bild, weil ihre Dateien auch der
   Urheberin nicht mehr ausgeliefert werden. Das Profil ist nur für das eigene Konto sichtbar: Eine öffentliche
   Liste aller Fotos einer Person würde ihre regelmässigen Wege und Zeiten verraten.
+- *Meine Daten herunterladen*: Im Profil lädt *Mit Originalfotos* (mit Grössenangabe) oder *Nur Daten* ein
+  ZIP mit allem, was zum Konto gehört: `konto.json` (Name, E-Mail, Rolle, Lizenz, Anmeldungen über
+  Google/GitHub, PRO), `fotos.geojson` (Ort, Zeit, Blickrichtung, Tags, Notiz, Lizenz, Bestimmungen; in QGIS
+  zu öffnen), die Originaldateien unter `fotos/`, die Touren als GPX, Fotoaufträge, eigene Meldungen und
+  gefolgte Spots, dazu eine `LIESMICH.txt`. Nicht enthalten sind der Passwort-Hash, Sitzungen, Push-Schlüssel
+  und Fotos anderer Personen. Das Archiv wird beim Download zusammengestellt und gestreamt, ohne Kompression
+  (Fotos sind schon komprimiert), ab 4 GB als ZIP64; höchstens 5 Exporte pro Stunde. Der Service Worker legt
+  den Download nicht im Cache ab.
 - *Anzeigename ändern*: Im Profil unter *Name ändern*. Es gelten dieselben Regeln wie beim Registrieren
   (3–40 Zeichen, eindeutig ohne Rücksicht auf Gross-/Kleinschreibung); „Anonym“ und „System“ sind reserviert,
   weil die App sie selbst anzeigt. Der neue Name steht sofort unter allen eigenen Fotos. Wer sich mit dem Namen
