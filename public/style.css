@@ -1550,6 +1550,9 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 /* Elevation profile of a route (tours.js) */
 .tour-profile { margin: 0.3rem 0 0.6rem; }
 .tour-profile svg { display: block; width: 100%; height: 64px; touch-action: none; cursor: crosshair; }
+.tour-sensors { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.7rem; margin: -0.2rem 0 0.6rem; }
+.tour-sensors dt { color: var(--muted); }
+.tour-sensors dd { margin: 0; font-variant-numeric: tabular-nums; }
 .profile-area { fill: color-mix(in srgb, var(--accent) 18%, transparent); }
 .profile-line { fill: none; stroke: var(--accent); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .profile-cursor { stroke: var(--gold); stroke-width: 1; vector-effect: non-scaling-stroke; }

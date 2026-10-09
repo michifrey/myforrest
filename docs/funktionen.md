@@ -934,6 +934,17 @@ wird.
   von Sportuhren und Velocomputern (Garmin, Wahoo, Polar, Coros, Suunto; bis 10 MB), bis 20 000 Punkte. FIT
   liest die App selbst (`src/fit.js`): die *record*-Meldungen mit Position, Höhe und Zeit, auch mit
   komprimierten Zeitstempeln. Eine FIT-Datei taugt auch im Upload als GPS-Track für Fotos und Videos ohne GPS.
+- **Sensorwerte aus FIT-Dateien**: Unter dem Höhenprofil fasst das Panel zusammen, was die Uhr mitgeschrieben
+  hat: **Puls**, **Leistung**, **Tritt- bzw. Schrittfrequenz** (bei Läufen verdoppelt, weil Uhren Doppelschritte
+  speichern; Stillstand zählt nicht) und **Temperatur**, jeweils Durchschnitt und Höchstwert. Dazu kommen
+  **Developer-Felder**, die Apps und Zusatzsensoren (z. B. ein Stryd-Laufsensor, ein CORE-Temperatursensor) in
+  die Datei schreiben, mit ihrem Namen und ihrer Einheit aus der Datei. Steht ein solches Feld für einen
+  Standardwert (z. B. die Laufleistung des Fusssensors), springt es ein, wo die Uhr selbst keinen hat, und
+  zählt nicht doppelt. Gespeichert bleiben die Werte bei der Tour; **nur wer die Tour gespeichert hat, sieht sie**,
+  auch bei öffentlichen Touren nicht andere, denn Puls und Ähnliches sind Gesundheitsdaten. Ins GPX gehen sie nicht.
+
+![Sensorwerte einer importierten FIT-Datei: Puls, Leistung, Schrittfrequenz, Temperatur und ein Developer-Feld](screenshots/fit-sensoren.jpg)
+
 - **Exportieren**: jede Route als GPX, mit Höhe und Zeit, wo vorhanden.
 - **Höhenprofil**: Unter der Länge zeigt das Panel das Profil der Route mit Auf- und Abstieg und tiefstem
   und höchstem Punkt. Die Höhen kommen aus der Route selbst (Aufzeichnung, Import, Wege-Magnet), sonst aus
@@ -1174,7 +1185,8 @@ prüfen lassen muss, gibt es **Organisationen**:
 - *Meine Daten herunterladen*: Im Profil lädt *Mit Originalfotos* (mit Grössenangabe) oder *Nur Daten* ein
   ZIP mit allem, was zum Konto gehört: `konto.json` (Name, E-Mail, Rolle, Lizenz, Anmeldungen über
   Google/GitHub, PRO, Organisationen), `fotos.geojson` (Ort, Zeit, Blickrichtung, Tags, Notiz, Lizenz, Bestimmungen; in QGIS
-  zu öffnen), die Originaldateien unter `fotos/`, die Touren als GPX, Fotoaufträge, eigene Meldungen und
+  zu öffnen), die Originaldateien unter `fotos/`, die Touren als GPX (mit den Sensorwerten aus FIT-Dateien als
+  `…_sensoren.json` daneben), Fotoaufträge, eigene Meldungen und
   gefolgte Spots, dazu eine `LIESMICH.txt`. Nicht enthalten sind der Passwort-Hash, Sitzungen, Push-Schlüssel
   und Fotos anderer Personen. Das Archiv wird beim Download zusammengestellt und gestreamt, ohne Kompression
   (Fotos sind schon komprimiert), ab 4 GB als ZIP64; höchstens 5 Exporte pro Stunde. Der Service Worker legt

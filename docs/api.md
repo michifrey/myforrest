@@ -84,10 +84,10 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/auth/oauth/:provider`  | Anmelden mit `google`, `github`, `microsoft`, `eduid`, `agov` oder `oidc`: leitet zum Anbieter weiter |
 | `GET`    | `/api/auth/oauth/:provider/callback` | Rückkehr vom Anbieter: meldet an, legt ein Konto an oder verknüpft (mit Sitzung); leitet nach `/?auth=ok\|created\|linked` bzw. `/?auth_error=…` |
 | `DELETE` | `/api/auth/identities/:provider` | Anmeldung über einen Anbieter vom eigenen Konto trennen (nicht die einzige) |
-| `POST`   | `/api/tracks/parse`          | GPX, TCX, KML, GeoJSON oder NMEA (`{ text, filename }`) bzw. FIT (`{ base64, filename }`) lesen, ohne zu speichern: Punkte, Name, Format, Länge |
+| `POST`   | `/api/tracks/parse`          | GPX, TCX, KML, GeoJSON oder NMEA (`{ text, filename }`) bzw. FIT (`{ base64, filename }`) lesen, ohne zu speichern: Punkte, Name, Format, Länge; bei FIT `sensors` (`[{ key, label, unit, avg, min, max, n }]`: `hr`, `power`, `cadence` bzw. `steps`, `temp`, Developer-Felder als `dev:<Name>`) |
 | `POST`   | `/api/route-profile`         | Höhenprofil einer Route (`{ points: [[lat, lon, ele?], …] }`): `samples` (`d`, `ele`), `ascent`, `descent`, `min`, `max`, `source` (`route` = eigene Höhen, `modell` = Höhenmodell) |
 | `GET`    | `/api/tracks`                | Öffentliche Touren (Name, Länge, Start nach der 200-m-Privatzone, Besitzer), `?bbox=w,s,e,n`; `?mine=1` die eigenen |
-| `POST`   | `/api/tracks`                | Tour speichern (Konto nötig): `{ name, kind: gezeichnet\|aufgezeichnet\|importiert, activity, visibility: privat\|oeffentlich, points: [[lat, lon, ele, time], …] }` |
+| `POST`   | `/api/tracks`                | Tour speichern (Konto nötig): `{ name, kind: gezeichnet\|aufgezeichnet\|importiert, activity, visibility: privat\|oeffentlich, points: [[lat, lon, ele, time], …], sensors? }`; `sensors` aus `/api/tracks/parse` nur bei `importiert`, zurück nur an den Besitzer |
 | `GET`    | `/api/tracks/:id`            | Tour mit Punkten; für andere ohne Zeiten und ohne die ersten und letzten 200 m |
 | `GET`    | `/api/tracks/:id.gpx`        | Tour als GPX                                             |
 | `PATCH`  | `/api/tracks/:id`            | `name`, `activity`, `visibility` (nur Besitzer oder Moderation) |

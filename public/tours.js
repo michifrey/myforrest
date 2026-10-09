@@ -47,7 +47,7 @@
     trackCache: new Map(),
   };
   function emptyRoute() {
-    return { waypoints: [], segments: [], raw: null, kind: 'gezeichnet', name: '', savedId: null, hasTime: false };
+    return { waypoints: [], segments: [], raw: null, kind: 'gezeichnet', name: '', savedId: null, hasTime: false, sensors: null };
   }
 
   const routeLayer = L.layerGroup();
@@ -393,7 +393,7 @@
         }), filename: file.name }
         : { text: await file.text(), filename: file.name };
       const t = await json('/api/tracks/parse', body);
-      setRoute({ raw: t.points, kind: 'importiert', name: t.name || file.name, hasTime: t.hasTime });
+      setRoute({ raw: t.points, kind: 'importiert', name: t.name || file.name, hasTime: t.hasTime, sensors: t.sensors || null });
       setStatus(`${t.points.length} Punkte importiert (${t.format.toUpperCase()}${t.hasTime ? ', mit Zeitstempeln' : ''}).`);
     } catch (err) {
       setStatus(err.message);
@@ -425,6 +425,7 @@
         activity: $('tour-activity').value || null,
         visibility: $('tour-public').checked ? 'oeffentlich' : 'privat',
         points: pts.map((p) => [p.lat, p.lon, p.ele ?? null, p.time ?? null]),
+        sensors: T.route.sensors || undefined,
       });
       T.route.savedId = t.id;
       T.route.name = t.name;
@@ -718,7 +719,7 @@
         el('button', { type: 'button', class: 'secondary', text: 'Anzeigen', onclick: async () => {
           T.trackCache.delete(t.id);
           const full = await trackPoints(t.id);
-          setRoute({ raw: full.points, kind: t.kind, name: t.name, savedId: t.id, hasTime: t.hasTime });
+          setRoute({ raw: full.points, kind: t.kind, name: t.name, savedId: t.id, hasTime: t.hasTime, sensors: full.sensors || null });
           setTab('route');
         } }),
         el('a', { class: 'link small', href: `/api/tracks/${t.id}.gpx`, text: 'GPX' }),
@@ -862,6 +863,7 @@
       el('section', { id: 'tour-route' }, [
         el('div', { class: 'tour-km' }, [el('output', { id: 'tour-distance', text: '0.00' }), el('span', { text: 'km' }), el('span', { id: 'tour-meta', class: 'muted small' })]),
         el('div', { id: 'tour-profile', class: 'tour-profile', hidden: '' }),
+        el('dl', { id: 'tour-sensors', class: 'tour-sensors small', hidden: '' }),
         el('div', { class: 'tour-modes', role: 'group', 'aria-label': 'Route erfassen' }, [
           el('button', { type: 'button', id: 'tour-draw', class: 'secondary', 'aria-pressed': 'true', text: 'Zeichnen' }),
           el('button', { type: 'button', id: 'tour-record', class: 'secondary', text: 'Aufzeichnen' }),
@@ -930,6 +932,7 @@
     }
     if (r.savedId) meta.push('gespeichert');
     $('tour-meta').textContent = meta.join(' · ');
+    renderSensors(r.sensors);
     $('tour-record').textContent = T.recorder ? 'Aufnahme beenden' : 'Aufzeichnen';
     $('tour-record').classList.toggle('recording', Boolean(T.recorder));
     $('tour-draw').setAttribute('aria-pressed', String(!r.raw && !T.recorder));
@@ -943,6 +946,19 @@
     $('tour-offline-save').disabled = !window.offlineMap?.supported() || pts.length < 2;
     $('tour-undo').disabled = !pts.length || Boolean(T.recorder);
     $('tour-loop').disabled = Boolean(r.raw) || r.waypoints.length < 2;
+  }
+
+  /** Heart rate, power … from a FIT file (only the owner sees them, also once saved). */
+  function renderSensors(list) {
+    const box = $('tour-sensors');
+    box.hidden = !list?.length;
+    if (!list?.length) return box.replaceChildren();
+    const num = (v) => Number(v).toLocaleString('de-CH', { maximumFractionDigits: Math.abs(v) < 10 ? 1 : 0 });
+    const unit = (u) => (u ? (u.startsWith('/') ? u : `\u00a0${u}`) : '');
+    box.replaceChildren(...list.flatMap((s) => [
+      el('dt', { text: s.label, title: s.key.startsWith('dev:') ? 'Developer-Feld aus der FIT-Datei (App oder Zusatzsensor)' : '' }),
+      el('dd', { text: s.key === 'temp' ? `${num(s.min)}–${num(s.max)}${unit(s.unit)} (Ø ${num(s.avg)})` : `Ø ${num(s.avg)}${unit(s.unit)} · max. ${num(s.max)}` }),
+    ]));
   }
 
   function setTab(tab) {
