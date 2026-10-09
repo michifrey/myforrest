@@ -78,17 +78,17 @@ module.exports = function registerAccounts(app, ctx) {
   const publicUrl = ctx.publicUrl || null;
   const mod = createModeration(db);
   const limits = ctx.rateLimits || {};
-  const loginPerAccount = createLimiter({ max: limits.loginPerAccount ?? 5, windowMs: 15 * 60 * 1000 });
-  const loginPerIp = createLimiter({ max: limits.loginPerIp ?? 30, windowMs: 15 * 60 * 1000 });
-  const oauthPerIp = createLimiter({ max: limits.oauthPerIp ?? 30, windowMs: 15 * 60 * 1000 });
-  const registerPerIp = createLimiter({ max: limits.registerPerIp ?? 10, windowMs: 3600 * 1000 });
-  const forgotPerIp = createLimiter({ max: limits.forgotPerIp ?? 10, windowMs: 3600 * 1000 });
-  const forgotPerAddress = createLimiter({ max: limits.forgotPerAddress ?? 3, windowMs: 3600 * 1000 });
-  const resetPerIp = createLimiter({ max: limits.resetPerIp ?? 20, windowMs: 15 * 60 * 1000 });
-  const emailChangePerAccount = createLimiter({ max: limits.emailChangePerAccount ?? 3, windowMs: 3600 * 1000 });
-  const renamePerAccount = createLimiter({ max: limits.renamePerAccount ?? 3, windowMs: 24 * 3600 * 1000 });
-  const verifyPerAccount = createLimiter({ max: limits.verifyPerAccount ?? 3, windowMs: 3600 * 1000 });
-  const reportPerIp = createLimiter({ max: limits.reportPerIp ?? 30, windowMs: 3600 * 1000 });
+  const loginPerAccount = createLimiter({ db, name: 'loginPerAccount', max: limits.loginPerAccount ?? 5, windowMs: 15 * 60 * 1000 });
+  const loginPerIp = createLimiter({ db, name: 'loginPerIp', max: limits.loginPerIp ?? 30, windowMs: 15 * 60 * 1000 });
+  const oauthPerIp = createLimiter({ db, name: 'oauthPerIp', max: limits.oauthPerIp ?? 30, windowMs: 15 * 60 * 1000 });
+  const registerPerIp = createLimiter({ db, name: 'registerPerIp', max: limits.registerPerIp ?? 10, windowMs: 3600 * 1000 });
+  const forgotPerIp = createLimiter({ db, name: 'forgotPerIp', max: limits.forgotPerIp ?? 10, windowMs: 3600 * 1000 });
+  const forgotPerAddress = createLimiter({ db, name: 'forgotPerAddress', max: limits.forgotPerAddress ?? 3, windowMs: 3600 * 1000 });
+  const resetPerIp = createLimiter({ db, name: 'resetPerIp', max: limits.resetPerIp ?? 20, windowMs: 15 * 60 * 1000 });
+  const emailChangePerAccount = createLimiter({ db, name: 'emailChangePerAccount', max: limits.emailChangePerAccount ?? 3, windowMs: 3600 * 1000 });
+  const renamePerAccount = createLimiter({ db, name: 'renamePerAccount', max: limits.renamePerAccount ?? 3, windowMs: 24 * 3600 * 1000 });
+  const verifyPerAccount = createLimiter({ db, name: 'verifyPerAccount', max: limits.verifyPerAccount ?? 3, windowMs: 3600 * 1000 });
+  const reportPerIp = createLimiter({ db, name: 'reportPerIp', max: limits.reportPerIp ?? 30, windowMs: 3600 * 1000 });
 
   const canSeeHidden = (req) => isModerator(req.user);
   /** What this request may see: hidden photos (moderation), protected ones (PRO, moderation), own uploads. */
@@ -647,10 +647,16 @@ module.exports = function registerAccounts(app, ctx) {
   });
   const backTo = (res, params) => res.redirect(303, `/?${new URLSearchParams(params)}`);
 
-  app.get('/api/auth/oauth/:provider', (req, res) => {
+  app.get('/api/auth/oauth/:provider', async (req, res) => {
     const provider = oauth.get(req.params.provider);
     if (!provider) return fail(res, 404, 'Diese Anmeldung ist nicht eingerichtet');
-    const { url, cookie } = oauth.begin(provider, origin(req));
+    let flow;
+    try {
+      flow = await oauth.begin(provider, origin(req));
+    } catch (err) {
+      return res.redirect(303, `/?${new URLSearchParams({ auth_error: err.message })}`);
+    }
+    const { url, cookie } = flow;
     res.set('Cache-Control', 'no-store');
     res.append('Set-Cookie', stateCookie(req, cookie, STATE_TTL_MS));
     res.redirect(303, url);
@@ -803,7 +809,7 @@ module.exports = function registerAccounts(app, ctx) {
 
   /* ---------- PRO membership: verified organisations (forest services, nature NGOs …) ---------- */
 
-  const proPerUser = createLimiter({ max: limits.proPerUser ?? 5, windowMs: 24 * 3600 * 1000 });
+  const proPerUser = createLimiter({ db, name: 'proPerUser', max: limits.proPerUser ?? 5, windowMs: 24 * 3600 * 1000 });
   app.post('/api/auth/pro', (req, res) => {
     if (!req.user) return fail(res, 401, 'Bitte zuerst anmelden');
     if (!jsonOnly(req, res)) return;

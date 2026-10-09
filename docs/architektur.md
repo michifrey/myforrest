@@ -68,9 +68,9 @@ src/pmtiles.js       PMTiles-v3-Schreiber (Hilbert-Kachel-IDs, Verzeichnisse mit
 src/mbtiles.js       MBTiles-1.3-Schreiber (SQLite)
 src/metadata.js      Metadatensatz nach ISO 19139 und GM03 (ISO19139.che) für geocat.ch, viersprachig
 src/routes/ogc-tiles.js  OGC API – Tiles (WebMercatorQuad und SwissLV95) und MapLibre-Stil
-src/auth.js          Konten, Passwort-Hashing (scrypt), Sitzungen, Rate-Limit
+src/auth.js          Konten, Passwort-Hashing (scrypt), Sitzungen, Rate-Limits (dauerhaft in SQLite)
 src/orgs.js          Organisationen mit Leitung und Mitgliedern; gelten, solange eine Person der Leitung verifiziert ist
-src/oauth.js         Anmelden mit Google und GitHub (OAuth 2.0 mit PKCE), ohne Abhängigkeiten
+src/oauth.js         Anmelden mit Google, GitHub, Microsoft, SWITCH edu-ID und weiteren OpenID-Connect-Diensten (OAuth 2.0 mit PKCE, Discovery), ohne Abhängigkeiten
 src/mail.js          E-Mail-Versand über SMTP (TLS/STARTTLS, AUTH PLAIN) für Bestätigungs- und Reset-Links
 src/moderation.js    Lizenzen, Meldungen, Ausblenden und Protokoll
 src/routes/accounts.js  Routen für Konten und Moderation, CSRF-Schutz, Rechte auf Fotos
