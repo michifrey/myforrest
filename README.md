@@ -225,8 +225,8 @@ map.geo.admin.ch. Ein Klick auf ein Objekt zeigt seine Angaben.
 </p>
 
 *Touren & Aufträge* hält fest, wo man unterwegs ist. Eine Route lässt sich auf der Karte **zeichnen**
-(Klick für Klick; der Wege-Magnet zieht die Linie auf Wege und Pfade), mit dem Handy per GPS **aufzeichnen** oder als GPX, TCX, KML
-oder GeoJSON **importieren**. Gelbe Kilometer-Marken zeigen den Verlauf, jede Route geht auch als GPX
+(Klick für Klick; der Wege-Magnet zieht die Linie auf Wege und Pfade), mit dem Handy per GPS **aufzeichnen** oder als GPX, FIT
+(Sportuhr, Velocomputer), TCX, KML oder GeoJSON **importieren**. Ein **Höhenprofil** zeigt Auf- und Abstieg. Gelbe Kilometer-Marken zeigen den Verlauf, jede Route geht auch als GPX
 wieder hinaus. Mit dem eigenen Routing-Server bevorzugt der Magnet Forststrassen und Rückegassen und führt
 während der Schutzzeit um **Wildruhezonen** herum, die die Karte beim Planen zeigt. Mit Konto lassen sich Touren speichern und veröffentlichen; andere sehen eine öffentliche
 Tour ohne Zeiten und ohne die ersten und letzten 200 m. Über eine Tour mit Zeitstempeln lassen sich im
@@ -236,7 +236,10 @@ Ein **Fotoauftrag** (rechts) bittet um ein Foto von einem Ort, etwa «Neue Licht
 Nordost», oder um ein neues Foto eines Spots. Er nennt keine Zeit und keinen Namen. Wer eine Route plant,
 sieht unter *Unterwegs fotografieren* (links) in der Reihenfolge der Strecke, was nahe am Weg liegt: offene
 Aufträge, Spots mit Satelliten-Frühwarnung und Fotoreihen, die seit über einem Jahr ruhen. Die Route wird
-dafür nicht gespeichert. Ein Foto am richtigen Ort erledigt den Auftrag automatisch.
+dafür nicht gespeichert. Ein Foto am richtigen Ort erledigt den Auftrag automatisch, und wer ihn gestellt hat,
+bekommt eine Push-Nachricht. Aufträge gelten eine Woche bis ein Jahr (Standard drei Monate).
+
+<p align="center"><img src="docs/screenshots/hoehenprofil.jpg" width="320" alt="Importierte FIT-Datei mit Höhenprofil, Auf- und Abstieg"></p>
 
 ### 11. Geschützte Funde für PRO-Mitglieder
 
@@ -377,7 +380,7 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   - Metadaten für geocat.ch und opendata.swiss (GM03/ISO 19139).
   - Ein fertiges QGIS-Projekt für QGIS Server (WMS/WMTS/WFS) für Geoportale wie map.geo.admin.ch.
 - **[Touren und Fotoaufträge](docs/funktionen.md#touren-und-fotoaufträge)**: Routen zeichnen, per GPS
-  aufzeichnen oder importieren (GPX, TCX, KML, GeoJSON, NMEA), als GPX exportieren und speichern; Fotoaufträge
+  aufzeichnen oder importieren (GPX, FIT, TCX, KML, GeoJSON, NMEA), als GPX exportieren und speichern; Fotoaufträge
   ohne Zeit und Namen und Vorschläge entlang der eigenen Route.
 - **[Geschützte Funde](docs/funktionen.md#geschützte-funde-und-pro-mitglieder)**: seltene Arten und Pilzstellen
   nur für verifizierte PRO-Mitglieder (Forstdienst, Naturschutz), öffentlich nur als 5-km-Raster;
