@@ -393,6 +393,9 @@ async function openSpot(id, photoId) {
 
   fillCompareSelects();
   showPhoto(state.index);
+  // Closures during logging: PRO members (forest service) and moderation.
+  const u = window.Account?.user;
+  $('closure-spot').hidden = !(u && (u.pro || ['moderator', 'admin'].includes(u.role)));
   updateSpotChange(state.spot);
   renderChronicle(state.spot);
   loadSpotStorms(state.spot);
