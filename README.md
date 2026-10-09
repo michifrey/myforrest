@@ -413,6 +413,7 @@ für den Wege-Magnet mit ([`deploy/brouter`](deploy/brouter/README.md)).
 | Dokument | Inhalt |
 |----------|--------|
 | [Funktionen im Detail](docs/funktionen.md) | Alle Funktionen mit Verfahren, Schwellenwerten und Grenzen |
+| [Tech-Onboarding](docs/tech-onboarding.md) | Selbst hosten: Voraussetzungen, Speicherplatz, Lizenzen, Ports, Zertifikate, ausgehende Verbindungen, Checkliste |
 | [Installation und Konfiguration](docs/installation.md) | Voraussetzungen, HTTPS fürs Handy, Umgebungsvariablen, externer Detektor, Phänologie-Daten |
 | [Betrieb, Datenschutz und Datenquellen](docs/betrieb.md) | Hinweise für einen öffentlichen Betrieb, externe Dienste und Quellenangaben |
 | [Architektur](docs/architektur.md) | Aufbau des Codes, Module im Überblick |
