@@ -5,7 +5,7 @@
 - Ohne `REQUIRE_LOGIN=1` lassen sich anonym hochgeladene Fotos von allen bearbeiten und löschen, wie bisher
   im Prototyp. Für einen öffentlichen Betrieb `REQUIRE_LOGIN=1` setzen und hinter HTTPS betreiben (das
   Sitzungs-Cookie erhält `Secure`, wenn die Anfrage über HTTPS bzw. `X-Forwarded-Proto: https` kommt).
-- Mit Anmeldung über Google oder GitHub erhalten diese Dienste beim Anmelden die Information, dass sich
+- Mit Anmeldung über Google, GitHub, Microsoft, SWITCH edu-ID oder einen weiteren Dienst erhalten diese Dienste beim Anmelden die Information, dass sich
   jemand bei dieser Instanz anmeldet; MyForrest speichert vom Anbieter nur die Konto-Kennung, die E-Mail-Adresse
   und den Namen. Client-Secrets und `SMTP_URL` (enthält das Mail-Passwort) gehören in Secrets, nicht in
   Repository oder ConfigMap.
@@ -13,6 +13,9 @@
   Kameramodell). Ausnahmen sind die Vorschaubilder und die aus HEIC umgewandelten JPEGs, die keine
   EXIF-Daten enthalten. Vor einem öffentlichen Betrieb sollten Metadaten entfernt und Personen sowie
   Kennzeichen automatisch verpixelt werden.
+- Die Rate-Limits (Tabelle `rate_limits`) speichern IP- und E-Mail-Adressen nur als SHA-256-Hash und
+  höchstens 24 Stunden. Das ist eine Pseudonymisierung, keine Anonymisierung: Ein Hash einer IP-Adresse
+  lässt sich durch Durchprobieren zurückrechnen, deshalb die kurze Aufbewahrung. Wer eine Sperre von Hand aufheben will: `DELETE FROM rate_limits;` in der Datenbank.
 - *Konto löschen* entfernt das Konto sofort aus der Datenbank. Behaltene Fotos sind danach nur noch über
   den Namen „Anonym“ vom Konto getrennt: Ihre EXIF-Daten (siehe oben) können weiterhin etwa Kameramodell
   oder einen in der Kamera eingetragenen Namen enthalten. Backups der Datenbank und von `data/uploads`

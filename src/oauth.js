@@ -8,6 +8,19 @@
  *   the access token, so no ID token signature has to be checked here.
  * - GitHub (OAuth App): the profile from /user, the e-mail address from
  *   /user/emails (only a primary, verified one).
+ * - SWITCH edu-ID and any other OpenID Connect provider (`oidc`): the
+ *   endpoints come from the provider's discovery document
+ *   (`<issuer>/.well-known/openid-configuration`, fetched once and checked
+ *   against the configured issuer), the profile from its userinfo endpoint.
+ *   An address counts as verified only with `email_verified: true`.
+ * - Microsoft (personal, work and school accounts): the profile comes from
+ *   the ID token, received directly from the token endpoint over TLS (so,
+ *   as OpenID Connect allows, without checking its signature; audience,
+ *   expiry, issuer and tenant are checked). Microsoft sends no
+ *   `email_verified`, and in other tenants anybody can enter any address
+ *   ("nOAuth"): the address counts as verified only with the optional claim
+ *   `xms_edov` (domain owner verified), which the app registration has to
+ *   add to the ID token together with `email`.
  *
  * A provider is enabled when its client ID and secret are configured. The
  * `state` and the PKCE verifier travel in a short-lived httpOnly cookie bound
@@ -57,7 +70,69 @@ const PROVIDERS = {
   },
 };
 
+/** Profile from a standard OpenID Connect userinfo response. */
+async function oidcProfile(token, get, provider) {
+  const p = await get(provider.userinfoUrl, token);
+  const name = p.name || [p.given_name, p.family_name].filter(Boolean).join(' ') || p.preferred_username || null;
+  return {
+    subject: p.sub === undefined ? null : String(p.sub),
+    email: p.email || null,
+    emailVerified: p.email_verified === true || p.email_verified === 'true',
+    name,
+  };
+}
+
+// OpenID Connect providers whose endpoints are discovered from their issuer.
+Object.assign(PROVIDERS, {
+  // Switch edu-ID: the login of Swiss universities, colleges and research; also open to everyone.
+  eduid: { label: 'SWITCH edu-ID', issuer: 'https://login.eduid.ch/', scope: 'openid email profile', profile: oidcProfile },
+  // Any further provider, e.g. the Microsoft account of an organisation or a Keycloak (issuer and label from the config).
+  oidc: { label: 'OpenID Connect', scope: 'openid email profile', profile: oidcProfile },
+});
+
+const truthy = (v) => v === true || v === 1 || v === '1' || v === 'true';
+
+/** Profile from Microsoft's ID token; throws when the token does not belong to this app and tenant. */
+function microsoftProfile(token, get, provider, tokens) {
+  const parts = String(tokens?.id_token || '').split('.');
+  let c;
+  try {
+    c = JSON.parse(Buffer.from(parts[1] || '', 'base64url').toString('utf8'));
+  } catch {
+    throw new Error('Microsoft hat kein gültiges ID-Token geliefert');
+  }
+  const iss = /^https:\/\/login\.microsoftonline\.com\/([0-9a-f-]{36})\/v2\.0$/.exec(String(c.iss || ''));
+  const aud = Array.isArray(c.aud) ? c.aud : [c.aud];
+  const tenantFixed = /^[0-9a-f-]{36}$/.test(provider.tenant);
+  if (!iss || iss[1] !== c.tid || !aud.includes(provider.clientId) || !(Number(c.exp) * 1000 > Date.now() - 60_000)
+    || (tenantFixed && c.tid !== provider.tenant)) {
+    throw new Error('Microsoft hat ein ID-Token für eine andere Anwendung oder Organisation geliefert');
+  }
+  const email = c.email || null;
+  return {
+    subject: c.sub === undefined ? null : String(c.sub),
+    email,
+    emailVerified: Boolean(email) && truthy(c.xms_edov),
+    name: c.name || c.preferred_username || null,
+  };
+}
+
+// Microsoft: endpoints per tenant ('common' = personal and organisation accounts, 'organizations',
+// 'consumers' or one tenant's id).
+PROVIDERS.microsoft = {
+  label: 'Microsoft',
+  tenant: 'common',
+  scope: 'openid email profile',
+  extraParams: { prompt: 'select_account' },
+  urls: (p) => ({
+    authorizeUrl: `https://login.microsoftonline.com/${encodeURIComponent(p.tenant)}/oauth2/v2.0/authorize`,
+    tokenUrl: `https://login.microsoftonline.com/${encodeURIComponent(p.tenant)}/oauth2/v2.0/token`,
+  }),
+  profile: microsoftProfile,
+};
+
 const base64url = (buf) => Buffer.from(buf).toString('base64url');
+const sameIssuer = (a, b) => String(a || '').replace(/\/+$/, '') === String(b || '').replace(/\/+$/, '');
 
 /**
  * Enabled providers from the configuration, e.g.
@@ -67,7 +142,40 @@ const base64url = (buf) => Buffer.from(buf).toString('base64url');
 function createOAuth({ providers = {}, publicUrl = null, fetchImpl = fetch } = {}) {
   const enabled = {};
   for (const [id, conf] of Object.entries(providers)) {
-    if (PROVIDERS[id] && conf?.clientId && conf?.clientSecret) enabled[id] = { ...PROVIDERS[id], ...conf, id };
+    if (!PROVIDERS[id] || !conf?.clientId || !conf?.clientSecret) continue;
+    const p = { ...PROVIDERS[id], ...Object.fromEntries(Object.entries(conf).filter(([, v]) => v)), id };
+    if (p.profile === oidcProfile && !p.issuer && !p.authorizeUrl) continue; // a generic provider needs its issuer
+    if (p.urls && !conf.authorizeUrl) Object.assign(p, p.urls(p));
+    enabled[id] = p;
+  }
+
+  /** Endpoints of an OpenID Connect provider from its discovery document (cached; retried after a failure). */
+  const discovered = new Map();
+  async function endpoints(provider) {
+    if (provider.authorizeUrl) return provider;
+    if (!discovered.has(provider.id)) {
+      discovered.set(provider.id, (async () => {
+        const url = `${provider.issuer.replace(/\/+$/, '')}/.well-known/openid-configuration`;
+        const res = await fetchImpl(url, { headers: { Accept: 'application/json', 'User-Agent': 'MyForrest' } });
+        if (!res.ok) throw new Error(`${provider.label} ist gerade nicht erreichbar (HTTP ${res.status})`);
+        const d = await res.json();
+        if (!sameIssuer(d.issuer, provider.issuer)) throw new Error(`${provider.label}: der Anbieter meldet einen anderen Aussteller`);
+        const https = (u) => typeof u === 'string' && u.startsWith('https://');
+        if (![d.authorization_endpoint, d.token_endpoint, d.userinfo_endpoint].every(https)) {
+          throw new Error(`${provider.label}: unvollständige Konfiguration des Anbieters`);
+        }
+        const methods = d.token_endpoint_auth_methods_supported;
+        return {
+          ...provider,
+          authorizeUrl: d.authorization_endpoint,
+          tokenUrl: d.token_endpoint,
+          userinfoUrl: d.userinfo_endpoint,
+          // client_secret_post when offered (or when nothing is said), otherwise HTTP Basic.
+          basicAuth: Array.isArray(methods) && !methods.includes('client_secret_post') && methods.includes('client_secret_basic'),
+        };
+      })().catch((err) => { discovered.delete(provider.id); throw err; }));
+    }
+    return discovered.get(provider.id);
   }
 
   const redirectUri = (provider, origin) => `${(publicUrl || origin).replace(/\/+$/, '')}/api/auth/oauth/${provider.id}/callback`;
@@ -86,11 +194,12 @@ function createOAuth({ providers = {}, publicUrl = null, fetchImpl = fetch } = {
     get: (id) => (Object.hasOwn(enabled, id) ? enabled[id] : null),
 
     /** Starts a flow: the provider URL to redirect to and the cookie value to set. */
-    begin(provider, origin) {
+    async begin(provider, origin) {
+      const ep = await endpoints(provider);
       const state = base64url(crypto.randomBytes(24));
       const verifier = base64url(crypto.randomBytes(32));
       const challenge = base64url(crypto.createHash('sha256').update(verifier).digest());
-      const url = new URL(provider.authorizeUrl);
+      const url = new URL(ep.authorizeUrl);
       url.search = new URLSearchParams({
         response_type: 'code',
         client_id: provider.clientId,
@@ -119,36 +228,51 @@ function createOAuth({ providers = {}, publicUrl = null, fetchImpl = fetch } = {
       }
       if (typeof query.code !== 'string' || !query.code) throw new Error(`${provider.label} hat keinen Code geliefert`);
 
-      const res = await fetchImpl(provider.tokenUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json', 'User-Agent': 'MyForrest' },
-        body: new URLSearchParams({
-          grant_type: 'authorization_code',
-          code: query.code,
-          redirect_uri: redirectUri(provider, origin),
-          client_id: provider.clientId,
-          client_secret: provider.clientSecret,
-          code_verifier: verifier,
-        }).toString(),
-      });
+      const ep = await endpoints(provider);
+      const form = {
+        grant_type: 'authorization_code',
+        code: query.code,
+        redirect_uri: redirectUri(provider, origin),
+        client_id: provider.clientId,
+        code_verifier: verifier,
+      };
+      const headers = { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json', 'User-Agent': 'MyForrest' };
+      if (ep.basicAuth) {
+        const enc = (v) => encodeURIComponent(v);
+        headers.Authorization = `Basic ${Buffer.from(`${enc(provider.clientId)}:${enc(provider.clientSecret)}`).toString('base64')}`;
+      } else {
+        form.client_secret = provider.clientSecret;
+      }
+      const res = await fetchImpl(ep.tokenUrl, { method: 'POST', headers, body: new URLSearchParams(form).toString() });
       const tokens = await res.json().catch(() => ({}));
       if (!res.ok || !tokens.access_token) {
         throw new Error(`${provider.label} hat die Anmeldung nicht bestätigt${tokens.error ? ` (${tokens.error})` : ''}`);
       }
-      const profile = await provider.profile(tokens.access_token, getJson);
+      const profile = await ep.profile(tokens.access_token, getJson, ep, tokens);
       if (!profile.subject || profile.subject === 'undefined') throw new Error(`${provider.label} hat kein Konto geliefert`);
       return profile;
     },
   };
 }
 
-/** Provider configuration from the environment (GOOGLE_CLIENT_ID, GITHUB_CLIENT_SECRET, …). */
+/**
+ * Provider configuration from the environment: GOOGLE_, GITHUB_, MICROSOFT_,
+ * EDUID_ and OIDC_CLIENT_ID / _CLIENT_SECRET; the generic provider also takes
+ * OIDC_ISSUER and OIDC_LABEL (EDUID_ISSUER may point to a test system), and
+ * MICROSOFT_TENANT limits the accounts (default 'common').
+ */
 function providersFromEnv(env = process.env) {
   const out = {};
   for (const id of Object.keys(PROVIDERS)) {
     const key = id.toUpperCase();
     if (env[`${key}_CLIENT_ID`] && env[`${key}_CLIENT_SECRET`]) {
-      out[id] = { clientId: env[`${key}_CLIENT_ID`], clientSecret: env[`${key}_CLIENT_SECRET`] };
+      out[id] = {
+        clientId: env[`${key}_CLIENT_ID`],
+        clientSecret: env[`${key}_CLIENT_SECRET`],
+        issuer: env[`${key}_ISSUER`] || undefined,
+        label: env[`${key}_LABEL`] || undefined,
+        tenant: env[`${key}_TENANT`] || undefined,
+      };
     }
   }
   return out;

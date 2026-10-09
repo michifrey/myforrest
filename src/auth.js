@@ -120,9 +120,14 @@ function serializeCookie(name, value, { maxAge, secure, path = '/' } = {}) {
 
 /**
  * Fixed-window rate limiter: at most `max` failures per key within `windowMs`.
- * Kept in memory; good enough for a single process.
+ *
+ * With `db` and a `name`, the counters live in the table `rate_limits` and
+ * so survive restarts (and are shared by processes on the same database);
+ * keys (IP addresses, e-mail addresses) are stored only as SHA-256 hashes,
+ * and rows past their window are deleted. Without `db`, they stay in memory.
  */
-function createLimiter({ max, windowMs, now = Date.now }) {
+function createLimiter({ max, windowMs, now = Date.now, db = null, name = null }) {
+  if (db && name) return createStoredLimiter({ max, windowMs, now, db, name });
   const hits = new Map();
   const entry = (key) => {
     const t = now();
@@ -144,6 +149,41 @@ function createLimiter({ max, windowMs, now = Date.now }) {
     },
     hit(key) { entry(key).count += 1; },
     reset(key) { hits.delete(key); },
+  };
+}
+
+function createStoredLimiter({ max, windowMs, now, db, name }) {
+  db.exec(`CREATE TABLE IF NOT EXISTS rate_limits (
+    bucket TEXT NOT NULL,
+    key    TEXT NOT NULL, -- SHA-256 of the key
+    start  INTEGER NOT NULL,
+    count  INTEGER NOT NULL,
+    PRIMARY KEY (bucket, key)
+  )`);
+  const hash = (key) => sha256(String(key));
+  const row = db.prepare('SELECT start, count FROM rate_limits WHERE bucket = ? AND key = ?');
+  const upsert = db.prepare(`INSERT INTO rate_limits (bucket, key, start, count) VALUES (?, ?, ?, 1)
+    ON CONFLICT (bucket, key) DO UPDATE SET
+      count = CASE WHEN rate_limits.start <= excluded.start - ? THEN 1 ELSE rate_limits.count + 1 END,
+      start = CASE WHEN rate_limits.start <= excluded.start - ? THEN excluded.start ELSE rate_limits.start END`);
+  const remove = db.prepare('DELETE FROM rate_limits WHERE bucket = ? AND key = ?');
+  const expire = db.prepare('DELETE FROM rate_limits WHERE bucket = ? AND start <= ?');
+  expire.run(name, now() - windowMs);
+  let writes = 0;
+  return {
+    blocked(key) {
+      const r = row.get(name, hash(key));
+      const t = now();
+      if (!r || t - r.start >= windowMs || r.count < max) return 0;
+      return Math.ceil((r.start + windowMs - t) / 1000);
+    },
+    hit(key) {
+      const t = now();
+      upsert.run(name, hash(key), t, windowMs, windowMs);
+      writes += 1;
+      if (writes % 100 === 0) expire.run(name, t - windowMs);
+    },
+    reset(key) { remove.run(name, hash(key)); },
   };
 }
 

@@ -25,7 +25,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 module.exports = function registerOrganizations(app, { db, auth, mod, mailer, publicUrl, limits = {}, fail, adminOnly }) {
   const orgs = auth.orgs;
-  const addPerUser = createLimiter({ max: limits.orgAddPerUser ?? 50, windowMs: 24 * 3600 * 1000 });
+  const addPerUser = createLimiter({ db, name: 'addPerUser', max: limits.orgAddPerUser ?? 50, windowMs: 24 * 3600 * 1000 });
   const isAdmin = (u) => u?.role === 'admin';
 
   /** The organisation of the request and what the current account may do in it, or an error sent. */
@@ -120,7 +120,7 @@ module.exports = function registerOrganizations(app, { db, auth, mod, mailer, pu
 
   /* ---------- Opening an invitation link ---------- */
 
-  const lookupPerIp = createLimiter({ max: limits.inviteLookupPerIp ?? 30, windowMs: 3600 * 1000 });
+  const lookupPerIp = createLimiter({ db, name: 'lookupPerIp', max: limits.inviteLookupPerIp ?? 30, windowMs: 3600 * 1000 });
   const invitation = (req, res) => {
     if (lookupPerIp.blocked(req.ip)) return void fail(res, 429, 'Zu viele Versuche – bitte später erneut');
     lookupPerIp.hit(req.ip);
