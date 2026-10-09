@@ -26,6 +26,9 @@ module.exports = function registerClimate(app, {
   const phenoref = createPhenoRef({ db, fetchImpl: phenoFetch, now });
 
   const spotRow = db.prepare('SELECT id, lat, lon, elevation FROM spots WHERE id = ?');
+  // Trees of a spot (Pl@ntNet or by hand), as trees.js entries.
+  const spotTreesOf = (spotId) => db.prepare('SELECT DISTINCT scientific_name FROM spot_species WHERE spot_id = ?').all(spotId)
+    .map((r) => require('../trees').treeInfo(r.scientific_name)).filter(Boolean);
   const spotPhotos = db.prepare('SELECT id, taken_at, change_json FROM photos WHERE spot_id = ? ORDER BY taken_at, id');
   const tagsOf = db.prepare('SELECT tag FROM photo_tags WHERE photo_id = ?');
   const iso = (t) => new Date(t).toISOString();
@@ -72,6 +75,17 @@ module.exports = function registerClimate(app, {
     return phenoref.forPlace(sciList, { lat: spot.lat, lon: spot.lon, elevation: spot.elevation });
   }
 
+  /**
+   * Leaf-out at a spot in the year of `takenAt`: this year's observations nearby, else the
+   * ten-year mean, of the spot's deciduous trees (then beech as the common forest tree).
+   */
+  function leafOutFor(spotId, species, takenAt) {
+    const spot = spotRow.get(spotId);
+    if (!spot) return null;
+    const list = [...new Set([...species.filter((t) => !t.evergreen).map((t) => t.sci), 'Fagus sylvatica'])];
+    return phenoref.leafOut(list, { lat: spot.lat, lon: spot.lon, elevation: spot.elevation }, new Date(takenAt).getUTCFullYear());
+  }
+
   /** Expected start of colouring of one species at a spot from the reference series, or null. */
   function colourHere(spotId, tree, terrain = terrainOf(spotId)) {
     if (!tree.colourDoy) return null;
@@ -93,6 +107,7 @@ module.exports = function registerClimate(app, {
     ctx.stormLink = interval ? { ...interval, windthrow, storm: likely, text: likely ? `vermutlich ${stormText(likely)}` : null } : null;
     return {
       nightFrost,
+      leafOut: leafOutFor(photo.spot_id, species, photo.taken_at),
       phenoRef: phenoRefFor(photo.spot_id, species.filter((t) => t.colourDoy).map((t) => t.sci)),
       irregularities: stormIrregularities({ events: ctx.storms, interval, windthrow, landform: terrain.landform }),
     };
@@ -208,6 +223,15 @@ module.exports = function registerClimate(app, {
     res.json(Object.values(refs).map((r) => ({ ...r, doyHere: r.doy + microShift(terrain) })));
   });
 
+  /** Leaf-out at the spot (for late frost): `?year=` (default this year), observed or ten-year mean. */
+  app.get('/api/spots/:id/leafout', (req, res) => {
+    const id = idOf(req, res);
+    if (id === null) return;
+    if (!spotRow.get(id)) return res.status(404).json({ error: 'Spot nicht gefunden' });
+    const year = Number(req.query.year) || new Date(now()).getUTCFullYear();
+    res.json(leafOutFor(id, spotTreesOf(id), Date.UTC(year, 5, 1)));
+  });
+
   /**
    * Reference data changes every spot's assessment: once accounts exist, only
    * admins may load or import it (without accounts the prototype stays open).
@@ -219,23 +243,29 @@ module.exports = function registerClimate(app, {
     return next();
   };
 
-  /** Downloads the DWD annual-reporter series (needs access to opendata.dwd.de). */
+  /**
+   * Downloads the DWD annual- and immediate-reporter series (opendata.dwd.de), or with
+   * `?source=meteoschweiz` the MeteoSchweiz phenology open data (data.geo.admin.ch).
+   */
   app.post('/api/phenoref/sync', adminOnly, async (req, res) => {
+    const meteo = req.query.source === 'meteoschweiz';
     try {
-      const result = await phenoref.syncDwd();
+      const result = meteo ? await phenoref.syncMeteoSchweiz() : await phenoref.syncDwd();
       reassessAll();
       res.json(result);
     } catch (err) {
-      res.status(502).json({ error: `DWD-Daten nicht verfügbar: ${err.message}` });
+      res.status(502).json({ error: `${meteo ? 'MeteoSchweiz' : 'DWD'}-Daten nicht verfügbar: ${err.message}` });
     }
   });
 
   /**
-   * Imports a file as text: `?format=generic` (CSV source;station_id;…;doy)
-   * or `?format=dwd&kind=stations|plants|phases|observations&name=<DWD file name>`.
-   * Description files (plants, phases) are kept for the following observation imports.
+   * Imports a file as text: `?format=generic` (CSV source;station_id;…;doy[;phase]),
+   * `?format=dwd&kind=stations|plants|phases|observations&name=<DWD file name>` or
+   * `?format=meteoschweiz&kind=stations|parameters|observations`.
+   * Description files (plants, phases, parameters) are kept for the following observation imports.
    */
   const pendingDwd = { plants: '', phases: '' };
+  const pendingMeteo = { stations: '', parameters: '' };
   app.post('/api/phenoref/import', adminOnly, express.text({ type: () => true, limit: '80mb' }), (req, res) => {
     const text = typeof req.body === 'string' ? req.body : '';
     if (!text.trim()) return res.status(400).json({ error: 'Leere Datei' });
@@ -251,8 +281,19 @@ module.exports = function registerClimate(app, {
       result = kind === 'stations'
         ? phenoref.importDwd({ stations: text })
         : phenoref.importDwd({ ...pendingDwd, files: [{ name: String(req.query.name || ''), text }] });
+    } else if (req.query.format === 'meteoschweiz') {
+      const kind = String(req.query.kind || 'observations');
+      if (kind === 'parameters') {
+        pendingMeteo.parameters = text;
+        return res.json({ stored: kind });
+      }
+      if (kind === 'stations') pendingMeteo.stations = text;
+      result = kind === 'stations'
+        ? phenoref.importMeteoSchweiz({ stations: text })
+        : phenoref.importMeteoSchweiz({ ...pendingMeteo, data: [text] });
+      if (kind !== 'stations' && !pendingMeteo.parameters) result.hint = 'Zuerst die Parameter-Beschreibung laden (kind=parameters)';
     } else {
-      return res.status(400).json({ error: 'Parameter "format" (dwd oder generic) fehlt' });
+      return res.status(400).json({ error: 'Parameter "format" (dwd, meteoschweiz oder generic) fehlt' });
     }
     reassessAll();
     res.json(result);

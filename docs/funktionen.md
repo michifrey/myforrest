@@ -431,6 +431,15 @@ geschätzt unter 0 °C fallen, zählen als Spätfrost. Im Kontext des Fotos steh
 Modellminimum, geschätztem Minimum in der Senke, Wind und Bewölkung. Fehlen Stundenwerte, gilt die alte
 3-°C-Regel.
 
+**Ab dem echten Laubaustrieb**: Frost schadet erst den ausgetriebenen Blättern. Die App nimmt deshalb den
+Austrieb der Region (siehe [Phänologie-Referenzdaten](#phänologie-referenzdaten)): für das Jahr des Fotos die
+Beobachtungen nahe gelegener Stationen, sobald sie gemeldet sind (DWD-Sofortmelder, MeteoSchweiz), sonst das
+Mittel der letzten zehn Jahre, mit 3 Tagen pro 100 m später in der Höhe. Massgebend sind die Laubbäume am Spot,
+ohne bestimmte Bäume die Buche. Frostnächte davor zählen nicht. Der Hinweis nennt die Quelle, z. B. *Das Laub
+treibt hier um den 28.04. aus (Beobachtet 2026: MeteoSchweiz-Station Zürich-Fluntern, 2 km, 556 m, auf die Höhe
+des Spots umgerechnet)*. Ohne Daten gilt wie bisher der 15. April. Die Stundenwerte der Nächte deckt die App
+vom 15. April bis 15. Juni ab; ein Austrieb vor dem 15. April verschiebt den Beginn also nicht nach vorne.
+
 ### Sturmereignisse
 
 Für jeden Spot lädt die App die täglichen Spitzenböen und die vorherrschende
@@ -448,12 +457,45 @@ DWD-Warnungen (Sturmböen Bft 9, schwere Sturmböen 10, orkanartige Böen 11, Or
 
 ERA5 rechnet auf einem Raster von rund 25 km und glättet Böenspitzen; die Werte sind eher eine untere Grenze.
 
+### Sturmwarnung und Besuch nach dem Sturm
+
+Alle drei Stunden (`STURM_WARN_HOURS`) holt der Server die Prognose der stärksten Böe für heute und die
+nächsten zwei Tage, für jedes Feld von 0,1° mit Spots, aus einem fein aufgelösten Modell (`STURM_MODELL`,
+Standard `icon_seamless`: ICON-D2 mit ~2 km für die ersten zwei Tage, danach ICON-EU, über Open-Meteo; mehrere
+Felder pro Anfrage). Ab Sturmböen (75 km/h, Bft 9) entsteht eine Warnung:
+
+1. **Vor dem Sturm** bekommt, wer einem betroffenen Spot folgt oder ihn regelmässig fotografiert (wie bei der
+   Frühwarnung), eine Push-Nachricht, eine pro Person, auch bei mehreren Spots: *Sturmwarnung: Böen bis 96 km/h
+   – Schwere Sturmböen am Sa 10.10. bei 2 Spots (1, 3). Nach dem Sturm hilft ein Foto – aber erst hingehen, wenn
+   es sicher ist.* Eine stärkere Prognose für denselben Tag schickt keine zweite Nachricht.
+2. **Nach dem Sturm** (ab dem Folgetag) entscheiden die gemessenen Böen (ERA5 bzw. die letzten Tage der
+   Prognose-API, ±1 Tag): Kam der Sturm, folgt *Nach dem Sturm: Spots besuchen* mit der gemessenen Böe und der
+   Bitte, erst bei freigegebenen Wegen und mit Abstand zu angeschobenen Bäumen zu gehen. Blieb er aus, endet
+   die Warnung still. Ohne Messwerte nach fünf Tagen ebenfalls.
+
+In der App steht über den Zahlen im Explorer ein Hinweis (*Sturmwarnung …* bzw. *Nach dem Sturm …*, eine Woche
+lang), *Diese Spots zeigen* und der Filter *Sturmwarnung / nach dem Sturm* zeigen die betroffenen Spots; der
+Link aus der Push-Nachricht öffnet sie ebenso. Die Liste (`/api/storm-warnings`) nennt nur Felder und Tage,
+keine Spots: Die App ordnet ihre sichtbaren Spots selbst zu, geschützte Funde bleiben verborgen.
+
+![Sturmwarnung im Explorer](screenshots/sturmwarnung.jpg)
+
 ### Phänologie-Referenzdaten
 
-Statt pauschaler Gradienten kann die App den Beginn der Herbstfärbung aus
-regionalen Beobachtungsreihen nehmen. Unterstützt sind die Jahresmelder-Daten des DWD (Phase
-*Blattverfärbung* für Rotbuche, Stiel- und Traubeneiche, Hänge-Birke, Rosskastanie, Eberesche, Linden,
-Ahorne und weitere) und ein einfaches CSV-Format für andere Quellen wie MeteoSchweiz. Für einen Spot zählen
+Statt pauschaler Gradienten kann die App den Beginn der Herbstfärbung und den Laubaustrieb aus
+regionalen Beobachtungsreihen nehmen. Unterstützt sind
+
+- die Jahresmelder-Daten des DWD (Phasen *Blattverfärbung* und *Blattentfaltung* für Rotbuche, Stiel- und
+  Traubeneiche, Hänge-Birke, Rosskastanie, Eberesche, Linden, Ahorne und weitere) und die **Sofortmelder** des
+  DWD, die das laufende Jahr innert Tagen melden;
+- die **offenen Phänologiedaten von MeteoSchweiz** (OGD über data.geo.admin.ch): Art und Phase liest die App aus
+  der deutschen Parameterbeschreibung (*Buche: Blattentfaltung*, *Buche: Blattverfärbung* …). Der Leser folgt der
+  veröffentlichten Beschreibung der Dateien; mit echten Downloads ist er noch nicht geprüft;
+- ein einfaches CSV-Format für weitere Quellen.
+
+Für den Laubaustrieb verschiebt die Höhe in die andere Richtung (3 Tage später pro 100 m), und für das laufende
+Jahr ersetzen die eigenen Beobachtungen das Mittel, sobald eine Station in der Nähe gemeldet hat. Für die
+Herbstfärbung gilt: Für einen Spot zählen
 die Stationen im Umkreis von 60 km (100 m Höhenunterschied wiegen wie 10 km Distanz) mit mindestens fünf
 Jahren in den letzten zehn abgeschlossenen Jahren. Bis zu drei Stationen werden gewichtet gemittelt und mit
 2,5 Tagen pro 100 m auf die Höhe des Spots umgerechnet. Exposition und Kaltluft kommen wie bisher dazu.
@@ -646,9 +688,20 @@ einen sandfarbenen Marker; der Filter oben links hat eine Gruppe *Landschaft*.
 **Trockengebiete**: Dort bleiben NDVI und NDMI aus Sentinel-2 (ausserhalb Europas ebenfalls verfügbar) das
 Mass für Vegetationsverlust und Wüstenbildung; die Frühwarnung meldet einen Rückgang gegenüber denselben
 Monaten der Vorjahre. Wetter und Normalwerte kommen weltweit von Open-Meteo. Die Schweizer Dienste
-(Kanton, Wildruhezonen, Landeskarte) greifen dort nicht. Grenzen: Auf wandernden Dünen fehlen feste
-Bezugspunkte, die automatische Ausrichtung braucht Fels, Bauten oder den Horizont im Bild; ohne sie bleibt
-das Foto unausgerichtet und wird nur nebeneinander verglichen.
+(Kanton, Wildruhezonen, Landeskarte) greifen dort nicht.
+
+**Ausrichtung am Horizont**: Auf wandernden Dünen fehlen feste Bezugspunkte, an denen die gewöhnliche
+Ausrichtung zwei Fotos aufeinanderlegt. Findet sie in einem Trockengebiet nichts, sucht die App in beiden
+Fotos die **Horizontlinie** (pro Bildspalte die erste Zeile von oben, die nicht mehr Himmel ist: hell und
+mindestens so blau wie rot, anders als Sand und Fels) und schiebt die beiden Linien gegeneinander. Die
+Verschiebung mit der besten Übereinstimmung gibt den seitlichen Versatz, der mittlere Höhenunterschied den
+senkrechten. Übernommen wird das nur, wenn die Linien sehr gut übereinstimmen (Korrelation mindestens 0,85
+auf mindestens der halben Bildbreite) und der Horizont Form hat; ein flacher Horizont ergibt keinen Versatz.
+
+Grenzen: Nur Verschiebung, keine Drehung oder Zoom (wer vom gleichen Standort mit gleicher Brennweite
+fotografiert, braucht nicht mehr); ein Horizont aus wandernden Dünen verändert sich selbst, das Foto liegt dann
+nur ungefähr; ohne Himmel im Bild (bedeckt und weiss-grau gegen hellen Sand) bleibt es unausgerichtet und wird
+nur nebeneinander verglichen.
 
 ### Gletscherumrisse
 
@@ -674,6 +727,23 @@ Der Kartenknopf **Gletscher** zeichnet die Umrisse aller Inventare übereinander
 gestrichelt, das neuste kräftig. Ein Klick auf ein Jahr in der Legende zeigt nur dieses Inventar. Die Umrisse
 erscheinen ab Zoomstufe 9 und werden für die Karte vereinfacht (Toleranz etwa ein Zweitausendstel des
 Ausschnitts, mindestens 5 m).
+
+### Längenänderung (GLAMOS)
+
+GLAMOS misst an rund 100 Schweizer Gletschern jedes Jahr, wie weit sich die Zunge zurückgezogen oder
+vorgestossen hat. Mit der Messreihe als CSV (`GLAMOS_CSV`, von glamos.ch → Daten → Längenänderung; mehrere
+Dateien durch Kommas getrennt) zeigt der Gletscher-Teil eines Spots die **Kurve der aufsummierten
+Längenänderung** und fasst sie zusammen: *Rückzug seit 1960: −725 m (65 Messungen bis 2025) · zuletzt
+−23,7 m pro Jahr* (Mittel der letzten zehn Jahre).
+
+Die Spalten werden an ihren Namen erkannt (Englisch oder Deutsch: Gletschername, SGI-Id, Beginn und Ende der
+Messperiode, Längenänderung), das Trennzeichen darf Komma, Semikolon oder Tabulator sein, Kommentarzeilen
+(`#`) werden übersprungen. Zugeordnet wird über die **SGI-Id** des Gletschers aus dem Inventar (`sgi-id`,
+`sgi_id`, `pk_sgi` …), sonst über den Namen ohne *Gletscher*, *Glacier*, *Ghiacciaio*, *Vadret* («Vadret da
+Morteratsch» passt zu «Morteratsch»). Die Messreihe gilt für die Zunge des ganzen Gletschers, nicht für den
+Ort des Spots.
+
+![Längenänderung aus GLAMOS und Archivbilder in der Nähe](screenshots/gletscher-archiv.jpg)
 
 ### Eis im Spätsommer (Sentinel-2)
 
@@ -721,6 +791,36 @@ erscheint im Zeitverlauf (*Archivfoto*) und im Vorher/Nachher-Vergleich. Über d
 Für Archivbilder gilt die Lizenz wie für alle Fotos: Hochladen darf man nur, was man selbst aufgenommen hat
 oder unter einer passenden Lizenz verwenden darf.
 
+**Archivbilder in der Nähe**: Mit einem Katalog offener Bildarchive (`ARCHIV_KATALOG`) schlägt der Gletscher-
+bzw. Gebirge-Teil eines Spots alte Aufnahmen vor, die höchstens 2 km entfernt sind und, wenn beide eine
+Blickrichtung haben, höchstens 60° davon abweichen, die nächsten zuerst. Jeder Vorschlag nennt Jahr, Titel,
+Abstand, Quelle und Lizenz und führt mit *Im Archiv ansehen* zur Seite des Archivs. Angemeldete übernehmen ein
+Bild mit **Übernehmen** als Archivfoto des Spots: Der Server lädt es von der Bild-Adresse des Katalogs, datiert
+es auf das Katalogdatum, legt es an den Spot, richtet es aus und schreibt Titel, Quelle, Lizenz und Link in die
+Notiz. Das Foto trägt die Lizenz des Archivbilds, nicht die Standardlizenz des Kontos.
+
+Übernommen werden nur Bilder, deren Lizenz das erlaubt: gemeinfrei (Public Domain, CC0), CC BY, CC BY-SA und
+CC BY-NC-SA. Bei anderen Lizenzen («Alle Rechte vorbehalten», CC BY-ND, unbekannt) bleibt es beim Link. Jedes
+Bild wird pro Spot einmal übernommen; danach verweist der Vorschlag auf das Foto.
+
+Der Katalog ist eine Datei, die der Betreiber zusammenstellt, etwa aus dem Bildarchiv der ETH-Bibliothek
+(e-pics, viele Gletscher- und Bergaufnahmen gemeinfrei oder CC BY-SA) oder den Luftbildern von swisstopo:
+CSV (Komma oder Semikolon) oder GeoJSON-Punkte mit
+
+| Spalte | Inhalt |
+|--------|--------|
+| `id` | Kennung im Katalog (Pflicht) |
+| `title` | Titel |
+| `date` | Aufnahmedatum: `1932`, `1932-08` oder `1932-08-14` (Pflicht; ohne Monat gilt Juli, ohne Tag der 15.) |
+| `lat`, `lon` oder `e`, `n` | Standort in WGS84 oder LV95 (Pflicht) |
+| `heading` | Blickrichtung in Grad (freiwillig) |
+| `source`, `license` | Quelle und Lizenz, wie sie das Archiv angibt |
+| `page` | Seite des Bilds im Archiv |
+| `image` | Adresse der Bilddatei (nur `https`; nötig für *Übernehmen*) |
+
+Der Server ruft nur die Bild-Adressen aus dem Katalog ab, nichts, was jemand im Browser angibt, und nur
+Bilddateien bis 30 MB.
+
 **Sicherheit**: Der Gletscher-Teil erinnert daran, Gletscher nur mit Erfahrung, Ausrüstung oder Bergführer zu
 betreten. Der Wege-Magnet führt nicht über Gletscher; das gewählte BRouter-Profil (`hiking-mountain`) meidet sie.
 
@@ -757,12 +857,24 @@ nur, wie viel wärmer oder kühler eine Stelle war als der Rest **derselben Tour
 3. Jede Tour zählt pro Zelle **einmal** (ihr Mittel dort), eine lange Pause wiegt nicht mehr als ein
    Vorbeilaufen.
 
+**Geeicht am Wettermodell**: Für die Mitte jeder Tour holt der Server die Lufttemperatur dieser Stunde aus dem
+Wettermodell (Open-Meteo, ERA5 bzw. Prognose; nur ein Rasterpunkt auf ~2 km gerundet und der Tag gehen dorthin).
+Liegt das Niveau der Uhr mehr als 3 °C darunter oder mehr als 15 °C darüber, war sie wohl unter dem Ärmel oder in
+der Tasche, und die Tour zählt nicht. Geprüft wird einmal pro Tour; ohne Modell (offline, zu frisch) zählt sie.
+
+**Jahres- und Tageszeit**: Ein Wald ist an einem Sommernachmittag kühler als die Wiese, in einer klaren Nacht
+oft wärmer. Jede Tour bekommt deshalb ein Halbjahr (Sommer April–September, Winter Oktober–März) und eine
+Tageszeit (Sonne über oder unter dem Horizont in der Mitte der Tour). Standardmässig zählen nur Touren, die zu
+Datum und Uhrzeit passen, die in *Sonne & Wetter* gewählt sind; *alle Touren* nimmt alles zusammen. Mit der
+Lufttemperatur des Modells zur gewählten Stunde schätzt der Tooltip die Temperatur in der Zelle
+(*≈ 18.4 °C um 14:00 (Luft laut Wettermodell 20.3 °C)*).
+
 Eine Zelle erscheint erst mit **mindestens 3 Touren von mindestens 2 Personen**, als Mittel ihrer Werte.
 Sie trägt keine Zeiten und keine Namen; die ersten und letzten 200 m jeder Tour zählen nicht. Die Ebene
 erscheint ab Zoom 13; der Schalter bleibt im Browser gespeichert. So zeigen sich mit der Zeit schattige
 Waldstücke, Bachtobel und Kaltluftsenken neben sonnigen Wiesen und Südhängen.
 
-![Kühle Abschnitte aus Touren: der Wald und ein Bachtobel kühler, eine Wiese wärmer](screenshots/kuehle-abschnitte.jpg)
+![Kühle Abschnitte aus Touren an einem Sommernachmittag: der Wald und ein Bachtobel kühler, eine Wiese wärmer](screenshots/kuehle-abschnitte.jpg)
 
 ### Horizontabschattung
 
@@ -783,6 +895,24 @@ als **Funde** aus (pro Foto die wahrscheinlichste Art, ab einem wählbaren Minde
 - **Hotspots**: Eine Kerndichte-Karte (Gauss-Kern, Radius 30–1000 m einstellbar) zeigt, wo sich Funde aller
   Neophyten, aller Arten oder einer gewählten Art häufen, mit Legende in Funden pro km². Die Spot-Marker
   weichen solange den einzelnen Funden; ein Klick auf einen Fund öffnet sein Foto.
+- **Suchaufwand berücksichtigen**: Wo viel fotografiert wird, gibt es auch mehr Funde. *Dichte: Funde pro 100
+  Fotos* teilt deshalb die Kerndichte der Funde durch dieselbe Kerndichte aller Fotos (an den Spots, mit ihrer
+  Anzahl Fotos) und zeigt das Verhältnis nur dort, wo mindestens 3 Fotos in der Nähe entstanden sind. Ein Ort, an
+  dem jedes zweite Foto Springkraut zeigt, fällt dann stärker auf als ein viel begangener Weg mit gleich vielen
+  Funden unter vielen Fotos.
+
+![Funde pro 100 Fotos: Neophyten-Hotspots mit Korrektur für den Suchaufwand](screenshots/arten-suchaufwand.jpg)
+
+- **Prüfen**: Verifizierte PRO-Mitglieder (z. B. Neobiota-Fachstellen, Forstdienst) und die Moderation prüfen
+  im Tab *Prüfen* die automatischen Bestimmungen, die neusten zuerst, mit Foto und allen Kandidaten von
+  Pl@ntNet: **bestätigen**, auf eine andere Art **korrigieren** (ein anderer Kandidat oder ein lateinischer Name)
+  oder **ablehnen** (kein Pflanzenfund, nicht bestimmbar). Die eigenen Fotos prüft jemand anderes (vier Augen);
+  nur die Moderation darf auch eigene. Abgelehnte Funde verschwinden aus Karte, Ausbreitung, Export und
+  Geodiensten; korrigierte zählen unter der neuen Art; bestätigte und korrigierte zählen unabhängig vom
+  Pl@ntNet-Score. Wer geprüft hat oder die Moderation kann die Prüfung zurücknehmen.
+
+![Automatische Bestimmungen prüfen: bestätigen, korrigieren oder ablehnen](screenshots/arten-pruefen.jpg)
+
 - **Ausbreitungsfronten**: Pro Art die besiedelte Fläche Jahr für Jahr als ineinanderliegende Umrisse
   (Alpha-Shape aller Funde bis zu diesem Jahr, jeder Fund um 25 m gepuffert), eingefärbt nach Jahr, mit
   Zeitregler und Abspielen. Die Alpha-Shape folgt dem tatsächlichen Bestand: Sie zerfällt in
@@ -813,9 +943,11 @@ als **Funde** aus (pro Foto die wahrscheinlichste Art, ab einem wählbaren Minde
   `coordinateUncertaintyInMeters` je nach Verortung, `basisOfRecord=HumanObservation`, Pl@ntNet-Score in
   `identificationRemarks`, Foto-URL in `associatedMedia`, Lizenz pro Foto, sobald es dafür eine Spalte gibt)
   und im **CSV-Importformat von iNaturalist** herunterladen. Filter: Art, nur Neophyten, Mindest-Score,
-  Kartenausschnitt, Zeitraum. Direkt zu iNaturalist oder Info Flora hochladen geht nicht, dafür bräuchte es dort
-  ein Konto und eine OAuth-Anmeldung. iNaturalist übernimmt beim CSV-Import keine Fotos, deshalb steht der
-  Foto-Link in der Beschreibung. Alle Bestimmungen sind automatisch und als `unverified` markiert.
+  Kartenausschnitt, Zeitraum und **nur von Menschen geprüfte Funde**. Direkt zu iNaturalist oder Info Flora hochladen
+  geht nicht, dafür bräuchte es dort ein Konto und eine OAuth-Anmeldung. iNaturalist übernimmt beim CSV-Import keine
+  Fotos, deshalb steht der Foto-Link in der Beschreibung. Geprüfte Funde stehen als `verified` in der Datei
+  (`identifiedBy`: *Pl@ntNet (automatisch), von Hand geprüft*, in `identificationRemarks` bestätigt oder korrigiert
+  samt Datum und dem Vorschlag von Pl@ntNet), die übrigen als `unverified`.
 
 ## Offene Geodaten für GIS und Geoportale
 
@@ -887,6 +1019,19 @@ einbinden.
     wie tileserver-gl oder martin.
   - Solange die Dateien zur aktuellen Datenversion noch berechnet werden, antworten beide mit 503 und
     `Retry-After`.
+  - **Auch für sehr grosse Datenmengen**: Die Dateien entstehen Kachel für Kachel aus dem Kachel-Speicher. Für
+    PMTiles hält der Server nur das Verzeichnis im Speicher (wenige Bytes pro Kachel) und schreibt die Kacheln
+    nacheinander in eine Zwischendatei, gleiche Kacheln nur einmal; MBTiles und GeoPackage werden seitenweise
+    gelesen. Das Ergebnis ist byte-gleich wie zuvor.
+- **LV95-Kacheln als GeoPackage**: `/api/export/myforrest-kacheln-lv95.gpkg` enthält die Vektorkacheln des
+  Datensatzes im Kachelgitter von swisstopo (EPSG:2056), nach der OGC-Erweiterung für Vektorkacheln in
+  GeoPackage (`data_type` *vector-tiles*, Ebenen und Felder in `gpkgext_vt_layers`/`gpkgext_vt_fields`, Mapbox
+  Vector Tiles). Weil ein GeoPackage verlangt, dass jede Zoomstufe dieselbe Fläche exakt abdeckt, und die
+  swisstopo-Auflösungen keine Zweierpotenzen sind (Erweiterung *gpkg_zoom_other*), enthält die Datei die feinen
+  Stufen, für die das aufgeht: 500 m bis 0,5 m pro Pixel (Stufen 15–26), auf einer Fläche, deren Seiten ein
+  Vielfaches aller dieser Kachelbreiten sind, oben links am Ursprung von swisstopo. Spalten und Zeilen sind
+  deshalb dieselben wie bei swisstopo und in der OGC API. GDAL (geprüft mit 3.12) und damit QGIS lesen
+  Vektorkacheln in GeoPackage noch nicht; in QGIS gehen die LV95-Kacheln über die OGC API Tiles.
 - **Metadaten für geocat.ch**: `/api/metadata/geocat.xml` beschreibt den Datensatz nach dem Schweizer
   Metadatenmodell GM03 (ISO19139.che), dem Format von geocat.ch. `/api/metadata/iso19139.xml` liefert
   dasselbe als reines ISO 19139 für andere Kataloge.
@@ -904,6 +1049,17 @@ einbinden.
     Französisch verlangen).
   - **Einstellungen**: Kontakt und Katalog über die Variablen `METADATA_*`
     (siehe [Installation](installation.md#umgebungsvariablen)).
+  - **Eintrag pro Collection**: `/api/metadata/collections/<id>/geocat.xml` (bzw. `iso19139.xml`) beschreibt jede
+    Collection einzeln (Spots, Fotos, Pflanzenfunde, Ausbreitungsfronten): eigener Titel und eigene Zusammenfassung in
+    vier Sprachen, eigene Ausdehnung und eigener Zeitraum, Download als GeoJSON und Vektorkacheln der Collection. Er
+    ist Teil des Datensatzes (`parentIdentifier` = Kennung des Datensatzes), seine Kennung bleibt ebenfalls gleich.
+  - **Objektkatalog (ISO 19110)**: `/api/metadata/objektkatalog.xml` beschreibt jede Collection als Objektart und
+    jedes Feld mit Definition, Datentyp und Einheit (z. B. *area_m2 – Besiedelte Fläche … Einheit: Quadratmeter*),
+    Felder mit festen Werten samt Liste (Status, Befunde, Herkunft der Position, Aktivität, Lizenz, Prüfstatus).
+    Datensatz und Collection-Einträge verweisen in `contentInfo` darauf (`MD_FeatureCatalogueDescription`), die
+    Startseite der OGC API und jede Collection verlinken Metadaten und Katalog (`describedby`). Collection-Einträge
+    und Objektkatalog sind bisher nur auf wohlgeformtes XML geprüft, nicht gegen die Schemas (vom Prüfrechner aus
+    nicht erreichbar).
 
 Ausgeblendete (moderierte) Fotos erscheinen in keinem Dienst.
 
@@ -912,8 +1068,9 @@ Ausgeblendete (moderierte) Fotos erscheinen in keinem Dienst.
 1. **Angaben setzen**: `PUBLIC_URL` (die Links im Datensatz zeigen sonst auf die Adresse der Anfrage),
    `METADATA_ORGANISATION` und `METADATA_EMAIL`, bei QGIS Server auch `METADATA_OWS_URL`.
 2. **Konto bei geocat.ch**: Organisationen erhalten ein Konto über das Team von geocat.ch bei swisstopo
-   (geocat.ch → Kontakt). Dort `/api/metadata/geocat.xml` als XML importieren. Nach Änderungen denselben
-   Datensatz erneut importieren; die gleiche Kennung ersetzt den bestehenden Eintrag.
+   (geocat.ch → Kontakt). Dort `/api/metadata/geocat.xml` als XML importieren, auf Wunsch auch die Einträge der
+   Collections und den Objektkatalog. Nach Änderungen denselben Datensatz erneut importieren; die gleiche Kennung
+   ersetzt den bestehenden Eintrag.
 3. **Weiter auf opendata.swiss**: opendata.swiss übernimmt Einträge aus geocat.ch, die das Schlagwort
    `opendata.swiss` und Nutzungsbedingungen von opendata.swiss tragen. `METADATA_OPENDATA_TERMS` setzt
    beides, mit einem der Werte `terms_open`, `terms_by`, `terms_ask` oder `terms_by_ask`. Die

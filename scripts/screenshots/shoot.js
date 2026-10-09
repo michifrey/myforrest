@@ -300,6 +300,12 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.evaluate(() => { document.querySelector('#panel').scrollTop -= 80; });
     await settle(page, 2000);
     await page.locator('#panel').screenshot({ path: out('gletscher.jpg'), ...jpg });
+    // GLAMOS length change and the archive pictures from the catalogue.
+    await page.waitForSelector('#glacier-archives .archive-list', { timeout: 10000 }).catch(() => {});
+    await page.evaluate(() => document.querySelector('.length-chart')?.scrollIntoView({ block: 'start' }));
+    await page.evaluate(() => { document.querySelector('#panel').scrollTop -= 60; });
+    await settle(page, 1500);
+    await page.locator('#panel').screenshot({ path: out('gletscher-archiv.jpg'), ...jpg });
     // Before/after: the postcard of 1928 against 2025.
     await page.evaluate(() => { document.querySelector('#panel').scrollTop = 0; });
     await page.click('#open-compare');

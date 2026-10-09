@@ -9,8 +9,14 @@
  *
  * Tiles come in already gzip-compressed (as the tile cache stores them).
  * Directories are gzip-compressed too; identical tiles are stored once.
+ *
+ * writePmtiles builds the archive in memory (small datasets, tests);
+ * writePmtilesFile streams it: tiles are read one at a time in tile id order
+ * and appended to a temporary file, only the directory entries (a few bytes
+ * per tile) stay in memory. Both give byte-identical archives.
  */
 
+const fs = require('node:fs');
 const zlib = require('node:zlib');
 const crypto = require('node:crypto');
 
@@ -110,7 +116,66 @@ function writePmtiles(tiles, { minzoom, maxzoom, bounds, center, metadata }, { r
   const tileData = Buffer.concat(parts);
   const { root, leaves } = buildDirectories(entries, rootMaxBytes);
   const meta = zlib.gzipSync(Buffer.from(JSON.stringify(metadata)));
+  const header = makeHeader({ root, meta, leaves, tileBytes: tileData.length, addressed: sorted.length, entries: entries.length,
+    contents: seen.size, minzoom, maxzoom, bounds, center });
+  return Buffer.concat([header, root, meta, leaves, tileData]);
+}
 
+/**
+ * Streams an archive to `file`: `keys` lists the tiles ([{ z, x, y }]), `read(z, x, y)`
+ * returns one gzip-compressed tile (or null). Same metadata as writePmtiles.
+ */
+function writePmtilesFile(file, { keys, read }, { minzoom, maxzoom, bounds, center, metadata }, { rootMaxBytes = ROOT_MAX_BYTES } = {}) {
+  const sorted = keys.map((k) => ({ z: k.z, x: k.x, y: k.y, tileId: zxyToTileId(k.z, k.x, k.y) })).sort((a, b) => a.tileId - b.tileId);
+  const dataFile = `${file}.data`;
+  const out = fs.openSync(dataFile, 'w');
+  const entries = [];
+  const seen = new Map(); // content hash → { offset, length }
+  let offset = 0;
+  let addressed = 0;
+  try {
+    for (const t of sorted) {
+      const data = read(t.z, t.x, t.y);
+      if (!data) continue;
+      addressed += 1;
+      const hash = crypto.createHash('sha1').update(data).digest('hex');
+      let loc = seen.get(hash);
+      if (!loc) {
+        loc = { offset, length: data.length };
+        seen.set(hash, loc);
+        fs.writeSync(out, data);
+        offset += data.length;
+      }
+      const last = entries[entries.length - 1];
+      if (last && last.offset === loc.offset && last.tileId + last.runLength === t.tileId) last.runLength += 1;
+      else entries.push({ tileId: t.tileId, offset: loc.offset, length: loc.length, runLength: 1 });
+    }
+  } finally {
+    fs.closeSync(out);
+  }
+  const { root, leaves } = buildDirectories(entries, rootMaxBytes);
+  const meta = zlib.gzipSync(Buffer.from(JSON.stringify(metadata)));
+  const header = makeHeader({ root, meta, leaves, tileBytes: offset, addressed, entries: entries.length,
+    contents: seen.size, minzoom, maxzoom, bounds, center });
+  // Header and directories first, then the tile data copied over in chunks.
+  const fd = fs.openSync(file, 'w');
+  try {
+    fs.writeSync(fd, Buffer.concat([header, root, meta, leaves]));
+    const src = fs.openSync(dataFile, 'r');
+    try {
+      const chunk = Buffer.alloc(1 << 20);
+      for (let n; (n = fs.readSync(src, chunk, 0, chunk.length, null)) > 0;) fs.writeSync(fd, chunk, 0, n);
+    } finally {
+      fs.closeSync(src);
+    }
+  } finally {
+    fs.closeSync(fd);
+    fs.rmSync(dataFile, { force: true });
+  }
+  return { tiles: addressed, entries: entries.length, contents: seen.size, bytes: fs.statSync(file).size };
+}
+
+function makeHeader({ root, meta, leaves, tileBytes, addressed, entries, contents, minzoom, maxzoom, bounds, center }) {
   const header = Buffer.alloc(HEADER_BYTES);
   header.write('PMTiles', 0, 'ascii');
   header.writeUInt8(3, 7);
@@ -123,10 +188,10 @@ function writePmtiles(tiles, { minzoom, maxzoom, bounds, center, metadata }, { r
   section(8, root.length);
   section(24, meta.length);
   section(40, leaves.length);
-  section(56, tileData.length);
-  header.writeBigUInt64LE(BigInt(sorted.length), 72); // addressed tiles
-  header.writeBigUInt64LE(BigInt(entries.length), 80); // tile entries
-  header.writeBigUInt64LE(BigInt(seen.size), 88); // tile contents
+  section(56, tileBytes);
+  header.writeBigUInt64LE(BigInt(addressed), 72); // addressed tiles
+  header.writeBigUInt64LE(BigInt(entries), 80); // tile entries
+  header.writeBigUInt64LE(BigInt(contents), 88); // tile contents
   header.writeUInt8(1, 96); // clustered: tile data in tile id order
   header.writeUInt8(COMPRESSION_GZIP, 97); // directories and metadata
   header.writeUInt8(COMPRESSION_GZIP, 98); // tiles
@@ -140,7 +205,7 @@ function writePmtiles(tiles, { minzoom, maxzoom, bounds, center, metadata }, { r
   header.writeUInt8(center[2], 118);
   header.writeInt32LE(e7(center[0]), 119);
   header.writeInt32LE(e7(center[1]), 123);
-  return Buffer.concat([header, root, meta, leaves, tileData]);
+  return header;
 }
 
-module.exports = { writePmtiles, zxyToTileId };
+module.exports = { writePmtiles, writePmtilesFile, zxyToTileId };

@@ -139,6 +139,8 @@ Die feste Adresse lässt sich als Variable `APP_URL` in die Android-App bauen, d
 | `LANDSAT_STAC_URL` | Planetary Computer | STAC-API für Landsat Collection 2 (vor 2017); leer = ohne Landsat |
 | `LANDSAT_TOKEN_URL`| Planetary Computer | Adresse für das anonyme Token, mit dem die Landsat-Links signiert werden |
 | `SATELLITE_WATCH_HOURS` | `24` | Abstand der Frühwarn-Runde über alle Spots in Stunden; `0` = aus |
+| `STURM_WARN_HOURS` | `3` | Abstand der Sturmwarn-Runde (Böenprognose, Push vor und nach dem Sturm) in Stunden; `0` = aus |
+| `STURM_MODELL` | `icon_seamless` | Wettermodell der Böenprognose bei Open-Meteo (z. B. `icon_d2`, `meteoswiss_icon_ch1`); `best_match` = Auswahl von Open-Meteo |
 | `REQUIRE_LOGIN`    | –        | `1`: Uploads und Änderungen nur mit Konto      |
 | `TRUST_PROXY`      | –        | Reverse Proxy, dessen `X-Forwarded-For` gilt, damit die Rate-Limits die Adresse der Person sehen statt die des Proxys: Anzahl Proxys (`1`), Adressen oder Netze (`loopback`, `uniquelocal`, `10.0.0.0/8`) oder `true` für alle; leer = keinem Proxy vertrauen (siehe [Betrieb](betrieb.md#vor-einem-öffentlichen-betrieb)) |
 | `ADMIN_EMAIL`      | –        | Dieses Konto wird Admin (sonst das erste Konto) |
@@ -162,6 +164,8 @@ Die feste Adresse lässt sich als Variable `APP_URL` in die Android-App bauen, d
 | `WILDRUHE_SEASON`  | `12-20/04-30` | Schutzzeit (Monat-Tag/Monat-Tag) für Zonen ohne eigene Angabe; `immer` = ganzjährig |
 | `MAPILLARY_TOKEN` | – | Client-Token von [Mapillary](https://www.mapillary.com/dashboard/developers) (`MLY|…`): Mapillary-Bilder im Durchgehen und auf der Karte, wo es keine eigenen gibt ([Details](funktionen.md#mapillary)) |
 | `GEBIRGE_AB_M` | `2100` | Ab dieser Höhe (m ü. M.) wird ein Spot ohne Profil, Baumarten und Wald-Beobachtungen ein Gebirge-Spot; `0` = aus |
+| `GLAMOS_CSV` | – | Längenänderung der Gletscherzungen von GLAMOS als CSV (mehrere durch Kommas getrennt); zeigt die Kurve im Gletscher-Teil eines Spots ([Details](funktionen.md#längenänderung-glamos)) |
+| `ARCHIV_KATALOG` | – | Katalog offener Archivbilder als CSV oder GeoJSON (mehrere durch Kommas getrennt); schlägt Bilder in der Nähe eines Gletscher- oder Gebirge-Spots vor ([Format](funktionen.md#archivfotos)) |
 | `GLETSCHER_GEOJSON` | – | Gletscherinventare als GeoJSON (WGS84 oder LV95, mehrere durch Kommas getrennt, z. B. GLAMOS SGI 1850, 1973, 2016); erkennt Gletscher-Spots, zeigt die Umrisse pro Jahr und wo früher Eis lag ([Details](funktionen.md#gletscherumrisse)) |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | erzeugt | Schlüssel für Web Push (base64url); ohne sie erzeugt der Server beim ersten Start ein Paar und speichert es in der Datenbank |
 | `VAPID_SUBJECT`    | `mailto:ADMIN_EMAIL` | Kontakt für die Push-Dienste (`mailto:` oder `https:`) |
@@ -293,11 +297,15 @@ erreichbar, fallen die Heuristiken ein, und die Antwort enthält einen Hinweis.
 
 ## Phänologie-Referenzdaten laden
 
-Die Referenzreihen für den Beginn der Herbstfärbung (siehe
+Die Referenzreihen für den Beginn der Herbstfärbung und den Laubaustrieb (siehe
 [Phänologie-Referenzdaten](funktionen.md#phänologie-referenzdaten)) stammen vom Deutschen Wetterdienst
-(Open Data, `opendata.dwd.de`, Jahresmelder Wildwachsende Pflanzen). Sie werden nicht automatisch geladen:
+(Open Data, `opendata.dwd.de`, Jahres- und Sofortmelder Wildwachsende Pflanzen) und von MeteoSchweiz (OGD
+über `data.geo.admin.ch`). Sie werden nicht automatisch geladen:
 
-- `POST /api/phenoref/sync` lädt sie herunter (braucht Zugang zu `opendata.dwd.de`), oder
+- `POST /api/phenoref/sync` lädt die DWD-Daten herunter, samt Sofortmeldern für das laufende Jahr (braucht Zugang
+  zu `opendata.dwd.de`); `POST /api/phenoref/sync?source=meteoschweiz` die Daten von MeteoSchweiz über die
+  STAC-API (braucht Zugang zu `data.geo.admin.ch`). Für den Austrieb des laufenden Jahres lohnt es sich, im
+  Frühling wöchentlich zu synchronisieren, oder
 - einzelne Dateien werden importiert, zuerst die Stationen, danach jede Datei
   `PH_Jahresmelder_Wildwachsende_Pflanze_<Art>_….txt` mit `kind=observations&name=<Dateiname>`:
 
@@ -306,9 +314,19 @@ curl --data-binary @PH_Beschreibung_Phaenologie_Stationen_Jahresmelder.txt \
   'localhost:3000/api/phenoref/import?format=dwd&kind=stations'
 ```
 
-Andere Quellen wie MeteoSchweiz lassen sich als generisches CSV importieren (`format=generic`). Es hat die
-Spalten `source;station_id;station_name;lat;lon;elevation;species;year;doy` (lateinischer Artname, Tag im
-Jahr der beginnenden Blattverfärbung).
+Die Dateien von MeteoSchweiz lassen sich ebenso einzeln importieren, zuerst die Parameterbeschreibung, dann
+die Stationen, dann die Beobachtungen:
+
+```bash
+curl --data-binary @ogd-phenology_meta_parameters.csv 'localhost:3000/api/phenoref/import?format=meteoschweiz&kind=parameters'
+curl --data-binary @ogd-phenology_meta_stations.csv   'localhost:3000/api/phenoref/import?format=meteoschweiz&kind=stations'
+curl --data-binary @<Beobachtungen>.csv               'localhost:3000/api/phenoref/import?format=meteoschweiz&kind=observations'
+```
+
+Andere Quellen lassen sich als generisches CSV importieren (`format=generic`). Es hat die
+Spalten `source;station_id;station_name;lat;lon;elevation;species;year;doy`, optional `phase` (lateinischer
+Artname, Tag im Jahr; Phase `colour` für die beginnende Blattverfärbung, Standard, oder `leafout` für die
+Blattentfaltung).
 
 ## Mit Docker und QGIS Server
 

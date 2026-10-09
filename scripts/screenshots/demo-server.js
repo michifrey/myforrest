@@ -1,7 +1,9 @@
 'use strict';
 // Demo server for the README screenshots: the real app with a synthetic Open-Meteo stand-in, so weather,
 // storms, night cooling and the elevation model work without network access.
+const fs = require('fs');
 const path = require('path');
+const sharp = require('sharp');
 const { createApp } = require('../../src/app');
 const glacier = require('./glacier-demo');
 
@@ -138,11 +140,22 @@ async function weatherFetch(url) {
 }
 
 const work = process.env.DEMO_DIR || path.join(__dirname, '.demo');
+// DEMO_GLETSCHER=1 also gets the GLAMOS length change and an archive catalogue; the archive pictures are drawn.
+const glacierDir = path.join(work, 'gletscher');
+if (process.env.DEMO_GLETSCHER === '1') {
+  fs.mkdirSync(glacierDir, { recursive: true });
+  fs.writeFileSync(path.join(glacierDir, 'glamos-laenge.csv'), glacier.glamosCsv());
+  fs.writeFileSync(path.join(glacierDir, 'archiv-katalog.csv'), glacier.archiveCsv());
+}
+const archiveFetch = async () => new Response(await sharp({ create: { width: 1200, height: 800, channels: 3, background: '#8a7d68' } }).jpeg().toBuffer(), { headers: { 'content-type': 'image/jpeg' } });
 const app = createApp({
   dataDir: path.join(work, 'data'),
   // DEMO_GLETSCHER=1: the glacier inventories of the demo glacier (written by seed-gletscher.js).
   ...(process.env.DEMO_MAPILLARY === '1' ? { mapillaryToken: 'MLY|demo', mapillaryFetch } : {}),
   glacierFiles: process.env.DEMO_GLETSCHER === '1' ? Object.keys(glacier.inventories()).map((f) => path.join(work, 'gletscher', f)).join(',') : '',
+  ...(process.env.DEMO_GLETSCHER === '1' ? {
+    glamosFiles: path.join(glacierDir, 'glamos-laenge.csv'), archiveFiles: path.join(glacierDir, 'archiv-katalog.csv'), archiveFetch,
+  } : {}),
   weatherFetch,
   tileOptions: { precompute: false },
   // Sign-in buttons for the screenshots; the demo never talks to Google, GitHub, Microsoft, Switch or AGOV.

@@ -2,6 +2,13 @@
 
 **Street View für die Natur, über die Zeit.**
 
+📖 **Dokumentation: [michifrey.github.io/myforrest](https://michifrey.github.io/myforrest/)** ·
+[Funktionen](https://michifrey.github.io/myforrest/funktionen/) ·
+[Installation](https://michifrey.github.io/myforrest/installation/) ·
+[REST-API](https://michifrey.github.io/myforrest/api/) ·
+[Roadmap](https://michifrey.github.io/myforrest/roadmap/) ·
+[Android-App](https://github.com/michifrey/myforrest/releases/latest/download/myforrest.apk)
+
 Beim Joggen, Wandern oder Biken fallen immer wieder Sturmschäden, Borkenkäfernester, neue
 Lichtungen oder sich ausbreitende Neophyten auf. MyForrest sammelt Fotos solcher Orte und legt
 sie zeitlich übereinander. So wird sichtbar, wie sich der Wald an einem Ort über Monate und Jahre
@@ -171,6 +178,13 @@ für das Kamera-Overlay) auf dem Gerät. Unterwegs zeigt die App Karte und Spots
   <img src="docs/screenshots/satellite.jpg" width="49%" alt="Satelliten-Frühwarnung und NDVI-Rückgang eines Nadelwald-Spots mit geeichter Schwelle">
 </p>
 
+Der Hinweis auf **Spätfrost** in Senken zählt erst Frostnächte nach dem tatsächlichen Laubaustrieb der Region,
+aus den Beobachtungen von DWD und MeteoSchweiz für das laufende Jahr.
+
+Eine **Sturmwarnung** aus der Prognose (ICON-D2) meldet Leuten, die einem Spot folgen oder ihn regelmässig
+fotografieren, Böen ab 75 km/h per Push; kam der Sturm, bittet eine zweite Nachricht danach um ein Foto, sobald es
+sicher ist.
+
 *Kontext zur Aufnahme* vergleicht die 90 Tage vor jedem Foto mit dem Mittel 1991–2020: Niederschlag,
 Temperatur, Hitzetage, längste Trockenphase und die Niederschläge der letzten zwölf Monate. Daraus
 entstehen Hinweise wie *Ausgeprägte Trockenheit*, *Frühe Laubverfärbung*, *Erhöhtes Borkenkäfer-Risiko*
@@ -213,8 +227,10 @@ Wetter, Tageszeit und Körperwärme, erst ab drei Touren von zwei Personen pro 1
 *Arten & Neophyten* wertet die Pflanzenbestimmungen als Funde aus. **Hotspots** (links) zeigen als
 Kerndichte-Karte, wo sich Funde aller Neophyten, aller Arten oder einer Art häufen. **Ausbreitung** (rechts)
 zeichnet pro Art die besiedelte Fläche Jahr für Jahr, verfolgt einzelne Teilbestände und schätzt Tempo und
-Richtung, im Beispiel das Drüsige Springkraut entlang eines Bachs mit ~180 m pro Jahr. Unter *Export*
-gehen die Funde als Darwin-Core-CSV an Info Flora und GBIF oder als CSV an iNaturalist.
+Richtung, im Beispiel das Drüsige Springkraut entlang eines Bachs mit ~180 m pro Jahr. *Funde pro 100 Fotos*
+gleicht aus, dass an viel begangenen Orten auch mehr gefunden wird. Fachstellen mit PRO-Konto und die Moderation
+**prüfen** die automatischen Bestimmungen (bestätigen, korrigieren, ablehnen). Unter *Export* gehen die Funde als
+Darwin-Core-CSV an Info Flora und GBIF oder als CSV an iNaturalist, auf Wunsch nur die geprüften.
 
 ### 9. Vektorkarten für GIS und Geoportale
 
@@ -368,6 +384,13 @@ App, seit wann der Gletscher den Ort freigegeben hat. **Archivfotos** wie alte P
 ihr Datum von Hand und werden auf die neuen Fotos ausgerichtet; im Vorher/Nachher (rechts) liegt die Postkarte
 von 1928 neben 2025.
 
+<p align="center"><img src="docs/screenshots/gletscher-archiv.jpg" width="38%" alt="Längenänderung der Gletscherzunge aus GLAMOS und Archivbilder in der Nähe"></p>
+
+Mit den Messreihen von **GLAMOS** zeigt der Gletscher-Teil, wie weit sich die Zunge seit Beginn der Messungen
+zurückgezogen hat und wie schnell zuletzt. Aus einem Katalog offener **Bildarchive** (z. B. ETH-Bibliothek)
+schlägt er alte Aufnahmen aus der Nähe und in passender Blickrichtung vor; mit einer Lizenz, die es erlaubt,
+übernimmt man sie mit einem Klick als datiertes Archivfoto des Spots.
+
 <p align="center"><img src="docs/screenshots/gebirge.jpg" width="38%" alt="Gebirge-Spot auf einer Alpweide mit der Schneeschmelze pro Jahr"></p>
 
 Spots über 2100 m ohne Baumarten werden **Gebirge**-Spots (brauner Marker) mit Beobachtungen wie Felssturz,
@@ -375,12 +398,14 @@ Murgang, Lawine, Rutschung, Permafrost und Verbuschung der Alpweide. Ihr Teil *S
 welchem Monat der Schnee schmilzt, und vergleicht die ersten mit den letzten Jahren, hier eine Alpweide, die
 heute rund sechs Wochen früher aper ist und auf der Grünerlen einwachsen. Für **Trockengebiete** gibt es ein
 eigenes Profil (Wanderdüne, Bodenerosion, Vegetationsverlust, Überweidung, Versalzung), gewählt beim Hochladen;
-dort meldet der NDVI den Verlust an Vegetation.
+dort meldet der NDVI den Verlust an Vegetation. Weil wandernde Dünen keine festen Punkte haben, richtet die
+App Fotos dort an der Horizontlinie aus.
 
 ## Was MyForrest kann
 
 Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen unter
-[Funktionen im Detail](docs/funktionen.md).
+[Funktionen im Detail](docs/funktionen.md) (auch auf der
+[Doku-Website](https://michifrey.github.io/myforrest/funktionen/)).
 
 - **[Fotos erfassen](docs/funktionen.md#fotos-erfassen-und-verorten)**: Handyfotos (auch HEIC vom iPhone),
   Action-Cam-Serien mit GPX-Track und Videos von GoPro oder 360°-Kameras. Verortung über GPS, GPX oder von
@@ -397,25 +422,33 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   Höhe, Exposition, Kaltluftseen sowie Satellitendaten (NDVI und Feuchteindex NDMI aus Sentinel-2, vor 2017
   Landsat) als unabhängige Bestätigung und als Frühwarnung für Spots ohne neue Fotos, deren Schwellen sich an
   bestätigten Schäden eichen (getrennt für Laub- und Nadelwald) und an zurückgehaltenen Spots geprüft werden,
-  als Push-Nachricht an alle, die den Spot regelmässig besuchen.
+  als Push-Nachricht an alle, die den Spot regelmässig besuchen. **Sturmwarnung** aus der Böenprognose mit der
+  Bitte, betroffene Spots nach dem Sturm zu besuchen; **Laubaustrieb** aus den Phänologie-Daten von MeteoSchweiz
+  und DWD, damit Spätfrost erst nach dem Austrieb zählt.
 - **[Landschaften und Gletscher](docs/funktionen.md#landschaften-und-gletscher)**: Profile für Wald, Gletscher,
   Gebirge und Trockengebiet mit eigenen Beobachtungen; Gletscherumrisse aus Inventaren (z. B. GLAMOS) pro Jahr, Eis im Spätsommer
-  und Schneeschmelze aus Sentinel-2, Archivfotos mit Datum von Hand.
+  und Schneeschmelze aus Sentinel-2, Längenänderung der Zunge aus GLAMOS, Archivfotos mit Datum von Hand und
+  Vorschläge aus offenen Bildarchiven; im Trockengebiet Ausrichtung am Horizont.
 - **[Kartenmodi](docs/funktionen.md#kartenmodi)**: Sonnenstand, Schatten und Einstrahlung inklusive
   Geländehorizont sowie Hotspots und Ausbreitungsfronten von Neophyten.
 - **[Pflanzen und Baumarten](docs/funktionen.md#pflanzen-und-baumarten)**: Pflanzenbestimmung mit Pl@ntNet,
-  Erkennung invasiver Neophyten, Artenbestand pro Spot und Export zu Info Flora, GBIF und iNaturalist.
+  Erkennung invasiver Neophyten, Artenbestand pro Spot, Prüfung der Bestimmungen durch Fachleute, Export
+  (auf Wunsch nur geprüfter Funde) zu Info Flora, GBIF und iNaturalist und Hotspots pro 100 Fotos gegen
+  ungleich verteilten Suchaufwand.
 - **[Offene Geodaten](docs/funktionen.md#offene-geodaten-für-gis-und-geoportale)**:
   - Alle Daten als OGC API – Features und GeoPackage, in WGS84 oder den Schweizer Landeskoordinaten LV95
     wie bei swisstopo.
   - Vektorkacheln (OGC API – Tiles, MVT) in Web Mercator und im Schweizer Kachelgitter LV95, vorberechnet
-    und als PMTiles/MBTiles zum Herunterladen.
+    und als PMTiles/MBTiles zum Herunterladen (Kachel für Kachel geschrieben, auch für sehr grosse Datenmengen),
+    die LV95-Kacheln als GeoPackage.
   - Zwei Vektorkarten: MapLibre in Web Mercator, OpenLayers auf der Landeskarte von swisstopo.
-  - Metadaten für geocat.ch und opendata.swiss (GM03/ISO 19139).
+  - Metadaten für geocat.ch und opendata.swiss (GM03/ISO 19139), auch pro Collection, mit Objektkatalog
+    (ISO 19110).
   - Ein fertiges QGIS-Projekt für QGIS Server (WMS/WMTS/WFS) für Geoportale wie map.geo.admin.ch.
 - **[Touren und Fotoaufträge](docs/funktionen.md#touren-und-fotoaufträge)**: Routen zeichnen, per GPS
   aufzeichnen oder importieren (GPX, FIT, TCX, KML, GeoJSON, NMEA), als GPX exportieren und speichern; Fotoaufträge
-  ohne Zeit und Namen und Vorschläge entlang der eigenen Route.
+  ohne Zeit und Namen und Vorschläge entlang der eigenen Route; eine Karte kühler Abschnitte aus den
+  Temperaturen vieler Touren, geeicht am Wettermodell, nach Jahres- und Tageszeit.
 - **[Geschützte Funde](docs/funktionen.md#geschützte-funde-und-pro-mitglieder)**: seltene Arten und Pilzstellen
   nur für verifizierte PRO-Mitglieder (Forstdienst, Naturschutz), öffentlich nur als 5-km-Raster;
   Organisationen nehmen ihre Mitglieder selbst auf.
@@ -449,21 +482,22 @@ für den Wege-Magnet mit ([`deploy/brouter`](deploy/brouter/README.md)).
 
 Die Doku gibt es auch als **Website** mit Suche, hellem und dunklem Design und *Seite bearbeiten*-Knopf:
 **[michifrey.github.io/myforrest](https://michifrey.github.io/myforrest/)**, später unter docs.myforrest.xyz. Sie
-entsteht aus `docs/*.md` (MkDocs Material) und wird bei jedem Merge neu veröffentlicht.
+entsteht aus `docs/*.md` (MkDocs Material) und wird bei jedem Merge neu veröffentlicht. Die Tabelle verlinkt
+jedes Dokument hier im Repository und auf der Website.
 
 <p align="center"><img src="docs/screenshots/doku-website.jpg" width="640" alt="Startseite der Doku-Website mit Navigation und Suche"></p>
 
 | Dokument | Inhalt |
 |----------|--------|
-| [Funktionen im Detail](docs/funktionen.md) | Alle Funktionen mit Verfahren, Schwellenwerten und Grenzen |
-| [Android-App](docs/android.md) | Fahrtmodus und Aufzeichnung im Hintergrund, Installieren, selbst bauen und signieren |
-| [Tech-Onboarding](docs/tech-onboarding.md) | Selbst hosten: Voraussetzungen, Speicherplatz, Lizenzen, Ports, Zertifikate, ausgehende Verbindungen, Checkliste |
-| [Installation und Konfiguration](docs/installation.md) | Voraussetzungen, HTTPS fürs Handy, Umgebungsvariablen, externer Detektor, Phänologie-Daten |
-| [Eigener Server: VPS und Synology](docs/hosting.md) | Dauerbetrieb mit Docker: VPS mit Caddy (HTTPS automatisch) oder Synology NAS mit Container Manager |
-| [Betrieb, Datenschutz und Datenquellen](docs/betrieb.md) | Hinweise für einen öffentlichen Betrieb, externe Dienste und Quellenangaben |
-| [Architektur](docs/architektur.md) | Aufbau des Codes, Module im Überblick |
-| [REST-API](docs/api.md) | Alle Routen des Servers |
-| [Roadmap](docs/roadmap.md) | Was als Nächstes geplant ist |
+| [Funktionen im Detail](docs/funktionen.md) · [Website](https://michifrey.github.io/myforrest/funktionen/) | Alle Funktionen mit Verfahren, Schwellenwerten und Grenzen |
+| [Android-App](docs/android.md) · [Website](https://michifrey.github.io/myforrest/android/) | Fahrtmodus und Aufzeichnung im Hintergrund, Installieren, selbst bauen und signieren |
+| [Tech-Onboarding](docs/tech-onboarding.md) · [Website](https://michifrey.github.io/myforrest/tech-onboarding/) | Selbst hosten: Voraussetzungen, Speicherplatz, Lizenzen, Ports, Zertifikate, ausgehende Verbindungen, Checkliste |
+| [Installation und Konfiguration](docs/installation.md) · [Website](https://michifrey.github.io/myforrest/installation/) | Voraussetzungen, HTTPS fürs Handy, Umgebungsvariablen, externer Detektor, Phänologie-Daten |
+| [Eigener Server: VPS und Synology](docs/hosting.md) · [Website](https://michifrey.github.io/myforrest/hosting/) | Dauerbetrieb mit Docker: VPS mit Caddy (HTTPS automatisch) oder Synology NAS mit Container Manager |
+| [Betrieb, Datenschutz und Datenquellen](docs/betrieb.md) · [Website](https://michifrey.github.io/myforrest/betrieb/) | Hinweise für einen öffentlichen Betrieb, externe Dienste und Quellenangaben |
+| [Architektur](docs/architektur.md) · [Website](https://michifrey.github.io/myforrest/architektur/) | Aufbau des Codes, Module im Überblick |
+| [REST-API](docs/api.md) · [Website](https://michifrey.github.io/myforrest/api/) | Alle Routen des Servers |
+| [Roadmap](docs/roadmap.md) · [Website](https://michifrey.github.io/myforrest/roadmap/) | Was als Nächstes geplant ist |
 | [QGIS Server](deploy/qgis-server/README.md) und [Kubernetes](deploy/k8s/README.md) | Betrieb mit Geodiensten per Docker Compose oder Kubernetes |
 | [Eigener Routing-Server](deploy/brouter/README.md) | BRouter für den Wege-Magnet, mit Routing-Daten für die Schweiz, Waldprofil, Wildruhezonen und fertigem Image |
 
@@ -472,7 +506,7 @@ entsteht aus `docs/*.md` (MkDocs Material) und wird bei jedem Merge neu veröffe
 Kartendaten © OpenStreetMap-Mitwirkende, Landeskarte und Luftbild © swisstopo. Wetterdaten von
 [Open-Meteo.com](https://open-meteo.com) (ERA5, CC BY 4.0). Enthält modifizierte Copernicus-Sentinel-Daten;
 Landsat-Daten mit freundlicher Genehmigung des U.S. Geological Survey. Phänologie-Daten: Deutscher
-Wetterdienst. Pflanzenbestimmung mit Pl@ntNet. Bilder von Mapillary (CC BY-SA 4.0) mit Urheber im Bild. Gletscherumrisse aus den geladenen Inventaren, z. B.
+Wetterdienst und MeteoSchweiz. Pflanzenbestimmung mit Pl@ntNet. Bilder von Mapillary (CC BY-SA 4.0) mit Urheber im Bild. Gletscherumrisse aus den geladenen Inventaren, z. B.
 GLAMOS. Details unter [Datenquellen](docs/betrieb.md#externe-datenquellen-und-netzzugang).
 
 Der Code steht unter der [Apache-Lizenz 2.0](LICENSE).

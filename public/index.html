@@ -154,6 +154,11 @@
       <div id="sun-charts"></div>
       <div class="cool-box">
         <label class="toggle small"><input type="checkbox" id="cool-toggle"> Kühle Abschnitte aus Touren</label>
+        <label class="sr-only" for="cool-match">Welche Touren</label>
+        <select id="cool-match" class="small" hidden>
+          <option value="zeit">passend zu Jahres- und Tageszeit</option>
+          <option value="alle">alle Touren</option>
+        </select>
         <p id="cool-status" class="muted small" hidden></p>
       </div>
       <p id="sun-source" class="wx-source"></p>
@@ -169,6 +174,7 @@
         <h2>Willkommen im Wald</h2>
         <p class="muted">Jeder Punkt ist ein <strong>Spot</strong>: ein Ort, an dem über die Zeit Fotos entstanden sind.
           Wähle einen Spot, um durch die Jahre zu blättern.</p>
+        <div id="storm-banner" class="storm-banner small" role="status" hidden></div>
         <div id="stats" class="stats"></div>
         <h3 class="label">Zuletzt fotografiert</h3>
         <div id="recent" class="recent"></div>

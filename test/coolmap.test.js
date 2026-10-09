@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { tourCells, cellOf, LAG_S } = require('../src/coolmap');
+const { tourCells, tourClass, cellOf, LAG_S } = require('../src/coolmap');
 const { createApp } = require('../src/app');
 
 const T0 = Date.UTC(2026, 6, 1, 6, 0, 0);
@@ -47,13 +47,21 @@ test('one tour: deviations without level, drift and lag; not at the ends', () =>
   assert.equal(tourCells(tour().map(({ temp, ...p }) => p)), null);
 });
 
-async function withServer(fn) {
+test('season and time of day of a tour, from its middle', () => {
+  const c = tourClass(tour());
+  assert.deepEqual([c.season, c.daytime], ['sommer', 'tag']); // 1 July, 08:00 in Zurich
+  assert.ok(Math.abs(c.level - (16 + 0.15 * 6.6)) < 1, `level ${c.level}`);
+  const night = tourClass(tour().map((p) => ({ ...p, time: p.time - 6 * 3600000 + 182 * 86400000 })));
+  assert.deepEqual([night.season, night.daytime], ['winter', 'nacht']); // end of December, 02:00
+});
+
+async function withServer(fn, { weatherFetch = async () => new Response('', { status: 503 }) } = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'myforrest-cool-'));
-  const app = createApp({ dataDir, routerUrl: '', weatherFetch: async () => new Response('', { status: 503 }) });
+  const app = createApp({ dataDir, routerUrl: '', weatherFetch });
   const server = app.listen(0);
   await new Promise((r) => server.once('listening', r));
   try {
-    await fn(`http://127.0.0.1:${server.address().port}`);
+    await fn(`http://127.0.0.1:${server.address().port}`, app);
   } finally {
     await app.locals.idle();
     server.close();
@@ -128,4 +136,42 @@ test('cool cells: only shared tours, at least 3 tours from 2 people, owner decid
     await ben.json(`/api/tracks/${mine[0].id}`, { method: 'PATCH', json: { shareTemp: false } });
     assert.deepEqual(await cells(), []);
   });
+});
+
+test('calibration against the weather model; only tours of the asked season and time of day', async () => {
+  const asked = [];
+  // Open-Meteo stand-in: 15 °C air temperature all day.
+  const weatherFetch = async (url) => {
+    const u = new URL(url);
+    asked.push(u);
+    const d = u.searchParams.get('start_date');
+    const time = Array.from({ length: 24 }, (_, h) => `${d}T${String(h).padStart(2, '0')}:00`);
+    return Response.json({ utc_offset_seconds: 0, hourly: { time, temperature_2m: time.map(() => 15) } });
+  };
+  await withServer(async (base, app) => {
+    const anna = client(base);
+    await anna.register('Anna');
+    const ben = client(base);
+    await ben.register('Benno');
+    const q = (extra = '') => anna.json(`/api/cool-cells?bbox=8.54,47.35,8.59,47.37${extra}`);
+    await save(anna, tour({ level: 18 }), true); // a watch on the wrist: 3 °C above the air
+    await save(anna, tour({ level: 21, reverse: true }), true);
+    await save(ben, tour({ level: 17 }), true);
+    const bag = await save(ben, tour({ level: 2 }), true); // in a bag in the cold car: 13 °C below the air
+    const all = await q();
+    assert.ok(all.cells.length > 10 && all.cells.every((c) => c.tours === 3), 'the bag tour does not count');
+    assert.ok(asked.length >= 1 && asked.every((u) => u.pathname.endsWith('/archive')));
+    const checks = app.locals.db.prepare('SELECT track_id, ok, model FROM cool_checks ORDER BY track_id').all();
+    assert.deepEqual(checks.map((c) => [c.ok, c.model]), [[1, 15], [1, 15], [1, 15], [0, 15]]);
+    assert.equal(checks.at(-1).track_id, bag.id);
+    // Checked once: a second view asks the model nothing new.
+    const before = asked.length;
+    await q();
+    assert.equal(asked.length, before);
+    // All three are summer mornings.
+    assert.equal((await q('&season=sommer&daytime=tag')).cells.length, all.cells.length);
+    assert.deepEqual((await q('&season=winter')).cells, []);
+    const night = await q('&daytime=nacht');
+    assert.deepEqual([night.cells, night.daytime], [[], 'nacht']);
+  }, { weatherFetch });
 });

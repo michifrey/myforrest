@@ -7,6 +7,10 @@
  *    overlay below the spot pins.
  *  - Ausbreitung: per species the occupied area per year (nested alpha shapes or hulls,
  *    coloured by year) with a year slider and the estimated spread rate.
+ *    "Funde pro 100 Fotos" divides by the same density of all photos (search
+ *    effort): many finds where many photos are taken is no hotspot.
+ *  - Prüfen: verified PRO members and moderation confirm, correct or reject
+ *    the automatic identifications (routes/species.js).
  *  - Export: Darwin Core and iNaturalist CSV downloads with filters.
  * Relies on globals from app.js (map, state, api, el, $, openSpot).
  */
@@ -28,6 +32,14 @@
     playing: null,
     token: 0,
     maxDensity: 0,
+    perEffort: false, // findings per 100 photos instead of per km²
+    effort: [], // spots with their photo counts (all visible photos)
+    review: [],
+  };
+  const MIN_EFFORT = 3; // photos (kernel-weighted) below which "per 100 photos" is not shown
+  const mayReview = () => {
+    const u = window.Account?.user;
+    return Boolean(u && (u.pro || ['moderator', 'admin'].includes(u.role)));
   };
   const pointLayer = L.layerGroup();
   const frontLayer = L.layerGroup();
@@ -92,20 +104,33 @@
       const reach = Math.ceil(3 * hCells);
       const norm = 1e6 / (2 * Math.PI * hs.bandwidth ** 2); // findings per km²
       const inv2s2 = 1 / (2 * hCells * hCells);
-      for (const o of hs.occ) {
-        const p = this._map.latLngToContainerPoint([o.lat, o.lon]);
-        const cx = p.x / CELL;
-        const cy = p.y / CELL;
-        if (cx < -reach || cy < -reach || cx > gw + reach || cy > gh + reach) continue;
-        const x0 = Math.max(0, Math.floor(cx - reach)); const x1 = Math.min(gw - 1, Math.ceil(cx + reach));
-        const y0 = Math.max(0, Math.floor(cy - reach)); const y1 = Math.min(gh - 1, Math.ceil(cy + reach));
-        for (let y = y0; y <= y1; y++) {
-          const dy = y + 0.5 - cy;
-          for (let x = x0; x <= x1; x++) {
-            const dx = x + 0.5 - cx;
-            grid[y * gw + x] += Math.exp(-(dx * dx + dy * dy) * inv2s2) * norm;
+      const spread = (target, points, weightOf) => {
+        for (const o of points) {
+          const p = this._map.latLngToContainerPoint([o.lat, o.lon]);
+          const cx = p.x / CELL;
+          const cy = p.y / CELL;
+          if (cx < -reach || cy < -reach || cx > gw + reach || cy > gh + reach) continue;
+          const wt = weightOf(o);
+          const x0 = Math.max(0, Math.floor(cx - reach)); const x1 = Math.min(gw - 1, Math.ceil(cx + reach));
+          const y0 = Math.max(0, Math.floor(cy - reach)); const y1 = Math.min(gh - 1, Math.ceil(cy + reach));
+          for (let y = y0; y <= y1; y++) {
+            const dy = y + 0.5 - cy;
+            for (let x = x0; x <= x1; x++) {
+              const dx = x + 0.5 - cx;
+              target[y * gw + x] += Math.exp(-(dx * dx + dy * dy) * inv2s2) * wt;
+            }
           }
         }
+      };
+      if (hs.perEffort) {
+        // Same kernel over all photos (search effort): finds per 100 photos where enough were taken.
+        const effort = new Float32Array(gw * gh);
+        spread(grid, hs.occ, () => 1);
+        spread(effort, hs.effort, (s) => s.photoCount);
+        // Findings sit at the photo, effort at the spot centre: tiny offsets could exceed 100.
+        for (let i = 0; i < grid.length; i++) grid[i] = effort[i] >= MIN_EFFORT ? Math.min(100, (100 * grid[i]) / effort[i]) : 0;
+      } else {
+        spread(grid, hs.occ, () => norm);
       }
       let max = 0;
       for (const v of grid) if (v > max) max = v;
@@ -225,7 +250,7 @@
         fillOpacity: 1,
         className: 'sp-point',
       })
-        .bindTooltip(`${o.neophyte || o.commonName || o.scientificName}<br><i>${o.scientificName}</i><br>${fmtDay(o.takenAt)} · Score ${fmt(o.score, 2)}`)
+        .bindTooltip(`${o.neophyte || o.commonName || o.scientificName}<br><i>${o.scientificName}</i><br>${fmtDay(o.takenAt)} · ${o.verification === 'bestaetigt' ? 'von Hand bestätigt' : o.verification === 'korrigiert' ? 'von Hand korrigiert' : `Score ${fmt(o.score, 2)}`}`)
         .on('click', () => typeof openSpot === 'function' && openSpot(o.spotId, o.photoId))
         .addTo(pointLayer);
     }
@@ -294,7 +319,7 @@
         el('button', { type: 'button', id: 'sp-close', class: 'icon', 'aria-label': 'Schliessen', text: '×' }),
       ]),
       el('div', { class: 'sp-tabs', role: 'tablist', 'aria-label': 'Ansicht' }, [
-        tabBtn('hotspots', 'Hotspots'), tabBtn('spread', 'Ausbreitung'), tabBtn('export', 'Export'),
+        tabBtn('hotspots', 'Hotspots'), tabBtn('spread', 'Ausbreitung'), tabBtn('review', 'Prüfen'), tabBtn('export', 'Export'),
       ]),
       el('div', { class: 'sp-row' }, [
         el('label', { for: 'sp-species', class: 'sr-only', text: 'Art' }),
@@ -309,9 +334,16 @@
           el('input', { id: 'sp-bw', type: 'range', min: '30', max: '1000', step: '10', value: String(hs.bandwidth) }),
           el('output', { id: 'sp-bw-out', for: 'sp-bw', class: 'sp-out', text: `${hs.bandwidth} m` }),
         ]),
+        el('div', { class: 'sp-row' }, [
+          el('label', { for: 'sp-effort', class: 'small muted', text: 'Dichte' }),
+          el('select', { id: 'sp-effort' }, [
+            el('option', { value: 'km2', text: 'Funde pro km²' }),
+            el('option', { value: 'effort', text: 'Funde pro 100 Fotos (Suchaufwand)' }),
+          ]),
+        ]),
         el('div', { id: 'sp-legend', class: 'sp-legend' }),
         el('div', { id: 'sp-hot-stats', class: 'sun-tiles' }),
-        el('p', { class: 'wx-source', text: 'Kerndichte-Schätzung (Gauss-Kern): jeder Fund wird mit dem gewählten Radius als Standardabweichung über die Fläche verteilt; die Farbe zeigt Funde pro km², relativ zum dichtesten Ort im Kartenausschnitt.' }),
+        el('p', { id: 'sp-hot-method', class: 'wx-source' }),
       ]),
       el('div', { id: 'sp-spread', role: 'tabpanel', hidden: '' }, [
         el('p', { id: 'sp-rate', class: 'sp-rate' }),
@@ -333,12 +365,18 @@
         el('div', { id: 'sp-patches', class: 'sp-patches' }),
         el('p', { id: 'sp-method', class: 'wx-source' }),
       ]),
+      el('div', { id: 'sp-review', role: 'tabpanel', hidden: '' }, [
+        el('p', { class: 'small', text: 'Automatische Bestimmungen prüfen: bestätigen, auf eine andere Art korrigieren oder ablehnen (kein Pflanzenfund, nicht bestimmbar). Geprüfte Funde gehen als «verified» in den Export, abgelehnte fallen weg. Eigene Fotos prüft jemand anderes.' }),
+        el('p', { id: 'sp-review-count', class: 'muted small' }),
+        el('ul', { id: 'sp-review-list', class: 'sp-review-list' }),
+      ]),
       el('div', { id: 'sp-export', role: 'tabpanel', hidden: '' }, [
         el('p', { class: 'small', text: 'Funde als Datei für Biodiversitäts-Portale. Darwin Core ist das Austauschformat von GBIF und Info Flora; die iNaturalist-Datei entspricht deren CSV-Import.' }),
         el('div', { class: 'sp-checks' }, [
           el('label', {}, [el('input', { type: 'checkbox', id: 'sp-x-neo', checked: '' }), ' Nur Neophyten']),
           el('label', {}, [el('input', { type: 'checkbox', id: 'sp-x-species' }), ' Nur die gewählte Art']),
           el('label', {}, [el('input', { type: 'checkbox', id: 'sp-x-bbox' }), ' Nur Kartenausschnitt']),
+          el('label', {}, [el('input', { type: 'checkbox', id: 'sp-x-verified' }), ' Nur von Menschen geprüfte Funde']),
         ]),
         el('div', { class: 'sp-dates' }, [
           el('label', {}, ['Von ', el('input', { type: 'date', id: 'sp-x-from' })]),
@@ -349,7 +387,7 @@
           el('a', { id: 'sp-dl-dwc', class: 'btn primary', href: '#', download: '', text: 'Darwin Core (CSV)' }),
           el('a', { id: 'sp-dl-inat', class: 'btn', href: '#', download: '', text: 'iNaturalist (CSV)' }),
         ]),
-        el('p', { class: 'wx-source', text: 'Direktes Hochladen zu iNaturalist oder Info Flora bräuchte dort ein Konto und eine OAuth-Anmeldung; deshalb gibt es hier nur den Datei-Export. iNaturalist übernimmt beim CSV-Import keine Fotos – der Link zum Foto steht in der Beschreibung. Alle Bestimmungen sind automatisch (Pl@ntNet) und ungeprüft.' }),
+        el('p', { class: 'wx-source', text: 'Direktes Hochladen zu iNaturalist oder Info Flora bräuchte dort ein Konto und eine OAuth-Anmeldung; deshalb gibt es hier nur den Datei-Export. iNaturalist übernimmt beim CSV-Import keine Fotos – der Link zum Foto steht in der Beschreibung. Bestimmungen sind automatisch (Pl@ntNet); von Hand geprüfte stehen als «verified» in der Datei, die übrigen als «unverified».' }),
       ]),
     );
   }
@@ -361,7 +399,7 @@
     box.replaceChildren(
       el('span', { class: 'small', text: 'gering' }),
       el('i', { class: 'sp-ramp', style: `background: linear-gradient(90deg, ${rgb(lo)}, ${rgb(hi)})` }),
-      el('span', { class: 'small', text: hs.maxDensity ? `${fmt(hs.maxDensity, hs.maxDensity < 10 ? 1 : 0)} Funde/km²` : 'hoch' }),
+      el('span', { class: 'small', text: hs.maxDensity ? `${fmt(hs.maxDensity, hs.maxDensity < 10 ? 1 : 0)} ${hs.perEffort ? 'Funde pro 100 Fotos' : 'Funde/km²'}` : 'hoch' }),
     );
   }
 
@@ -369,7 +407,14 @@
     return el('div', { class: 'wx-tile' }, [el('span', { text: label }), el('b', { text: value }), el('em', { text: sub || '' })]);
   }
 
+  function renderHotspotMethod() {
+    $('sp-hot-method').textContent = hs.perEffort
+      ? `Suchaufwand berücksichtigt: Funde und alle Fotos werden mit demselben Kern (Radius als Standardabweichung) verteilt und geteilt; gezeigt nur, wo mindestens ${MIN_EFFORT} Fotos in der Nähe entstanden sind. So fallen Orte nicht als Hotspot auf, nur weil dort viel fotografiert wird.`
+      : 'Kerndichte-Schätzung (Gauss-Kern): jeder Fund wird mit dem gewählten Radius als Standardabweichung über die Fläche verteilt; die Farbe zeigt Funde pro km², relativ zum dichtesten Ort im Kartenausschnitt. Wo viel fotografiert wird, gibt es auch mehr Funde: «Funde pro 100 Fotos» gleicht das aus.';
+  }
+
   function renderHotspotStats() {
+    renderHotspotMethod();
     const occ = hs.occ;
     const species = new Set(occ.map((o) => o.scientificName));
     const spots = new Set(occ.map((o) => o.spotId));
@@ -471,6 +516,7 @@
     }
     if ($('sp-x-from').value) q.set('from', $('sp-x-from').value);
     if ($('sp-x-to').value) q.set('to', $('sp-x-to').value);
+    if ($('sp-x-verified').checked) q.set('verified', '1');
     return q;
   }
 
@@ -499,6 +545,9 @@
     frontLayer.clearLayers();
     if (hs.tab === 'hotspots') {
       density.addTo(map);
+      if (hs.perEffort && !hs.effort.length) {
+        try { hs.effort = (await api('/api/spots')).map((x) => ({ lat: x.lat, lon: x.lon, photoCount: x.photoCount })); } catch { hs.effort = []; }
+      }
       await loadOccurrences();
     } else {
       density.remove();
@@ -515,6 +564,76 @@
     if (hs.tab === 'export') {
       updateExport();
     }
+    if (hs.tab === 'review') {
+      await loadReview();
+    }
+  }
+
+  /* ---------- Review of the automatic identifications ---------- */
+
+  async function loadReview() {
+    const list = $('sp-review-list');
+    if (!mayReview()) {
+      $('sp-review-count').textContent = 'Prüfen können verifizierte PRO-Mitglieder (Fachstellen, Forstdienst) und die Moderation.';
+      list.replaceChildren();
+      return;
+    }
+    const q = query();
+    q.delete('minScore');
+    try {
+      hs.review = await api(`/api/identifications/review?${q}&minScore=0`);
+    } catch (err) {
+      $('sp-review-count').textContent = err.message;
+      return;
+    }
+    renderReview();
+  }
+
+  function renderReview() {
+    const items = hs.review;
+    $('sp-review-count').textContent = items.length ? `${fmt(items.length)} ungeprüfte Funde, die neusten zuerst.` : 'Alles geprüft.';
+    $('sp-review-list').replaceChildren(...items.slice(0, 30).map((it) => {
+      const name = (c) => (c.neophyte || c.commonName ? `${c.neophyte || c.commonName} (${c.scientificName})` : c.scientificName);
+      const others = it.candidates.filter((c) => c.scientificName !== it.scientificName);
+      const select = el('select', { 'aria-label': 'Andere Art' }, [
+        el('option', { value: '', text: 'Andere Art …' }),
+        ...others.map((c) => el('option', { value: c.scientificName, text: `${name(c)} · ${fmt(c.score, 2)}` })),
+        el('option', { value: '@frei', text: 'Andere, lateinisch eingeben …' }),
+      ]);
+      const status = el('span', { class: 'small muted', role: 'status' });
+      const send = async (body) => {
+        try {
+          await api(`/api/photos/${it.photoId}/identification-review`, { method: 'PUT', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
+          hs.review = hs.review.filter((x) => x.photoId !== it.photoId);
+          renderReview();
+          if (hs.occ.length) loadOccurrences();
+        } catch (err) {
+          status.textContent = err.message;
+        }
+      };
+      select.addEventListener('change', () => {
+        let v = select.value;
+        if (v === '@frei') v = (window.prompt('Lateinischer Artname, z. B. Impatiens glandulifera') || '').trim();
+        if (v) send({ status: 'korrigiert', scientificName: v });
+        select.value = '';
+      });
+      return el('li', { class: 'sp-review-item' }, [
+        el('button', { type: 'button', class: 'sp-review-thumb', title: 'Foto öffnen', onclick: () => typeof openSpot === 'function' && openSpot(it.spotId, it.photoId) },
+          el('img', { src: it.url, alt: `Foto vom ${fmtDay(it.takenAt)}`, loading: 'lazy' })),
+        el('div', {}, [
+          el('b', { text: name(it) }),
+          el('span', { class: 'small muted', text: ` · Score ${fmt(it.score, 2)} · ${fmtDay(it.takenAt)}` }),
+          it.own
+            ? el('p', { class: 'small muted', text: 'Eigenes Foto: prüft jemand anderes.' })
+            : el('div', { class: 'sp-review-actions' }, [
+              el('button', { type: 'button', class: 'secondary', text: 'Bestätigen', onclick: () => send({ status: 'bestaetigt' }) }),
+              select,
+              el('button', { type: 'button', class: 'link small', text: 'Ablehnen', onclick: () => send({ status: 'abgelehnt' }) }),
+            ]),
+          status,
+        ]),
+      ]);
+    }));
   }
 
   function setTab(tab) {
@@ -523,6 +642,7 @@
     $('sp-hotspots').hidden = tab !== 'hotspots';
     $('sp-spread').hidden = tab !== 'spread';
     $('sp-export').hidden = tab !== 'export';
+    $('sp-review').hidden = tab !== 'review';
     refresh();
   }
 
@@ -616,7 +736,8 @@
       setYear(hs.yearIndex + 1);
     }, 1100);
   });
-  for (const id of ['sp-x-neo', 'sp-x-species', 'sp-x-bbox', 'sp-x-from', 'sp-x-to']) $(id).addEventListener('change', updateExport);
+  for (const id of ['sp-x-neo', 'sp-x-species', 'sp-x-bbox', 'sp-x-from', 'sp-x-to', 'sp-x-verified']) $(id).addEventListener('change', updateExport);
+  $('sp-effort').addEventListener('change', (e) => { hs.perEffort = e.target.value === 'effort'; refresh(); });
   map.on('moveend', () => { if ($('sp-x-bbox').checked) updateExport(); });
   // Re-colour when the colour scheme changes.
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => {

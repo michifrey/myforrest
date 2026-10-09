@@ -275,23 +275,29 @@ async function loadSpots({ fit = false } = {}) {
   const filter = $('tag-filter').value;
   const special = filter.startsWith('@') ? filter : null;
   const tag = special ? '' : filter;
-  const [spots, storms, satellite] = await Promise.all([
+  const [spots, storms, satellite, warnings] = await Promise.all([
     api(`/api/spots${tag ? `?tag=${encodeURIComponent(tag)}` : ''}`),
     api('/api/storms/spots').catch(() => []),
     api('/api/satellite/alerts').catch(() => []),
+    api('/api/storm-warnings').then((w) => w.warnings).catch(() => []),
   ]);
+  // Storm warnings come per 0.1° cell; the strongest one of a spot's cell counts.
+  const cellOf = (s) => `${s.lat.toFixed(1)},${s.lon.toFixed(1)}`;
   for (const s of spots) {
     s.storm = storms.find((x) => x.spotId === s.id) || null;
     s.satellite = satellite.find((x) => x.spotId === s.id) || null;
+    s.stormWarning = warnings.filter((w) => w.cell === cellOf(s)).sort((a, b) => b.gust - a.gust)[0] || null;
   }
   state.spots = special === '@change' ? spots.filter((s) => s.change?.fraction >= 0.05)
     : special === '@irregular' ? spots.filter((s) => s.irregularities.length)
     : special === '@storm' ? spots.filter((s) => s.storm)
     : special === '@satellite' ? spots.filter((s) => s.satellite)
+    : special === '@sturmwarnung' ? spots.filter((s) => s.stormWarning)
     : special?.startsWith('@land:') ? spots.filter((s) => s.landscape === special.slice(6))
       : spots;
   renderMarkers();
   renderStats(!filter);
+  renderStormBanner(spots);
   loadProtectedCells();
   if (fit && state.spots.length) {
     // Keep spots clear of the floating toolbar and (on wide screens) the side panel.
@@ -305,6 +311,33 @@ async function loadSpots({ fit = false } = {}) {
 }
 
 const RING_SVG = '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="22"/><circle cx="24" cy="24" r="16.5"/><circle cx="24" cy="24" r="11"/><circle cx="24" cy="24" r="5.5"/></svg>';
+
+/** Notice in the explorer: a storm is coming, or spots want a visit after one. */
+function renderStormBanner(spots) {
+  const box = $('storm-banner');
+  const hit = spots.filter((s) => s.stormWarning);
+  box.hidden = !hit.length;
+  if (!hit.length) return;
+  const coming = hit.filter((s) => s.stormWarning.phase === 'vorher');
+  const after = hit.filter((s) => s.stormWarning.phase === 'nachher');
+  const day = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('de-CH', { weekday: 'short', day: 'numeric', month: 'numeric' });
+  const top = (list) => list.reduce((a, b) => (b.stormWarning.gust > a.stormWarning.gust ? b : a)).stormWarning;
+  const lines = [];
+  if (coming.length) {
+    const w = top(coming);
+    lines.push(el('p', {}, [el('strong', { text: 'Sturmwarnung: ' }),
+      `Böen bis ${w.gust} km/h${w.from16 ? ` aus ${w.from16}` : ''} am ${day(w.date)} bei ${coming.length} Spot${coming.length === 1 ? '' : 's'}. Danach hilft ein Foto, aber erst, wenn es sicher ist.`]));
+  }
+  if (after.length) {
+    const w = top(after);
+    lines.push(el('p', {}, [el('strong', { text: 'Nach dem Sturm: ' }),
+      `am ${day(w.date)} Böen bis ${w.gust} km/h. ${after.length} Spot${after.length === 1 ? ' wartet' : 's warten'} auf ein neues Foto.`]));
+  }
+  box.replaceChildren(...lines, el('button', {
+    type: 'button', class: 'link small', text: 'Diese Spots zeigen',
+    onclick: async () => { $('tag-filter').value = '@sturmwarnung'; await loadSpots({ fit: true }); },
+  }));
+}
 
 function renderStats(updateHero = true) {
   const photos = state.spots.reduce((n, s) => n + s.photoCount, 0);
@@ -1495,6 +1528,7 @@ async function stormNote(a, b, change, current) {
     el('option', { value: '@irregular', text: 'Auffälligkeiten' }),
     el('option', { value: '@storm', text: 'Von Sturm betroffen' }),
     el('option', { value: '@satellite', text: 'Satellit meldet Rückgang' }),
+    el('option', { value: '@sturmwarnung', text: 'Sturmwarnung / nach dem Sturm' }),
   );
   const landscapes = Object.entries(state.config.landscapes || {});
   if (landscapes.length > 1) {
@@ -1522,8 +1556,8 @@ async function stormNote(a, b, change, current) {
   // Links from push messages: ?spot=<id> opens a spot, ?filter=satellite shows the spots with early warnings.
   const openFromUrl = async (href) => {
     const q = new URL(href, location.href).searchParams;
-    if (q.get('filter') === 'satellite') {
-      $('tag-filter').value = '@satellite';
+    if (q.get('filter') === 'satellite' || q.get('filter') === 'sturm') {
+      $('tag-filter').value = q.get('filter') === 'sturm' ? '@sturmwarnung' : '@satellite';
       await loadSpots({ fit: true });
     }
     const id = Number(q.get('spot'));

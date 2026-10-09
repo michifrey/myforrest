@@ -8,7 +8,9 @@ const path = require('node:path');
 const zlib = require('node:zlib');
 const { DatabaseSync } = require('node:sqlite');
 const { createApp } = require('../src/app');
-const { zxyToTileId, writePmtiles } = require('../src/pmtiles');
+const { zxyToTileId, writePmtiles, writePmtilesFile } = require('../src/pmtiles');
+const { gpkgTileGrid } = require('../src/gpkg-tiles');
+const lv95 = require('../src/tiles-lv95');
 const { tileMatrixSet, tileRange, validTile } = require('../src/tiles');
 
 const noWeather = async () => new Response('offline', { status: 503 });
@@ -238,7 +240,7 @@ test('OGC API – Tiles: tilesets, TileJSON, MVT tiles for the dataset and per c
 });
 
 test('Swiss LV95 tile grid: swisstopo resolutions, clipping, winding, tiles at the right place', async () => {
-  const lv95 = require('../src/tiles-lv95');
+  // (lv95 from the top)
   const { wgs84ToLv95 } = require('../src/lv95');
   const tms = lv95.tileMatrixSet();
   assert.equal(tms.tileMatrices.length, 29);
@@ -369,6 +371,28 @@ test('PMTiles writer: leaf directories, run lengths for repeated tiles, deduplic
     }
     assert.equal(pm.tile(4, 0, 0), null);
     assert.equal(Number(buf.readBigUInt64LE(88)), 1 + 512, 'identical tiles stored once');
+    // Streamed to a file, tile by tile in any order: the same bytes.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pmtiles-'));
+    const file = path.join(dir, 'x.pmtiles');
+    const byKey = new Map(tiles.map((t) => [`${t.z}/${t.x}/${t.y}`, t.data]));
+    const keys = [...tiles].reverse().map(({ z, x, y }) => ({ z, x, y }));
+    const info = writePmtilesFile(file, { keys, read: (z, x, y) => byKey.get(`${z}/${x}/${y}`) }, meta, options);
+    assert.deepEqual(fs.readFileSync(file), buf);
+    assert.deepEqual([info.tiles, info.contents], [1024, 513]);
+    assert.ok(!fs.existsSync(`${file}.data`), 'temporary data removed');
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('GeoPackage tile grid for LV95: the finest levels whose tiles cover the same box exactly', () => {
+  const grid = gpkgTileGrid({ resolutions: lv95.RESOLUTIONS, origin: lv95.ORIGIN, extent: lv95.EXTENT_LV95, maxZoom: 26 });
+  assert.deepEqual(grid.levels.map((l) => l.zoom), [15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]);
+  const [minX, minY, maxX, maxY] = grid.bounds;
+  assert.deepEqual([minX, maxY], lv95.ORIGIN, 'anchored at the swisstopo origin: same columns and rows');
+  assert.ok(maxX >= lv95.EXTENT_LV95[2] && minY <= lv95.EXTENT_LV95[1], 'covers Switzerland');
+  for (const l of grid.levels) {
+    assert.equal(l.width * 256 * l.res, maxX - minX, `width at ${l.zoom}`);
+    assert.equal(l.height * 256 * l.res, maxY - minY, `height at ${l.zoom}`);
   }
 });
 
@@ -436,6 +460,30 @@ test('Precomputed tiles: same bytes as live tiles, gzip, 204 from the store, PMT
     assert.deepEqual(zlib.gunzipSync(row.tile_data), liveBytes);
     mb.close();
     fs.rmSync(path.dirname(mbFile), { recursive: true, force: true });
+
+    // GeoPackage with the LV95 tiles: vector-tiles extension, grid, the same tile as the API (uncompressed).
+    const gpRes = await fetch(`${base}/api/export/myforrest-kacheln-lv95.gpkg`);
+    assert.equal(gpRes.status, 200);
+    assert.equal(gpRes.headers.get('content-type'), 'application/geopackage+sqlite3');
+    const gpFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'gpkg-tiles-')), 'x.gpkg');
+    fs.writeFileSync(gpFile, Buffer.from(await gpRes.arrayBuffer()));
+    const gp = new DatabaseSync(gpFile);
+    assert.equal(gp.prepare('PRAGMA application_id').get().application_id, 1196444487);
+    assert.deepEqual({ ...gp.prepare('SELECT data_type, srs_id FROM gpkg_contents').get() }, { data_type: 'vector-tiles', srs_id: 2056 });
+    assert.deepEqual(gp.prepare('SELECT DISTINCT extension_name FROM gpkg_extensions ORDER BY 1').all().map((x) => x.extension_name),
+      ['gpkg_zoom_other', 'im_vector_tiles', 'im_vector_tiles_mapbox']);
+    assert.deepEqual(gp.prepare('SELECT name FROM gpkgext_vt_layers ORDER BY id').all().map((x) => x.name), ['spread_fronts', 'spots', 'findings']);
+    assert.ok(gp.prepare("SELECT COUNT(*) n FROM gpkgext_vt_fields WHERE name = 'scientific_name'").get().n >= 2);
+    const z22 = gp.prepare('SELECT * FROM gpkg_tile_matrix WHERE zoom_level = 22').get();
+    assert.deepEqual([z22.pixel_x_size, z22.tile_width], [2.5, 256]);
+    const col = Math.floor((e - 2420000) / 640);
+    const rowLv = Math.floor((1350000 - n) / 640);
+    const lvDataset = Buffer.from(await (await fetch(`${base}/ogc/tiles/SwissLV95/22/${rowLv}/${col}`)).arrayBuffer());
+    const stored = gp.prepare('SELECT tile_data FROM myforrest WHERE zoom_level = 22 AND tile_column = ? AND tile_row = ?').get(col, rowLv);
+    assert.deepEqual(Buffer.from(stored.tile_data), lvDataset);
+    assert.equal(gp.prepare('SELECT COUNT(*) n FROM myforrest WHERE zoom_level < 15').get().n, 0, 'only levels of the GeoPackage grid');
+    gp.close();
+    fs.rmSync(path.dirname(gpFile), { recursive: true, force: true });
 
     // New data: the stored version no longer counts, tiles are cut live until the rebuild.
     db.prepare('INSERT INTO photo_tags (photo_id, tag) VALUES ((SELECT MIN(id) FROM photos), ?)').run('borkenkaefer');
