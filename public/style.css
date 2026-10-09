@@ -499,6 +499,12 @@ input[type="checkbox"] { accent-color: var(--accent); width: 1.05rem; height: 1.
 .thumbs button { padding: 0; border: 2px solid transparent; border-radius: 10px; flex: none; background: none; }
 .thumbs button[aria-current="true"] { border-color: var(--gold); }
 .thumbs img { display: block; width: 66px; height: 50px; object-fit: cover; border-radius: 8px; }
+/* Pictures from the car (drive mode, dashcam) */
+.thumbs button.is-drive { position: relative; }
+.thumbs button.is-drive::after {
+  content: 'Fahrt'; position: absolute; left: 3px; bottom: 3px; padding: 0 0.3rem; border-radius: 999px;
+  font-size: 0.6rem; font-weight: 700; line-height: 1.5; background: rgb(0 0 0 / 0.6); color: #fff;
+}
 .toggle { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--muted); margin-top: 0.6rem; font-weight: 500; }
 
 .compare { margin-top: 0.9rem; }

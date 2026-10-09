@@ -5,9 +5,9 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 
 ## Phase 2: Mehr und bessere Fotos
 
-- **Dashcam ausbauen**: Videos gängiger Dashcams direkt lesen (GPS als NMEA im MP4 bzw. in Begleitdateien,
-  z. B. Viofo, BlackVue), damit sie ohne GPX-Track gehen; Fahrtmodus im Hintergrund (braucht eine native
-  Hülle); Bilder aus dem Auto in der Zeitreise kennzeichnen und auf Wunsch ausblenden.
+- **Dashcam ausbauen**: Fahrtmodus im Hintergrund (braucht eine native Hülle); das Dashcam-GPS mit echten
+  Dateien verschiedener Modelle prüfen (bisher nach den bekannten Formaten mit Testdaten) und weitere Formate
+  (z. B. GPS-Spur von Garmin- und Nextbase-Kameras, verschlüsselte Viofo-Daten).
 
 - **360°-Rohdateien**: Insta360-`.insv` und GoPro-MAX-`.360` direkt lesen (Fischaugen stitchen, GPS aus dem
   Datei-Trailer). Braucht Beispieldateien der Kameras und deren Objektivdaten; bis dahin über den Export
@@ -61,7 +61,8 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 Aus früheren Versionen dieser Roadmap:
 
 - Fahrtmodus: das Handy als Dashcam im Auto, Route automatisch, Auswahl und Deduplizierung der Bilder auf dem
-  Gerät
+  Gerät; GPS von Dashcam-Videos (NMEA, Novatek) direkt aus der Datei; Fahrtbilder in der Zeitreise markiert
+  und ausblendbar
 - Video statt Einzelbilder (GoPro mit GPMF, 360°-MP4, GPX), unscharfe Bilder werden ersetzt oder verworfen
 - 360°-Fotos beim Upload erkennen, Panoramen über eine Drehung der Kugel ausrichten und vergleichen
 - Spots mit gemischten Blickrichtungen auf Wunsch aufteilen

@@ -13,6 +13,7 @@ const { parseTags } = require('../tags');
 const { assignSpot, refreshSpot } = require('../spots');
 const { readMp4 } = require('../mp4');
 const { gpsTrack } = require('../gpmf');
+const { dashcamTrack, toVideoPoints } = require('../dashcam');
 const { planByDistance, planByTime, isEquirectangular, sharpness, createFramePicker, createFfmpeg } = require('../video');
 
 const MAX_FRAMES = 300;
@@ -158,7 +159,7 @@ module.exports = function videoRoutes(app, ctx) {
     const manual = b.lat !== undefined && b.lat !== '' ? { lat: Number(b.lat), lon: Number(b.lon) } : null;
     if (manual && !isValidCoord(manual.lat, manual.lon)) throw new HttpError(400, 'Ungültige Koordinaten');
     const fallbackTime = b.takenAt ? Date.parse(b.takenAt) : NaN;
-    const activity = activities.includes(b.activity) ? b.activity : null;
+    let activity = activities.includes(b.activity) ? b.activity : null;
     const note = b.note ? String(b.note).slice(0, 2000) : null;
     const tags = parseTags(b.tags);
     const protect = ['1', 'true', 'on'].includes(String(b.protected)); // protected finds: PRO members only
@@ -189,6 +190,19 @@ module.exports = function videoRoutes(app, ctx) {
     if (gps.points.length >= 2) {
       frames = plan(gps.points);
       [source, trackKind] = ['exif', 'gpmf'];
+    }
+    // Dashcams: NMEA text or Novatek freeGPS blocks in the file, one position per second from the start.
+    if (!frames.length) {
+      job.phase = 'GPS der Dashcam wird gesucht';
+      const dash = await dashcamTrack(video.path);
+      if (dash.points.length >= 2) {
+        startMs = dash.points[0].time;
+        frames = plan(toVideoPoints(dash.points));
+        if (frames.length) {
+          [source, trackKind] = ['exif', dash.kind];
+          activity = activity || 'fahren';
+        }
+      }
     }
     if (!frames.length && gpxFile) {
       const track = parseGpx(await fsp.readFile(gpxFile.path, 'utf8'));

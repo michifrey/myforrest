@@ -43,6 +43,7 @@ src/openmeteo.js     Zeitreihen aus Archiv und Prognose von Open-Meteo zusammens
 src/routes/climate.js  Routen und Analyse-Hooks für Stürme, Phänologie-Referenz und Frostnächte
 src/elevation.js     Geländehöhe, Hangneigung, Exposition und Geländeform (Copernicus-DEM über Open-Meteo)
 src/exif.js          Aufnahmezeit, GPS und Blickrichtung aus den Bilddaten
+src/dashcam.js       GPS von Dashcams: NMEA-Text und Novatek-freeGPS-Blöcke im Video, NMEA-Dateien
 src/gpx.js           GPX-Parser
 src/mp4.js           MP4-Boxen lesen: Telemetrie-Spur, Startzeit, Dauer, 360°-Metadaten
 src/gpmf.js          GoPro-Telemetrie (GPMF): GPS5/GPS9, GPSU, SCAL
@@ -76,7 +77,7 @@ src/routes/accounts.js  Routen für Konten und Moderation, CSRF-Schutz, Rechte a
 src/routes/organizations.js  Mitglieder einer Organisation aufnehmen, Einladungen per E-Mail, Rollen, austreten
 src/routes/profile.js   Eigene Profilseite: Zahlen, eigene Fotos und Export als ZIP (nur für das eigene Konto)
 src/zip.js           ZIP-Archive als Stream schreiben (ohne Kompression, ZIP64 ab 4 GB), ohne Abhängigkeiten
-src/trackfile.js     Touren lesen (GPX, TCX, KML, GeoJSON) und als GPX schreiben
+src/trackfile.js     Touren lesen (GPX, TCX, KML, GeoJSON, NMEA) und als GPX schreiben
 src/routegeo.js      Länge, Abstand zur Route und Position entlang der Route, Privatzone an den Enden
 src/sensitive.js     Sensible Arten (Orchideen, geschützte Pflanzen), deren Funde automatisch geschützt werden; kantonale Schutzlisten (CSV-Import)
 src/routes/protection.js  Geschützte Funde als 5-km-Raster für alle ohne PRO-Status

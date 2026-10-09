@@ -4,12 +4,14 @@
  * Reads tracks from the files sports watches and route planners export and
  * writes GPX. Supported: GPX (tracks, routes, or waypoints when nothing else),
  * Garmin TCX, KML (LineString and gx:Track) and GeoJSON (LineString,
- * MultiLineString, Features, with optional `coordTimes`). Points carry
+ * MultiLineString, Features, with optional `coordTimes`) and NMEA (dashcams). Points carry
  * `lat`, `lon` and, when known, `ele` (m) and `time` (ms since epoch).
  *
  * parseTrackFile(text, filename?) → { name, format, points, hasTime }
  * toGpx(track) → GPX 1.1 string
  */
+
+const { parseNmea, looksLikeNmea } = require('./dashcam');
 
 const MAX_POINTS = 20000;
 
@@ -126,6 +128,8 @@ function parseGeoJson(text) {
 function detect(text, filename = '') {
   const ext = String(filename).toLowerCase().split('.').pop();
   const head = text.slice(0, 2000);
+  // NMEA first: BlackVue lines start with "[unix ms]", which would look like JSON.
+  if (ext === 'nmea' || looksLikeNmea(head)) return 'nmea';
   if (ext === 'geojson' || ext === 'json' || /^\s*[{[]/.test(head)) return 'geojson';
   if (ext === 'tcx' || /<TrainingCenterDatabase\b/.test(head)) return 'tcx';
   if (ext === 'kml' || /<kml\b/.test(head)) return 'kml';
@@ -145,10 +149,13 @@ function thin(points, max = MAX_POINTS) {
 
 function parseTrackFile(text, filename) {
   const format = detect(text, filename);
-  if (!format) throw new Error('Unbekanntes Format – unterstützt sind GPX, TCX, KML und GeoJSON');
+  if (!format) throw new Error('Unbekanntes Format – unterstützt sind GPX, TCX, KML, GeoJSON und NMEA');
   let parsed;
   try {
-    parsed = { gpx: parseGpx, tcx: parseTcx, kml: parseKml, geojson: parseGeoJson }[format](text);
+    parsed = {
+      gpx: parseGpx, tcx: parseTcx, kml: parseKml, geojson: parseGeoJson,
+      nmea: (t) => ({ name: null, points: parseNmea(t).map((p) => point(p.lat, p.lon, p.ele, p.time)) }),
+    }[format](text);
   } catch (err) {
     throw new Error(`Datei konnte nicht gelesen werden (${err.message})`);
   }

@@ -713,7 +713,7 @@
           el('button', { type: 'button', id: 'tour-record', class: 'secondary', text: 'Aufzeichnen' }),
           el('button', { type: 'button', id: 'tour-drive', class: 'secondary', title: 'Handy als Dashcam im Auto: Bilder und Route automatisch', text: 'Fahrtmodus', onclick: () => window.Drive?.open() }),
           el('label', { class: 'secondary file-btn', for: 'tour-file', text: 'Importieren' }),
-          el('input', { type: 'file', id: 'tour-file', accept: '.gpx,.tcx,.kml,.geojson,.json,application/gpx+xml', hidden: '' }),
+          el('input', { type: 'file', id: 'tour-file', accept: '.gpx,.tcx,.kml,.geojson,.json,.nmea,application/gpx+xml', hidden: '' }),
         ]),
         el('p', { id: 'tour-hint', class: 'muted small' }),
         el('label', { class: 'toggle', id: 'tour-follow-wrap', hidden: '' }, [el('input', { type: 'checkbox', id: 'tour-follow', checked: '' }), ' Magnet: Wegen folgen']),

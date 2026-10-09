@@ -121,8 +121,9 @@ neue Foto gehört automatisch zu diesem Spot und öffnet sich gleich im Vorher/N
 
 <p align="center"><img src="docs/screenshots/upload.png" width="420" alt="Upload-Dialog"></p>
 
-*Foto beitragen* nimmt beliebig viele Fotos auf einmal entgegen, auch HEIC vom iPhone und Videos von GoPro
-oder 360°-Kameras, aus denen entlang der Route Einzelbilder werden. Ort und Zeit kommen aus den EXIF- bzw.
+*Foto beitragen* nimmt beliebig viele Fotos auf einmal entgegen, auch HEIC vom iPhone und Videos von GoPro,
+Dashcams (GPS direkt aus der Datei: NMEA, Novatek) oder 360°-Kameras, aus denen entlang der Route Einzelbilder
+werden. Ort und Zeit kommen aus den EXIF- bzw.
 Telemetriedaten. Fotos ohne GPS lassen sich über einen GPX-Track verorten (dafür gibt es unter
 *Zeitabgleich für GPX* Zeitzone und Korrektur für die Kamera-Uhr) oder von Hand auf der Karte bzw. über
 den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen, eine Notiz und die Lizenz (Standard
@@ -138,7 +139,8 @@ installierten App) macht alle paar Sekunden ein Bild und zeichnet die Strecke al
 nur Bilder an bekannten Spots (das nächstgelegene, in Blickrichtung des Spots) und eines alle 150 m; Bilder
 im Stillstand, unscharfe und solche, die gleich aussehen wie das letzte, verwirft schon das Handy. Aus
 einem Tag mit Tausenden Bildern werden so einige Dutzend, die im Hintergrund hochgeladen werden. (Im
-Screenshot liefert die Testkamera des Browsers das Bild.)
+Screenshot liefert die Testkamera des Browsers das Bild.) In der Zeitreise tragen Bilder aus dem Auto die Marke
+*Fahrt* und lassen sich ausblenden.
 
 Vor einer Tour ohne Empfang speichert *Touren & Aufträge → Karte entlang der Route offline speichern* die
 Kartenkacheln eines Korridors um die Route und die Spots daran (mit Vorschaubildern und den Referenzfotos
@@ -314,7 +316,7 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   - Metadaten für geocat.ch und opendata.swiss (GM03/ISO 19139).
   - Ein fertiges QGIS-Projekt für QGIS Server (WMS/WMTS/WFS) für Geoportale wie map.geo.admin.ch.
 - **[Touren und Fotoaufträge](docs/funktionen.md#touren-und-fotoaufträge)**: Routen zeichnen, per GPS
-  aufzeichnen oder importieren (GPX, TCX, KML, GeoJSON), als GPX exportieren und speichern; Fotoaufträge
+  aufzeichnen oder importieren (GPX, TCX, KML, GeoJSON, NMEA), als GPX exportieren und speichern; Fotoaufträge
   ohne Zeit und Namen und Vorschläge entlang der eigenen Route.
 - **[Geschützte Funde](docs/funktionen.md#geschützte-funde-und-pro-mitglieder)**: seltene Arten und Pilzstellen
   nur für verifizierte PRO-Mitglieder (Forstdienst, Naturschutz), öffentlich nur als 5-km-Raster;
