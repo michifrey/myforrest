@@ -353,3 +353,83 @@ test('Microsoft with a fixed tenant accepts only accounts of that organisation',
     assert.match((await browser(base).signIn('microsoft', 'outlook', challenges)).searchParams.get('auth_error'), /andere Anwendung oder Organisation/);
   }, { providers, fetch: fakeMicrosoft(claims) });
 });
+
+/**
+ * A fake AGOV-like provider that takes only private_key_jwt: it checks the
+ * assertion's signature against the JWKS the app publishes, its audience and lifetime.
+ */
+function fakeKeyProvider(issuer, jwksOf) {
+  const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  const host = new URL(issuer).origin;
+  return (accounts, challenges) => async (url, init = {}) => {
+    const u = new URL(url);
+    if (u.href === `${issuer}/.well-known/openid-configuration`) {
+      return json({
+        issuer, authorization_endpoint: `${host}/authorize`, token_endpoint: `${host}/token`, userinfo_endpoint: `${host}/userinfo`,
+        token_endpoint_auth_methods_supported: ['private_key_jwt'],
+      });
+    }
+    if (u.pathname === '/token') {
+      const body = new URLSearchParams(init.body);
+      if (body.has('client_secret') || body.get('client_assertion_type') !== 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer') {
+        return json({ error: 'invalid_client' }, 401);
+      }
+      const [h, p, sig] = body.get('client_assertion').split('.');
+      const header = JSON.parse(Buffer.from(h, 'base64url'));
+      const claims = JSON.parse(Buffer.from(p, 'base64url'));
+      const jwk = (await jwksOf()).keys.find((k) => k.kid === header.kid);
+      const ok = jwk && crypto.verify('sha256', Buffer.from(`${h}.${p}`),
+        header.alg === 'ES256' ? { key: crypto.createPublicKey({ key: jwk, format: 'jwk' }), dsaEncoding: 'ieee-p1363' } : crypto.createPublicKey({ key: jwk, format: 'jwk' }),
+        Buffer.from(sig, 'base64url'));
+      const now = Date.now() / 1000;
+      if (!ok || claims.iss !== 'agov-client' || claims.sub !== 'agov-client' || claims.aud !== `${host}/token` || !(claims.exp > now && claims.exp <= now + 120) || !claims.jti) {
+        return json({ error: 'invalid_client' }, 401);
+      }
+      const challenge = crypto.createHash('sha256').update(body.get('code_verifier') || '').digest('base64url');
+      if (!accounts[body.get('code')] || !challenges.has(challenge)) return json({ error: 'invalid_grant' }, 400);
+      return json({ access_token: `at-${body.get('code')}`, token_type: 'Bearer' });
+    }
+    if (u.pathname === '/userinfo') {
+      const a = accounts[String(init.headers?.Authorization || '').replace('Bearer at-', '')];
+      return a ? json({ sub: a.sub, email: a.email, email_verified: a.verified, given_name: a.given, family_name: a.family }) : json({}, 401);
+    }
+    return json({}, 404);
+  };
+}
+
+for (const [type, opts] of [['ec', { namedCurve: 'P-256' }], ['rsa', { modulusLength: 2048 }]]) {
+  test(`AGOV with private_key_jwt (${type}): signed assertion, published JWKS, acr_values`, async () => {
+    const { privateKey } = crypto.generateKeyPairSync(type, opts);
+    const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
+    const issuer = 'https://idp.agov.example';
+    let base;
+    const jwksOf = async () => (await fetch(`${base}/api/auth/jwks.json`)).json();
+    const providers = { agov: { clientId: 'agov-client', privateKey: pem, issuer, acrValues: 'urn:example:acr:hoch' } };
+    await withServer(EDU, async (b0, challenges) => {
+      base = b0;
+      const jwks = await jwksOf();
+      assert.equal(jwks.keys.length, 1);
+      assert.equal(jwks.keys[0].alg, type === 'ec' ? 'ES256' : 'RS256');
+      assert.ok(!('d' in jwks.keys[0]), 'only the public key');
+      const b = browser(base);
+      assert.ok((await b.me()).providers.some((p) => p.id === 'agov' && p.label === 'AGOV'));
+      const start = await b.req('/api/auth/oauth/agov');
+      assert.equal(new URL(start.headers.get('location')).searchParams.get('acr_values'), 'urn:example:acr:hoch');
+      assert.equal((await b.signIn('agov', 'lea', challenges)).searchParams.get('auth'), 'created');
+      assert.equal((await b.me()).user.name, 'Lea Muster');
+    }, { providers, fetch: fakeKeyProvider(issuer, jwksOf) });
+  });
+}
+
+test('without an issuer AGOV stays off; a key is refused where the provider does not take one', async () => {
+  const { privateKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'P-256' });
+  const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
+  await withServer(EDU, async (base) => {
+    assert.ok(!(await browser(base).me()).providers.some((p) => p.id === 'agov'));
+  }, { providers: { agov: { clientId: 'agov-client', privateKey: pem } } });
+  // edu-ID's fake offers only client_secret_basic: with a key the flow stops with a message.
+  await withServer(EDU, async (base) => {
+    const start = await browser(base).req('/api/auth/oauth/eduid');
+    assert.match(new URL(start.headers.get('location'), base).searchParams.get('auth_error'), /keine Anmeldung mit Schlüssel/);
+  }, { providers: { eduid: { clientId: 'eid', privateKey: pem } }, fetch: fakeOidc('https://login.eduid.ch/') });
+});

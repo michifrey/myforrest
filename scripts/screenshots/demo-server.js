@@ -104,12 +104,13 @@ const app = createApp({
   dataDir: path.join(process.env.DEMO_DIR || path.join(__dirname, '.demo'), 'data'),
   weatherFetch,
   tileOptions: { precompute: false },
-  // Sign-in buttons for the screenshots; the demo never talks to Google, GitHub, Microsoft or Switch.
+  // Sign-in buttons for the screenshots; the demo never talks to Google, GitHub, Microsoft, Switch or AGOV.
   oauthProviders: {
     google: { clientId: 'demo', clientSecret: 'demo' },
     github: { clientId: 'demo', clientSecret: 'demo' },
     microsoft: { clientId: 'demo', clientSecret: 'demo' },
     eduid: { clientId: 'demo', clientSecret: 'demo' },
+    agov: { clientId: 'demo', clientSecret: 'demo', issuer: 'https://agov.example' },
   },
   mailer: { send: async () => ({ sent: true }) },
 });

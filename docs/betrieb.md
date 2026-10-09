@@ -7,7 +7,7 @@
   Sitzungs-Cookie erhält `Secure`, wenn die Anfrage über HTTPS bzw. `X-Forwarded-Proto: https` kommt).
 - Mit Anmeldung über Google, GitHub, Microsoft, SWITCH edu-ID oder einen weiteren Dienst erhalten diese Dienste beim Anmelden die Information, dass sich
   jemand bei dieser Instanz anmeldet; MyForrest speichert vom Anbieter nur die Konto-Kennung, die E-Mail-Adresse
-  und den Namen. Client-Secrets und `SMTP_URL` (enthält das Mail-Passwort) gehören in Secrets, nicht in
+  und den Namen. Client-Secrets, private Schlüssel (`…_PRIVATE_KEY_FILE`) und `SMTP_URL` (enthält das Mail-Passwort) gehören in Secrets, nicht in
   Repository oder ConfigMap.
 - Bilder werden unverändert gespeichert und ausgeliefert, **inklusive EXIF-Daten** (GPS,
   Kameramodell). Ausnahmen sind die Vorschaubilder und die aus HEIC umgewandelten JPEGs, die keine

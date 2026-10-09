@@ -81,4 +81,4 @@ Aus früheren Versionen dieser Roadmap:
 - Geodienste: OGC API – Features und Tiles (auch im LV95-Kachelgitter, vorberechnet, PMTiles/MBTiles),
   Vektorkarten, QGIS Server, Metadaten für geocat.ch (GM03)
 - Betrieb mit Docker Compose und Kubernetes (podman-Startskript)
-- Konten: Anmelden mit Google und GitHub, E-Mail bestätigen, Passwort zurücksetzen und ändern, Konto löschen, Profilseite mit eigenen Fotos, Anzeigename und E-Mail-Adresse ändern, Export der eigenen Daten, Microsoft, SWITCH edu-ID und weitere OpenID-Connect-Dienste, dauerhafte Rate-Limits
+- Konten: Anmelden mit Google und GitHub, E-Mail bestätigen, Passwort zurücksetzen und ändern, Konto löschen, Profilseite mit eigenen Fotos, Anzeigename und E-Mail-Adresse ändern, Export der eigenen Daten, Microsoft, SWITCH edu-ID, AGOV und weitere OpenID-Connect-Dienste, dauerhafte Rate-Limits

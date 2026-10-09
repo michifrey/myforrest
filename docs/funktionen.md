@@ -965,7 +965,11 @@ prüfen lassen muss, gibt es **Organisationen**:
   Diensten liest die App die Endpunkte aus deren Discovery-Dokument und prüft, dass der Aussteller stimmt.
   Bei Microsoft kommen die Angaben aus dem ID-Token (Empfänger, Ablauf, Aussteller und Tenant geprüft); die
   Adresse gilt nur mit dem Anspruch `xms_edov` als bestätigt, sonst könnte ein fremder Tenant fremde Adressen
-  vorgeben. Der Ablauf ist OAuth 2.0 mit PKCE; `state` und Verifier liegen in einem
+  vorgeben.
+- *AGOV und Anmeldung mit Schlüssel*: Für Instanzen, die eine Behörde betreibt, lässt sich AGOV anbinden, der
+  Anmeldedienst der Schweizer Behörden (siehe [Installation](installation.md#agov)). Bei AGOV und den anderen
+  OpenID-Connect-Diensten kann sich die App statt mit einem Client-Secret mit einem privaten Schlüssel
+  ausweisen (`private_key_jwt`); die öffentlichen Schlüssel stehen unter `/api/auth/jwks.json`. Der Ablauf ist OAuth 2.0 mit PKCE; `state` und Verifier liegen in einem
   kurzlebigen httpOnly-Cookie, ein fremder oder abgelaufener Rücksprung wird abgewiesen. Beim ersten Mal
   entsteht ein Konto ohne Passwort mit der vom Anbieter **bestätigten** E-Mail-Adresse (ohne bestätigte
   Adresse keine Registrierung); der Name kommt vom Anbieter und lässt sich durch eine Zahl eindeutig machen.

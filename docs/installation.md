@@ -52,6 +52,8 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | – | Aktiviert „Mit GitHub anmelden“ |
 | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | – | Aktiviert „Mit Microsoft anmelden“; `MICROSOFT_TENANT` (Standard `common`) schränkt ein: `consumers` (nur private Konten), `organizations` oder die ID eines Tenants |
 | `EDUID_CLIENT_ID`, `EDUID_CLIENT_SECRET` | – | Aktiviert „Mit SWITCH edu-ID anmelden“; `EDUID_ISSUER` (Standard `https://login.eduid.ch/`) für ein Testsystem |
+| `AGOV_ISSUER`, `AGOV_CLIENT_ID`, `AGOV_PRIVATE_KEY_FILE` | – | Aktiviert „Mit AGOV anmelden“ (siehe [unten](#agov)); `AGOV_ACR_VALUES` fordert eine Authentifizierungsqualität an |
+| `…_PRIVATE_KEY_FILE` | – | Bei allen OpenID-Connect-Diensten (`EDUID_`, `OIDC_`, `AGOV_`): privater Schlüssel (PEM, RSA oder EC P-256) statt Client-Secret, Anmeldung per `private_key_jwt` |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_LABEL` | – | Ein weiterer OpenID-Connect-Dienst (z. B. Microsoft Entra ID einer Organisation, Keycloak) mit eigener Beschriftung |
 | `ROUTER_URL`       | `https://brouter.de/brouter` | Routing-Dienst im Format von [BRouter](https://brouter.de) für den Wege-Magnet beim Zeichnen von Touren; leer (`ROUTER_URL=`) = aus, dann gerade Linien. Für den Betrieb einen [eigenen BRouter](../deploy/brouter/README.md) nehmen, z. B. `http://brouter:17777/brouter` |
 | `PRO_VALID_DAYS`   | `365`    | Wie lange eine PRO-Verifizierung gilt, bevor sie bestätigt werden muss |
@@ -85,7 +87,8 @@ MAIL_FROM='MyForrest <wald@example.org>' npm start
 ## Anmelden über Google, GitHub, Microsoft und SWITCH edu-ID
 
 Neben E-Mail und Passwort kann man sich mit einem Google-, GitHub- oder SWITCH-edu-ID-Konto anmelden oder
-registrieren, mit einem Microsoft-Konto und mit einem weiteren Dienst, der OpenID Connect spricht.
+registrieren, mit einem Microsoft-Konto, über AGOV (Behörden, siehe [unten](#agov)) und mit einem weiteren
+Dienst, der OpenID Connect spricht.
 Ein Anbieter erscheint im Anmeldedialog, sobald Client-ID und Secret gesetzt sind. Die Rücksprungadresse
 lautet `<PUBLIC_URL>/api/auth/oauth/<anbieter>/callback`; ohne `PUBLIC_URL` wird sie aus der Anfrage
 gebildet. Sie muss beim Anbieter genau so eingetragen sein.
@@ -125,6 +128,38 @@ EDUID_CLIENT_ID=… EDUID_CLIENT_SECRET=… npm start
 ```
 
 Für lokale Versuche geht auch `http://localhost:3000` als Rücksprungadresse.
+
+### AGOV
+
+[AGOV](https://www.agov.admin.ch/de) ist der Anmeldedienst der Schweizer Behörden. **Anschliessen dürfen sich
+Behörden und Organisationen, soweit das EMBAG oder ein Spezialgesetz es zulässt** – für MyForrest also etwa,
+wenn ein Forstamt, eine kantonale Fachstelle oder eine Hochschule die Instanz betreibt. Den Anschluss richtet
+man selbst im Portal *AGOV connect* ein, begleitet von der Bundeskanzlei.
+
+1. Schlüssel erzeugen (EC P-256; RSA geht auch) und als Secret ablegen:
+   ```bash
+   openssl ecparam -name prime256v1 -genkey -noout | openssl pkcs8 -topk8 -nocrypt -out agov.pem
+   ```
+2. In AGOV connect einen OIDC-Client anlegen: Redirect-URI `https://example.org/api/auth/oauth/agov/callback`,
+   Client-Authentisierung `private_key_jwt`, öffentlicher Schlüssel als JWKS-URL
+   `https://example.org/api/auth/jwks.json` (oder deren Inhalt einfügen), Claims E-Mail (mit
+   `email_verified`) und Name.
+3. Starten:
+   ```bash
+   AGOV_ISSUER=<Issuer aus AGOV connect> AGOV_CLIENT_ID=… AGOV_PRIVATE_KEY_FILE=/run/secrets/agov.pem \
+   AGOV_ACR_VALUES=<gewünschte Qualität> npm start
+   ```
+
+Die App liest die Endpunkte aus `<AGOV_ISSUER>/.well-known/openid-configuration`, prüft den Aussteller und
+meldet sich am Token-Endpunkt mit einer selbst signierten, 60 Sekunden gültigen Zusicherung an. Bietet ein
+Anbieter `private_key_jwt` nicht an, bricht die Anmeldung mit einer Meldung ab.
+
+**Noch offen:** Die technische Spezifikation (agov.ch/spec) und die Liste der Authentifizierungsqualitäten
+(agov.ch/aq) waren bei der Umsetzung nicht abrufbar. Issuer, die Werte für `AGOV_ACR_VALUES` und ob AGOV
+`email` mit `email_verified` liefert, kommen deshalb aus AGOV connect bzw. der Spezifikation. Liefert AGOV
+keine bestätigte Adresse, entsteht über AGOV kein neues Konto (Verknüpfen geht). Die angeforderte Qualität
+wird nicht nachgeprüft, weil in MyForrest nichts davon abhängt; wer das braucht, muss das `acr` des ID-Tokens
+prüfen. Gegen ein echtes AGOV ist die Anbindung nicht getestet.
 
 ## Externer Detektor
 
