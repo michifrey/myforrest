@@ -8,9 +8,9 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 - **360°-Rohdateien**: Insta360-`.insv` und GoPro-MAX-`.360` direkt lesen (Fischaugen stitchen, GPS aus dem
   Datei-Trailer). Braucht Beispieldateien der Kameras und deren Objektivdaten; bis dahin über den Export
   als 360°-MP4.
-- **Geschützte Funde**: Pilze per Bild erkennen (braucht ein Modell; Pl@ntNet kennt keine Pilze),
-  Organisationen mit mehreren Mitgliedern verwalten, die kantonalen Listen direkt von den Fachstellen bzw.
-  Info Flora beziehen (sobald es dafür eine offene Schnittstelle gibt).
+- **Geschützte Funde**: Pilze per Bild erkennen (braucht ein Modell; Pl@ntNet kennt keine Pilze), die
+  kantonalen Listen direkt von den Fachstellen bzw. Info Flora beziehen (sobald es dafür eine offene
+  Schnittstelle gibt); Einladungen in eine Organisation für Personen ohne Konto.
 - **Eigener Routing-Server**: Image von `deploy/brouter` in einer Registry bauen und gegen echte Routing-Daten
   prüfen, ein eigenes Waldprofil (Forststrassen und Rückegassen bevorzugen, Wildruhezonen meiden).
 - **Touren**: FIT-Dateien direkt lesen, Höhenprofil der Route, Abgleich mit Strava/Komoot per OAuth,
@@ -64,6 +64,7 @@ Aus früheren Versionen dieser Roadmap:
   abgelehnt wurde
 - Schutzlisten je Kanton laden (Kanton des Spots über geo.admin.ch); PRO-Verifizierung auf ein Jahr befristet,
   mit Erinnerung und Verlängerung
+- Organisationen mit mehreren Mitgliedern: die verifizierte Leitung nimmt Kolleginnen und Kollegen auf
 - Sturmereignisse aus Böen mit Windwurf-Funden verknüpfen
 - DWD-Phänologie als Referenz für den Beginn der Herbstfärbung
 - Nächtliche Abkühlung in Senken aus Wind und Bewölkung

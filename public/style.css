@@ -1324,3 +1324,15 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 .pro-cell .danger { color: var(--danger); }
 .pro-renewal { color: var(--gold); font-weight: 600; }
 .lists-import { display: block; margin-top: 0.8rem; }
+
+/* Organisations with several members (account.js) */
+#org-dialog { max-width: 560px; }
+.org-card { border-top: 1px solid var(--border); padding-top: 0.6rem; margin-top: 0.8rem; }
+.org-card h3 { margin: 0 0 0.2rem; }
+.org-invalid { color: var(--danger); }
+.org-members { list-style: none; margin: 0.4rem 0; padding: 0; }
+.org-member { display: flex; justify-content: space-between; align-items: baseline; gap: 0.6rem; padding: 0.35rem 0; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.org-add { display: grid; gap: 0.35rem; margin-top: 0.6rem; }
+.org-add label { font-weight: 600; font-size: 0.85rem; }
+.org-add-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.org-add-row input { flex: 1 1 14rem; min-width: 0; }

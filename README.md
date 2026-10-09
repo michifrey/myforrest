@@ -240,6 +240,12 @@ Naturschutzverordnungen, Rote Liste) als CSV. Eine Art gilt dann dort als gesch�
 den Kanton fragt der Server einmal pro Spot bei geo.admin.ch ab. Funde, die schon vorher bestimmt wurden,
 werden beim Laden einer Liste nachträglich geschützt.
 
+<p align="center"><img src="docs/screenshots/organisation.jpg" width="420" alt="Organisation mit Leitung und Mitgliedern, Formular zum Aufnehmen"></p>
+
+Ein Forstrevier oder eine Fachstelle muss nicht jede Person einzeln verifizieren lassen: Wer verifiziert ist,
+leitet die **Organisation** und nimmt Kolleginnen und Kollegen mit Konto auf. Sie sehen geschützte Funde,
+solange eine Person der Leitung verifiziert ist, und die Leitung lässt sich weitergeben.
+
 ### 12. Konto: E-Mail, Google oder GitHub
 
 <p>
@@ -291,7 +297,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   aufzeichnen oder importieren (GPX, TCX, KML, GeoJSON), als GPX exportieren und speichern; Fotoaufträge
   ohne Zeit und Namen und Vorschläge entlang der eigenen Route.
 - **[Geschützte Funde](docs/funktionen.md#geschützte-funde-und-pro-mitglieder)**: seltene Arten und Pilzstellen
-  nur für verifizierte PRO-Mitglieder (Forstdienst, Naturschutz), öffentlich nur als 5-km-Raster.
+  nur für verifizierte PRO-Mitglieder (Forstdienst, Naturschutz), öffentlich nur als 5-km-Raster;
+  Organisationen nehmen ihre Mitglieder selbst auf.
 - **[Konten und Moderation](docs/funktionen.md#konten-moderation-und-lizenzen)**: Konten mit Rollen, Anmeldung mit E-Mail (Bestätigungslink, Passwort ändern und zurücksetzen, Konto löschen) oder über Google und GitHub,
   Lizenz pro Foto, Melden und Moderieren.
 
