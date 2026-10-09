@@ -1,8 +1,15 @@
 # Builds the Android app (android/): unit tests (the drive mode selection must decide like
-# public/drive-select.js, test/fixtures/drive-select-cases.json) and the APK as an artifact
-# (Actions → run → Artifacts). Server address baked in: the repository variable APP_URL (else the
-# app asks on first start). Signed release APK when the secrets ANDROID_KEYSTORE_BASE64,
-# ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD exist. Setup: docs/android.md.
+# public/drive-select.js, test/fixtures/drive-select-cases.json) and the APK.
+#
+#   Pull request   tests + debug APK as an artifact (Actions → run → Artifacts)
+#   main           additionally a release on the Releases page (download for everyone):
+#                  tag android-1.0.<run>, file myforrest.apk, always reachable at
+#                  …/releases/latest/download/myforrest.apk
+#
+# Server address baked in: the repository variable APP_URL (else the app asks on first start).
+# Signed with the own key when the secrets ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+# ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD exist; else the release carries the debug APK (a new
+# key on every run: an update then needs uninstalling first). Setup: docs/android.md.
 name: Android-App
 
 on:
@@ -23,39 +30,85 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # the release on main
     defaults:
       run:
         working-directory: android
     env:
       MYFORREST_URL: ${{ vars.APP_URL }}
       ANDROID_VERSION_CODE: ${{ github.run_number }}
+      ANDROID_VERSION_NAME: 1.0.${{ github.run_number }}
+      PUBLISH: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic # the open-source cache on GitHub, no commercial service
       - name: Tests und Debug-APK
         run: ./gradlew --no-daemon test assembleDebug
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: myforrest-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
-      - name: Release-APK (signiert)
-        if: github.event_name != 'pull_request'
+
+      - name: Release-APK (signiert, wenn ein Schlüssel hinterlegt ist)
+        id: apk
+        if: env.PUBLISH == 'true'
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -z "$KEYSTORE_BASE64" ]; then echo "Kein Schlüssel hinterlegt: nur die Debug-APK."; exit 0; fi
-          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
-          ANDROID_KEYSTORE="$RUNNER_TEMP/release.jks" ./gradlew --no-daemon assembleRelease
-      - uses: actions/upload-artifact@v4
-        if: github.event_name != 'pull_request'
-        with:
-          name: myforrest-release-apk
-          path: android/app/build/outputs/apk/release/app-release.apk
-          if-no-files-found: ignore
+          mkdir -p dist
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            ANDROID_KEYSTORE="$RUNNER_TEMP/release.jks" ./gradlew --no-daemon assembleRelease
+            cp app/build/outputs/apk/release/app-release.apk dist/myforrest.apk
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            cp app/build/outputs/apk/debug/app-debug.apk dist/myforrest.apk
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "sha256=$(sha256sum dist/myforrest.apk | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Release auf der Releases-Seite
+        if: env.PUBLISH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: android-${{ env.ANDROID_VERSION_NAME }}
+          SIGNED: ${{ steps.apk.outputs.signed }}
+          SHA256: ${{ steps.apk.outputs.sha256 }}
+          SERVER: ${{ vars.APP_URL }}
+        run: |
+          {
+            echo "Android-App von MyForrest, Version $ANDROID_VERSION_NAME (Commit ${GITHUB_SHA::7})."
+            echo
+            echo "**Installieren:** \`myforrest.apk\` unten auf dem Handy öffnen und die Installation aus dieser Quelle erlauben (Android 8.0 oder neuer)."
+            if [ -n "$SERVER" ]; then
+              echo "Die App verbindet sich mit $SERVER."
+            else
+              echo "Beim ersten Start fragt die App nach der Adresse des MyForrest-Servers."
+            fi
+            echo
+            if [ "$SIGNED" != "true" ]; then
+              echo "> **Testversion (Debug-Signatur):** Jede Version ist mit einem anderen Schlüssel signiert. Vor einem Update die alte Version deinstallieren."
+              echo
+            fi
+            echo "Was die App kann und wie sie gebaut wird: [Android-App](https://github.com/$GITHUB_REPOSITORY/blob/main/docs/android.md)."
+            echo
+            echo "SHA-256: \`$SHA256\`"
+          } > "$RUNNER_TEMP/notes.md"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            # A re-run of the same run: replace the file.
+            gh release upload "$TAG" dist/myforrest.apk --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" dist/myforrest.apk \
+              --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "Android-App $ANDROID_VERSION_NAME" --notes-file "$RUNNER_TEMP/notes.md" --latest
+          fi
