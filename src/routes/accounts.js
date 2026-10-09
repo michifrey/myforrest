@@ -643,10 +643,16 @@ module.exports = function registerAccounts(app, ctx) {
   });
   const backTo = (res, params) => res.redirect(303, `/?${new URLSearchParams(params)}`);
 
-  app.get('/api/auth/oauth/:provider', (req, res) => {
+  app.get('/api/auth/oauth/:provider', async (req, res) => {
     const provider = oauth.get(req.params.provider);
     if (!provider) return fail(res, 404, 'Diese Anmeldung ist nicht eingerichtet');
-    const { url, cookie } = oauth.begin(provider, origin(req));
+    let flow;
+    try {
+      flow = await oauth.begin(provider, origin(req));
+    } catch (err) {
+      return res.redirect(303, `/?${new URLSearchParams({ auth_error: err.message })}`);
+    }
+    const { url, cookie } = flow;
     res.set('Cache-Control', 'no-store');
     res.append('Set-Cookie', stateCookie(req, cookie, STATE_TTL_MS));
     res.redirect(303, url);

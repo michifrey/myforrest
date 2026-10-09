@@ -73,7 +73,7 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `POST`   | `/api/auth/password/change`  | Angemeldet: Passwort ändern (`{ current, password }`); beendet die anderen Sitzungen, Hinweis per E-Mail |
 | `GET`    | `/api/auth/password/reset?token=` | Prüft einen Link: `{ name, email }` oder 400 |
 | `POST`   | `/api/auth/password/reset`   | Neues Passwort setzen (`{ token, password }`): beendet alle Sitzungen und meldet an |
-| `GET`    | `/api/auth/oauth/:provider`  | Anmelden mit `google` oder `github`: leitet zum Anbieter weiter |
+| `GET`    | `/api/auth/oauth/:provider`  | Anmelden mit `google`, `github`, `eduid` oder `oidc`: leitet zum Anbieter weiter |
 | `GET`    | `/api/auth/oauth/:provider/callback` | Rückkehr vom Anbieter: meldet an, legt ein Konto an oder verknüpft (mit Sitzung); leitet nach `/?auth=ok\|created\|linked` bzw. `/?auth_error=…` |
 | `DELETE` | `/api/auth/identities/:provider` | Anmeldung über einen Anbieter vom eigenen Konto trennen (nicht die einzige) |
 | `POST`   | `/api/tracks/parse`          | GPX, TCX, KML oder GeoJSON lesen (`{ text, filename }`), ohne zu speichern: Punkte, Name, Format, Länge |

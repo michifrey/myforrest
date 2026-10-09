@@ -36,7 +36,7 @@ function fakeProviders(accounts, challenges) {
   };
 }
 
-async function withServer(accounts, fn) {
+async function withServer(accounts, fn, extra = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'myforrest-oauth-'));
   const challenges = new Set();
   const mails = [];
@@ -44,8 +44,8 @@ async function withServer(accounts, fn) {
     mailer: { send: async (m) => { mails.push(m); return { sent: true }; } },
     dataDir,
     weatherFetch: noWeather,
-    oauthProviders: { google: { clientId: 'gid', clientSecret: 'gsecret' }, github: { clientId: 'hid', clientSecret: 'hsecret' } },
-    oauthFetch: fakeProviders(accounts, challenges),
+    oauthProviders: { google: { clientId: 'gid', clientSecret: 'gsecret' }, github: { clientId: 'hid', clientSecret: 'hsecret' }, ...extra.providers },
+    oauthFetch: extra.fetch ? extra.fetch(accounts, challenges) : fakeProviders(accounts, challenges),
   });
   const server = app.listen(0);
   await new Promise((r) => server.once('listening', r));
@@ -216,4 +216,82 @@ test('a logged-in account links and unlinks providers', async () => {
     assert.equal((await after.signIn('github', 'hub', challenges)).searchParams.get('auth'), 'linked');
     assert.equal((await after.me()).user.name, 'Anna');
   });
+});
+
+/**
+ * A fake OpenID Connect provider at `issuer`: discovery, a token endpoint that
+ * only takes HTTP Basic client authentication, and userinfo.
+ */
+function fakeOidc(issuer, { reportedIssuer = issuer } = {}) {
+  const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  const host = new URL(issuer).origin;
+  return (accounts, challenges) => async (url, init = {}) => {
+    const u = new URL(url);
+    if (u.href === `${issuer.replace(/\/+$/, '')}/.well-known/openid-configuration`) {
+      return json({
+        issuer: reportedIssuer,
+        authorization_endpoint: `${host}/idp/authorize`,
+        token_endpoint: `${host}/idp/token`,
+        userinfo_endpoint: `${host}/idp/userinfo`,
+        token_endpoint_auth_methods_supported: ['client_secret_basic'],
+      });
+    }
+    if (u.pathname === '/idp/token') {
+      const body = new URLSearchParams(init.body);
+      const basic = String(init.headers?.Authorization || '');
+      if (!basic.startsWith('Basic ') || body.has('client_secret')) return json({ error: 'invalid_client' }, 401);
+      const challenge = crypto.createHash('sha256').update(body.get('code_verifier') || '').digest('base64url');
+      if (!accounts[body.get('code')] || !challenges.has(challenge)) return json({ error: 'invalid_grant' }, 400);
+      return json({ access_token: `at-${body.get('code')}`, token_type: 'Bearer' });
+    }
+    if (u.pathname === '/idp/userinfo') {
+      const a = accounts[String(init.headers?.Authorization || '').replace('Bearer at-', '')];
+      if (!a) return json({}, 401);
+      return json({ sub: a.sub, email: a.email, email_verified: a.verified, given_name: a.given, family_name: a.family });
+    }
+    return json({}, 404);
+  };
+}
+
+const EDU = {
+  lea: { sub: 'pairwise-lea', email: 'lea.muster@uzh.ch', verified: true, given: 'Lea', family: 'Muster' },
+  raw: { sub: 'pairwise-raw', email: 'raw@example.org', verified: false, given: 'Raw', family: 'Ohne' },
+};
+
+test('SWITCH edu-ID: endpoints from discovery, HTTP Basic at the token endpoint, verified address', async () => {
+  const eduid = { eduid: { clientId: 'eid', clientSecret: 'esecret' } };
+  await withServer(EDU, async (base, challenges) => {
+    const b = browser(base);
+    assert.ok((await b.me()).providers.some((p) => p.id === 'eduid' && p.label === 'SWITCH edu-ID'));
+    const start = await b.req('/api/auth/oauth/eduid');
+    const auth = new URL(start.headers.get('location'));
+    assert.equal(auth.origin + auth.pathname, 'https://login.eduid.ch/idp/authorize');
+    assert.equal(auth.searchParams.get('scope'), 'openid email profile');
+
+    const signIn = await b.signIn('eduid', 'lea', challenges);
+    assert.equal(signIn.searchParams.get('auth'), 'created');
+    const me = await b.me();
+    assert.equal(me.user.name, 'Lea Muster');
+    assert.equal(me.user.email, 'lea.muster@uzh.ch');
+    assert.deepEqual(me.user.identities, ['eduid']);
+
+    // Without email_verified: no new account.
+    const raw = await browser(base).signIn('eduid', 'raw', challenges);
+    assert.match(raw.searchParams.get('auth_error'), /bestätigte E-Mail/);
+  }, { providers: eduid, fetch: fakeOidc('https://login.eduid.ch/') });
+});
+
+test('generic OpenID Connect provider from issuer and label; a wrong issuer is refused', async () => {
+  const providers = { oidc: { clientId: 'oid', clientSecret: 'osecret', issuer: 'https://login.example.org/realms/wald', label: 'Forstamt' } };
+  await withServer(EDU, async (base, challenges) => {
+    const b = browser(base);
+    assert.ok((await b.me()).providers.some((p) => p.id === 'oidc' && p.label === 'Forstamt'));
+    assert.equal((await b.signIn('oidc', 'lea', challenges)).searchParams.get('auth'), 'created');
+  }, { providers, fetch: fakeOidc('https://login.example.org/realms/wald') });
+
+  await withServer(EDU, async (base) => {
+    const start = await browser(base).req('/api/auth/oauth/oidc');
+    assert.equal(start.status, 303);
+    assert.match(new URL(start.headers.get('location'), base).searchParams.get('auth_error'), /anderen Aussteller/);
+  }, { providers, fetch: fakeOidc('https://login.example.org/realms/wald', { reportedIssuer: 'https://evil.example/' }) });
 });

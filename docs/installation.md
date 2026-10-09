@@ -48,8 +48,10 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 | `REQUIRE_VERIFIED_EMAIL` | – | `1`: Uploads und Änderungen nur mit bestätigter E-Mail-Adresse (schliesst `REQUIRE_LOGIN` ein) |
 | `SMTP_URL`         | –        | Mailserver für Bestätigungslinks, z. B. `smtps://user:passwort@smtp.example.org` (siehe [unten](#e-mail-versand)); ohne ihn stehen die Links im Server-Log |
 | `MAIL_FROM`        | `MyForrest <no-reply@…>` | Absender der E-Mails |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | – | Aktiviert „Mit Google anmelden“ (siehe [unten](#anmelden-mit-google-und-github)) |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | – | Aktiviert „Mit Google anmelden“ (siehe [unten](#anmelden-über-google-github-und-switch-edu-id)) |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | – | Aktiviert „Mit GitHub anmelden“ |
+| `EDUID_CLIENT_ID`, `EDUID_CLIENT_SECRET` | – | Aktiviert „Mit SWITCH edu-ID anmelden“; `EDUID_ISSUER` (Standard `https://login.eduid.ch/`) für ein Testsystem |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_LABEL` | – | Ein weiterer OpenID-Connect-Dienst (z. B. Microsoft Entra ID einer Organisation, Keycloak) mit eigener Beschriftung |
 | `ROUTER_URL`       | `https://brouter.de/brouter` | Routing-Dienst im Format von [BRouter](https://brouter.de) für den Wege-Magnet beim Zeichnen von Touren; leer (`ROUTER_URL=`) = aus, dann gerade Linien. Für den Betrieb einen [eigenen BRouter](../deploy/brouter/README.md) nehmen, z. B. `http://brouter:17777/brouter` |
 | `PRO_VALID_DAYS`   | `365`    | Wie lange eine PRO-Verifizierung gilt, bevor sie bestätigt werden muss |
 | `CANTON_LOOKUP_URL` | geo.admin.ch | Dienst für den Kanton eines Spots (swisstopo identify); leer = aus, dann zählt jede kantonale Schutzliste |
@@ -79,9 +81,10 @@ MAIL_FROM='MyForrest <wald@example.org>' npm start
 - Mit `REQUIRE_VERIFIED_EMAIL=1` können nur Konten mit bestätigter Adresse Fotos beitragen und ändern.
   Konten aus der Zeit vor dieser Funktion fordern ihren Link im Konto-Menü an.
 
-## Anmelden mit Google und GitHub
+## Anmelden über Google, GitHub und SWITCH edu-ID
 
-Neben E-Mail und Passwort kann man sich mit einem Google- oder GitHub-Konto anmelden oder registrieren.
+Neben E-Mail und Passwort kann man sich mit einem Google-, GitHub- oder SWITCH-edu-ID-Konto anmelden oder
+registrieren, und mit einem weiteren Dienst, der OpenID Connect spricht.
 Ein Anbieter erscheint im Anmeldedialog, sobald Client-ID und Secret gesetzt sind. Die Rücksprungadresse
 lautet `<PUBLIC_URL>/api/auth/oauth/<anbieter>/callback`; ohne `PUBLIC_URL` wird sie aus der Anfrage
 gebildet. Sie muss beim Anbieter genau so eingetragen sein.
@@ -91,11 +94,23 @@ gebildet. Sie muss beim Anbieter genau so eingetragen sein.
   `https://example.org/api/auth/oauth/google/callback` eintragen. Bereiche: `openid`, `email`, `profile`.
 - *GitHub*: Unter *Settings → Developer settings → [OAuth Apps](https://github.com/settings/developers)*
   eine App anlegen, *Authorization callback URL* `https://example.org/api/auth/oauth/github/callback`.
+- *SWITCH edu-ID* (Hochschulen, Forschung, aber für alle offen): Den Dienst in der
+  [SWITCH Resource Registry](https://rr.aai.switch.ch/) als OpenID-Connect-Client registrieren, Redirect-URI
+  `https://example.org/api/auth/oauth/eduid/callback`, Claims *E-Mail* (mit `email_verified`) und *Name* als
+  benötigt freigeben. Die App liest Adressen der Endpunkte aus `https://login.eduid.ch/.well-known/openid-configuration`
+  und meldet sich mit Client-Secret (POST oder HTTP Basic, je nach Angabe des Anbieters) an. Die Kennung
+  (`sub`) ist pro Dienst verschieden (pairwise), andere Dienste können Konten also nicht verknüpfen.
+- *Weitere Dienste* (`OIDC_…`): `OIDC_ISSUER` ist die Adresse, unter der
+  `/.well-known/openid-configuration` liegt; `OIDC_LABEL` steht auf dem Knopf („Mit … anmelden“).
+  Redirect-URI `https://example.org/api/auth/oauth/oidc/callback`. Ein neues Konto entsteht nur mit
+  `email_verified: true`; Dienste, die das nicht liefern (etwa Microsoft Entra ID), lassen sich trotzdem mit
+  einem bestehenden Konto verknüpfen und dann zum Anmelden nutzen.
 
 ```bash
 PUBLIC_URL=https://example.org \
 GOOGLE_CLIENT_ID=… GOOGLE_CLIENT_SECRET=… \
-GITHUB_CLIENT_ID=… GITHUB_CLIENT_SECRET=… npm start
+GITHUB_CLIENT_ID=… GITHUB_CLIENT_SECRET=… \
+EDUID_CLIENT_ID=… EDUID_CLIENT_SECRET=… npm start
 ```
 
 Für lokale Versuche geht auch `http://localhost:3000` als Rücksprungadresse.
