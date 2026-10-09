@@ -20,6 +20,8 @@ RUN curl -fsSL -o brouter.zip "https://github.com/abrensch/brouter/releases/down
   && rm -rf release \
   && test -f profiles2/hiking-mountain.brf
 
+# MyForrest's own profiles (myforrest-wald: forest roads and skid trails first).
+COPY profiles/*.brf /opt/brouter/profiles2/
 COPY entrypoint.sh /usr/local/bin/brouter-entrypoint
 RUN chmod 755 /usr/local/bin/brouter-entrypoint \
   && useradd --uid 1000 --create-home brouter 2>/dev/null || true \

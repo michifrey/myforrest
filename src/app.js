@@ -9,6 +9,8 @@ const multer = require('multer');
 
 const { openDb, transaction } = require('./db');
 const { distanceM, isValidCoord, positionAt } = require('./geo');
+const { lenientFetch } = require('./lenient-fetch');
+const { createWildlife } = require('./wildlife');
 const { parseGpx } = require('./gpx');
 const { readPhotoMeta, imageExtension } = require('./exif');
 const { assignSpot, refreshSpot, backfillSpotHeadings, planSplit, splitSpot, HEADING_TOLERANCE_DEG } = require('./spots');
@@ -62,7 +64,7 @@ function createApp({
   detectorUrl = process.env.DETECTOR_URL || null, detectorFetch = fetch,
   // Routing along paths for drawn tours (BRouter-compatible, e.g. https://brouter.de/brouter); off when unset.
   // Public BRouter by default (only waypoints are sent, by the server); ROUTER_URL= (empty) turns it off.
-  routerUrl = (process.env.ROUTER_URL ?? 'https://brouter.de/brouter') || null, routerFetch = fetch,
+  routerUrl = (process.env.ROUTER_URL ?? 'https://brouter.de/brouter') || null, routerFetch = lenientFetch,
   routerProfile = process.env.ROUTER_PROFILE || 'hiking-mountain',
   // Vector tile precomputation (routes/ogc-tiles.js): { precompute, delayMs }.
   tileOptions = { precompute: process.env.TILES_PRECOMPUTE !== '0' },
@@ -96,6 +98,8 @@ function createApp({
     db, requireLogin, requireVerifiedEmail, adminEmail, rateLimits, oauth, mailer, publicUrl: process.env.PUBLIC_URL || null,
   };
   const accounts = registerAccounts(app, accountsCtx);
+  // Wildlife rest areas (WILDRUHE_GEOJSON): the path magnet routes around them in their protection period.
+  const wildlife = createWildlife();
   app.locals.remindPro = accounts.remindPro;
   // Protection lists per canton (src/sensitive.js) and the canton of each spot (src/canton.js).
   const sensitiveLists = createSensitiveLists(db);
@@ -454,7 +458,7 @@ function createApp({
   const climate = require('./routes/climate')(app, { db, weatherFetch, getPhoto, terrainOf, background, reassessSpot, visibleSpotIds: accounts.visibleSpotIds });
 
   app.get('/api/config', (req, res) => {
-    res.json({ tags: TAGS, activities: ACTIVITIES, plantnet: Boolean(plantnetKey), spotRadiusM, routing: Boolean(routerUrl) });
+    res.json({ tags: TAGS, activities: ACTIVITIES, plantnet: Boolean(plantnetKey), spotRadiusM, routing: Boolean(routerUrl), wildlifeZones: wildlife.enabled() });
   });
 
   app.get('/api/spots', (req, res) => {
@@ -1125,7 +1129,7 @@ function createApp({
   app.locals.push = push;
   const vegetation = require('./routes/vegetation')(app, { db, uploadDir, background, fetchImpl: weatherFetch, push, accounts });
   Object.assign(tours, require('./routes/tracks')(app, {
-    db, spotRadiusM, satelliteAlerts: vegetation.alerts, routerUrl, routerFetch, routerProfile, accounts,
+    db, spotRadiusM, satelliteAlerts: vegetation.alerts, routerUrl, routerFetch, routerProfile, accounts, wildlife,
   }));
   require('./routes/analysis')(app, {
     db, uploadDir, getPhoto, idParam, background, changeBetween, spotTrees, terrainOf, refreshIrregularities, detectorUrl, detectorFetch,

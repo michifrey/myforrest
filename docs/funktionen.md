@@ -45,6 +45,14 @@ nächstgelegenen Stelle gezogen. So füllt jede Runde dieselben Spots weiter.
 - **GoPro-Telemetrie (GPMF)**: Die GPS-Spur (GPS5 bzw. GPS9 ab HERO11, mit GPSU-Zeit, SCAL-Skalierung
   sowie Fix und Genauigkeit) wird direkt aus der MP4-Datei gelesen, ohne Zusatzprogramm. Daraus ergeben
   sich Position, UTC-Aufnahmezeit, Höhe und Blickrichtung (Fahrtrichtung) jedes Bildes.
+- **Dashcams**: Ohne GoPro-Telemetrie sucht die App das GPS der Dashcam in der Datei, ohne Zusatzprogramm:
+  NMEA-Sätze (`$GPRMC`/`$GNRMC` mit Zeit, Ort, Geschwindigkeit und Kurs, Höhe aus `$GPGGA`, mit Prüfsumme),
+  wie sie z. B. BlackVue im MP4 speichert, und die `freeGPS`-Blöcke von Novatek-Kameras (Viofo, Kenwood und
+  viele ohne Marke). Die Datei wird stückweise gelesen, auch grosse Videos brauchen wenig Speicher. Die
+  Dashcams schreiben ab dem Start jeder Datei eine Position pro Sekunde; die erste ist der Videoanfang.
+  Solche Videos bekommen die Aktivität *Fahrt*, wenn keine gewählt ist. Verschlüsselte Varianten (manche
+  neuere Viofo-Firmware) werden nicht gelesen. Eine `.nmea`-Datei neben dem Video geht im Feld für den
+  GPX-Track, auch für Fotos und beim Import einer Tour.
 - **Ohne Telemetrie** wird das Video über einen mitgeschickten GPX-Track verortet; die Startzeit kommt
   aus dem Video-Header (UTC) oder dem Datumsfeld und lässt sich mit *Kamera-Uhr korrigieren* verschieben.
   Mit einem auf der Karte gewählten Standort wird stattdessen alle N Sekunden ein Bild gezogen.
@@ -91,8 +99,14 @@ der installierten App, `/?action=fahrt`) zeigt eine dunkle Vollbildansicht für 
   zählt gemachte und behaltene Bilder, die Strecke, den gesparten Speicher und warum Bilder verworfen wurden.
 - **Auf dem Server** gilt zusätzlich: Pro Konto und Ort (Spot-Radius) wird innerhalb von 12 Stunden nur ein
   Fahrtbild gespeichert, falls doch einmal zwei kommen (zweites Gerät, erneut gesendete Warteschlange).
-- **Echte Dashcams**: Deren Videos lassen sich schon heute über *Foto beitragen* hochladen (mit GPX-Track
-  oder GoPro-Telemetrie); daraus wird etwa alle 25 m ein Bild gezogen, siehe *Videos statt Einzelbilder*.
+- **Echte Dashcams**: Deren Videos gehen über *Foto beitragen*; das GPS liest die App direkt aus der Datei
+  (siehe *Videos statt Einzelbilder*), daraus wird etwa alle 25 m ein Bild gezogen.
+- **In der Zeitreise** tragen Bilder aus dem Auto (Fahrtmodus und Dashcam-Videos, Aktivität *Fahrt*) die
+  Marke *Fahrt*; die Bildunterschrift nennt *Fahrt (Dashcam)*. Hat ein Spot auch andere Fotos, blendet
+  *Fahrtbilder (Dashcam) ausblenden* sie aus (gilt für alle Spots, merkt sich das Gerät); die Spot-Zeile sagt,
+  wie viele ausgeblendet sind.
+
+![Fahrtbilder in der Zeitreise](screenshots/fahrtbilder.jpg)
 
 ### HEIC-Fotos vom iPhone
 
@@ -723,12 +737,22 @@ wird.
   RunnerMaps. Dafür fragt der Server einen BRouter-Dienst an (Standard `brouter.de`, Profil `hiking-mountain`,
   anpassbar mit `ROUTER_URL` und `ROUTER_PROFILE`, siehe [Installation](installation.md#umgebungsvariablen));
   der Browser spricht ihn nie direkt an. Ohne Magnet oder ohne Dienst entstehen gerade Linien.
+- **Eigener Routing-Server mit Waldprofil**: Mit dem eigenen BRouter ([`deploy/brouter`](../deploy/brouter/README.md))
+  gilt das Profil `myforrest-wald`: Forststrassen zuerst, Rückegassen fast gleich gut, dann Pfade; Strassen
+  mit Verkehr werden umgangen, Autobahnen und schwierige Bergwege (ab SAC T5) nie genommen.
+- **Wildruhezonen**: Ist eine Datei mit den Zonen hinterlegt (`WILDRUHE_GEOJSON`, z. B. der BAFU-Datensatz von
+  geo.admin.ch), führt der Magnet während der Schutzzeit (aus dem Text der Zone, sonst 20.12.–30.4.) um sie
+  herum, und die Karte zeigt sie beim Planen gestrichelt (ab Zoom 11, mit Name und Schutzzeit). Das Panel
+  sagt, um welche Zonen die Route geführt wurde; liegt ein Wegpunkt in einer Zone, weist es darauf hin.
+
+![Wildruhezone beim Planen einer Route](screenshots/wildruhezonen.jpg)
 - **Aufzeichnen**: Das Handy zeichnet die Strecke per GPS auf (Punkte ab ±40 m Genauigkeit, mindestens 4 m
   auseinander, mit Zeit und Höhe). Der Bildschirm bleibt dabei an (Wake Lock), denn Browser stoppen GPS
   für Seiten im Hintergrund. Die Punkte liegen laufend im Browser; nach einem Neuladen lässt sich die
   Aufzeichnung fortsetzen.
 - **Importieren**: GPX (Tracks, Routen oder Wegpunkte), Garmin TCX, KML (LineString und `gx:Track`) und
-  GeoJSON (LineString, MultiLineString, mit `coordTimes`), bis 14 MB und 20 000 Punkte. FIT-Dateien bitte in
+  GeoJSON (LineString, MultiLineString, mit `coordTimes`) sowie NMEA von Dashcams (`.nmea`), bis 14 MB und
+  20 000 Punkte. FIT-Dateien bitte in
   Garmin Connect oder Strava als GPX exportieren.
 - **Exportieren**: jede Route als GPX, mit Höhe und Zeit, wo vorhanden.
 
@@ -890,7 +914,9 @@ prüfen lassen muss, gibt es **Organisationen**:
   geht eine **Einladung** mit einem Link (`/#einladung=…`, 14 Tage gültig) an diese Adresse; in der Datenbank
   steht nur der SHA-256 des Tokens. Der Link zeigt, wer einlädt, und öffnet *Konto erstellen* mit der
   vorausgefüllten Adresse (oder *Anmelden*, wenn es schon ein Konto gibt; Google und GitHub gehen auch).
-  Danach ist die Person Mitglied, und ihre Adresse gilt als bestätigt, weil der Link an sie ging. Annehmen
+  Danach ist die Person Mitglied, und ihre Adresse gilt als bestätigt, weil der Link an sie ging. Wer sich so
+  mit der eingeladenen Adresse neu registriert, bekommt deshalb keinen separaten Bestätigungslink; wer im
+  Formular eine andere Adresse eintippt, bestätigt diese wie gewohnt per E-Mail. Annehmen
   kann nur ein Konto mit genau der eingeladenen Adresse; ein weitergeleiteter Link nützt niemand anderem.
   Die Leitung sieht offene Einladungen mit Ablaufdatum und kann sie zurückziehen; eine neue Einladung an
   dieselbe Adresse ersetzt die alte.
@@ -930,8 +956,9 @@ prüfen lassen muss, gibt es **Organisationen**:
   Sperre übersteht so einen Neustart oder ein Deployment und gilt für alle Prozesse auf derselben Datenbank.
   IP- und E-Mail-Adressen stehen dort nur als SHA-256-Hash; Einträge nach Ablauf ihres Zeitfensters (höchstens
   24 Stunden) werden gelöscht.
-- *E-Mail bestätigen*: Nach der Registrierung mit Passwort kommt ein Link per E-Mail (24 Stunden gültig,
-  nur der SHA-256 des Tokens steht in der Datenbank; ein neu angeforderter Link ersetzt den alten, höchstens
+- *E-Mail bestätigen*: Nach der Registrierung mit Passwort kommt ein Link per E-Mail; über eine Einladung an
+  dieselbe Adresse entfällt er, weil die Adresse damit schon bestätigt ist. Der Link ist 24 Stunden gültig;
+  in der Datenbank steht nur der SHA-256 des Tokens, ein neu angeforderter Link ersetzt den alten (höchstens
   3 pro Stunde). Bis zur Bestätigung zeigt das Konto-Menü „E-Mail-Adresse noch nicht bestätigt“ und
   *Bestätigungslink senden*. Mit `REQUIRE_VERIFIED_EMAIL=1` braucht es eine bestätigte Adresse für Uploads
   und Änderungen. Fällt der Mailserver aus, gelingt die Registrierung trotzdem; der Link lässt sich später
@@ -990,7 +1017,11 @@ prüfen lassen muss, gibt es **Organisationen**:
   Diensten liest die App die Endpunkte aus deren Discovery-Dokument und prüft, dass der Aussteller stimmt.
   Bei Microsoft kommen die Angaben aus dem ID-Token (Empfänger, Ablauf, Aussteller und Tenant geprüft); die
   Adresse gilt nur mit dem Anspruch `xms_edov` als bestätigt, sonst könnte ein fremder Tenant fremde Adressen
-  vorgeben. Der Ablauf ist OAuth 2.0 mit PKCE; `state` und Verifier liegen in einem
+  vorgeben.
+- *AGOV und Anmeldung mit Schlüssel*: Für Instanzen, die eine Behörde betreibt, lässt sich AGOV anbinden, der
+  Anmeldedienst der Schweizer Behörden (siehe [Installation](installation.md#agov)). Bei AGOV und den anderen
+  OpenID-Connect-Diensten kann sich die App statt mit einem Client-Secret mit einem privaten Schlüssel
+  ausweisen (`private_key_jwt`); die öffentlichen Schlüssel stehen unter `/api/auth/jwks.json`. Der Ablauf ist OAuth 2.0 mit PKCE; `state` und Verifier liegen in einem
   kurzlebigen httpOnly-Cookie, ein fremder oder abgelaufener Rücksprung wird abgewiesen. Beim ersten Mal
   entsteht ein Konto ohne Passwort mit der vom Anbieter **bestätigten** E-Mail-Adresse (ohne bestätigte
   Adresse keine Registrierung); der Name kommt vom Anbieter und lässt sich durch eine Zahl eindeutig machen.

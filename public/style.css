@@ -499,6 +499,12 @@ input[type="checkbox"] { accent-color: var(--accent); width: 1.05rem; height: 1.
 .thumbs button { padding: 0; border: 2px solid transparent; border-radius: 10px; flex: none; background: none; }
 .thumbs button[aria-current="true"] { border-color: var(--gold); }
 .thumbs img { display: block; width: 66px; height: 50px; object-fit: cover; border-radius: 8px; }
+/* Pictures from the car (drive mode, dashcam) */
+.thumbs button.is-drive { position: relative; }
+.thumbs button.is-drive::after {
+  content: 'Fahrt'; position: absolute; left: 3px; bottom: 3px; padding: 0 0.3rem; border-radius: 999px;
+  font-size: 0.6rem; font-weight: 700; line-height: 1.5; background: rgb(0 0 0 / 0.6); color: #fff;
+}
 .toggle { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--muted); margin-top: 0.6rem; font-weight: 500; }
 
 .compare { margin-top: 0.9rem; }
@@ -1397,6 +1403,9 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 .drive-controls { display: flex; justify-content: center; margin-top: auto; }
 .drive-go { min-width: min(320px, 100%); padding: 1rem 1.4rem; font-size: 1.1rem; }
 #drive-toggle.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* Wildlife rest areas on the map while planning a tour (tours.js) */
+.wildlife-zone { stroke: #b0452a; stroke-width: 1.5; stroke-dasharray: 5 4; fill: #b0452a; fill-opacity: 0.12; }
 
 /* ---------- Walk-through (walk.js) ---------- */
 .walk-open, .walk-open body { overflow: hidden; }

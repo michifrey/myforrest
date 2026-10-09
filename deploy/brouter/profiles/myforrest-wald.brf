@@ -1,0 +1,83 @@
+# MyForrest – Waldprofil für BRouter
+#
+# Für Leute, die im Wald unterwegs sind (Forstdienst, Wandern, Joggen):
+#   - Forststrassen (highway=track) und Rückegassen (track grade4/5, Zufahrt
+#     forestry/agricultural) bevorzugen,
+#   - Pfade und Fusswege gut, ruhige Nebenstrassen in Ordnung,
+#   - Strassen mit Verkehr meiden, Autobahn und Autostrasse nie,
+#   - schwierige Bergwege (SAC T4 und mehr) meiden, ab T5 nie.
+# Wildruhezonen kommen nicht aus OpenStreetMap: MyForrest gibt sie als
+# Sperrflächen (polygons) mit jeder Anfrage mit, während der Schutzzeit.
+#
+# Kosten pro Meter: 1 = Forststrasse; höher = wird umgangen, wenn ein
+# Waldweg höchstens so viel länger ist.
+
+---context:global
+
+assign   validForFoot         1
+assign   turnInstructionMode  1
+assign   turnInstructionCatchingRange 20
+
+# Steigung zählt mit (ca. 4 km/h in der Ebene, 600 Hm pro Stunde)
+assign   uphillcost           7
+assign   uphillcutoff         3
+assign   downhillcost         4
+assign   downhillcutoff       3
+
+assign   rueckegasse_factor   1.1   # Rückegassen: fast so gut wie Forststrassen
+assign   path_factor          1.25  # Pfade und Fusswege
+assign   minor_road_factor    1.6   # Nebenstrassen, Erschliessungsstrassen
+assign   road_factor          3.0   # Strassen mit Verkehr
+assign   major_road_factor    8.0   # Hauptstrassen
+
+---context:way
+
+assign ismotorroad or highway=motorway|motorway_link|trunk|trunk_link motorroad=yes
+
+# Zu Fuss erlaubt? Forst- und Landwirtschaftswege sind es in der Schweiz, auch mit access=forestry
+# (in BRouter ein Wert mit access=agricultural).
+assign footaccess
+  if foot=no|private then false
+  else if foot=yes|designated|permissive then true
+  else if access=no|private then false
+  else true
+
+assign SAC
+  if      sac_scale=difficult_alpine_hiking|demanding_alpine_hiking then 5
+  else if sac_scale=alpine_hiking             then 4
+  else if sac_scale=demanding_mountain_hiking then 3
+  else if sac_scale=mountain_hiking           then 2
+  else 1
+
+assign isrueckegasse
+  and highway=track
+      or tracktype=grade4|grade5 access=agricultural
+
+assign basecost
+  if      highway=track                                then ( if isrueckegasse then rueckegasse_factor else 1.0 )
+  else if highway=path|footway|bridleway|steps         then path_factor
+  else if highway=cycleway|pedestrian|living_street    then path_factor
+  else if highway=service|residential|unclassified|road then minor_road_factor
+  else if highway=tertiary|tertiary_link               then road_factor
+  else if highway=secondary|secondary_link             then road_factor
+  else if highway=primary|primary_link                 then major_road_factor
+  else 10000
+
+assign costfactor
+  if      ismotorroad          then 10000
+  else if not footaccess       then 10000
+  else if route=ferry          then 10000
+  else if equal SAC 5          then 10000
+  else if equal SAC 4          then ( multiply basecost 3 )
+  else if equal SAC 3          then ( multiply basecost 1.5 )
+  else if highway=steps        then ( multiply basecost 1.3 )
+  else basecost
+
+assign turncost    0
+assign initialcost 0
+
+---context:node
+
+assign initialcost
+  if barrier=fence|wall then 1000000
+  else 0

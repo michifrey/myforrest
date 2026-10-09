@@ -10,7 +10,7 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/spots/:id`             | Ein Spot mit Blickrichtung und allen Fotos chronologisch (jedes Foto mit `url`, `thumbUrl` und `largeUrl`, `panorama` für 360°-Bilder und `alignment`: bei Fotos die Homographie `h`, bei Panoramen `kind: 'rotation'` mit der Drehung `r`, `yaw` und `tilt`) |
 | `GET`    | `/thumbs/:datei`             | Vorschaubilder (WebP)                                    |
 | `POST`   | `/api/photos`                | Upload (multipart: `photos[]` als JPEG, PNG, WebP oder HEIC, optional `spotId` und `refPhotoId` für Wiederholungsfotos, `requestId` für einen Fotoauftrag, `sequenceId` für Bilder einer Aufnahme (Fahrt, Upload mit mehreren Fotos), `protected=1` für einen geschützten Fund, `license`, `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity` (`joggen`, `wandern`, `biken`, `fahren`, `sonstiges`), `heading` (Blickrichtung in Grad, wenn das Foto keine im EXIF hat), `note`, `utcOffsetMinutes`, `clockShiftSeconds`). Mit `activity=fahren` (Fahrtmodus) wird pro Konto und Ort innerhalb von 12 Stunden nur ein Bild gespeichert, weitere stehen in `skipped` |
-| `POST`   | `/api/videos`                | Video-Upload (multipart: `video`, optional `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `clockShiftSeconds`, `frameDistanceM`, `frameIntervalS`, `panorama` = `auto`/`1`/`0`, `async=1` für Hintergrundverarbeitung) |
+| `POST`   | `/api/videos`                | Video-Upload (GPS aus GoPro-Telemetrie oder der Dashcam: NMEA bzw. Novatek `freeGPS`, sonst `gpx`; `video.track` im Ergebnis: `gpmf`, `nmea`, `novatek`, `gpx` oder `manual`) (multipart: `video`, optional `gpx` (GPX oder NMEA), `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `clockShiftSeconds`, `frameDistanceM`, `frameIntervalS`, `panorama` = `auto`/`1`/`0`, `async=1` für Hintergrundverarbeitung) |
 | `GET`    | `/api/videos/jobs/:id`       | Fortschritt und Ergebnis eines Video-Uploads mit `async=1` |
 | `GET`    | `/api/videos/config`         | ffmpeg verfügbar? Standardabstand und -intervall         |
 | `GET`    | `/api/protected-species`     | Geladene Schutzlisten pro Kanton (`canton`, `entries`, `sources`, `loadedAt`) |
@@ -56,7 +56,7 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `PATCH`  | `/api/photos/:id`            | Tags und Notiz ändern; `license` nur durch den Urheber; `protected` (true/false) durch den Urheber, PRO-Mitglieder oder Moderation |
 | `DELETE` | `/api/photos/:id`            | Foto löschen (Urheber oder Moderation; anonyme Fotos ohne `REQUIRE_LOGIN` frei) |
 | `GET`    | `/api/auth/me`               | Angemeldetes Konto (mit `identities`, `emailVerified`, `hasPassword`, `pendingEmail`), CSRF-Token, Lizenzen, Meldegründe, `requireLogin`, `requireVerifiedEmail`, `providers` |
-| `POST`   | `/api/auth/register`         | Konto anlegen (JSON: `email`, `name`, `password`) und anmelden; schickt den Bestätigungslink (`verification`: `sent`, `logged` oder `failed`) |
+| `POST`   | `/api/auth/register`         | Konto anlegen (JSON: `email`, `name`, `password`, optional `invite` = Token einer Einladung) und anmelden; schickt den Bestätigungslink (`verification`: `sent`, `logged` oder `failed`), ausser die Einladung gilt für diese Adresse (`invite`: Adresse gleich bestätigt) |
 | `POST`   | `/api/auth/login`            | Anmelden (JSON: `login` = E-Mail oder Name, `password`)  |
 | `POST`   | `/api/auth/logout`           | Abmelden                                                 |
 | `GET`    | `/api/auth/verify?token=`    | Link aus der Bestätigungs-E-Mail: bestätigt die Adresse, leitet nach `/?auth=verified` bzw. `/?auth_error=…` |
@@ -74,7 +74,8 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `POST`   | `/api/auth/password/change`  | Angemeldet: Passwort ändern (`{ current, password }`); beendet die anderen Sitzungen, Hinweis per E-Mail |
 | `GET`    | `/api/auth/password/reset?token=` | Prüft einen Link: `{ name, email }` oder 400 |
 | `POST`   | `/api/auth/password/reset`   | Neues Passwort setzen (`{ token, password }`): beendet alle Sitzungen und meldet an |
-| `GET`    | `/api/auth/oauth/:provider`  | Anmelden mit `google`, `github`, `microsoft`, `eduid` oder `oidc`: leitet zum Anbieter weiter |
+| `GET`    | `/api/auth/jwks.json`        | Öffentliche Schlüssel der App für `private_key_jwt` (JWKS), zum Hinterlegen bei AGOV o. Ä. |
+| `GET`    | `/api/auth/oauth/:provider`  | Anmelden mit `google`, `github`, `microsoft`, `eduid`, `agov` oder `oidc`: leitet zum Anbieter weiter |
 | `GET`    | `/api/auth/oauth/:provider/callback` | Rückkehr vom Anbieter: meldet an, legt ein Konto an oder verknüpft (mit Sitzung); leitet nach `/?auth=ok\|created\|linked` bzw. `/?auth_error=…` |
 | `DELETE` | `/api/auth/identities/:provider` | Anmeldung über einen Anbieter vom eigenen Konto trennen (nicht die einzige) |
 | `POST`   | `/api/tracks/parse`          | GPX, TCX, KML oder GeoJSON lesen (`{ text, filename }`), ohne zu speichern: Punkte, Name, Format, Länge |
@@ -84,7 +85,8 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/tracks/:id.gpx`        | Tour als GPX                                             |
 | `PATCH`  | `/api/tracks/:id`            | `name`, `activity`, `visibility` (nur Besitzer oder Moderation) |
 | `DELETE` | `/api/tracks/:id`            | Tour löschen                                             |
-| `GET`    | `/api/route?points=lat,lon;lat,lon` | Weg zwischen Wegpunkten vom Routing-Dienst (`ROUTER_URL`); 501 ohne Dienst |
+| `GET`    | `/api/route?points=lat,lon;lat,lon` | Weg zwischen Wegpunkten vom Routing-Dienst (`ROUTER_URL`, Profil `ROUTER_PROFILE`); 501 ohne Dienst. Wildruhezonen in der Schutzzeit gehen als Sperrflächen mit: `wildlifeZones` (umgangen), `insideWildlifeZones` (ein Wegpunkt liegt darin) |
+| `GET`    | `/api/wildlife-zones?bbox=w,s,e,n` | Wildruhezonen in der Schutzzeit als GeoJSON (`name`, `season`), für die Karte; `wildlifeZones` in `/api/config` sagt, ob welche hinterlegt sind |
 | `POST`   | `/api/route-suggestions`     | Fotoaufträge, Spots mit Satelliten-Frühwarnung und lange nicht besuchte Spots nahe einer Route (`{ points, maxDistanceM }`), mit Abstand und Kilometer; die Route wird nicht gespeichert |
 | `GET`    | `/api/photo-requests`        | Offene Fotoaufträge (`?status=alle` auch erledigte), ohne Namen der anfragenden Person |
 | `POST`   | `/api/photo-requests`        | Fotoauftrag: `{ lat, lon, heading?, title, note? }` oder `{ spotId, title }` |

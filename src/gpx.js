@@ -1,5 +1,7 @@
 'use strict';
 
+const { parseNmea, looksLikeNmea } = require('./dashcam');
+
 const attr = (attrs, name) => {
   const m = attrs.match(new RegExp(`\\b${name}\\s*=\\s*["']([^"']+)["']`));
   return m ? Number(m[1]) : NaN;
@@ -7,10 +9,12 @@ const attr = (attrs, name) => {
 
 /**
  * Extracts timestamped points from a GPX file (e.g. exported from Strava,
- * Komoot or a sports watch). Points without a <time> are skipped.
+ * Komoot or a sports watch), or from NMEA text (dashcams). Points without a <time> are skipped.
  * Returns [{lat, lon, time}] sorted by time (ms since epoch, UTC).
  */
 function parseGpx(xml) {
+  // A dashcam's NMEA file (.nmea/.log) in place of a GPX track.
+  if (looksLikeNmea(xml)) return parseNmea(xml).map((p) => ({ lat: p.lat, lon: p.lon, time: p.time }));
   const points = [];
   const re = /<(trkpt|rtept|wpt)\b([^>]*)>([\s\S]*?)<\/\1>/g;
   let m;

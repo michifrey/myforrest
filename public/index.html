@@ -225,6 +225,7 @@
           <input id="time-slider" type="range" min="0" value="0" aria-label="Zeitachse">
           <div class="timeline-labels"><span id="t-first"></span><span id="t-last"></span></div>
           <label class="toggle"><input type="checkbox" id="stabilize" checked> Stabilisiert – ausgerichtete Fotos deckungsgleich zeigen</label>
+          <label class="toggle" id="drive-filter-wrap" hidden><input type="checkbox" id="drive-filter"> Fahrtbilder (Dashcam) ausblenden</label>
           <div id="thumbs" class="thumbs"></div>
         </div>
 
@@ -359,12 +360,12 @@
         <input type="file" name="photos" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,video/mp4,video/quicktime,.mp4,.mov,.insv,.360" multiple required>
         <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="10" width="36" height="28" rx="5"/><path d="M6 32l10-10 8 8 6-6 12 12"/><circle cx="32" cy="19" r="3"/></svg>
         <strong data-empty="Fotos oder Videos hierher ziehen oder auswählen">Fotos oder Videos hierher ziehen oder auswählen</strong>
-        <span class="muted small">JPEG, PNG, WebP, HEIC oder Video (GoPro, 360°-MP4) · Ort und Zeit werden aus den Bild- und Telemetriedaten gelesen</span>
+        <span class="muted small">JPEG, PNG, WebP, HEIC oder Video (GoPro, Dashcam, 360°-MP4) · Ort und Zeit werden aus den Bild- und Telemetriedaten gelesen</span>
       </label>
       <label class="dropzone compact">
-        <input type="file" name="gpx" accept=".gpx,application/gpx+xml">
+        <input type="file" name="gpx" accept=".gpx,.nmea,.log,application/gpx+xml">
         <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 38c5-10 12-4 16-12s10-10 16-14"/><circle cx="8" cy="38" r="3"/><circle cx="40" cy="12" r="3"/></svg>
-        <strong data-empty="GPX-Track hinzufügen (optional)">GPX-Track hinzufügen (optional)</strong>
+        <strong data-empty="GPX-Track oder NMEA-Datei hinzufügen (optional)">GPX-Track oder NMEA-Datei hinzufügen (optional)</strong>
         <span class="muted small">Verortet Fotos ohne GPS über die Aufnahmezeit</span>
       </label>
 

@@ -121,8 +121,9 @@ neue Foto gehört automatisch zu diesem Spot und öffnet sich gleich im Vorher/N
 
 <p align="center"><img src="docs/screenshots/upload.png" width="420" alt="Upload-Dialog"></p>
 
-*Foto beitragen* nimmt beliebig viele Fotos auf einmal entgegen, auch HEIC vom iPhone und Videos von GoPro
-oder 360°-Kameras, aus denen entlang der Route Einzelbilder werden. Ort und Zeit kommen aus den EXIF- bzw.
+*Foto beitragen* nimmt beliebig viele Fotos auf einmal entgegen, auch HEIC vom iPhone und Videos von GoPro,
+Dashcams (GPS direkt aus der Datei: NMEA, Novatek) oder 360°-Kameras, aus denen entlang der Route Einzelbilder
+werden. Ort und Zeit kommen aus den EXIF- bzw.
 Telemetriedaten. Fotos ohne GPS lassen sich über einen GPX-Track verorten (dafür gibt es unter
 *Zeitabgleich für GPX* Zeitzone und Korrektur für die Kamera-Uhr) oder von Hand auf der Karte bzw. über
 den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen, eine Notiz und die Lizenz (Standard
@@ -138,7 +139,8 @@ installierten App) macht alle paar Sekunden ein Bild und zeichnet die Strecke al
 nur Bilder an bekannten Spots (das nächstgelegene, in Blickrichtung des Spots) und eines alle 150 m; Bilder
 im Stillstand, unscharfe und solche, die gleich aussehen wie das letzte, verwirft schon das Handy. Aus
 einem Tag mit Tausenden Bildern werden so einige Dutzend, die im Hintergrund hochgeladen werden. (Im
-Screenshot liefert die Testkamera des Browsers das Bild.)
+Screenshot liefert die Testkamera des Browsers das Bild.) In der Zeitreise tragen Bilder aus dem Auto die Marke
+*Fahrt* und lassen sich ausblenden.
 
 Vor einer Tour ohne Empfang speichert *Touren & Aufträge → Karte entlang der Route offline speichern* die
 Kartenkacheln eines Korridors um die Route und die Spots daran (mit Vorschaubildern und den Referenzfotos
@@ -216,7 +218,8 @@ map.geo.admin.ch. Ein Klick auf ein Objekt zeigt seine Angaben.
 *Touren & Aufträge* hält fest, wo man unterwegs ist. Eine Route lässt sich auf der Karte **zeichnen**
 (Klick für Klick; der Wege-Magnet zieht die Linie auf Wege und Pfade), mit dem Handy per GPS **aufzeichnen** oder als GPX, TCX, KML
 oder GeoJSON **importieren**. Gelbe Kilometer-Marken zeigen den Verlauf, jede Route geht auch als GPX
-wieder hinaus. Mit Konto lassen sich Touren speichern und veröffentlichen; andere sehen eine öffentliche
+wieder hinaus. Mit dem eigenen Routing-Server bevorzugt der Magnet Forststrassen und Rückegassen und führt
+während der Schutzzeit um **Wildruhezonen** herum, die die Karte beim Planen zeigt. Mit Konto lassen sich Touren speichern und veröffentlichen; andere sehen eine öffentliche
 Tour ohne Zeiten und ohne die ersten und letzten 200 m. Über eine Tour mit Zeitstempeln lassen sich im
 Upload auch Fotos ohne GPS verorten.
 
@@ -259,7 +262,7 @@ leitet die **Organisation** und nimmt Kolleginnen und Kollegen auf; wer noch kei
 **Einladung per E-Mail** und registriert sich über den Link. Mitglieder sehen geschützte Funde, solange eine
 Person der Leitung verifiziert ist, und die Leitung lässt sich weitergeben.
 
-### 12. Konto: E-Mail, Google, GitHub, Microsoft oder SWITCH edu-ID
+### 12. Konto: E-Mail, Google, GitHub, Microsoft, SWITCH edu-ID oder AGOV
 
 <p>
   <img src="docs/screenshots/anmelden.png" width="38%" alt="Anmeldedialog mit Google, GitHub und E-Mail">
@@ -267,7 +270,7 @@ Person der Leitung verifiziert ist, und die Leitung lässt sich weitergeben.
   <img src="docs/screenshots/konto-loeschen.png" width="38%" alt="Konto löschen mit der Wahl, die Fotos anonym zu behalten oder zu löschen">
 </p>
 
-Ein **Konto** legt man mit E-Mail und Passwort an oder mit einem Klick über **Google**, **GitHub**, **Microsoft** oder **SWITCH edu-ID**
+Ein **Konto** legt man mit E-Mail und Passwort an oder mit einem Klick über **Google**, **GitHub**, **Microsoft** oder **SWITCH edu-ID** (bei Behörden auch **AGOV**)
 (links). Nach der Registrierung kommt ein **Bestätigungslink** per E-Mail; bis dahin erinnert das Konto-Menü
 daran (Mitte). Ein vergessenes Passwort lässt sich per Link **zurücksetzen**, im Menü **ändern**, und
 Google, GitHub, Microsoft oder SWITCH edu-ID lassen sich mit einem bestehenden Konto **verknüpfen**. Wer geht, **löscht das Konto**
@@ -326,14 +329,14 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   - Metadaten für geocat.ch und opendata.swiss (GM03/ISO 19139).
   - Ein fertiges QGIS-Projekt für QGIS Server (WMS/WMTS/WFS) für Geoportale wie map.geo.admin.ch.
 - **[Touren und Fotoaufträge](docs/funktionen.md#touren-und-fotoaufträge)**: Routen zeichnen, per GPS
-  aufzeichnen oder importieren (GPX, TCX, KML, GeoJSON), als GPX exportieren und speichern; Fotoaufträge
+  aufzeichnen oder importieren (GPX, TCX, KML, GeoJSON, NMEA), als GPX exportieren und speichern; Fotoaufträge
   ohne Zeit und Namen und Vorschläge entlang der eigenen Route.
 - **[Geschützte Funde](docs/funktionen.md#geschützte-funde-und-pro-mitglieder)**: seltene Arten und Pilzstellen
   nur für verifizierte PRO-Mitglieder (Forstdienst, Naturschutz), öffentlich nur als 5-km-Raster;
   Organisationen nehmen ihre Mitglieder selbst auf.
 - **[Fahrtmodus](docs/funktionen.md#fahrtmodus-dashcam-im-auto)**: das Handy als Dashcam im Auto, Route
   automatisch, Bilder an Spots und alle 150 m, Stillstand und Doppelte werden schon auf dem Gerät verworfen.
-- **[Konten und Moderation](docs/funktionen.md#konten-moderation-und-lizenzen)**: Konten mit Rollen, Anmeldung mit E-Mail (Bestätigungslink, Passwort ändern und zurücksetzen, Konto löschen, Profil mit den eigenen Fotos, Export der eigenen Daten) oder über Google, GitHub, Microsoft, SWITCH edu-ID und weitere OpenID-Connect-Dienste,
+- **[Konten und Moderation](docs/funktionen.md#konten-moderation-und-lizenzen)**: Konten mit Rollen, Anmeldung mit E-Mail (Bestätigungslink, Passwort ändern und zurücksetzen, Konto löschen, Profil mit den eigenen Fotos, Export der eigenen Daten) oder über Google, GitHub, Microsoft, SWITCH edu-ID, AGOV und weitere OpenID-Connect-Dienste,
   Lizenz pro Foto, Melden und Moderieren.
 
 ## Schnellstart
@@ -365,7 +368,7 @@ für den Wege-Magnet mit ([`deploy/brouter`](deploy/brouter/README.md)).
 | [REST-API](docs/api.md) | Alle Routen des Servers |
 | [Roadmap](docs/roadmap.md) | Was als Nächstes geplant ist |
 | [QGIS Server](deploy/qgis-server/README.md) und [Kubernetes](deploy/k8s/README.md) | Betrieb mit Geodiensten per Docker Compose oder Kubernetes |
-| [Eigener Routing-Server](deploy/brouter/README.md) | BRouter für den Wege-Magnet, mit Routing-Daten für die Schweiz |
+| [Eigener Routing-Server](deploy/brouter/README.md) | BRouter für den Wege-Magnet, mit Routing-Daten für die Schweiz, Waldprofil, Wildruhezonen und fertigem Image |
 
 ## Daten und Lizenz
 

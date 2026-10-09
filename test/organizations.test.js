@@ -233,3 +233,35 @@ test('an invitation by e-mail brings in someone without an account, only with th
     for (const a of ['org-eingeladen', 'org-einladung-angenommen']) assert.ok(log.includes(a), a);
   });
 });
+
+test('registering from an invitation link confirms the invited address without a confirmation mail', async () => {
+  await withServer(async (base, app, mails) => {
+    const db = app.locals.db;
+    const admin = client(base, db);
+    await admin.register('Admina');
+    const lead = client(base, db);
+    const leadUser = await lead.register('Förster');
+    await lead.json('/api/auth/pro', { method: 'POST', json: { organization: 'Forstrevier Adlisberg' } });
+    await admin.json(`/api/users/${leadUser.id}/pro`, { method: 'POST', json: { decision: 'verifiziert' } });
+    const [org] = await lead.json('/api/organizations/mine');
+    await lead.req(`/api/organizations/${org.id}/members`, { method: 'POST', json: { account: 'lea@example.org' } });
+    const token = mails.at(-1).text.match(/#einladung=([\w-]+)/)[1];
+    const register = (json) => fetch(`${base}/api/auth/register`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(json),
+    }).then((r) => r.json());
+
+    const before = mails.length;
+    const lea = await register({ email: 'LEA@example.org', name: 'Lea', password: 'geheim-1234', invite: token });
+    assert.equal(lea.verification, 'invite');
+    assert.equal(lea.user.emailVerified, true, 'the invitation link proves the address');
+    assert.equal(mails.length, before, 'no confirmation mail');
+
+    // Another address with the same link, or a made-up token: the usual confirmation.
+    const other = await register({ email: 'ben@example.org', name: 'Ben Berg', password: 'geheim-1234', invite: token });
+    assert.equal(other.verification, 'sent');
+    assert.equal(other.user.emailVerified, false);
+    const fake = await register({ email: 'cleo@example.org', name: 'Cleo', password: 'geheim-1234', invite: 'erfunden' });
+    assert.equal(fake.user.emailVerified, false);
+    assert.equal(mails.slice(before).filter((m) => /bestätigen/.test(m.subject)).length, 2, 'Ben and Cleo get the usual link');
+  });
+});

@@ -124,7 +124,7 @@
   }
 
   function describe(v, createdCount, spotCount) {
-    const how = { gpmf: 'GPS aus der Kamera-Telemetrie', gpx: 'über GPX-Track', manual: 'am gewählten Standort' }[v.track];
+    const how = { gpmf: 'GPS aus der Kamera-Telemetrie', nmea: 'GPS der Dashcam (NMEA)', novatek: 'GPS der Dashcam (Novatek)', gpx: 'über GPX-Track', manual: 'am gewählten Standort' }[v.track];
     const parts = [
       `${plural(createdCount, 'Bild', 'Bilder')} aus ${fmtClock(v.durationS)} min`,
       v.distanceM ? `${v.distanceM < 1000 ? `${v.distanceM} m` : `${(v.distanceM / 1000).toLocaleString('de-CH', { maximumFractionDigits: 1 })} km`} Strecke` : null,

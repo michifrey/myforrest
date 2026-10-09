@@ -5,9 +5,9 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 
 ## Phase 2: Mehr und bessere Fotos
 
-- **Dashcam ausbauen**: Videos gängiger Dashcams direkt lesen (GPS als NMEA im MP4 bzw. in Begleitdateien,
-  z. B. Viofo, BlackVue), damit sie ohne GPX-Track gehen; Fahrtmodus im Hintergrund (braucht eine native
-  Hülle); Bilder aus dem Auto in der Zeitreise kennzeichnen und auf Wunsch ausblenden.
+- **Dashcam ausbauen**: Fahrtmodus im Hintergrund (braucht eine native Hülle); das Dashcam-GPS mit echten
+  Dateien verschiedener Modelle prüfen (bisher nach den bekannten Formaten mit Testdaten) und weitere Formate
+  (z. B. GPS-Spur von Garmin- und Nextbase-Kameras, verschlüsselte Viofo-Daten).
 
 - **Durchgehen ausbauen**: Mapillary-Bilder an einer Stelle als zusätzliche Ansicht zeigen (API-Schlüssel,
   CC BY-SA) und eigene Reihen dorthin hochladen, ohne geschützte Funde; weiche Übergänge zwischen Panoramen
@@ -18,8 +18,9 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 - **Geschützte Funde**: Pilze per Bild erkennen (braucht ein Modell; Pl@ntNet kennt keine Pilze), die
   kantonalen Listen direkt von den Fachstellen bzw. Info Flora beziehen (sobald es dafür eine offene
   Schnittstelle gibt).
-- **Eigener Routing-Server**: Image von `deploy/brouter` in einer Registry bauen und gegen echte Routing-Daten
-  prüfen, ein eigenes Waldprofil (Forststrassen und Rückegassen bevorzugen, Wildruhezonen meiden).
+- **Eigener Routing-Server**: den ersten Lauf des Image-Workflows und echte Segmente von brouter.de prüfen;
+  die Wildruhezonen regelmässig selbst von geo.admin.ch laden statt aus einer Datei; Rückegassen nach
+  Holzschlag zeitweise sperren.
 - **Touren**: FIT-Dateien direkt lesen, Höhenprofil der Route, Abgleich mit Strava/Komoot per OAuth,
   Aufzeichnung im Hintergrund (braucht eine native Hülle, Browser stoppen GPS im Hintergrund),
   Benachrichtigung, wenn ein eigener Fotoauftrag erledigt wurde, Ablaufdatum für Aufträge.
@@ -62,7 +63,10 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 Aus früheren Versionen dieser Roadmap:
 
 - Fahrtmodus: das Handy als Dashcam im Auto, Route automatisch, Auswahl und Deduplizierung der Bilder auf dem
-  Gerät
+  Gerät; GPS von Dashcam-Videos (NMEA, Novatek) direkt aus der Datei; Fahrtbilder in der Zeitreise markiert
+  und ausblendbar
+- Eigener Routing-Server: Waldprofil (Forststrassen und Rückegassen zuerst), Wildruhezonen in der Schutzzeit
+  umgehen, BRouter-Image per GitHub-Workflow in der Registry
 - Video statt Einzelbilder (GoPro mit GPMF, 360°-MP4, GPX), unscharfe Bilder werden ersetzt oder verworfen
 - 360°-Fotos beim Upload erkennen, Panoramen über eine Drehung der Kugel ausrichten und vergleichen
 - Durchgehen wie Street View: Pfeile entlang der Aufnahme und zu Spots in der Nähe, Blickrichtung bleibt beim Schritt
@@ -85,4 +89,4 @@ Aus früheren Versionen dieser Roadmap:
 - Geodienste: OGC API – Features und Tiles (auch im LV95-Kachelgitter, vorberechnet, PMTiles/MBTiles),
   Vektorkarten, QGIS Server, Metadaten für geocat.ch (GM03)
 - Betrieb mit Docker Compose und Kubernetes (podman-Startskript)
-- Konten: Anmelden mit Google und GitHub, E-Mail bestätigen, Passwort zurücksetzen und ändern, Konto löschen, Profilseite mit eigenen Fotos, Anzeigename und E-Mail-Adresse ändern, Export der eigenen Daten, Microsoft, SWITCH edu-ID und weitere OpenID-Connect-Dienste, dauerhafte Rate-Limits
+- Konten: Anmelden mit Google und GitHub, E-Mail bestätigen, Passwort zurücksetzen und ändern, Konto löschen, Profilseite mit eigenen Fotos, Anzeigename und E-Mail-Adresse ändern, Export der eigenen Daten, Microsoft, SWITCH edu-ID, AGOV und weitere OpenID-Connect-Dienste, dauerhafte Rate-Limits
