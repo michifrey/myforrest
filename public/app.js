@@ -49,6 +49,12 @@ function tagClass(tag) {
   return 'chip';
 }
 
+/** Tags offered for a landscape profile (all tags without profiles). */
+function landscapeTags(landscape) {
+  const l = state.config.landscapes?.[landscape || 'wald'];
+  return l ? l.tags : Object.keys(state.config.tags);
+}
+
 function tagChip(tag) {
   return el('span', { class: tagClass(tag), text: state.config.tags[tag] || tag });
 }
@@ -218,7 +224,7 @@ function renderMarkers() {
     const anchor = pinAnchor(s, size);
     const icon = L.divIcon({
       className: 'pin-icon',
-      html: `<div class="pin ${pinKind(s)}${state.spot?.id === s.id ? ' active' : ''}"><b>${s.photoCount}</b>${s.irregularities.length ? '<i class="flag">!</i>' : ''}${s.storm ? `<i class="storm-flag" title="Sturm">${WIND_ICON}</i>` : ''}${s.satellite ? `<i class="sat-flag" title="Satellit: Rückgang">${SAT_ICON}</i>` : ''}${s.protectedPhotos ? `<i class="lock-flag" title="Geschützter Fund">${LOCK_ICON}</i>` : ''}</div>`,
+      html: `<div class="pin ${pinKind(s)} land-${s.landscape || 'wald'}${state.spot?.id === s.id ? ' active' : ''}"><b>${s.photoCount}</b>${s.irregularities.length ? '<i class="flag">!</i>' : ''}${s.storm ? `<i class="storm-flag" title="Sturm">${WIND_ICON}</i>` : ''}${s.satellite ? `<i class="sat-flag" title="Satellit: Rückgang">${SAT_ICON}</i>` : ''}${s.protectedPhotos ? `<i class="lock-flag" title="Geschützter Fund">${LOCK_ICON}</i>` : ''}</div>`,
       iconSize: [size, size],
       iconAnchor: anchor,
       tooltipAnchor: [size / 2 - anchor[0], -size * 1.1 + (size * 1.2 - anchor[1])],
@@ -282,6 +288,7 @@ async function loadSpots({ fit = false } = {}) {
     : special === '@irregular' ? spots.filter((s) => s.irregularities.length)
     : special === '@storm' ? spots.filter((s) => s.storm)
     : special === '@satellite' ? spots.filter((s) => s.satellite)
+    : special?.startsWith('@land:') ? spots.filter((s) => s.landscape === special.slice(6))
       : spots;
   renderMarkers();
   renderStats(!filter);
@@ -468,7 +475,7 @@ function showPhoto(i) {
   const frame = stabilize ? photos.find((x) => x.alignment && Boolean(x.panorama) === Boolean(p.panorama)) : null;
   showFramed($('viewer-stage'), $('viewer-img'), p, frame);
   $('viewer-img').alt = `Spot ${state.spot.id} am ${fmtDate(p.takenAt)}`;
-  const parts = [fmtDateTime(p.takenAt), SOURCE_LABEL[p.locationSource]];
+  const parts = [p.archive ? `${fmtDate(p.takenAt)} · Archivfoto` : fmtDateTime(p.takenAt), p.archive ? '' : SOURCE_LABEL[p.locationSource]].filter(Boolean);
   if (p.activity) parts.push(isDrive(p) ? 'Fahrt (Dashcam)' : p.activity[0].toUpperCase() + p.activity.slice(1));
   if (p.heading !== null) parts.push(`Blickrichtung ${Math.round(p.heading)}°`);
   if (stabilize) parts.push(frame && relativeAlignment(p, frame) ? 'ausgerichtet' : 'nicht ausgerichtet');
@@ -477,7 +484,9 @@ function showPhoto(i) {
   [...$('thumbs').children].forEach((b, j) => b.setAttribute('aria-current', String(i === j)));
   $('thumbs').children[i]?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 
-  $('photo-tags').replaceChildren(...Object.entries(state.config.tags).map(([key, label]) =>
+  // The observations of the spot's landscape, and any the photo already has.
+  const offered = landscapeTags(state.spot.landscape);
+  $('photo-tags').replaceChildren(...Object.entries(state.config.tags).filter(([key]) => offered.includes(key) || p.tags.includes(key)).map(([key, label]) =>
     el('button', {
       type: 'button',
       class: tagClass(key),
@@ -551,15 +560,17 @@ function renderElevation(spot) {
       : '';
     parts.push(`${spot.landformLabel}${depth} (${ELEV_SOURCE[spot.landformSource]})`);
   }
+  // Autumn colouring is a forest matter; other landscapes show the terrain only.
+  const forest = (spot.landscape || 'wald') === 'wald';
   const shift = spot.colourShiftDays;
-  if (shift) {
+  if (forest && shift) {
     const labels = { altitude: 'Höhe', exposition: 'Exposition', coldPool: 'Kaltluft' };
     const contributions = Object.entries(spot.colourShift).filter(([, v]) => v);
     const detail = contributions.length > 1
       ? ` (${contributions.map(([k, v]) => `${labels[k]} ${v > 0 ? '+' : '−'}${Math.abs(v)}`).join(', ')})`
       : '';
     parts.push(`Herbstfärbung ~${days(shift)} ${shift < 0 ? 'früher' : 'später'} als im Flachland${detail}`);
-  } else if (spot.elevation === null && !spot.exposition && !spot.landform) {
+  } else if (forest && spot.elevation === null && !spot.exposition && !spot.landform) {
     parts.push('Herbstfärbung wird für das Flachland bewertet');
   }
   text.append(parts.join(' · '));
@@ -615,6 +626,8 @@ function treeChip(t) {
 
 function renderSpecies(spot) {
   const species = spot.species || [];
+  // Tree species belong to forest spots (and to any spot that has some recorded).
+  $('species-box').hidden = (spot.landscape || 'wald') !== 'wald' && !species.length;
   const conifers = species.filter((t) => t.group === 'nadel').length;
   $('species-summary').replaceChildren(...(species.length
     ? [...species.map(treeChip), el('span', { class: 'muted small', text: `${species.length - conifers} Laub · ${conifers} Nadel` })]
@@ -814,7 +827,8 @@ function updateSpotChange(spot) {
   badge.hidden = !latest;
   if (!latest) return;
   const { fraction, summary, baseTakenAt } = latest.change;
-  const top = fraction >= 0.05 && summary[0] ? ` · ${summary[0].label}` : '';
+  // Outside the forest the change has no class (only "Veränderung"): nothing to add.
+  const top = fraction >= 0.05 && summary[0] && summary[0].class !== 'sonstiges' ? ` · ${summary[0].label}` : '';
   badge.textContent = `≈ ${pct(fraction)} der Ansicht verändert seit ${fmtDate(baseTakenAt)}${top}`;
   badge.classList.toggle('calm', fraction < 0.05);
 }
@@ -1064,6 +1078,7 @@ $('use-geo').addEventListener('click', () => {
 
 $('open-upload').addEventListener('click', () => {
   form.reset();
+  $('upload-landscape').dispatchEvent(new Event('change'));
   form.utcOffsetMinutes.value = String(-new Date().getTimezoneOffset());
   $('upload-result').replaceChildren();
   refreshDropzones();
@@ -1118,7 +1133,7 @@ form.addEventListener('submit', async (e) => {
         fd.append('lon', String(state.picked.lng));
       }
       if (form.takenAtLocal.value) fd.append('takenAt', new Date(form.takenAtLocal.value).toISOString());
-      for (const name of ['activity', 'note', 'utcOffsetMinutes', 'clockShiftSeconds', 'license']) fd.append(name, form[name].value);
+      for (const name of ['activity', 'note', 'utcOffsetMinutes', 'clockShiftSeconds', 'license', 'landscape']) fd.append(name, form[name].value);
       const tags = [...$('upload-tags').querySelectorAll('input:checked')].map((c) => c.value);
       fd.append('tags', tags.join(','));
       if (form.protected?.checked) fd.append('protected', '1');
@@ -1478,10 +1493,28 @@ async function stormNote(a, b, change, current) {
     el('option', { value: '@storm', text: 'Von Sturm betroffen' }),
     el('option', { value: '@satellite', text: 'Satellit meldet Rückgang' }),
   );
-  for (const [key, label] of Object.entries(state.config.tags)) {
-    $('tag-filter').append(el('option', { value: key, text: label }));
-    $('upload-tags').append(el('label', {}, [el('input', { type: 'checkbox', value: key }), label]));
+  const landscapes = Object.entries(state.config.landscapes || {});
+  if (landscapes.length > 1) {
+    $('tag-filter').append(el('optgroup', { label: 'Landschaft' }, landscapes.map(([key, l]) => el('option', { value: `@land:${key}`, text: l.label }))));
+    $('upload-landscape').append(...landscapes.map(([key, l]) => el('option', { value: key, text: l.label })));
   }
+  const tagGroup = el('optgroup', { label: 'Beobachtungen' });
+  for (const [key, label] of Object.entries(state.config.tags)) {
+    tagGroup.append(el('option', { value: key, text: label }));
+    const where = landscapes.filter(([, l]) => l.tags.includes(key)).map(([k]) => k);
+    $('upload-tags').append(el('label', { 'data-landscapes': where.join(' ') }, [el('input', { type: 'checkbox', value: key }), label]));
+  }
+  $('tag-filter').append(tagGroup);
+  // The upload offers the observations of the chosen landscape (those of the forest while it is recognised
+  // automatically; choosing a landscape shows its own).
+  $('upload-landscape').addEventListener('change', () => {
+    const chosen = $('upload-landscape').value || 'wald';
+    for (const label of $('upload-tags').children) {
+      const fits = !label.dataset.landscapes || label.dataset.landscapes.split(' ').includes(chosen);
+      label.hidden = !fits;
+      if (!fits) label.querySelector('input').checked = false;
+    }
+  });
   $('tag-filter').addEventListener('change', () => loadSpots());
   // Links from push messages: ?spot=<id> opens a spot, ?filter=satellite shows the spots with early warnings.
   const openFromUrl = async (href) => {

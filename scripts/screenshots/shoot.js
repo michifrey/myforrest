@@ -1,6 +1,7 @@
 'use strict';
 // Takes the README screenshots from the demo server (see README.md here).
-// Usage: node shoot.js [hero map spot satellite sun species vektor touren walk schutz konto profil timelapse compare upload mobile]
+// Usage: node shoot.js [hero map spot satellite sun species vektor touren walk schutz konto profil timelapse compare upload gletscher mobile]
+// «gletscher» uses the glacier demo server (BASE_GLETSCHER, default http://localhost:3124; see README.md).
 const path = require('path');
 const fs = require('fs');
 const { execFileSync } = require('child_process');
@@ -198,6 +199,61 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await settle(page, 4000);
     await page.screenshot({ path: out('durchgehen.jpg'), ...jpg });
     await page.close();
+  }
+
+  if (want('gletscher')) {
+    const GB = process.env.BASE_GLETSCHER || 'http://localhost:3124';
+    const gctx = await desktop(browser);
+    const page = await gctx.newPage();
+    page.on('console', (m) => m.type() === 'error' && console.log('console:', m.text()));
+    await page.goto(`${GB}/`);
+    await settle(page, 2500);
+    await page.evaluate(() => document.querySelector('#explore').scrollIntoView());
+    await settle(page, 1500);
+    // The map with the outlines of the three inventories.
+    await page.click('#glacier-toggle');
+    await page.evaluate(() => map.setView([46.6035, 8.4005], 14, { animate: false }));
+    await settle(page, 4000);
+    await page.screenshot({ path: out('gletscher-karte.jpg'), ...jpg });
+    // The spot at the tongue: newest photo, the glacier section of the panel.
+    const tongue = await page.evaluate(() => state.spots.find((s) => s.landscape === 'gletscher' && s.photoCount > 3).id);
+    await page.evaluate((id) => openSpot(id), tongue);
+    await settle(page, 3500);
+    // The spot with its landscape and the newest photo, the outlines behind it.
+    await page.evaluate(() => { map.setView([46.6015, 8.4005], 15, { animate: false }); map.panBy([230, 0], { animate: false }); });
+    await settle(page, 3000);
+    await page.screenshot({ path: out('gletscher-spot.jpg'), ...jpg });
+    await page.setViewportSize({ width: 1440, height: 1100 });
+    await page.evaluate(() => document.querySelector('#glacier-title')?.scrollIntoView({ block: 'start' }));
+    await page.evaluate(() => { document.querySelector('#panel').scrollTop -= 80; });
+    await settle(page, 2000);
+    await page.locator('#panel').screenshot({ path: out('gletscher.jpg'), ...jpg });
+    // Before/after: the postcard of 1928 against 2025.
+    await page.evaluate(() => { document.querySelector('#panel').scrollTop = 0; });
+    await page.click('#open-compare');
+    await settle(page, 1500);
+    await page.selectOption('#cmp-a', { index: 0 });
+    await page.selectOption('#cmp-b', { index: await page.evaluate(() => state.spot.photos.length - 1) });
+    await settle(page, 5000);
+    await page.uncheck('#cmp-heat');
+    await page.evaluate(() => { const r = document.querySelector('#swipe-range'); r.value = 50; r.dispatchEvent(new Event('input', { bubbles: true })); });
+    await page.evaluate(() => document.querySelector('#compare').scrollIntoView({ block: 'start' }));
+    await settle(page, 1500);
+    const clip = await page.evaluate(() => {
+      const a = document.querySelector('#compare').getBoundingClientRect();
+      const b = document.querySelector('#cmp-heat').closest('div, label').getBoundingClientRect();
+      return { x: a.x - 4, y: a.y - 4, width: a.width + 8, height: b.bottom - a.y + 12 };
+    });
+    await page.screenshot({ path: out('gletscher-vergleich.jpg'), clip, ...jpg });
+    // A mountain spot: the alpine pasture with the snow melt per year.
+    const pasture = await page.evaluate(() => state.spots.find((s) => s.landscape === 'gebirge')?.id);
+    await page.evaluate((id) => openSpot(id), pasture);
+    await settle(page, 3500);
+    await page.evaluate(() => document.querySelector('#glacier-title')?.scrollIntoView({ block: 'start' }));
+    await page.evaluate(() => { document.querySelector('#panel').scrollTop -= 80; });
+    await settle(page, 2000);
+    await page.locator('#panel').screenshot({ path: out('gebirge.jpg'), ...jpg });
+    await gctx.close();
   }
 
   if (want('schutz')) {

@@ -22,7 +22,7 @@ src/foliage.js       Nadel-/Laubholzanteil (Heuristik) und Zuordnung von Verfär
 src/detect.js        Objekterkennung: externer Detektor oder Heuristiken (liegende Stämme, Holzpolter)
 src/routes/analysis.js  API der automatischen Auswertung
 src/vegetation.js    Vegetationsdichte pro Foto (Grünanteil, Kronendach-Deckung, Lücken)
-src/sentinel.js      Sentinel-2 NDVI/NDMI: STAC-Suche, COG-Fenster lesen, Wolkenmaske, Monatsreihe, Rückgänge, Frühwarnung
+src/sentinel.js      Sentinel-2 NDVI/NDMI: STAC-Suche, COG-Fenster lesen, Wolkenmaske, Monatsreihe, Rückgänge, Frühwarnung; Schnee- und Eisanteil für Gletscher-Spots
 src/landsat.js       Landsat 5/7/8 (Collection 2) über Planetary Computer: signierte Links, QA-Maske, 30-m-Indizes
 src/harmonize.js     Angleichung von Landsat an Sentinel-2 aus den Überlappungsmonaten (Theil–Sen, Landsat 5 über 7)
 src/calibration.js   Kalibrierung der Frühwarnung und der Rückgänge zwischen Fotos an bestätigten Schäden (Rückrechnung ohne Blick nach vorn, F1, Kreuzvalidierung nach Spots, pro Waldtyp)
@@ -44,6 +44,9 @@ src/routes/climate.js  Routen und Analyse-Hooks für Stürme, Phänologie-Refere
 src/elevation.js     Geländehöhe, Hangneigung, Exposition und Geländeform (Copernicus-DEM über Open-Meteo)
 src/exif.js          Aufnahmezeit, GPS und Blickrichtung aus den Bilddaten
 src/wildlife.js      Wildruhezonen (GeoJSON, WGS84/LV95, Schutzzeit) als Sperrflächen für BRouter
+src/landscapes.js    Landschaftsprofile (Wald, Gletscher, Gebirge, Trockengebiet): Beobachtungen je Profil, welche Profile Schnee und Eis auswerten, Höhe für Gebirge-Spots
+src/glaciers.js      Gletscherumrisse aus Inventaren (GeoJSON, WGS84/LV95, Jahr aus Eigenschaft oder Dateiname): Eis pro Jahr an einem Ort, Abstand, Umrisse für die Karte
+src/routes/landscapes.js  Landschaft eines Spots setzen, Gletscher am Spot, Umrisse (/api/glaciers)
 src/lenient-fetch.js HTTP-Client für BRouters eigenen Server (Kopfzeilen nur mit \n)
 src/fit.js           FIT-Dateien von Sportuhren und Velocomputern lesen (record-Meldungen, komprimierte Zeitstempel)
 src/dashcam.js       GPS von Dashcams: NMEA-Text und Novatek-freeGPS-Blöcke im Video, NMEA-Dateien
@@ -97,6 +100,7 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
                      video.js den Video-Upload und die 360°-Ansicht,
                      walk.js das Durchgehen wie Street View,
                      vegetation.js die Diagramme zu Vegetationsdichte und NDVI,
+                     glacier.js Landschaft des Spots, Gletscher- und Schnee-Teil, Archivfotos und Gletscherumrisse auf der Karte,
                      account.js Konto-Menü, Lizenz, Melden und Moderation;
                      vektorkarte.html zeigt die Vektorkacheln mit MapLibre,
                      vektorkarte-lv95.html im LV95-Gitter mit OpenLayers auf der Landeskarte)

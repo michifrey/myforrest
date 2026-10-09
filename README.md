@@ -5,7 +5,8 @@
 Beim Joggen, Wandern oder Biken fallen immer wieder Sturmschäden, Borkenkäfernester, neue
 Lichtungen oder sich ausbreitende Neophyten auf. MyForrest sammelt Fotos solcher Orte und legt
 sie zeitlich übereinander. So wird sichtbar, wie sich der Wald an einem Ort über Monate und Jahre
-verändert.
+verändert. Dasselbe geht für Gletscher und Gebirge: wie weit das Eis früher reichte, wann es einen Ort
+freigab und wie früh der Schnee heute schmilzt.
 
 ![Startseite von MyForrest](docs/screenshots/hero.jpg)
 
@@ -28,7 +29,8 @@ Der Ablauf hat drei Schritte:
 > Die Screenshots zeigen generierte Demo-Bilder eines fiktiven Waldstücks bei Zürich, eine vereinfachte
 > Platzhalter-Karte und synthetische Wetter- und Satellitendaten. Im Betrieb zeigt die App echte Fotos,
 > OpenStreetMap- bzw. swisstopo-Kacheln und Daten von Open-Meteo, Sentinel-2 und Landsat. Wie die Bilder
-> entstehen, steht unter [`scripts/screenshots`](scripts/screenshots/README.md).
+> entstehen, steht unter [`scripts/screenshots`](scripts/screenshots/README.md). Auch Gletscher und Alpweide in
+> Abschnitt 14 sind erfunden.
 
 ### 1. Karte mit Spots
 
@@ -57,7 +59,7 @@ Spot an, sich **aufzuteilen**: ein Spot pro Blickrichtung, jeder für sich ausge
 oder nur das gezeigte Foto abzutrennen.
 Oben links lässt sich die Karte nach Beobachtungen und Meldungen filtern,
 daneben schalten *Sonne & Wetter*, *Arten & Neophyten* und *Touren & Aufträge* die Kartenmodi ein
-(Abschnitte 7, 8 und 10). Gelbe Kamera-Pins sind Fotoaufträge.
+(Abschnitte 7, 8 und 10), mit Gletscherinventaren auch *Gletscher* (Abschnitt 14). Gelbe Kamera-Pins sind Fotoaufträge.
 Rechts stehen Kennzahlen und die zuletzt fotografierten Spots.
 
 ### 2. Zeitreise an einem Spot
@@ -126,7 +128,9 @@ Dashcams (GPS direkt aus der Datei: NMEA, Novatek) oder 360°-Kameras, aus denen
 werden. Ort und Zeit kommen aus den EXIF- bzw.
 Telemetriedaten. Fotos ohne GPS lassen sich über einen GPX-Track verorten (dafür gibt es unter
 *Zeitabgleich für GPX* Zeitzone und Korrektur für die Kamera-Uhr) oder von Hand auf der Karte bzw. über
-den aktuellen Standort. Dazu kommen Aktivität, Beobachtungen, eine Notiz und die Lizenz (Standard
+den aktuellen Standort. Dazu kommen Aktivität, Landschaft (Wald, Gletscher, Gebirge, Trockengebiet oder
+automatisch erkannt; sie
+bestimmt, welche Beobachtungen zur Wahl stehen), Beobachtungen, eine Notiz und die Lizenz (Standard
 CC BY-SA 4.0). Als installierte App landen Uploads ohne Empfang in einer Warteschlange und gehen später raus;
 lehnt der Server einen davon ab, während die App zu ist, meldet das eine Benachrichtigung.
 
@@ -299,6 +303,42 @@ Blickrichtung bleibt beim Schritt erhalten, *Zeit* wechselt zu einem anderen Jah
 kleine Karte zeigt, wo man steht und wohin man schaut. Mit der Tastatur geht es mit W/S vor und zurück.
 Einmal gesehene Bilder gehen auch ohne Empfang, im Wald und in den Bergen.
 
+### 14. Gletscher und Gebirge
+
+<p>
+  <img src="docs/screenshots/gletscher-karte.jpg" width="49%" alt="Karte mit den Gletscherumrissen von 1850, 1973 und 2016">
+  <img src="docs/screenshots/gletscher-spot.jpg" width="49%" alt="Gletscher-Spot am Zungenende mit See und Landschaftsprofil">
+</p>
+
+Jeder Spot hat ein **Landschaftsprofil**. Neben dem Wald gibt es den **Gletscher**: Liegt ein Spot auf dem
+Eis eines Gletscherinventars, auf dem Eis eines früheren oder nahe am heutigen, erkennt die App ihn als
+Gletscher-Spot (blauer Marker); sonst wählt man das Profil beim Hochladen oder im Spot. Gletscher-Spots bieten
+eigene Beobachtungen an (Gletscherzunge, Gletschersee, Spalten, Schuttbedeckung, Toteis, Felssturz,
+Murgang, Pioniervegetation), und die Waldbegriffe fallen weg: Veränderungen heissen nur «Veränderung», statt
+Windwurf und Laubverfärbung. Der Knopf *Gletscher* zeichnet die Umrisse aller geladenen Inventare, hier
+1850, 1973 und 2016, ältere heller; ein Klick auf ein Jahr zeigt nur dieses.
+
+<p>
+  <img src="docs/screenshots/gletscher.jpg" width="38%" alt="Gletscher-Teil eines Spots: Eis pro Inventar und Eis im Spätsommer aus Sentinel-2">
+  <img src="docs/screenshots/gletscher-vergleich.jpg" width="38%" alt="Vorher/Nachher: Postkarte von 1928 und Foto von 2025">
+</p>
+
+Der Gletscher-Teil eines Spots (links) nennt den Gletscher, den Abstand zum Eis des neusten Inventars und pro
+Inventar, ob hier Eis lag. Darunter steht der **Anteil Schnee und Eis im Spätsommer** aus Sentinel-2, Jahr für
+Jahr: Wenn der Winterschnee weg ist, bleibt nur noch Eis weiss. Fällt er dauerhaft unter die Hälfte, meldet die
+App, seit wann der Gletscher den Ort freigegeben hat. **Archivfotos** wie alte Postkarten oder Dias bekommen
+ihr Datum von Hand und werden auf die neuen Fotos ausgerichtet; im Vorher/Nachher (rechts) liegt die Postkarte
+von 1928 neben 2025.
+
+<p align="center"><img src="docs/screenshots/gebirge.jpg" width="38%" alt="Gebirge-Spot auf einer Alpweide mit der Schneeschmelze pro Jahr"></p>
+
+Spots über 2100 m ohne Baumarten werden **Gebirge**-Spots (brauner Marker) mit Beobachtungen wie Felssturz,
+Murgang, Lawine, Rutschung, Permafrost und Verbuschung der Alpweide. Ihr Teil *Schnee* zeigt pro Jahr, in
+welchem Monat der Schnee schmilzt, und vergleicht die ersten mit den letzten Jahren, hier eine Alpweide, die
+heute rund sechs Wochen früher aper ist und auf der Grünerlen einwachsen. Für **Trockengebiete** gibt es ein
+eigenes Profil (Wanderdüne, Bodenerosion, Vegetationsverlust, Überweidung, Versalzung), gewählt beim Hochladen;
+dort meldet der NDVI den Verlust an Vegetation.
+
 ## Was MyForrest kann
 
 Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen unter
@@ -319,6 +359,9 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   Landsat) als unabhängige Bestätigung und als Frühwarnung für Spots ohne neue Fotos, deren Schwellen sich an
   bestätigten Schäden eichen (getrennt für Laub- und Nadelwald) und an zurückgehaltenen Spots geprüft werden,
   als Push-Nachricht an alle, die den Spot regelmässig besuchen.
+- **[Landschaften und Gletscher](docs/funktionen.md#landschaften-und-gletscher)**: Profile für Wald, Gletscher,
+  Gebirge und Trockengebiet mit eigenen Beobachtungen; Gletscherumrisse aus Inventaren (z. B. GLAMOS) pro Jahr, Eis im Spätsommer
+  und Schneeschmelze aus Sentinel-2, Archivfotos mit Datum von Hand.
 - **[Kartenmodi](docs/funktionen.md#kartenmodi)**: Sonnenstand, Schatten und Einstrahlung inklusive
   Geländehorizont sowie Hotspots und Ausbreitungsfronten von Neophyten.
 - **[Pflanzen und Baumarten](docs/funktionen.md#pflanzen-und-baumarten)**: Pflanzenbestimmung mit Pl@ntNet,
@@ -378,6 +421,7 @@ für den Wege-Magnet mit ([`deploy/brouter`](deploy/brouter/README.md)).
 Kartendaten © OpenStreetMap-Mitwirkende, Landeskarte und Luftbild © swisstopo. Wetterdaten von
 [Open-Meteo.com](https://open-meteo.com) (ERA5, CC BY 4.0). Enthält modifizierte Copernicus-Sentinel-Daten;
 Landsat-Daten mit freundlicher Genehmigung des U.S. Geological Survey. Phänologie-Daten: Deutscher
-Wetterdienst. Pflanzenbestimmung mit Pl@ntNet. Details unter [Datenquellen](docs/betrieb.md#externe-datenquellen-und-netzzugang).
+Wetterdienst. Pflanzenbestimmung mit Pl@ntNet. Gletscherumrisse aus den geladenen Inventaren, z. B.
+GLAMOS. Details unter [Datenquellen](docs/betrieb.md#externe-datenquellen-und-netzzugang).
 
 Der Code steht unter der [Apache-Lizenz 2.0](LICENSE).

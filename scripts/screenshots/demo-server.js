@@ -3,6 +3,7 @@
 // storms, night cooling and the elevation model work without network access.
 const path = require('path');
 const { createApp } = require('../../src/app');
+const glacier = require('./glacier-demo');
 
 const DAY = 86400000;
 const hash = (s) => {
@@ -15,7 +16,8 @@ const dry = (d) => d >= '2025-06-01' && d <= '2025-08-31';
 
 function daily(d, lat) {
   const season = Math.sin(((doy(d) - 105) / 365) * 2 * Math.PI);
-  let tm = 9.5 + 9 * season + (hash(`t${d}`) - 0.5) * 6 - (lat - 47.37) * 20;
+  // Around the forest the north is a little cooler; the demo glacier (below 47° N) lies high in the Alps.
+  let tm = 9.5 + 9 * season + (hash(`t${d}`) - 0.5) * 6 - (lat > 47 ? (lat - 47.37) * 20 : 11);
   if (dry(d)) tm += 3.2;
   const wet = hash(`r${d}`) < (dry(d) ? 0.12 : 0.42);
   const p = wet ? Math.round((1 + hash(`p${d}`) * 14) * 10) / 10 : 0;
@@ -25,6 +27,7 @@ function daily(d, lat) {
 const STORMS = { '2022-02-17': [118, 255], '2022-02-18': [92, 265], '2026-02-24': [101, 245], '2023-07-24': [84, 240], '2018-01-03': [129, 260] };
 
 function elevation(lat, lon) {
+  if (lat < 46.9) return glacier.elevation(lat, lon);
   // Hill (Adlisberg-like) north-east, hollow towards the south-west.
   const hill = 130 * Math.exp(-(((lat - 47.3765) / 0.006) ** 2 + ((lon - 8.578) / 0.009) ** 2));
   const hollow = -45 * Math.exp(-(((lat - 47.367) / 0.0025) ** 2 + ((lon - 8.566) / 0.0035) ** 2));
@@ -100,8 +103,11 @@ async function weatherFetch(url) {
   return new Response('offline', { status: 503 });
 }
 
+const work = process.env.DEMO_DIR || path.join(__dirname, '.demo');
 const app = createApp({
-  dataDir: path.join(process.env.DEMO_DIR || path.join(__dirname, '.demo'), 'data'),
+  dataDir: path.join(work, 'data'),
+  // DEMO_GLETSCHER=1: the glacier inventories of the demo glacier (written by seed-gletscher.js).
+  glacierFiles: process.env.DEMO_GLETSCHER === '1' ? Object.keys(glacier.inventories()).map((f) => path.join(work, 'gletscher', f)).join(',') : '',
   weatherFetch,
   tileOptions: { precompute: false },
   // Sign-in buttons for the screenshots; the demo never talks to Google, GitHub, Microsoft, Switch or AGOV.

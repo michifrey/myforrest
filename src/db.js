@@ -135,6 +135,10 @@ const MIGRATIONS = [
   ['photos', 'protected_reason', 'TEXT'], // 'upload' | 'art' | 'pro' | 'moderation'
   // Walk-through (routes/walk.js): photos of one recording (video, drive, upload batch) in order of time.
   ['photos', 'sequence_id', 'TEXT'],
+  // Landscape profile of a spot (src/landscapes.js): 'wald' | 'gletscher'; null = forest.
+  ['spots', 'landscape', 'TEXT'],
+  ['spots', 'landscape_source', 'TEXT'], // 'upload' | 'auto' | 'manual'
+  ['photos', 'archive', 'INTEGER'], // 1 = archive picture (old photo, scanned), dated by hand
 ];
 
 function openDb(file) {
