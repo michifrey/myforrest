@@ -266,7 +266,7 @@ input[type="checkbox"] { accent-color: var(--accent); width: 1.05rem; height: 1.
 }
 .sky {
   position: absolute; inset: 0; z-index: -3;
-  background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 45%, var(--sky-low) 75%, var(--l3) 100%);
+  background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 45%, var(--sky-low) 75%, var(--sky-end) 100%);
 }
 .sun {
   position: absolute; right: 16%; top: 16%;
@@ -285,6 +285,8 @@ input[type="checkbox"] { accent-color: var(--accent); width: 1.05rem; height: 1.
 .stars { position: absolute; inset: 0; width: 100%; height: 100%; opacity: var(--stars); }
 .stars circle { fill: #f4f1dc; animation: twinkle 4s ease-in-out infinite; }
 .forest { position: absolute; inset: 0; z-index: -2; pointer-events: none; }
+.scene { position: absolute; inset: 0; opacity: 0; transition: opacity 2.4s ease; }
+.scene.active { opacity: 1; }
 .tree-layer { position: absolute; inset: auto -4% 0; height: 100%; will-change: transform; }
 .tree-layer svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .tree-layer.l1 path { fill: var(--l1); }
@@ -1548,3 +1550,48 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 /* Own photo requests: done or run out (tours.js) */
 .req-mine { display: flex; flex-wrap: wrap; gap: 0.2rem 0.6rem; align-items: baseline; padding: 0.35rem 0; border-top: 1px solid var(--border); }
 .req-expired { color: var(--danger); }
+
+/* ---------- Changing landscapes of the hero (forest.js) ---------- */
+/* Registered, so the sky and the veil fade from one landscape to the next. */
+@property --sky-top { syntax: '<color>'; inherits: true; initial-value: #e9eedc; }
+@property --sky-mid { syntax: '<color>'; inherits: true; initial-value: #f3ead0; }
+@property --sky-low { syntax: '<color>'; inherits: true; initial-value: #f6dfb0; }
+@property --sky-end { syntax: '<color>'; inherits: true; initial-value: #5f7f5a; }
+@property --veil { syntax: '<color>'; inherits: true; initial-value: rgb(246 241 226 / 0.88); }
+:root { --sky-end: var(--l3); }
+.hero { transition: --sky-top 2.4s ease, --sky-mid 2.4s ease, --sky-low 2.4s ease, --sky-end 2.4s ease, --veil 2.4s ease; }
+.tree-layer path.snow { fill: var(--snow); }
+.tree-layer path.ice { fill: var(--ice-fill); }
+.tree-layer path.crevasse { fill: none; stroke: var(--crevasse); stroke-width: 2; stroke-linecap: round; }
+.tree-layer path.crest { fill: var(--crest); }
+.fireflies { transition: opacity 2.4s ease; }
+.hero:not([data-scene="wald"]) .fireflies { opacity: 0; }
+.hero-swap { transition: opacity 0.45s ease; }
+.hero.swapping .hero-swap { opacity: 0; }
+.scene-pick { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 1.6rem; }
+.scene-pick button {
+  font: 600 0.8rem/1 var(--font-body); letter-spacing: 0.04em; padding: 0.45rem 0.8rem; border-radius: 999px; cursor: pointer;
+  background: transparent; color: var(--hero-text); border: 1px solid color-mix(in srgb, var(--hero-text) 30%, transparent);
+}
+.scene-pick button[aria-pressed="true"] { background: var(--hero-text); color: var(--veil-solid, #f6f1e2); border-color: var(--hero-text); }
+
+.hero[data-scene="gletscher"] { --sky-top: #d9e6ef; --sky-mid: #eaf0f2; --sky-low: #f2efe4; --sky-end: #6c7680; --veil: rgb(240 245 247 / 0.86); }
+.scene[data-scene="gletscher"] { --l1: #c3d0db; --l2: #e9f1f6; --l3: #8b97a3; --l4: #5c6670; --l5: #2b3238; --snow: #f8fbfd; --ice-fill: #dbe9f2; --crevasse: #9fbdd0; --mist: rgb(238 244 248 / 0.7); }
+.hero[data-scene="gebirge"] { --sky-top: #dde8ee; --sky-mid: #eeeee2; --sky-low: #f3e2bd; --sky-end: #7c8c6c; --veil: rgb(244 242 232 / 0.86); }
+.scene[data-scene="gebirge"] { --l1: #c2ccd4; --l2: #8d939a; --l3: #8c9b78; --l4: #557046; --l5: #213520; --snow: #f6f8fa; --mist: rgb(244 244 236 / 0.7); }
+.hero[data-scene="wueste"] { --sky-top: #f1e5cd; --sky-mid: #f5dbb0; --sky-low: #f0c68a; --sky-end: #b57e43; --veil: rgb(250 240 222 / 0.86); }
+.scene[data-scene="wueste"] { --l1: #e2c497; --l2: #dbb27a; --l3: #cc9a5e; --l4: #ad7940; --l5: #6f4a25; --crest: rgb(255 238 205 / 0.45); --mist: rgb(250 236 210 / 0.6); }
+
+@media (prefers-color-scheme: dark) {
+  .hero[data-scene="gletscher"] { --sky-top: #060c14; --sky-mid: #0e1a26; --sky-low: #1b2c38; --sky-end: #18222b; --veil: rgb(6 10 14 / 0.55); }
+  .scene[data-scene="gletscher"] { --l1: #1c2833; --l2: #4f6271; --l3: #18222b; --l4: #10171d; --l5: #070b0e; --snow: #445562; --ice-fill: #4f6271; --crevasse: #33434f; --mist: rgb(150 170 185 / 0.14); }
+  .hero[data-scene="gebirge"] { --sky-top: #070c12; --sky-mid: #101b24; --sky-low: #1f2f33; --sky-end: #141f1a; --veil: rgb(6 10 10 / 0.55); }
+  .scene[data-scene="gebirge"] { --l1: #1d2a32; --l2: #19232a; --l3: #142019; --l4: #0d1710; --l5: #060c08; --snow: #3f4e58; --mist: rgb(150 170 170 / 0.14); }
+  .hero[data-scene="wueste"] { --sky-top: #0a0b16; --sky-mid: #191a2a; --sky-low: #3a2d2c; --sky-end: #2c2018; --veil: rgb(12 9 8 / 0.55); }
+  .scene[data-scene="wueste"] { --l1: #3a2d24; --l2: #33271d; --l3: #2a1f17; --l4: #201810; --l5: #120d08; --crest: rgb(255 220 170 / 0.12); --mist: rgb(180 150 120 / 0.1); }
+  .scene-pick button[aria-pressed="true"] { color: #0e1611; }
+}
+/* On narrow screens the scene is cut around its middle; glacier and peak stand right of it: move the cut there. */
+@media (max-width: 700px) {
+  .scene[data-scene="gletscher"] .tree-layer svg, .scene[data-scene="gebirge"] .tree-layer svg { left: -100%; width: 300%; transform: translateX(-10%); }
+}

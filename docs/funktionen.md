@@ -598,6 +598,11 @@ Ausserhalb des Waldes:
 - fallen Herbstfärbung, Baumarten und die Kronendach-Deckung weg; der Grünanteil der Fotos bleibt (er
   zeigt, wie Pflanzen ein Gletschervorfeld besiedeln).
 
+Die **Startseite** zeigt die Landschaften im Wechsel (alle acht Sekunden, mit Überblendung von Szene,
+Himmel und Überschrift); die Knöpfe *Wald*, *Gletscher*, *Gebirge* und *Wüste* halten eine fest. Wer im
+Betriebssystem weniger Bewegung eingestellt hat, sieht keinen automatischen Wechsel, und der Wechsel ruht,
+solange die Startseite nicht zu sehen ist.
+
 Auf der Karte haben Gletscher-Spots einen blauen, Gebirge-Spots einen braunen und Spots in Trockengebieten
 einen sandfarbenen Marker; der Filter oben links hat eine Gruppe *Landschaft*.
 

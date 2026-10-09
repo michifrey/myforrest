@@ -326,7 +326,7 @@ function renderStats(updateHero = true) {
     $('hero-stats').replaceChildren(
       heroStat(state.spots.length, 'Orte'),
       heroStat(photos, 'Fotos'),
-      heroStat(years, years === 1 ? 'Jahr Waldgeschichte' : 'Jahre Waldgeschichte'),
+      heroStat(years, years === 1 ? 'Jahr Geschichte' : 'Jahre Geschichte'),
     );
   }
 
