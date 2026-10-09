@@ -249,4 +249,25 @@ async function renderCloseup(seed, species, file) {
   await sharp(Buffer.from(closeupSvg(seed, species))).jpeg({ quality: 84 }).toFile(file);
 }
 
-module.exports = { layout, svg, render, renderCloseup };
+/**
+ * An equirectangular 360° picture (2:1) for the walk-through: two forest views
+ * (ahead and behind) side by side, with sky above and ground below, so the
+ * horizon sits in the middle like in a real panorama.
+ */
+async function renderPano(seed, state, file) {
+  const half = async (s) => sharp(Buffer.from(svg(layout(s, { kind: 'mixed', trees: 10 }), state))).resize(1600, 1200).toBuffer();
+  const [ahead, behind] = await Promise.all([half(seed), half(seed + 1)]);
+  const season = SEASONS[state.season || 'summer'];
+  await sharp({ create: { width: 3200, height: 1600, channels: 3, background: season.ground[0] } })
+    .composite([
+      { input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="3200" height="220"><rect width="3200" height="220" fill="${season.sky[0]}"/></svg>`), left: 0, top: 0 },
+      // The view ahead in the middle of the panorama (its heading), the view behind split across the seam.
+      { input: await sharp(behind).extract({ left: 800, top: 0, width: 800, height: 1200 }).toBuffer(), left: 0, top: 160 },
+      { input: ahead, left: 800, top: 160 },
+      { input: await sharp(behind).extract({ left: 0, top: 0, width: 800, height: 1200 }).toBuffer(), left: 2400, top: 160 },
+    ])
+    .extract({ left: 0, top: 0, width: 3200, height: 1600 })
+    .jpeg({ quality: 82 }).toFile(file);
+}
+
+module.exports = { layout, svg, render, renderCloseup, renderPano };

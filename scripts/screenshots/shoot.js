@@ -1,6 +1,6 @@
 'use strict';
 // Takes the README screenshots from the demo server (see README.md here).
-// Usage: node shoot.js [hero map spot satellite sun species vektor touren schutz konto profil timelapse compare upload mobile]
+// Usage: node shoot.js [hero map spot satellite sun species vektor touren walk schutz konto profil timelapse compare upload mobile]
 const path = require('path');
 const fs = require('fs');
 const { execFileSync } = require('child_process');
@@ -178,6 +178,26 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await settle(page, 1200);
     await page.screenshot({ path: out('fotoauftraege.jpg'), ...jpg });
     await tctx.close();
+  }
+
+  if (want('walk')) {
+    // Walk-through along the 360° recording of the forest track (seed.js), second picture, looking ahead.
+    const page = await ctx.newPage();
+    await page.goto(`${BASE}/`);
+    await settle(page, 2000);
+    const ids = await page.evaluate(async () => {
+      const spots = await (await fetch('/api/spots')).json();
+      const panos = [];
+      for (const s of spots) {
+        const d = await (await fetch(`/api/spots/${s.id}`)).json();
+        for (const p of d.photos) if (p.sequenceId === 'demo-360-waldweg') panos.push([p.takenAt, p.id]);
+      }
+      return panos.sort().map((x) => x[1]);
+    });
+    await page.evaluate((id) => Walk.open(id), ids[1]);
+    await settle(page, 4000);
+    await page.screenshot({ path: out('durchgehen.jpg'), ...jpg });
+    await page.close();
   }
 
   if (want('schutz')) {

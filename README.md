@@ -285,6 +285,17 @@ fortgesetzt und wie viele Fotoaufträge man erledigt hat, und alle eigenen Fotos
 öffnet den Spot, und über *Name ändern* und *E-Mail ändern* lassen sich Anzeigename und Adresse anpassen (die neue Adresse gilt erst nach ihrem Bestätigungslink). *Meine Daten herunterladen* liefert alles zum Konto als ZIP: Fotos mit Originalen und GeoJSON, Touren als GPX, Aufträge und Meldungen. Das Profil sieht nur, wem es gehört; eine öffentliche Liste aller Fotos einer Person würde
 zeigen, wo und wann sie regelmässig unterwegs ist.
 
+### 13. Durchgehen wie Street View
+
+<p align="center"><img src="docs/screenshots/durchgehen.jpg" width="720" alt="360°-Panorama auf einem Waldweg mit Pfeilen vor und zurück und kleiner Karte"></p>
+
+*Durchgehen wie Street View* im Spot öffnet ein Bild bildschirmfüllend: 360°-Panoramen dreht man mit Finger
+oder Maus, Pfeile unten führen weiter. Weisse Pfeile folgen der Aufnahme, also den Bildern eines 360°-Videos,
+einer Fahrt oder eines Uploads mit mehreren Fotos. Goldene Pfeile führen zu anderen Spots in der Nähe. Die
+Blickrichtung bleibt beim Schritt erhalten, *Zeit* wechselt zu einem anderen Jahr am selben Ort, und die
+kleine Karte zeigt, wo man steht und wohin man schaut. Mit der Tastatur geht es mit W/S vor und zurück.
+Einmal gesehene Bilder gehen auch ohne Empfang, im Wald und in den Bergen.
+
 ## Was MyForrest kann
 
 Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen unter
@@ -294,7 +305,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   Action-Cam-Serien mit GPX-Track und Videos von GoPro oder 360°-Kameras. Verortung über GPS, GPX oder von
   Hand. Als installierbare App funktioniert der Upload auch ohne Empfang im Wald und wird später gesendet.
 - **[Spots und Zeitreise](docs/funktionen.md#spots-und-zeitreise)**: Fotos am selben Ort und mit derselben
-  Blickrichtung werden automatisch zu Spots zusammengefasst und lassen sich als Zeitreihe durchblättern.
+  Blickrichtung werden automatisch zu Spots zusammengefasst und lassen sich als Zeitreihe durchblättern;
+  360°-Aufnahmen und Bilderreihen lassen sich [wie Street View durchgehen](docs/funktionen.md#durchgehen-wie-street-view).
 - **[Bildanalyse](docs/funktionen.md#bildanalyse)**: automatische Ausrichtung, Veränderungs-Heatmap,
   Einordnung der Veränderungen (Windwurf, Auflichtung, Verfärbung, neuer Bewuchs), die aus Bestätigungen
   dazulernt, Objekterkennung für liegende Stämme und Holzpolter sowie Vegetationsdichte pro Foto.

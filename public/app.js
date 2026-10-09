@@ -1096,6 +1096,8 @@ for (const zone of form.querySelectorAll('.dropzone')) {
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   const files = [...form.photos.files];
+  // Several photos of one upload form a sequence: the walk-through steps along them in order of time.
+  const sequenceId = files.length > 1 && crypto.randomUUID ? crypto.randomUUID() : null;
   if (!files.length) return;
   const submit = $('upload-submit');
   submit.disabled = true;
@@ -1120,6 +1122,7 @@ form.addEventListener('submit', async (e) => {
       const tags = [...$('upload-tags').querySelectorAll('input:checked')].map((c) => c.value);
       fd.append('tags', tags.join(','));
       if (form.protected?.checked) fd.append('protected', '1');
+      if (sequenceId) fd.append('sequenceId', sequenceId);
       if (window.Tours) await Tours.decorateUpload(fd);
 
       const res = await postPhotos(fd);

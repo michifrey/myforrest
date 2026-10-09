@@ -9,6 +9,9 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
   Dateien verschiedener Modelle prüfen (bisher nach den bekannten Formaten mit Testdaten) und weitere Formate
   (z. B. GPS-Spur von Garmin- und Nextbase-Kameras, verschlüsselte Viofo-Daten).
 
+- **Durchgehen ausbauen**: Mapillary-Bilder an einer Stelle als zusätzliche Ansicht zeigen (API-Schlüssel,
+  CC BY-SA) und eigene Reihen dorthin hochladen, ohne geschützte Funde; weiche Übergänge zwischen Panoramen
+  (Überblenden, Zoom in Gehrichtung); Wege aus dem Wegnetz statt nur aus Reihen und Spots.
 - **360°-Rohdateien**: Insta360-`.insv` und GoPro-MAX-`.360` direkt lesen (Fischaugen stitchen, GPS aus dem
   Datei-Trailer). Braucht Beispieldateien der Kameras und deren Objektivdaten; bis dahin über den Export
   als 360°-MP4.
@@ -66,6 +69,7 @@ Aus früheren Versionen dieser Roadmap:
   umgehen, BRouter-Image per GitHub-Workflow in der Registry
 - Video statt Einzelbilder (GoPro mit GPMF, 360°-MP4, GPX), unscharfe Bilder werden ersetzt oder verworfen
 - 360°-Fotos beim Upload erkennen, Panoramen über eine Drehung der Kugel ausrichten und vergleichen
+- Durchgehen wie Street View: Pfeile entlang der Aufnahme und zu Spots in der Nähe, Blickrichtung bleibt beim Schritt
 - Spots mit gemischten Blickrichtungen auf Wunsch aufteilen
 - Karte und Spots entlang einer Route offline speichern; Benachrichtigung, wenn ein Upload im Hintergrund
   abgelehnt wurde

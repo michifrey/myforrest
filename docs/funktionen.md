@@ -213,6 +213,31 @@ Mit dem Zeitregler und der Thumbnail-Leiste durch alle Aufnahmen blättern.
 
 Zwei beliebige Aufnahmen mit einem Wischregler überlagern.
 
+### Durchgehen wie Street View
+
+*Durchgehen wie Street View* im Spot öffnet das aktuelle Bild bildschirmfüllend. 360°-Panoramen dreht man
+mit Finger oder Maus, flache Fotos zeigen ihre Blickrichtung. Pfeile auf einem Ring unten führen weiter.
+Jeder Pfeil steht in der Richtung, in der sein Ziel liegt, relativ zur aktuellen Blickrichtung, mit der
+Distanz darunter:
+
+- **Weiss: entlang der Aufnahme.** Bilder einer Aufnahme bilden eine **Reihe**: die Bilder eines Videos,
+  einer Fahrt im Fahrtmodus oder eines Uploads mit mehreren Fotos, nach Aufnahmezeit geordnet. Vor und
+  zurück geht es zum nächsten bzw. vorherigen Bild der Reihe, wenn es höchstens 500 m entfernt ist.
+- **Gold: zu anderen Spots** im Umkreis von 80 m. Pro Spot zählt ein Bild, ein Panorama wenn vorhanden,
+  sonst das Bild, das zeitlich am nächsten am gerade betrachteten liegt. Pro Himmelsrichtung (45°) steht nur
+  der nächste Spot, damit der Ring lesbar bleibt.
+
+Beim Schritt bleibt die Blickrichtung erhalten: Wer nach Osten schaut und weitergeht, schaut im nächsten
+Panorama wieder nach Osten. Die Richtung der Bildmitte kommt aus dem Video bzw. aus `GPano:PoseHeadingDegrees`
+der 360°-Kamera. Fehlt sie, nimmt die App Norden an, und die Pfeile stimmen nur ungefähr. *Zeit* oben wechselt
+zu einem anderen Datum am selben Spot (Zeitreise im Gehen), und eine kleine Karte unten links zeigt Standort,
+Blickkegel und die Reihe.
+
+Bedienung: **W**/**↑** geht in Blickrichtung, **S**/**↓** zurück, **A**/**D** bzw. **←**/**→** drehen, **Esc**
+beendet und öffnet den Spot, an dem man zuletzt stand. Ein Link wie `…/#durchgehen=123` öffnet ein Bild direkt.
+Die Bilder der nächsten Schritte werden vorgeladen. Was man einmal gesehen hat, geht so auch ohne Empfang, im
+Wald, in den Bergen und abseits von Strassen.
+
 ## Bildanalyse
 
 ### Automatische Feinausrichtung
