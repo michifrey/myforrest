@@ -38,7 +38,7 @@ const ROLE_LABEL = { user: 'Mitglied', moderator: 'Moderation', admin: 'Administ
 const ACTION_LABEL = {
   hide: 'ausgeblendet', unhide: 'wieder eingeblendet', dismiss: 'Meldungen verworfen', delete: 'gelöscht', role: 'Rolle geändert',
   protect: 'geschützt', unprotect: 'Schutz aufgehoben', 'pro-verifiziert': 'PRO verifiziert', 'pro-abgelehnt': 'PRO abgelehnt', 'pro-entzogen': 'PRO entzogen',
-  'account-delete': 'Konto gelöscht',
+  'account-delete': 'Konto gelöscht', rename: 'Namen geändert',
 };
 const PROTECT_REASON = { upload: 'beim Hochladen geschützt', art: 'automatisch: seltene oder geschützte Art', pro: 'von einem PRO-Mitglied geschützt', moderation: 'von der Moderation geschützt' };
 /** Verified PRO members and moderation see protected finds exactly. */
@@ -715,10 +715,24 @@ profileDialog.innerHTML = `
   <div class="dialog-head mod-head">
     <div>
       <p class="eyebrow">Mein Profil</p>
-      <h2 id="profile-title"></h2>
+      <div class="profile-name">
+        <h2 id="profile-title"></h2>
+        <button type="button" class="link small" id="profile-rename">Name ändern</button>
+      </div>
+      <form id="rename-form" class="rename-form" hidden novalidate>
+        <label class="field"><span>Neuer Anzeigename <em>3–40 Zeichen, wird bei deinen Fotos genannt</em></span>
+          <input name="name" maxlength="40" autocomplete="nickname" required></label>
+        <p class="muted small">Der neue Name steht sofort unter all deinen Fotos. Wer sich mit dem Namen statt der
+          E-Mail-Adresse anmeldet, braucht danach den neuen. Höchstens 3 Änderungen pro Tag.</p>
+        <p id="rename-error" class="auth-error" role="alert" hidden></p>
+        <div class="row">
+          <button type="submit" class="btn primary">Speichern</button>
+          <button type="button" class="link" id="rename-cancel">Abbrechen</button>
+        </div>
+      </form>
       <p id="profile-since" class="muted small"></p>
     </div>
-    <button type="button" class="icon" id="profile-close" aria-label="Schliessen">×</button>
+    <button type="button" class="icon" id="profile-close" aria-label="Schliessen" autofocus>×</button>
   </div>
   <div id="profile-stats" class="stats profile-stats"></div>
   <p id="profile-more" class="muted small"></p>
@@ -727,6 +741,36 @@ profileDialog.innerHTML = `
   <div class="row center"><button type="button" class="secondary" id="profile-next" hidden>Weitere Fotos laden</button></div>`;
 document.body.append(profileDialog);
 $('profile-close').addEventListener('click', () => profileDialog.close());
+
+const renameForm = $('rename-form');
+function showRename(open) {
+  renameForm.hidden = !open;
+  $('profile-rename').hidden = open;
+  $('rename-error').hidden = true;
+  if (open) {
+    renameForm.name.value = Account.user.name;
+    renameForm.name.focus();
+    renameForm.name.select();
+  }
+}
+$('profile-rename').addEventListener('click', () => showRename(true));
+$('rename-cancel').addEventListener('click', () => showRename(false));
+renameForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const r = await jsonPost('/api/auth/me', { name: renameForm.name.value }, 'PATCH');
+    Account.user = r.user;
+    $('profile-title').textContent = r.user.name;
+    showRename(false);
+    renderNav();
+    fillLicenseSelect();
+    // Photo credits show the current name.
+    await refreshViews();
+  } catch (err) {
+    $('rename-error').textContent = err.message;
+    $('rename-error').hidden = false;
+  }
+});
 let profileFilter = 'alle';
 let profileOffset = 0;
 
@@ -742,6 +786,7 @@ async function openProfile() {
     return;
   }
   $('profile-title').textContent = p.name;
+  showRename(false);
   const span = p.firstAt ? ` · Fotos von ${new Date(p.firstAt).getFullYear()} bis ${new Date(p.lastAt).getFullYear()}` : '';
   $('profile-since').textContent = `Dabei seit ${fmtDate(p.memberSince)}${span}`;
   $('profile-stats').replaceChildren(

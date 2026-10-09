@@ -1348,3 +1348,6 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 .tile-placeholder { display: grid; place-items: center; height: 100%; padding: 0.8rem; text-align: center; font-size: 0.8rem; color: var(--muted); }
 .profile-empty { grid-column: 1 / -1; display: grid; justify-items: start; gap: 0.6rem; }
 .row.center { justify-content: center; }
+.profile-name { display: flex; align-items: baseline; gap: 0.8rem; flex-wrap: wrap; }
+.rename-form { max-width: 440px; margin: 0.4rem 0 0.6rem; }
+.rename-form .field input { width: 100%; }

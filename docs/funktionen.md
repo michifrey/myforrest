@@ -845,6 +845,11 @@ der Zeit vor der Befristung gelten ein Jahr ab dem Entscheid, mindestens aber no
   sich getrennt anzeigen; ausgeblendete erscheinen mit dem Grund, aber ohne Bild, weil ihre Dateien auch der
   Urheberin nicht mehr ausgeliefert werden. Das Profil ist nur für das eigene Konto sichtbar: Eine öffentliche
   Liste aller Fotos einer Person würde ihre regelmässigen Wege und Zeiten verraten.
+- *Anzeigename ändern*: Im Profil unter *Name ändern*. Es gelten dieselben Regeln wie beim Registrieren
+  (3–40 Zeichen, eindeutig ohne Rücksicht auf Gross-/Kleinschreibung); „Anonym“ und „System“ sind reserviert,
+  weil die App sie selbst anzeigt. Der neue Name steht sofort unter allen eigenen Fotos. Wer sich mit dem Namen
+  statt der E-Mail-Adresse anmeldet, braucht danach den neuen. Höchstens 3 Änderungen pro Tag; jede Änderung
+  steht als „alt → neu“ im Moderationsprotokoll, damit die Moderation Missbrauch nachverfolgen kann.
 - *Konto löschen*: Im Konto-Menü unter *Konto löschen …*, bestätigt mit dem Passwort (Konten ohne Passwort
   tippen ihren Kontonamen ein). Für die eigenen Fotos ist eine ausdrückliche Wahl nötig: **anonym behalten**
   (sie bleiben für die Zeitreihen der Spots erhalten und heissen danach „Anonym“, die Lizenz bleibt) oder

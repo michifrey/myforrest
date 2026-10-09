@@ -81,6 +81,7 @@ module.exports = function registerAccounts(app, ctx) {
   const forgotPerIp = createLimiter({ max: limits.forgotPerIp ?? 10, windowMs: 3600 * 1000 });
   const forgotPerAddress = createLimiter({ max: limits.forgotPerAddress ?? 3, windowMs: 3600 * 1000 });
   const resetPerIp = createLimiter({ max: limits.resetPerIp ?? 20, windowMs: 15 * 60 * 1000 });
+  const renamePerAccount = createLimiter({ max: limits.renamePerAccount ?? 3, windowMs: 24 * 3600 * 1000 });
   const verifyPerAccount = createLimiter({ max: limits.verifyPerAccount ?? 3, windowMs: 3600 * 1000 });
   const reportPerIp = createLimiter({ max: limits.reportPerIp ?? 30, windowMs: 3600 * 1000 });
 
@@ -431,6 +432,25 @@ module.exports = function registerAccounts(app, ctx) {
     } catch (err) {
       next(err);
     }
+  });
+
+  /* ---------- Display name ---------- */
+
+  app.patch('/api/auth/me', (req, res) => {
+    if (!jsonOnly(req, res)) return;
+    if (!req.user) return fail(res, 401, 'Bitte zuerst anmelden');
+    if (req.body?.name === undefined) return fail(res, 400, 'Bitte einen neuen Namen angeben (name)');
+    const wait = renamePerAccount.blocked(req.user.id);
+    if (wait) {
+      return res.set('Retry-After', String(wait)).status(429)
+        .json({ error: `Der Name wurde heute schon mehrmals geändert – wieder möglich in ${Math.ceil(wait / 3600)} Stunden` });
+    }
+    const r = auth.rename(req.user, req.body.name);
+    if (r.error) return fail(res, r.status, r.error);
+    renamePerAccount.hit(req.user.id);
+    // The moderation can trace who someone was before (photo credits always show the current name).
+    mod.log(r.user, 'rename', { targetUserId: r.user.id, detail: `${r.previous} → ${r.user.name}` });
+    res.json({ user: selfJson(r.user) });
   });
 
   /* ---------- Deleting the account ---------- */

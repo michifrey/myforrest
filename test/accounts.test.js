@@ -706,3 +706,37 @@ test('profile: own figures and photos, hidden ones without files, nothing of oth
     assert.deepEqual((await (await admin.req('/api/profile/photos')).json()).photos.map((x) => x.id), [first.id]);
   });
 });
+
+test('changing the display name: rules, credits, login by the new name, log, limit', async () => {
+  await withServer({ rateLimits: { renamePerAccount: 2 } }, async (base, db) => {
+    const admin = client(base);
+    await admin.register('admin@example.org', 'Admin');
+    const anna = client(base);
+    await anna.register('anna@example.org', 'Anna Wald');
+    const p = (await (await anna.upload('nogps.jpg', { lat: '47.1', lon: '8.1' })).json()).created[0];
+    const rename = (c, name, opts = {}) => c.req('/api/auth/me', { method: 'PATCH', json: { name }, ...opts });
+
+    assert.equal((await rename(client(base), 'Niemand')).status, 401);
+    assert.equal((await rename(anna, 'A')).status, 400);
+    assert.equal((await rename(anna, 'anonym')).status, 400, 'reserved');
+    assert.equal((await rename(anna, 'ADMIN')).status, 409, 'taken, regardless of case');
+    assert.equal((await rename(anna, 'Anna Wald')).status, 400, 'unchanged');
+    assert.equal((await rename(anna, 'Anna Neu', { csrf: false })).status, 403, 'needs the CSRF token');
+
+    const ok = await rename(anna, '  Anna   Moos ');
+    assert.equal(ok.status, 200);
+    assert.equal((await ok.json()).user.name, 'Anna Moos');
+    const spot = await (await fetch(`${base}/api/spots/${p.spotId}`)).json();
+    assert.equal(spot.photos[0].uploader.name, 'Anna Moos', 'credits show the new name');
+    assert.equal((await client(base).login('Anna Moos')).res.status, 200);
+    assert.equal((await client(base).login('Anna Wald')).res.status, 401);
+    const log = db.prepare("SELECT * FROM moderation_log WHERE action = 'rename'").get();
+    assert.equal(log.detail, 'Anna Wald → Anna Moos');
+
+    // Only the case of the own name: allowed. Then the daily limit.
+    assert.equal((await rename(anna, 'anna moos')).status, 200);
+    assert.equal((await rename(anna, 'Anna Dritte')).status, 429);
+    // Registering with a reserved name is refused as well.
+    assert.equal((await client(base).register('x@example.org', 'System')).res.status, 400);
+  });
+});

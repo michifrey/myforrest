@@ -147,6 +147,15 @@ function createLimiter({ max, windowMs, now = Date.now }) {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NAME_RE = /^[\p{L}\p{N}][\p{L}\p{N} ._-]{1,38}[\p{L}\p{N}]$/u;
+// Words the app shows itself: "Anonym" for photos without account, "System" in the moderation log.
+const RESERVED_NAMES = new Set(['anonym', 'system']);
+const cleanName = (name) => (typeof name === 'string' ? name.trim().replace(/\s+/g, ' ') : '');
+/** Why a display name is not allowed, or null. */
+function nameError(name) {
+  if (!NAME_RE.test(name)) return 'Der Name braucht 3–40 Zeichen (Buchstaben, Ziffern, Leerzeichen, . _ -)';
+  if (RESERVED_NAMES.has(name.toLowerCase())) return `«${name}» ist für die App reserviert`;
+  return null;
+}
 
 /** Account store bound to a database. */
 // PRO membership (verified organisations such as forest services or nature NGOs), added in place.
@@ -187,11 +196,9 @@ function createAuth(db, { adminEmail = null } = {}) {
 
   async function register({ email, name, password }) {
     email = typeof email === 'string' ? email.trim() : '';
-    name = typeof name === 'string' ? name.trim().replace(/\s+/g, ' ') : '';
+    name = cleanName(name);
     if (!EMAIL_RE.test(email) || email.length > 200) return { error: 'Bitte eine gültige E-Mail-Adresse angeben' };
-    if (!NAME_RE.test(name)) {
-      return { error: 'Der Name braucht 3–40 Zeichen (Buchstaben, Ziffern, Leerzeichen, . _ -)' };
-    }
+    if (nameError(name)) return { error: nameError(name) };
     if (typeof password !== 'string' || password.length < 8 || password.length > 200) {
       return { error: 'Das Passwort braucht mindestens 8 Zeichen' };
     }
@@ -227,7 +234,7 @@ function createAuth(db, { adminEmail = null } = {}) {
     if (!NAME_RE.test(base)) base = `Waldfreund${base ? ` ${base}` : ''}`.slice(0, 34).trim();
     for (let i = 1; i < 1000; i += 1) {
       const name = i === 1 ? base : `${base} ${i}`;
-      if (NAME_RE.test(name) && !db.prepare('SELECT 1 FROM users WHERE name = ?').get(name)) return name;
+      if (!nameError(name) && !db.prepare('SELECT 1 FROM users WHERE name = ?').get(name)) return name;
     }
     return `Waldfreund ${crypto.randomBytes(3).toString('hex')}`;
   }
@@ -417,6 +424,24 @@ function createAuth(db, { adminEmail = null } = {}) {
     }
   }
 
+  /** Changes the display name; only the case of the own name may stay the same. */
+  function rename(user, wanted) {
+    const name = cleanName(wanted);
+    const error = nameError(name);
+    if (error) return { error, status: 400 };
+    if (name === user.name) return { error: 'Das ist bereits dein Name', status: 400 };
+    // Names are unique regardless of case (COLLATE NOCASE).
+    if (db.prepare('SELECT 1 FROM users WHERE name = ? AND id != ?').get(name, user.id)) {
+      return { error: 'Dieser Name ist bereits vergeben', status: 409 };
+    }
+    try {
+      db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name, user.id);
+    } catch {
+      return { error: 'Dieser Name ist bereits vergeben', status: 409 }; // lost a race
+    }
+    return { user: userById.get(user.id), previous: user.name };
+  }
+
   const userByEmail = (email) => (typeof email === 'string' && EMAIL_RE.test(email.trim()) ? db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim()) : null);
 
   const identitiesOf = (userId) => db.prepare('SELECT provider FROM identities WHERE user_id = ? ORDER BY provider').all(userId).map((r) => r.provider);
@@ -476,7 +501,7 @@ function createAuth(db, { adminEmail = null } = {}) {
   return {
     register, authenticate, createSession, session, destroySession, identityLogin, identitiesOf, unlinkIdentity,
     createEmailToken, confirmEmail, checkResetToken, resetPassword, changePassword, userByEmail,
-    confirmOwner, deleteBlocker, deleteUser,
+    confirmOwner, deleteBlocker, deleteUser, rename,
     userById: (id) => userById.get(id),
   };
 }

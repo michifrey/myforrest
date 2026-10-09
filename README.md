@@ -260,7 +260,7 @@ möglich, ausser der Betrieb verlangt eines (`REQUIRE_LOGIN`) oder eine bestäti
 
 Unter **Mein Profil** stehen die eigenen Beiträge: wie viele Fotos und Spots, wie viele Zeitreihen man
 fortgesetzt und wie viele Fotoaufträge man erledigt hat, und alle eigenen Fotos, das neueste zuerst. Ein Klick
-öffnet den Spot. Das Profil sieht nur, wem es gehört; eine öffentliche Liste aller Fotos einer Person würde
+öffnet den Spot, und über *Name ändern* lässt sich der Anzeigename anpassen. Das Profil sieht nur, wem es gehört; eine öffentliche Liste aller Fotos einer Person würde
 zeigen, wo und wann sie regelmässig unterwegs ist.
 
 ## Was MyForrest kann
