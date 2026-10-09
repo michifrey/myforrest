@@ -36,6 +36,8 @@ const { createOAuth, providersFromEnv } = require('./oauth');
 const { createMailer } = require('./mail');
 const { createSensitiveLists } = require('./sensitive');
 const { createCantons } = require('./canton');
+const { createStorms } = require('./storms');
+const { createStormWatch } = require('./stormwatch');
 const {
   altitudeShift, aspectShift, coldPoolShift, expectedColourDoy, aspectLabel, aspectFromCompass, COMPASS, LANDFORMS, landform,
 } = require('./phenology');
@@ -91,6 +93,8 @@ function createApp({
   glacierFiles = process.env.GLETSCHER_GEOJSON || '',
   // Spots without a profile above this height become mountain spots (src/landscapes.js); 0 = off.
   mountainMinM = MOUNTAIN_MIN_M,
+  // Storm warnings from the forecast (src/stormwatch.js): hours between checks, 0 = off.
+  stormWarnHours = Number(process.env.STURM_WARN_HOURS ?? 3),
   // Mapillary pictures in the walk-through and on the map (src/mapillary.js); off without a token.
   mapillaryToken = process.env.MAPILLARY_TOKEN || '', mapillaryFetch = fetch,
   // Reverse proxies whose X-Forwarded-For counts (Express 'trust proxy'), so rate limits see the client's
@@ -1221,6 +1225,17 @@ function createApp({
   const push = require('./routes/push')(app, { db, idParam, adminEmail, ...pushOptions });
   app.locals.push = push;
   const vegetation = require('./routes/vegetation')(app, { db, uploadDir, background, fetchImpl: weatherFetch, push, accounts });
+  // Storm warnings from the forecast and "visit after the storm" (push to followers and regular visitors).
+  const stormWatch = createStormWatch({ db, fetchImpl: weatherFetch, push, storms: createStorms({ db, fetchImpl: weatherFetch }) });
+  app.locals.stormWatch = () => stormWatch.run();
+  app.get('/api/storm-warnings', (req, res) => {
+    res.json({ model: stormWatch.model, threshold: stormWatch.threshold, warnings: stormWatch.list() });
+  });
+  if (stormWarnHours > 0) {
+    const tick = () => stormWatch.run().catch((err) => console.error('Sturmwarnungen:', err.message));
+    setTimeout(tick, 5 * 60000).unref?.();
+    setInterval(tick, stormWarnHours * 3600000).unref?.();
+  }
   // Spots from before the profiles (or the glacier outlines) existed.
   for (const { id } of db.prepare('SELECT id FROM spots WHERE landscape IS NULL AND (? OR elevation >= ?)').all(glaciers.enabled() ? 1 : 0, mountainMinM > 0 ? mountainMinM : 1e9)) {
     classifySpot(id);

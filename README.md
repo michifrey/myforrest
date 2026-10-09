@@ -162,6 +162,10 @@ für das Kamera-Overlay) auf dem Gerät. Unterwegs zeigt die App Karte und Spots
   <img src="docs/screenshots/satellite.jpg" width="49%" alt="Satelliten-Frühwarnung und NDVI-Rückgang eines Nadelwald-Spots mit geeichter Schwelle">
 </p>
 
+Eine **Sturmwarnung** aus der Prognose (ICON-D2) meldet Leuten, die einem Spot folgen oder ihn regelmässig
+fotografieren, Böen ab 75 km/h per Push; kam der Sturm, bittet eine zweite Nachricht danach um ein Foto, sobald es
+sicher ist.
+
 *Kontext zur Aufnahme* vergleicht die 90 Tage vor jedem Foto mit dem Mittel 1991–2020: Niederschlag,
 Temperatur, Hitzetage, längste Trockenphase und die Niederschläge der letzten zwölf Monate. Daraus
 entstehen Hinweise wie *Ausgeprägte Trockenheit*, *Frühe Laubverfärbung*, *Erhöhtes Borkenkäfer-Risiko*

@@ -38,6 +38,7 @@ src/trees.js         Waldbaumarten mit Phänologie, Trockenheitsempfindlichkeit 
 src/phenology.js     Korrektur der Herbstfärbung für Höhe, Exposition und Kaltluftseen
 src/phenoref.js      Phänologie-Referenzreihen (DWD-Jahresmelder, generisches CSV) und Stationsauswahl
 src/storms.js        Sturmereignisse aus Spitzenböen, Verknüpfung mit Windwurf
+src/stormwatch.js    Sturmwarnung aus der Böenprognose (ICON), Push vor und nach dem Sturm an Folgende und Regelmässige
 src/nightcool.js     Nächtliche Abkühlung in Senken aus Wind und Bewölkung
 src/openmeteo.js     Zeitreihen aus Archiv und Prognose von Open-Meteo zusammensetzen
 src/routes/climate.js  Routen und Analyse-Hooks für Stürme, Phänologie-Referenz und Frostnächte

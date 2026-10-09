@@ -1631,3 +1631,11 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
   display: inline-block; width: 3.6rem; height: 0.55rem; border-radius: 999px; vertical-align: middle;
   background: linear-gradient(90deg, rgb(43, 108, 176), rgb(239, 227, 161), rgb(192, 57, 43));
 }
+
+/* Storm warning / after the storm (app.js, src/stormwatch.js) */
+.storm-banner {
+  margin: 0.6rem 0; padding: 0.6rem 0.8rem; border-radius: 12px;
+  background: color-mix(in srgb, var(--damage) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--damage) 35%, transparent);
+}
+.storm-banner p { margin: 0 0 0.3rem; }

@@ -142,6 +142,7 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/satellite/harmonization` | Angleichung von Landsat an Sentinel-2 pro Index und Satellit (Gerade oder Versatz, Monatspaare, Abstand vorher, Restabweichung) |
 | `POST`   | `/api/satellite/harmonization` | Sofort neu schätzen |
 | `GET`    | `/api/satellite/alerts`      | Frühwarnung: Spots, deren letzte Monate gegenüber derselben Jahreszeit der Vorjahre gefallen sind (Index, seit wann, wie stark, Sturm davor, ob ein Besuch lohnt, `calibration`: verwendete Schwelle) |
+| `GET`    | `/api/storm-warnings`        | Sturmwarnungen aus der Böenprognose und Stürme der letzten Woche: `warnings` (`cell` 0,1°-Feld, `lat`, `lon`, `date`, `gust` km/h – vor dem Sturm Prognose, danach gemessen –, `from16`, `label`, `phase` `vorher`\|`nachher`), `model`, `threshold` |
 | `GET`    | `/api/photos/:id/regions?to=` | Veränderte Regionen mit entscheidender Quelle (Regel/gelernt), Sicherheit, Nadelholzanteil, vermuteter Art und eigener Bestätigung |
 | `POST`   | `/api/photos/:id/region-labels` | Region bestätigen oder korrigieren (`{ to, index, class }`, `class: null` entfernt die Bestätigung) |
 | `GET`    | `/api/analysis/status`       | Stand des Lernmodells (Beispiele pro Klasse, Genauigkeit) und des Detektors (Bestätigungsquote pro Label) |

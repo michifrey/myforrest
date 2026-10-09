@@ -43,6 +43,8 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 | `LANDSAT_STAC_URL` | Planetary Computer | STAC-API für Landsat Collection 2 (vor 2017); leer = ohne Landsat |
 | `LANDSAT_TOKEN_URL`| Planetary Computer | Adresse für das anonyme Token, mit dem die Landsat-Links signiert werden |
 | `SATELLITE_WATCH_HOURS` | `24` | Abstand der Frühwarn-Runde über alle Spots in Stunden; `0` = aus |
+| `STURM_WARN_HOURS` | `3` | Abstand der Sturmwarn-Runde (Böenprognose, Push vor und nach dem Sturm) in Stunden; `0` = aus |
+| `STURM_MODELL` | `icon_seamless` | Wettermodell der Böenprognose bei Open-Meteo (z. B. `icon_d2`, `meteoswiss_icon_ch1`); `best_match` = Auswahl von Open-Meteo |
 | `REQUIRE_LOGIN`    | –        | `1`: Uploads und Änderungen nur mit Konto      |
 | `TRUST_PROXY`      | –        | Reverse Proxy, dessen `X-Forwarded-For` gilt, damit die Rate-Limits die Adresse der Person sehen statt die des Proxys: Anzahl Proxys (`1`), Adressen oder Netze (`loopback`, `uniquelocal`, `10.0.0.0/8`) oder `true` für alle; leer = keinem Proxy vertrauen (siehe [Betrieb](betrieb.md#vor-einem-öffentlichen-betrieb)) |
 | `ADMIN_EMAIL`      | –        | Dieses Konto wird Admin (sonst das erste Konto) |

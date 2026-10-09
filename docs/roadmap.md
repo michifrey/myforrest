@@ -47,8 +47,8 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 - **Phänologie**: MeteoSchweiz-Daten direkt lesen (heute über das generische CSV), Referenz auch für den
   Laubaustrieb (Spätfrost erst nach dem tatsächlichen Austrieb der Region) und für das laufende Jahr
   (Sofortmelder) statt nur des Zehnjahresmittels.
-- **Stürme genauer**: Böen aus feiner aufgelösten Modellen (z. B. ICON-D2) oder Stationsmessungen,
-  Sturmwarnungen aus der Prognose als Hinweis, betroffene Spots nach einem Sturm zu besuchen.
+- **Stürme genauer**: auch die vergangenen Stürme aus feiner aufgelösten Daten (Stationsmessungen von
+  MeteoSchweiz statt ERA5), Gewitterböen (lokal, im Modell kaum sichtbar) aus Warnungen der Wetterdienste.
 - **Vegetationsdichte verfeinern**: Himmel und Vegetation mit einem Segmentierungsmodell statt Farbregeln
   trennen (Schnee, helle Felsen und Mauern gelten heute teils als Himmel); Kennzahlen nur im Bildteil
   vergleichen, den alle Fotos eines Spots abdecken.
@@ -100,6 +100,7 @@ Aus früheren Versionen dieser Roadmap:
 - Organisationen mit mehreren Mitgliedern: die verifizierte Leitung nimmt Kolleginnen und Kollegen auf, auch per
   Einladung an eine E-Mail-Adresse ohne Konto
 - Sturmereignisse aus Böen mit Windwurf-Funden verknüpfen
+- Sturmwarnung aus der Böenprognose (ICON-D2) per Push, nach dem Sturm die Bitte um ein Foto, wenn er wirklich kam
 - DWD-Phänologie als Referenz für den Beginn der Herbstfärbung
 - Nächtliche Abkühlung in Senken aus Wind und Bewölkung
 - Hotspot-Karten, Ausbreitungsfronten und Datei-Export zu Info Flora / iNaturalist

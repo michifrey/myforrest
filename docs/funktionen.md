@@ -445,6 +445,29 @@ DWD-Warnungen (Sturmböen Bft 9, schwere Sturmböen 10, orkanartige Böen 11, Or
 
 ERA5 rechnet auf einem Raster von rund 25 km und glättet Böenspitzen; die Werte sind eher eine untere Grenze.
 
+### Sturmwarnung und Besuch nach dem Sturm
+
+Alle drei Stunden (`STURM_WARN_HOURS`) holt der Server die Prognose der stärksten Böe für heute und die
+nächsten zwei Tage, für jedes Feld von 0,1° mit Spots, aus einem fein aufgelösten Modell (`STURM_MODELL`,
+Standard `icon_seamless`: ICON-D2 mit ~2 km für die ersten zwei Tage, danach ICON-EU, über Open-Meteo; mehrere
+Felder pro Anfrage). Ab Sturmböen (75 km/h, Bft 9) entsteht eine Warnung:
+
+1. **Vor dem Sturm** bekommt, wer einem betroffenen Spot folgt oder ihn regelmässig fotografiert (wie bei der
+   Frühwarnung), eine Push-Nachricht, eine pro Person, auch bei mehreren Spots: *Sturmwarnung: Böen bis 96 km/h
+   – Schwere Sturmböen am Sa 10.10. bei 2 Spots (1, 3). Nach dem Sturm hilft ein Foto – aber erst hingehen, wenn
+   es sicher ist.* Eine stärkere Prognose für denselben Tag schickt keine zweite Nachricht.
+2. **Nach dem Sturm** (ab dem Folgetag) entscheiden die gemessenen Böen (ERA5 bzw. die letzten Tage der
+   Prognose-API, ±1 Tag): Kam der Sturm, folgt *Nach dem Sturm: Spots besuchen* mit der gemessenen Böe und der
+   Bitte, erst bei freigegebenen Wegen und mit Abstand zu angeschobenen Bäumen zu gehen. Blieb er aus, endet
+   die Warnung still. Ohne Messwerte nach fünf Tagen ebenfalls.
+
+In der App steht über den Zahlen im Explorer ein Hinweis (*Sturmwarnung …* bzw. *Nach dem Sturm …*, eine Woche
+lang), *Diese Spots zeigen* und der Filter *Sturmwarnung / nach dem Sturm* zeigen die betroffenen Spots; der
+Link aus der Push-Nachricht öffnet sie ebenso. Die Liste (`/api/storm-warnings`) nennt nur Felder und Tage,
+keine Spots: Die App ordnet ihre sichtbaren Spots selbst zu, geschützte Funde bleiben verborgen.
+
+![Sturmwarnung im Explorer](screenshots/sturmwarnung.jpg)
+
 ### Phänologie-Referenzdaten
 
 Statt pauschaler Gradienten kann die App den Beginn der Herbstfärbung aus
