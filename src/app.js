@@ -12,7 +12,7 @@ const { distanceM, isValidCoord, positionAt } = require('./geo');
 const { lenientFetch } = require('./lenient-fetch');
 const { createWildlife } = require('./wildlife');
 const { createGlaciers } = require('./glaciers');
-const { LANDSCAPES, ICE_LANDSCAPES, isLandscape, landscapeOf } = require('./landscapes');
+const { LANDSCAPES, ICE_LANDSCAPES, MOUNTAIN_MIN_M, FOREST_ONLY_TAGS, isLandscape, landscapeOf } = require('./landscapes');
 const { parseGpx } = require('./gpx');
 const { readPhotoMeta, imageExtension } = require('./exif');
 const { assignSpot, refreshSpot, backfillSpotHeadings, planSplit, splitSpot, HEADING_TOLERANCE_DEG } = require('./spots');
@@ -76,6 +76,8 @@ function createApp({
   pushOptions = {},
   // Glacier outlines (src/glaciers.js): GeoJSON files of glacier inventories, comma-separated.
   glacierFiles = process.env.GLETSCHER_GEOJSON || '',
+  // Spots without a profile above this height become mountain spots (src/landscapes.js); 0 = off.
+  mountainMinM = MOUNTAIN_MIN_M,
 } = {}) {
   const uploadDir = path.join(dataDir, 'uploads');
   const tmpDir = path.join(dataDir, 'tmp');
@@ -360,7 +362,9 @@ function createApp({
         // Terrain service unavailable: fall back below and retry next time.
       }
     }
-    if (terrainOf(spotId).elevation !== null) return terrainOf(spotId).elevation;
+    // With the height known, a spot high above the forest becomes a mountain spot (classifySpot).
+    const known = () => { classifySpot(spotId); return terrainOf(spotId).elevation; };
+    if (terrainOf(spotId).elevation !== null) return known();
     let value = null;
     let source = null;
     try {
@@ -377,7 +381,7 @@ function createApp({
     if (value !== null) {
       db.prepare('UPDATE spots SET elevation = ?, elevation_source = ? WHERE id = ? AND elevation IS NULL').run(value, source, spotId);
     }
-    return terrainOf(spotId).elevation;
+    return known();
   }
 
   const irregularitiesOf = (photo, ctx) => {
@@ -651,15 +655,22 @@ function createApp({
   /**
    * Sets the landscape profile of a spot: `chosen` (from an upload, or by hand
    * with source 'manual') when the spot has none yet or only a guessed one;
-   * without a choice a spot on or near a glacier becomes a glacier spot.
+   * without a choice a spot on or near a glacier becomes a glacier spot, one
+   * above `mountainMinM` (once its height is known) a mountain spot.
    * A profile set by hand is only changed by hand. Runs inside a transaction.
    */
+  /** Tree species or forest observations at a spot: a larch wood at 2200 m stays forest. */
+  const forestSigns = (spotId) => Boolean(db.prepare('SELECT 1 FROM spot_species WHERE spot_id = ? LIMIT 1').get(spotId)
+    || db.prepare(`SELECT 1 FROM photo_tags t JOIN photos p ON p.id = t.photo_id WHERE p.spot_id = ? AND t.tag IN (${FOREST_ONLY_TAGS.map(() => '?').join(',')}) LIMIT 1`)
+      .get(spotId, ...FOREST_ONLY_TAGS));
+
   function classifySpot(spotId, chosen = null, source = 'upload') {
-    const spot = db.prepare('SELECT lat, lon, landscape, landscape_source FROM spots WHERE id = ?').get(spotId);
+    const spot = db.prepare('SELECT lat, lon, elevation, landscape, landscape_source FROM spots WHERE id = ?').get(spotId);
     if (!spot) return;
     let next = null;
     if (chosen && (source === 'manual' || spot.landscape === null || spot.landscape_source === 'auto')) next = [chosen, source];
     else if (!chosen && spot.landscape === null && glaciers.isGlacierPlace(spot.lat, spot.lon)) next = ['gletscher', 'auto'];
+    else if (!chosen && spot.landscape === null && mountainMinM > 0 && spot.elevation >= mountainMinM && !forestSigns(spotId)) next = ['gebirge', 'auto'];
     if (!next || (next[0] === spot.landscape && next[1] === spot.landscape_source)) return;
     db.prepare('UPDATE spots SET landscape = ?, landscape_source = ? WHERE id = ?').run(next[0], next[1], spotId);
     // A glacier spot needs the snow and ice share of its satellite scenes.
@@ -973,6 +984,7 @@ function createApp({
         else db.prepare("UPDATE spots SET landform = ?, landform_source = 'manual', tpi600 = NULL, tpi300 = NULL WHERE id = ?").run(form, id);
       }
       if (value === null || expo === null || form === null) await ensureElevation(id);
+      else classifySpot(id); // a height set by hand may make it a mountain spot
       reassessSpot(id);
       // Weather is downscaled to the altitude: refresh the spot's contexts in the background.
       for (const { id: photoId } of db.prepare('SELECT id FROM photos WHERE spot_id = ? AND context_json IS NOT NULL').all(id)) {
@@ -1189,9 +1201,9 @@ function createApp({
   const push = require('./routes/push')(app, { db, idParam, adminEmail, ...pushOptions });
   app.locals.push = push;
   const vegetation = require('./routes/vegetation')(app, { db, uploadDir, background, fetchImpl: weatherFetch, push, accounts });
-  // Spots from before the glacier outlines were loaded.
-  if (glaciers.enabled()) {
-    for (const { id } of db.prepare('SELECT id FROM spots WHERE landscape IS NULL').all()) classifySpot(id);
+  // Spots from before the profiles (or the glacier outlines) existed.
+  for (const { id } of db.prepare('SELECT id FROM spots WHERE landscape IS NULL AND (? OR elevation >= ?)').all(glaciers.enabled() ? 1 : 0, mountainMinM > 0 ? mountainMinM : 1e9)) {
+    classifySpot(id);
   }
   require('./routes/landscapes')(app, { db, glaciers, vegetation, accounts, classifySpot, spotJson, idParam });
   Object.assign(tours, require('./routes/tracks')(app, {

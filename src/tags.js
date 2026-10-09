@@ -21,6 +21,11 @@ const TAGS = {
   felssturz: 'Felssturz / Steinschlag',
   murgang: 'Murgang',
   pioniervegetation: 'Pioniervegetation im Vorfeld',
+  // Mountains
+  lawine: 'Lawine / Lawinenzug',
+  rutschung: 'Rutschung / Hangmure',
+  permafrost: 'Permafrost / Blockgletscher',
+  verbuschung: 'Verbuschung der Alpweide',
 };
 
 const isTag = (t) => Object.prototype.hasOwnProperty.call(TAGS, t);

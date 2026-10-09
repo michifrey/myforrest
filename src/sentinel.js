@@ -689,7 +689,10 @@ const ICE_PRESENT = 0.5;
  *            old snow, firn: a glacier's accumulation area stays white too);
  *   iceFreeSince: the first summer of a run of ice-free summers (share below
  *            0.5) to the last one, after at least one summer with ice; null
- *            while there is ice or without such a change.
+ *            while there is ice or without such a change;
+ *   meltOut: [{ year, month }] when the snow melts (mountain spots): the first
+ *            month of March–August below half snow, in years whose winter
+ *            (January, February) was white; years with ice all summer have none.
  */
 function iceSeries(scenes) {
   const byMonth = new Map();
@@ -712,7 +715,17 @@ function iceSeries(scenes) {
   let iceFreeSince = null;
   for (let i = summers.length - 1; i >= 0 && summers[i].ice < ICE_PRESENT; i--) iceFreeSince = summers[i].year;
   if (iceFreeSince !== null && !summers.some((s) => s.year < iceFreeSince && s.ice >= ICE_PRESENT)) iceFreeSince = null;
-  return { monthly, summers, iceFreeSince };
+  const snowAt = new Map(monthly.map((m) => [m.month, m.snow]));
+  const meltOut = [];
+  for (const y of [...new Set(monthly.map((m) => Number(m.month.slice(0, 4))))].sort((a, b) => a - b)) {
+    const winter = [`${y}-01`, `${y}-02`].map((m) => snowAt.get(m)).filter((v) => v !== undefined);
+    if (!winter.length || Math.max(...winter) < ICE_PRESENT) continue;
+    for (let m = 3; m <= 8; m++) {
+      const v = snowAt.get(`${y}-${String(m).padStart(2, '0')}`);
+      if (v !== undefined && v < ICE_PRESENT) { meltOut.push({ year: y, month: m }); break; }
+    }
+  }
+  return { monthly, summers, iceFreeSince, meltOut };
 }
 
 module.exports = {

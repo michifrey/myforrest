@@ -99,7 +99,15 @@ test('ice share of late summer: the lowest month of July–October per year, and
   // Always ice, or never: no change to report.
   assert.equal(iceSeries([{ date: '2020-08-01', snow: 1 }, { date: '2021-08-01', snow: 0.9 }]).iceFreeSince, null);
   assert.equal(iceSeries([{ date: '2020-08-01', snow: 0 }, { date: '2021-08-01', snow: 0 }]).iceFreeSince, null);
-  assert.deepEqual(iceSeries([]), { monthly: [], summers: [], iceFreeSince: null });
+  assert.deepEqual(iceSeries([]), { monthly: [], summers: [], iceFreeSince: null, meltOut: [] });
+  // A glacier keeps its snow all summer: no melt-out in 2019; in 2022 the place is free in August.
+  assert.deepEqual(s.meltOut, []);
+  const mountain = iceSeries([
+    ['2018-01-10', 1], ['2018-04-10', 0.9], ['2018-05-12', 0.8], ['2018-06-10', 0.2],
+    ['2025-02-10', 0.95], ['2025-04-11', 0.4], ['2025-05-10', 0.1],
+    ['2026-03-01', 0.1], // no winter month: not counted
+  ].map(([date, snow]) => ({ date, snow })));
+  assert.deepEqual(mountain.meltOut, [{ year: 2018, month: 6 }, { year: 2025, month: 4 }]);
 });
 
 test('outside the forest a change keeps no forest class', () => {
@@ -230,6 +238,24 @@ test('glacier spots: recognised from the outlines, chosen at upload or by hand; 
     assert.deepEqual(fc.years, [1850, 1973, 2016]);
     assert.equal(fc.features.length, 1);
     assert.equal((await fetch(`${base}/api/glaciers?bbox=1,2,3`)).status, 400);
+  });
+});
+
+test('mountain spots: above the tree line without signs of forest', async () => {
+  await withServer(() => ({}), async (base) => {
+    const patch = (id, body) => fetch(`${base}/api/spots/${id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const a = await upload(base, { lat: 46.7, lon: 8.6, takenAt: '2024-07-20T10:00:00Z', tags: 'lawine' });
+    assert.equal((await (await patch(a.spotId, { elevation: 2400 })).json()).landscape, 'gebirge');
+    assert.equal((await json(`${base}/api/spots/${a.spotId}`)).landscapeSource, 'auto');
+    // A larch wood at 2200 m stays forest.
+    const b = await upload(base, { lat: 46.5, lon: 9.8, takenAt: '2024-07-20T10:00:00Z' });
+    await fetch(`${base}/api/spots/${b.spotId}/species`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ scientificName: 'Larix decidua' }) });
+    assert.equal((await (await patch(b.spotId, { elevation: 2200 })).json()).landscape, 'wald');
+    // Low down nothing changes.
+    const c = await upload(base, { lat: 47.3, lon: 8.5, takenAt: '2024-07-20T10:00:00Z' });
+    assert.equal((await (await patch(c.spotId, { elevation: 600 })).json()).landscape, 'wald');
+    const config = await json(`${base}/api/config`);
+    assert.ok(config.landscapes.gebirge.tags.includes('lawine'));
   });
 });
 

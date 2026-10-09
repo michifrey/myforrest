@@ -48,6 +48,16 @@ const MORAINE = {
     ['2025-08-02T16:40', { tongue: 0.08, lake: 0.3, green: 0.6 }, ['schuttbedeckung', 'murgang'], 'Murgang aus der Seitenmoräne nach einem Gewitter'],
   ],
 };
+// An alpine pasture high above the valley (a mountain spot by its height): shrubs moving in.
+const PASTURE = {
+  lat: 46.625, lon: 8.383, heading: 120, seed: 93,
+  visits: [
+    ['2018-08-12T14:00', { tongue: 0, green: 0.7 }, []],
+    ['2025-08-18T13:30', { tongue: 0, green: 1 }, ['verbuschung'], 'Grünerlen breiten sich auf der Weide aus, seit sie nicht mehr bestossen wird'],
+  ],
+};
+// Month the snow melts at the pasture: from June to May, 2025 already in April.
+const MELT = { 2017: 6, 2018: 6, 2019: 6, 2020: 5, 2021: 6, 2022: 5, 2023: 5, 2024: 5, 2025: 4, 2026: 5 };
 // Lowest monthly snow and ice share of late summer per year at the tongue: ice until 2020, free from 2021.
 const SUMMER_ICE = { 2017: 0.93, 2018: 0.9, 2019: 0.86, 2020: 0.7, 2021: 0.32, 2022: 0.05, 2023: 0.08, 2024: 0.04, 2025: 0.03, 2026: 0.02 };
 
@@ -78,12 +88,13 @@ async function main() {
   }
   const db = new DatabaseSync(path.join(WORK, 'data', 'myforrest.db'));
   db.exec('PRAGMA busy_timeout = 15000');
-  const ids = { tongue: await spot(TONGUE), moraine: await spot(MORAINE) };
+  const ids = { tongue: await spot(TONGUE), moraine: await spot(MORAINE), pasture: await spot(PASTURE) };
   for (const [def, id] of [[TONGUE, ids.tongue], [MORAINE, ids.moraine]]) db.prepare('UPDATE spots SET heading = ? WHERE id = ?').run(def.heading, id);
   db.prepare('UPDATE photos SET heading = ? WHERE spot_id = ?').run(TONGUE.heading, ids.tongue);
   db.prepare('UPDATE photos SET heading = ? WHERE spot_id = ?').run(MORAINE.heading, ids.moraine);
   seedIce(db, ids.tongue, SUMMER_ICE);
   seedIce(db, ids.moraine, Object.fromEntries(Object.keys(SUMMER_ICE).map((y) => [y, 0.03])));
+  seedSnow(db, ids.pasture, MELT);
 }
 
 /** Monthly Sentinel-2 scenes with the snow and ice share (winter white, late summer what is left). */
@@ -97,6 +108,23 @@ function seedIce(db, spotId, summers) {
       const s = summers[y];
       const snow = m >= 11 || m <= 5 ? 1 : m === 6 ? Math.min(1, s + 0.4) : m === 7 ? Math.min(1, s + 0.2) : m === 8 ? s : m === 9 ? s + 0.01 : Math.min(1, s + 0.35);
       ins.run(spotId, `S2_${spotId}_${y}${m}`, `${y}-${String(m).padStart(2, '0')}-${String(8 + (m % 10)).padStart(2, '0')}`, Math.round(snow * 100) / 100);
+    }
+  }
+  db.prepare(`INSERT OR REPLACE INTO spot_ndvi (spot_id, lat, lon, from_date, to_date, fetched_at, complete, error)
+    VALUES (?, ?, ?, '1984-04-01', '2026-10-08', ?, 1, NULL)`).run(spotId, spot.lat, spot.lon, Date.now() + 365 * 86400000);
+}
+
+/** A pasture: white winters, snow-free from the melt-out month, green in summer (NDVI). */
+function seedSnow(db, spotId, melt) {
+  const spot = db.prepare('SELECT lat, lon FROM spots WHERE id = ?').get(spotId);
+  const ins = db.prepare(`INSERT OR REPLACE INTO spot_ndvi_scenes (spot_id, scene_id, date, cloud, ndvi, ndmi, snow, clear_fraction, sensor, v)
+    VALUES (?, ?, ?, 10, ?, ?, ?, ?, 'S2', 3)`);
+  for (let y = 2017; y <= 2026; y++) {
+    for (let m = 1; m <= 12; m++) {
+      if (y === 2026 && m > 10) break;
+      const snow = m >= 11 || m < melt[y] ? 1 : m === melt[y] ? 0.3 : 0;
+      const ndvi = snow ? null : Math.round((0.35 + 0.3 * Math.sin(((m - melt[y]) / 6) * Math.PI) + (y - 2017) * 0.006) * 1000) / 1000;
+      ins.run(spotId, `S2_${spotId}_${y}${m}`, `${y}-${String(m).padStart(2, '0')}-12`, ndvi, ndvi === null ? null : Math.round((ndvi - 0.25) * 1000) / 1000, snow, ndvi === null ? 0 : 0.9);
     }
   }
   db.prepare(`INSERT OR REPLACE INTO spot_ndvi (spot_id, lat, lon, from_date, to_date, fetched_at, complete, error)

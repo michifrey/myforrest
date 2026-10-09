@@ -5,7 +5,8 @@
 Beim Joggen, Wandern oder Biken fallen immer wieder Sturmschäden, Borkenkäfernester, neue
 Lichtungen oder sich ausbreitende Neophyten auf. MyForrest sammelt Fotos solcher Orte und legt
 sie zeitlich übereinander. So wird sichtbar, wie sich der Wald an einem Ort über Monate und Jahre
-verändert. Dasselbe geht für Gletscher: Wie weit das Eis früher reichte und wann es einen Ort freigab.
+verändert. Dasselbe geht für Gletscher und Gebirge: wie weit das Eis früher reichte, wann es einen Ort
+freigab und wie früh der Schnee heute schmilzt.
 
 ![Startseite von MyForrest](docs/screenshots/hero.jpg)
 
@@ -28,8 +29,8 @@ Der Ablauf hat drei Schritte:
 > Die Screenshots zeigen generierte Demo-Bilder eines fiktiven Waldstücks bei Zürich, eine vereinfachte
 > Platzhalter-Karte und synthetische Wetter- und Satellitendaten. Im Betrieb zeigt die App echte Fotos,
 > OpenStreetMap- bzw. swisstopo-Kacheln und Daten von Open-Meteo, Sentinel-2 und Landsat. Wie die Bilder
-> entstehen, steht unter [`scripts/screenshots`](scripts/screenshots/README.md). Auch der Gletscher in
-> Abschnitt 14 ist erfunden.
+> entstehen, steht unter [`scripts/screenshots`](scripts/screenshots/README.md). Auch Gletscher und Alpweide in
+> Abschnitt 14 sind erfunden.
 
 ### 1. Karte mit Spots
 
@@ -298,7 +299,7 @@ Blickrichtung bleibt beim Schritt erhalten, *Zeit* wechselt zu einem anderen Jah
 kleine Karte zeigt, wo man steht und wohin man schaut. Mit der Tastatur geht es mit W/S vor und zurück.
 Einmal gesehene Bilder gehen auch ohne Empfang, im Wald und in den Bergen.
 
-### 14. Gletscher
+### 14. Gletscher und Gebirge
 
 <p>
   <img src="docs/screenshots/gletscher-karte.jpg" width="49%" alt="Karte mit den Gletscherumrissen von 1850, 1973 und 2016">
@@ -325,6 +326,13 @@ App, seit wann der Gletscher den Ort freigegeben hat. **Archivfotos** wie alte P
 ihr Datum von Hand und werden auf die neuen Fotos ausgerichtet; im Vorher/Nachher (rechts) liegt die Postkarte
 von 1928 neben 2025.
 
+<p align="center"><img src="docs/screenshots/gebirge.jpg" width="38%" alt="Gebirge-Spot auf einer Alpweide mit der Schneeschmelze pro Jahr"></p>
+
+Spots über 2100 m ohne Baumarten werden **Gebirge**-Spots (brauner Marker) mit Beobachtungen wie Felssturz,
+Murgang, Lawine, Rutschung, Permafrost und Verbuschung der Alpweide. Ihr Teil *Schnee* zeigt pro Jahr, in
+welchem Monat der Schnee schmilzt, und vergleicht die ersten mit den letzten Jahren, hier eine Alpweide, die
+heute rund sechs Wochen früher aper ist und auf der Grünerlen einwachsen.
+
 ## Was MyForrest kann
 
 Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen unter
@@ -345,9 +353,9 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   Landsat) als unabhängige Bestätigung und als Frühwarnung für Spots ohne neue Fotos, deren Schwellen sich an
   bestätigten Schäden eichen (getrennt für Laub- und Nadelwald) und an zurückgehaltenen Spots geprüft werden,
   als Push-Nachricht an alle, die den Spot regelmässig besuchen.
-- **[Landschaften und Gletscher](docs/funktionen.md#landschaften-und-gletscher)**: Profile für Wald und Gletscher
-  mit eigenen Beobachtungen; Gletscherumrisse aus Inventaren (z. B. GLAMOS) pro Jahr, Eis im Spätsommer aus
-  Sentinel-2 und Archivfotos mit Datum von Hand.
+- **[Landschaften und Gletscher](docs/funktionen.md#landschaften-und-gletscher)**: Profile für Wald, Gletscher und
+  Gebirge mit eigenen Beobachtungen; Gletscherumrisse aus Inventaren (z. B. GLAMOS) pro Jahr, Eis im Spätsommer
+  und Schneeschmelze aus Sentinel-2, Archivfotos mit Datum von Hand.
 - **[Kartenmodi](docs/funktionen.md#kartenmodi)**: Sonnenstand, Schatten und Einstrahlung inklusive
   Geländehorizont sowie Hotspots und Ausbreitungsfronten von Neophyten.
 - **[Pflanzen und Baumarten](docs/funktionen.md#pflanzen-und-baumarten)**: Pflanzenbestimmung mit Pl@ntNet,

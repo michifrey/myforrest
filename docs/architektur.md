@@ -44,7 +44,7 @@ src/routes/climate.js  Routen und Analyse-Hooks für Stürme, Phänologie-Refere
 src/elevation.js     Geländehöhe, Hangneigung, Exposition und Geländeform (Copernicus-DEM über Open-Meteo)
 src/exif.js          Aufnahmezeit, GPS und Blickrichtung aus den Bilddaten
 src/wildlife.js      Wildruhezonen (GeoJSON, WGS84/LV95, Schutzzeit) als Sperrflächen für BRouter
-src/landscapes.js    Landschaftsprofile (Wald, Gletscher): Beobachtungen je Profil, welche Profile Eis auswerten
+src/landscapes.js    Landschaftsprofile (Wald, Gletscher, Gebirge): Beobachtungen je Profil, welche Profile Schnee und Eis auswerten, Höhe für Gebirge-Spots
 src/glaciers.js      Gletscherumrisse aus Inventaren (GeoJSON, WGS84/LV95, Jahr aus Eigenschaft oder Dateiname): Eis pro Jahr an einem Ort, Abstand, Umrisse für die Karte
 src/routes/landscapes.js  Landschaft eines Spots setzen, Gletscher am Spot, Umrisse (/api/glaciers)
 src/lenient-fetch.js HTTP-Client für BRouters eigenen Server (Kopfzeilen nur mit \n)
@@ -99,7 +99,7 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
                      video.js den Video-Upload und die 360°-Ansicht,
                      walk.js das Durchgehen wie Street View,
                      vegetation.js die Diagramme zu Vegetationsdichte und NDVI,
-                     glacier.js Landschaft des Spots, Gletscher-Teil, Archivfotos und Gletscherumrisse auf der Karte,
+                     glacier.js Landschaft des Spots, Gletscher- und Schnee-Teil, Archivfotos und Gletscherumrisse auf der Karte,
                      account.js Konto-Menü, Lizenz, Melden und Moderation;
                      vektorkarte.html zeigt die Vektorkacheln mit MapLibre,
                      vektorkarte-lv95.html im LV95-Gitter mit OpenLayers auf der Landeskarte)

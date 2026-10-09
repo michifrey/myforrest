@@ -456,7 +456,7 @@ module.exports = function registerVegetation(app, {
 
   /** Snow and ice share of a glacier spot (src/sentinel.js iceSeries), fetching the scenes when due. */
   function ice(id) {
-    if (!sentinel) return { status: 'disabled', monthly: [], summers: [], iceFreeSince: null };
+    if (!sentinel) return { status: 'disabled', monthly: [], summers: [], iceFreeSince: null, meltOut: [] };
     if (sentinel.needsRefresh(id)) refreshNdvi(id);
     const st = sentinel.series(id);
     return { status: refreshing.has(id) ? 'pending' : st.error ? 'offline' : 'ready', error: st.error, ...sentinel.ice(id) };

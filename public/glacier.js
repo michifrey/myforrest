@@ -138,10 +138,82 @@
     ]);
   }
 
+  /** Melt-out month per year (mountain spots): dots from March to August. */
+  function meltChart(meltOut) {
+    const W = 360; const H = 120; const left = 34; const right = 8; const top = 8; const bottom = 20;
+    const n = meltOut.length;
+    const step = (W - left - right) / n;
+    const y = (m) => top + ((m - 3) / 5) * (H - top - bottom);
+    const nodes = [];
+    for (const m of [3, 4, 5, 6, 7, 8]) {
+      nodes.push(svg('line', { class: 'grid', x1: left, x2: W - right, y1: y(m), y2: y(m), 'stroke-dasharray': '2 3' }));
+      nodes.push(svg('text', { class: 'axis', x: left - 4, y: y(m) + 3, 'text-anchor': 'end' }, [MONTHS[m - 1]]));
+    }
+    const pts = meltOut.map((s, i) => [left + step * (i + 0.5), y(s.month)]);
+    nodes.push(svg('path', { class: 'melt-line', d: pts.map(([px, py], i) => `${i ? 'L' : 'M'}${px.toFixed(1)} ${py.toFixed(1)}`).join('') }));
+    meltOut.forEach((s, i) => {
+      const c = svg('circle', { class: 'melt-dot', cx: pts[i][0], cy: pts[i][1], r: 4.5 });
+      c.append(svg('title', {}, [`${s.year}: aper im ${MONTHS[s.month - 1]}`]));
+      nodes.push(c);
+      if (n <= 12 || i % 2 === 0) nodes.push(svg('text', { class: 'axis', x: pts[i][0], y: H - 6, 'text-anchor': 'middle' }, [String(s.year)]));
+    });
+    const caption = 'Monat der Ausaperung (erster Monat mit weniger als der Hälfte Schnee), pro Jahr';
+    return el('div', { class: 'wx-chart veg-chart melt-chart' }, [
+      el('h4', { text: 'Schneeschmelze (Sentinel-2)' }),
+      svg('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': caption }, nodes),
+      el('div', { class: 'sr-only' }, el('table', {}, [
+        el('caption', { text: caption }),
+        el('tr', {}, ['Jahr', 'Monat'].map((h) => el('th', { text: h }))),
+        ...meltOut.map((s) => el('tr', {}, [String(s.year), MONTHS[s.month - 1]].map((c) => el('td', { text: c })))),
+      ])),
+    ]);
+  }
+
+  /** "Aper im Mittel rund 4 Wochen früher als 2017–2019" from the first and last three years. */
+  function meltTrend(meltOut) {
+    if (meltOut.length < 4) return null;
+    const k = Math.min(3, Math.floor(meltOut.length / 2));
+    const avg = (list) => list.reduce((a, s) => a + s.month, 0) / list.length;
+    const early = meltOut.slice(0, k);
+    const late = meltOut.slice(-k);
+    const weeks = Math.round((avg(late) - avg(early)) * 4.35);
+    const span = (list) => `${list[0].year}–${list[list.length - 1].year}`;
+    if (Math.abs(weeks) < 2) return `Der Schnee schmilzt ${span(late)} etwa zur selben Zeit wie ${span(early)}.`;
+    return `Der Schnee schmilzt ${span(late)} im Mittel rund ${Math.abs(weeks)} Wochen ${weeks < 0 ? 'früher' : 'später'} als ${span(early)}.`;
+  }
+
+  function renderSnow(spot, data) {
+    const sat = data.satellite;
+    const parts = [];
+    if (data.glacier && data.glacier.distanceM !== null && data.glacier.distanceM <= 3000) {
+      parts.push(el('p', { class: 'small', text: `${data.glacier.name || 'Gletscher'}: Eisrand ${data.glacier.latestYear} ${data.glacier.distanceM >= 1000 ? `${(data.glacier.distanceM / 1000).toFixed(1).replace('.', ',')} km` : `${data.glacier.distanceM} m`} entfernt.` }));
+    }
+    if (sat.meltOut.length) {
+      parts.push(meltChart(sat.meltOut));
+      const trend = meltTrend(sat.meltOut);
+      if (trend) parts.push(el('p', { class: 'melt-trend', text: trend }));
+    }
+    if (sat.status === 'pending') parts.push(el('p', { class: 'context-loading', text: 'Satellitendaten (Schnee) werden geladen …' }));
+    else if (sat.status === 'offline' && !sat.meltOut.length) parts.push(el('p', { class: 'context-loading', text: 'Satellitendaten derzeit nicht erreichbar.' }));
+    parts.push(archiveForm(spot));
+    parts.push(el('p', {
+      class: 'hint',
+      text: 'Schneeschmelze: der erste Monat von März bis August, in dem die Szenenklassifikation von Sentinel-2 im Umkreis von rund 40 m weniger als die Hälfte Schnee zeigt, in Jahren mit weissem Winter. '
+        + 'Eine frühere Ausaperung verlängert die Vegetationszeit und begünstigt die Verbuschung von Alpweiden.',
+    }));
+    return parts;
+  }
+
   function renderGlacier(spot, data) {
     const wrap = $('glacier-wrap');
     const body = $('glacier-body');
     const isGlacier = data.landscape === 'gletscher';
+    $('glacier-title').textContent = data.landscape === 'gebirge' ? 'Schnee' : 'Gletscher';
+    if (data.landscape === 'gebirge') {
+      body.replaceChildren(...renderSnow(spot, data));
+      wrap.hidden = false;
+      return;
+    }
     if (!isGlacier && !data.glacier) { wrap.hidden = true; return; }
     const parts = [];
     const g = data.glacier;
@@ -185,7 +257,7 @@
     const data = await api(`/api/spots/${spot.id}/glacier`).catch(() => null);
     if (my !== token || state.spot?.id !== spot.id || !data) return;
     renderGlacier(state.spot, data);
-    if (data.landscape === 'gletscher' && data.satellite.status === 'pending' && polls < 30) {
+    if (['gletscher', 'gebirge'].includes(data.landscape) && data.satellite.status === 'pending' && polls < 30) {
       pollTimer = setTimeout(() => { if (state.spot?.id === spot.id) load(state.spot, polls + 1); }, polls < 5 ? 2000 : 5000);
     }
   }
@@ -203,6 +275,7 @@
   loadSpots = async function loadSpotsWithLegend(...args) { // eslint-disable-line no-global-assign
     const r = await baseLoadSpots(...args);
     $('legend-ice').hidden = !(state.spots || []).some((s) => s.landscape === 'gletscher');
+    $('legend-rock').hidden = !(state.spots || []).some((s) => s.landscape === 'gebirge');
     return r;
   };
 

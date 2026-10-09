@@ -245,6 +245,14 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
       return { x: a.x - 4, y: a.y - 4, width: a.width + 8, height: b.bottom - a.y + 12 };
     });
     await page.screenshot({ path: out('gletscher-vergleich.jpg'), clip, ...jpg });
+    // A mountain spot: the alpine pasture with the snow melt per year.
+    const pasture = await page.evaluate(() => state.spots.find((s) => s.landscape === 'gebirge')?.id);
+    await page.evaluate((id) => openSpot(id), pasture);
+    await settle(page, 3500);
+    await page.evaluate(() => document.querySelector('#glacier-title')?.scrollIntoView({ block: 'start' }));
+    await page.evaluate(() => { document.querySelector('#panel').scrollTop -= 80; });
+    await settle(page, 2000);
+    await page.locator('#panel').screenshot({ path: out('gebirge.jpg'), ...jpg });
     await gctx.close();
   }
 

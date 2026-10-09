@@ -130,7 +130,9 @@ Sturmschaden/Windwurf, Borkenkäfer, Trockenschaden, Totholz,
 Holzschlag, Verjüngung, Neophyt, Weg/Erosion, dazu eine Notiz. Die Karte lässt sich danach filtern.
 An Gletscher-Spots stehen andere Beobachtungen zur Wahl (siehe [Landschaften](#landschaftsprofile)):
 Gletscherzunge/Rückzug, Gletschersee, Spalten/Séracs, Schuttbedeckung, Toteis/Einbruch,
-Felssturz/Steinschlag, Murgang, Pioniervegetation im Vorfeld und Weg/Erosion.
+Felssturz/Steinschlag, Murgang, Pioniervegetation im Vorfeld und Weg/Erosion; an Gebirge-Spots
+Felssturz, Murgang, Lawine/Lawinenzug, Rutschung/Hangmure, Permafrost/Blockgletscher, Verbuschung der
+Alpweide, Neophyt und Weg/Erosion.
 
 ### Installierbare App mit Offline-Upload
 
@@ -565,6 +567,7 @@ Veränderungen und die Geschichte, die der Satellit erzählt. Dafür hat jeder S
 |--------|---------------|---------------|----------|
 | **Wald** (Standard) | Sturmschaden, Borkenkäfer, Trockenschaden, Totholz, Holzschlag, Verjüngung, frühe Verfärbung, Frost, Neophyt, Weg | Windwurf, Auflichtung, Verfärbung, neuer Bewuchs | NDVI, NDMI, Frühwarnung |
 | **Gletscher** | Gletscherzunge/Rückzug, Gletschersee, Spalten, Schuttbedeckung, Toteis, Felssturz, Murgang, Pioniervegetation, Weg | nur «Veränderung», ohne Waldklassen | Eis im Spätsommer |
+| **Gebirge** | Felssturz, Murgang, Lawine, Rutschung, Permafrost, Verbuschung der Alpweide, Neophyt, Weg | nur «Veränderung», ohne Waldklassen | NDVI, NDMI und Schneeschmelze |
 
 So kommt ein Spot zu seinem Profil:
 
@@ -572,7 +575,9 @@ So kommt ein Spot zu seinem Profil:
   Formular zeigt dann nur die Beobachtungen dieses Profils.
 - **Automatisch**: Liegt ein neuer Spot auf dem Eis eines Gletscherinventars, in einem früheren Inventar
   oder höchstens 500 m vom Eis des neusten Inventars entfernt, wird er ein Gletscher-Spot (Gletscherumrisse
-  siehe unten). Ohne Umrisse bleibt ein Spot ohne Wahl ein Wald-Spot.
+  siehe unten). Liegt ein Spot über 2100 m ü. M. (`GEBIRGE_AB_M`) und gibt es dort keine Baumarten und keine
+  Wald-Beobachtungen, wird er ein Gebirge-Spot, sobald seine Höhe bekannt ist (Höhenmodell oder von Hand);
+  ein Lärchenwald an der Waldgrenze bleibt Wald. Sonst bleibt ein Spot ohne Wahl ein Wald-Spot.
 - **Von Hand**: Im Spot steht unter den Koordinaten das Profil mit seiner Herkunft (*Standard*, *beim
   Hochladen gewählt*, *erkannt an den Gletscherumrissen*, *von Hand gesetzt*); *ändern* setzt es neu,
   *automatisch* lässt es wieder bestimmen.
@@ -590,7 +595,8 @@ Ausserhalb des Waldes:
 - fallen Herbstfärbung, Baumarten und die Kronendach-Deckung weg; der Grünanteil der Fotos bleibt (er
   zeigt, wie Pflanzen ein Gletschervorfeld besiedeln).
 
-Auf der Karte haben Gletscher-Spots einen blauen Marker; der Filter oben links hat eine Gruppe *Landschaft*.
+Auf der Karte haben Gletscher-Spots einen blauen, Gebirge-Spots einen braunen Marker; der Filter oben links
+hat eine Gruppe *Landschaft*.
 
 ### Gletscherumrisse
 
@@ -638,9 +644,22 @@ die Klassifikation zwar mit, brauchen sie aber nicht.
 - Schuttbedecktes Eis sieht der Satellit als Fels: Dort zeigt der Anteil weniger Eis, als da ist.
 - Nur Sentinel-2 (ab 2017); Landsat liefert keine Klassifikation in dieser Form.
 
+### Schneeschmelze (Gebirge)
+
+Für Gebirge-Spots nutzt die App denselben Schneeanteil der Szenenklassifikation und nennt pro Jahr den Monat
+der **Ausaperung**: den ersten Monat von März bis August, in dem weniger als die Hälfte Schnee liegt, in
+Jahren, deren Winter (Januar, Februar) weiss war. Mit mindestens vier Jahren vergleicht sie die ersten drei
+mit den letzten drei: *Der Schnee schmilzt 2024–2026 im Mittel rund 6 Wochen früher als 2017–2019*. Eine
+frühere Ausaperung verlängert die Vegetationszeit; zusammen mit dem NDVI und der Beobachtung *Verbuschung der
+Alpweide* zeigt das, wie Sträucher eine nicht mehr bestossene Weide erobern. Liegt ein Gletscher näher als
+3 km, nennt der Teil seinen Abstand.
+
+**Grenzen**: Monatswerte, also auf etwa zwei Wochen genau; Wolken im Frühling können einen Monat fehlen
+lassen, dann zählt der nächste.
+
 ### Archivfotos
 
-Alte Aufnahmen vom gleichen Standort zeigen, wie weit das Eis früher reichte. Im Gletscher-Teil eines Spots
+Alte Aufnahmen vom gleichen Standort zeigen, wie weit das Eis früher reichte. Im Gletscher- bzw. Schnee-Teil eines Spots
 nimmt *Archivfoto hinzufügen* einen Scan, eine Postkarte oder ein altes Dia mit einem **Aufnahmedatum von
 Hand** entgegen. Das Datum gilt auch dann, wenn die Datei ein EXIF-Datum (das des Scans) hat, und das Bild
 liegt am Spot, auch wenn die Datei GPS-Daten hat. Es wird wie jedes Foto auf die neuen ausgerichtet und
