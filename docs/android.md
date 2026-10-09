@@ -25,9 +25,10 @@ wie im Browser. Neue Funktionen kommen deshalb ohne neue App-Version: Die App l�
 3. Beim ersten Start zeigt die App ihren **Startbildschirm** und fragt nach der Adresse des Servers (z. B.
    `https://myforrest.example.org`), ausser sie wurde beim Bauen fest eingetragen. *Verbinden* prüft zuerst,
    ob dort ein MyForrest-Server antwortet (`/api/config`), und sagt sonst, was nicht stimmt (Adresse nicht
-   gefunden, Zertifikat, kein MyForrest-Server). Ist der Server später nicht erreichbar und nichts im
-   Offline-Speicher, erscheint wieder der Startbildschirm. Wechseln lässt sich die Adresse über die
-   Verknüpfung *Server wechseln* (lange auf das App-Symbol drücken).
+   gefunden, Zertifikat, kein MyForrest-Server). Auch bei jedem weiteren Start prüft die App den
+   gespeicherten Server zuerst und zeigt so lange den Startbildschirm. Antwortet er nicht, bleibt sie dort,
+   mit *Trotzdem öffnen* für die offline gespeicherten Seiten (z. B. im Wald ohne Empfang). Wechseln lässt
+   sich die Adresse dort oder über die Verknüpfung *Server wechseln* (lange auf das App-Symbol drücken).
 
 Die App braucht einen laufenden MyForrest-Server; ohne ihn zeigt sie nur den Startbildschirm. Wie man einen
 einrichtet: [Tech-Onboarding](tech-onboarding.md) und [Installation](installation.md).

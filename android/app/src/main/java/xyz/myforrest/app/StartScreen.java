@@ -38,16 +38,22 @@ final class StartScreen {
 
   private final Activity activity;
   private final Consumer<String> onConnected;
+  private final Runnable onOffline;
+  private final Button offline;
   private final ScrollView view;
   private final EditText address;
   private final TextView message;
   private final Button connect;
   private final ProgressBar busy;
 
-  /** onConnected gets the checked address (with a trailing slash). */
-  StartScreen(Activity activity, Consumer<String> onConnected) {
+  /**
+   * onConnected gets the checked address (with a trailing slash); onOffline opens the saved server anyway
+   * (its pages may be in the offline storage of the page).
+   */
+  StartScreen(Activity activity, Consumer<String> onConnected, Runnable onOffline) {
     this.activity = activity;
     this.onConnected = onConnected;
+    this.onOffline = onOffline;
 
     LinearLayout box = new LinearLayout(activity);
     box.setOrientation(LinearLayout.VERTICAL);
@@ -103,6 +109,15 @@ final class StartScreen {
     lp.height = dp(52);
     box.addView(connect, lp);
 
+    offline = new Button(activity);
+    offline.setText("Trotzdem öffnen (offline gespeicherte Seiten)");
+    offline.setAllCaps(false);
+    offline.setTextColor(GREEN);
+    offline.setBackgroundColor(Color.TRANSPARENT);
+    offline.setVisibility(View.GONE);
+    offline.setOnClickListener(v -> this.onOffline.run());
+    box.addView(offline, full());
+
     busy = new ProgressBar(activity);
     busy.setIndeterminate(true);
     busy.setVisibility(View.GONE);
@@ -136,8 +151,16 @@ final class StartScreen {
     if (server != null && !server.isEmpty()) address.setText(server.replaceAll("/$", ""));
     message.setText(error == null ? "" : error);
     setBusy(false);
+    // After a failed connection to a known server: its pages may still be offline in the app.
+    offline.setVisibility(error != null && server != null && !server.isEmpty() ? View.VISIBLE : View.GONE);
     view.setVisibility(View.VISIBLE);
     view.bringToFront();
+  }
+
+  /** On start with a saved server: shown while it is checked, the page only loads when it answers. */
+  void connect(String server) {
+    show(server, null);
+    check();
   }
 
   void hide() {
@@ -155,13 +178,14 @@ final class StartScreen {
     while (v.endsWith("/")) v = v.substring(0, v.length() - 1);
     String server = v + "/";
     message.setText("");
+    offline.setVisibility(View.GONE);
     setBusy(true);
     new Thread(() -> {
       String error = probe(server);
       activity.runOnUiThread(() -> {
         setBusy(false);
         if (error == null) onConnected.accept(server);
-        else message.setText(error);
+        else show(server, error);
       });
     }, "server-check").start();
   }
