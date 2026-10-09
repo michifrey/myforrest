@@ -907,9 +907,9 @@ prüfen lassen muss, gibt es **Organisationen**:
   Sperre übersteht so einen Neustart oder ein Deployment und gilt für alle Prozesse auf derselben Datenbank.
   IP- und E-Mail-Adressen stehen dort nur als SHA-256-Hash; Einträge nach Ablauf ihres Zeitfensters (höchstens
   24 Stunden) werden gelöscht.
-- *E-Mail bestätigen*: Nach der Registrierung mit Passwort kommt ein Link per E-Mail (ausser bei einer
-  Registrierung über eine Einladung an dieselbe Adresse, die gilt schon als bestätigt) (24 Stunden gültig,
-  nur der SHA-256 des Tokens steht in der Datenbank; ein neu angeforderter Link ersetzt den alten, höchstens
+- *E-Mail bestätigen*: Nach der Registrierung mit Passwort kommt ein Link per E-Mail; über eine Einladung an
+  dieselbe Adresse entfällt er, weil die Adresse damit schon bestätigt ist. Der Link ist 24 Stunden gültig;
+  in der Datenbank steht nur der SHA-256 des Tokens, ein neu angeforderter Link ersetzt den alten (höchstens
   3 pro Stunde). Bis zur Bestätigung zeigt das Konto-Menü „E-Mail-Adresse noch nicht bestätigt“ und
   *Bestätigungslink senden*. Mit `REQUIRE_VERIFIED_EMAIL=1` braucht es eine bestätigte Adresse für Uploads
   und Änderungen. Fällt der Mailserver aus, gelingt die Registrierung trotzdem; der Link lässt sich später
