@@ -834,6 +834,24 @@ als **Funde** aus (pro Foto die wahrscheinlichste Art, ab einem wählbaren Minde
 - **Hotspots**: Eine Kerndichte-Karte (Gauss-Kern, Radius 30–1000 m einstellbar) zeigt, wo sich Funde aller
   Neophyten, aller Arten oder einer gewählten Art häufen, mit Legende in Funden pro km². Die Spot-Marker
   weichen solange den einzelnen Funden; ein Klick auf einen Fund öffnet sein Foto.
+- **Suchaufwand berücksichtigen**: Wo viel fotografiert wird, gibt es auch mehr Funde. *Dichte: Funde pro 100
+  Fotos* teilt deshalb die Kerndichte der Funde durch dieselbe Kerndichte aller Fotos (an den Spots, mit ihrer
+  Anzahl Fotos) und zeigt das Verhältnis nur dort, wo mindestens 3 Fotos in der Nähe entstanden sind. Ein Ort, an
+  dem jedes zweite Foto Springkraut zeigt, fällt dann stärker auf als ein viel begangener Weg mit gleich vielen
+  Funden unter vielen Fotos.
+
+![Funde pro 100 Fotos: Neophyten-Hotspots mit Korrektur für den Suchaufwand](screenshots/arten-suchaufwand.jpg)
+
+- **Prüfen**: Verifizierte PRO-Mitglieder (z. B. Neobiota-Fachstellen, Forstdienst) und die Moderation prüfen
+  im Tab *Prüfen* die automatischen Bestimmungen, die neusten zuerst, mit Foto und allen Kandidaten von
+  Pl@ntNet: **bestätigen**, auf eine andere Art **korrigieren** (ein anderer Kandidat oder ein lateinischer Name)
+  oder **ablehnen** (kein Pflanzenfund, nicht bestimmbar). Die eigenen Fotos prüft jemand anderes (vier Augen);
+  nur die Moderation darf auch eigene. Abgelehnte Funde verschwinden aus Karte, Ausbreitung, Export und
+  Geodiensten; korrigierte zählen unter der neuen Art; bestätigte und korrigierte zählen unabhängig vom
+  Pl@ntNet-Score. Wer geprüft hat oder die Moderation kann die Prüfung zurücknehmen.
+
+![Automatische Bestimmungen prüfen: bestätigen, korrigieren oder ablehnen](screenshots/arten-pruefen.jpg)
+
 - **Ausbreitungsfronten**: Pro Art die besiedelte Fläche Jahr für Jahr als ineinanderliegende Umrisse
   (Alpha-Shape aller Funde bis zu diesem Jahr, jeder Fund um 25 m gepuffert), eingefärbt nach Jahr, mit
   Zeitregler und Abspielen. Die Alpha-Shape folgt dem tatsächlichen Bestand: Sie zerfällt in
@@ -864,9 +882,11 @@ als **Funde** aus (pro Foto die wahrscheinlichste Art, ab einem wählbaren Minde
   `coordinateUncertaintyInMeters` je nach Verortung, `basisOfRecord=HumanObservation`, Pl@ntNet-Score in
   `identificationRemarks`, Foto-URL in `associatedMedia`, Lizenz pro Foto, sobald es dafür eine Spalte gibt)
   und im **CSV-Importformat von iNaturalist** herunterladen. Filter: Art, nur Neophyten, Mindest-Score,
-  Kartenausschnitt, Zeitraum. Direkt zu iNaturalist oder Info Flora hochladen geht nicht, dafür bräuchte es dort
-  ein Konto und eine OAuth-Anmeldung. iNaturalist übernimmt beim CSV-Import keine Fotos, deshalb steht der
-  Foto-Link in der Beschreibung. Alle Bestimmungen sind automatisch und als `unverified` markiert.
+  Kartenausschnitt, Zeitraum und **nur von Menschen geprüfte Funde**. Direkt zu iNaturalist oder Info Flora hochladen
+  geht nicht, dafür bräuchte es dort ein Konto und eine OAuth-Anmeldung. iNaturalist übernimmt beim CSV-Import keine
+  Fotos, deshalb steht der Foto-Link in der Beschreibung. Geprüfte Funde stehen als `verified` in der Datei
+  (`identifiedBy`: *Pl@ntNet (automatisch), von Hand geprüft*, in `identificationRemarks` bestätigt oder korrigiert
+  samt Datum und dem Vorschlag von Pl@ntNet), die übrigen als `unverified`.
 
 ## Offene Geodaten für GIS und Geoportale
 

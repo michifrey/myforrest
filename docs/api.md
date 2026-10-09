@@ -125,8 +125,11 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 
 | `POST`   | `/api/photos/:id/identify`   | Pflanzen bestimmen (Pl@ntNet)                            |
 | `GET`    | `/api/species`               | Arten mit Funden: Anzahl, Spots, Jahre, Neophyt ja/nein  |
-| `GET`    | `/api/occurrences`           | Funde (bestes Pl@ntNet-Ergebnis pro Foto). Filter für diese und die folgenden Routen: `species`, `neophytes=1`, `minScore` (Standard 0,2), `bbox=west,süd,ost,nord`, `from`/`to` (Datum) |
+| `GET`    | `/api/occurrences`           | Funde (bestes Pl@ntNet-Ergebnis pro Foto). Filter für diese und die folgenden Routen: `species`, `neophytes=1`, `minScore` (Standard 0,2), `bbox=west,süd,ost,nord`, `from`/`to` (Datum), `verified=1` (nur von Menschen geprüfte). Jeder Fund trägt `verification` (`bestaetigt`, `korrigiert` oder `null`); abgelehnte fehlen |
 | `GET`    | `/api/spread?species=`       | Ausbreitungsfronten einer Art: Umriss (`polygons` mit Lücken), Fläche, Teilbestände und Frontabstand pro Jahr, Rate und Richtung, dazu `patches` mit Rate, Richtung, Flächenzuwachs, Sprung und Zusammenwachsen (`until`, `mergedInto`, `absorbed`) pro Teilbestand, Umriss pro Jahr (`buffer` in m, Standard 25; `alpha` in m, Standard automatisch; `shape=convex` für die konvexe Hülle) |
+| `GET`    | `/api/identifications/review` | Prüfliste (PRO und Moderation): ungeprüfte Funde, neuste zuerst, mit allen Pl@ntNet-Kandidaten und `own` (eigenes Foto) |
+| `PUT`    | `/api/photos/:id/identification-review` | Bestimmung prüfen: `{ status: 'bestaetigt' \| 'abgelehnt' }` oder `{ status: 'korrigiert', scientificName }`; nicht das eigene Foto (ausser Moderation) |
+| `DELETE` | `/api/photos/:id/identification-review` | Prüfung zurücknehmen (wer geprüft hat oder Moderation) |
 | `GET`    | `/api/export/dwc.csv`        | Funde als Darwin-Core-Occurrence-CSV (Info Flora, GBIF)  |
 | `GET`    | `/api/export/inaturalist.csv` | Funde im CSV-Importformat von iNaturalist               |
 | `GET`    | `/api/spots/:id/vegetation`  | Grünanteil, Kronendach-Deckung, Lückenanteil und GCC pro Foto (`pending`: noch in Berechnung) |

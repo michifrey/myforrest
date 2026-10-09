@@ -211,8 +211,10 @@ Wetter, Tageszeit und Körperwärme, erst ab drei Touren von zwei Personen pro 1
 *Arten & Neophyten* wertet die Pflanzenbestimmungen als Funde aus. **Hotspots** (links) zeigen als
 Kerndichte-Karte, wo sich Funde aller Neophyten, aller Arten oder einer Art häufen. **Ausbreitung** (rechts)
 zeichnet pro Art die besiedelte Fläche Jahr für Jahr, verfolgt einzelne Teilbestände und schätzt Tempo und
-Richtung, im Beispiel das Drüsige Springkraut entlang eines Bachs mit ~180 m pro Jahr. Unter *Export*
-gehen die Funde als Darwin-Core-CSV an Info Flora und GBIF oder als CSV an iNaturalist.
+Richtung, im Beispiel das Drüsige Springkraut entlang eines Bachs mit ~180 m pro Jahr. *Funde pro 100 Fotos*
+gleicht aus, dass an viel begangenen Orten auch mehr gefunden wird. Fachstellen mit PRO-Konto und die Moderation
+**prüfen** die automatischen Bestimmungen (bestätigen, korrigieren, ablehnen). Unter *Export* gehen die Funde als
+Darwin-Core-CSV an Info Flora und GBIF oder als CSV an iNaturalist, auf Wunsch nur die geprüften.
 
 ### 9. Vektorkarten für GIS und Geoportale
 

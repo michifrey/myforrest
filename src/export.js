@@ -72,9 +72,9 @@ function darwinCoreCsv(occurrences, { base }) {
       coordinateUncertaintyInMeters: o.uncertaintyM,
       georeferenceRemarks: GEOREF[o.locationSource] || '',
       establishmentMeans: o.neophyte ? 'introduced' : '',
-      identifiedBy: 'Pl@ntNet (automatisch)',
-      identificationVerificationStatus: 'unverified',
-      identificationRemarks: scoreText(o.score),
+      identifiedBy: o.verification ? 'Pl@ntNet (automatisch), von Hand geprüft (MyForrest)' : 'Pl@ntNet (automatisch)',
+      identificationVerificationStatus: o.verification ? 'verified' : 'unverified',
+      identificationRemarks: reviewText(o),
       occurrenceRemarks: o.note || '',
       associatedMedia: mediaUrl(base, o),
       license: o.license || '',
@@ -83,10 +83,18 @@ function darwinCoreCsv(occurrences, { base }) {
   return toCsv(DWC_COLUMNS, rows);
 }
 
+/** Score text, plus the human review: confirmed, or corrected from Pl@ntNet's proposal. */
+function reviewText(o) {
+  const day = o.reviewedAt ? ` am ${new Date(o.reviewedAt).toISOString().slice(0, 10)}` : '';
+  if (o.verification === 'korrigiert') return `Von Hand korrigiert${day} (Pl@ntNet schlug ${o.plantnetName} vor)`;
+  if (o.verification === 'bestaetigt') return `${scoreText(o.score)}, von Hand bestätigt${day}`;
+  return scoreText(o.score);
+}
+
 /** iNaturalist bulk-import CSV for the given occurrences. */
 function inaturalistCsv(occurrences, { base }) {
   const rows = occurrences.map((o) => {
-    const parts = [scoreText(o.score)];
+    const parts = [reviewText(o)];
     if (o.neophyte) parts.push(`Invasiver Neophyt: ${o.neophyte}`);
     if (o.note) parts.push(o.note);
     parts.push(`Foto: ${mediaUrl(base, o)}`);

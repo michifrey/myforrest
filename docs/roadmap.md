@@ -52,9 +52,8 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 - **Vegetationsdichte verfeinern**: Himmel und Vegetation mit einem Segmentierungsmodell statt Farbregeln
   trennen (Schnee, helle Felsen und Mauern gelten heute teils als Himmel); Kennzahlen nur im Bildteil
   vergleichen, den alle Fotos eines Spots abdecken.
-- **Arten und Neophyten**: direkter Upload über die APIs (OAuth-Konto bei iNaturalist bzw. Info Flora),
-  Bestätigung der automatischen Bestimmungen durch Menschen vor dem Export und eine Korrektur für
-  ungleich verteilten Suchaufwand.
+- **Arten und Neophyten**: direkter Upload über die APIs (OAuth-Konto bei iNaturalist bzw. Info Flora); den
+  Suchaufwand auch aus Touren statt nur aus Fotos schätzen und in den Ausbreitungsfronten berücksichtigen.
 
 ## Phase 4: Betrieb und Geodienste
 
@@ -106,6 +105,8 @@ Aus früheren Versionen dieser Roadmap:
   Austrieb der Region
 - Nächtliche Abkühlung in Senken aus Wind und Bewölkung
 - Hotspot-Karten, Ausbreitungsfronten und Datei-Export zu Info Flora / iNaturalist
+- Bestimmungen von Fachleuten prüfen lassen (bestätigen, korrigieren, ablehnen), Export nur geprüfter Funde, Hotspots
+  pro 100 Fotos gegen ungleichen Suchaufwand
 - Satellitenkontext: NDMI, Frühwarnung ohne neue Fotos, Landsat vor 2017, Sturm als Kontext
 - Kalibrierung der Frühwarnung und der Rückgänge zwischen Fotos an bestätigten Schäden, geprüft mit
   Kreuzvalidierung nach Spots, getrennt für Laub- und Nadelwald

@@ -1639,3 +1639,11 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
   border: 1px solid color-mix(in srgb, var(--damage) 35%, transparent);
 }
 .storm-banner p { margin: 0 0 0.3rem; }
+
+/* Review of automatic identifications (hotspots.js, tab "Prüfen") */
+.sp-review-list { list-style: none; margin: 0.4rem 0 0; padding: 0; display: grid; gap: 0.6rem; }
+.sp-review-item { display: grid; grid-template-columns: 72px 1fr; gap: 0.6rem; align-items: start; }
+.sp-review-thumb { padding: 0; border: 0; background: none; cursor: pointer; }
+.sp-review-thumb img { width: 72px; height: 54px; object-fit: cover; border-radius: 8px; display: block; }
+.sp-review-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin-top: 0.3rem; }
+.sp-review-actions select { max-width: 11rem; font-size: 0.82rem; }
