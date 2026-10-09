@@ -14,6 +14,7 @@
  *                                        around wildlife rest areas in their protection period (WILDRUHE_GEOJSON)
  *   GET    /api/wildlife-zones?bbox=    those areas as GeoJSON, for the map
  *   GET/POST/DELETE /api/closures       temporary closures during forestry work (src/closures.js)
+ *   GET    /api/cool-cells?bbox=        map of cool stretches from shared tour temperatures (src/coolmap.js)
  *   POST   /api/route-suggestions       photo requests and spots worth a visit near a route (satellite early warning,
  *                                       series not continued for a year); the route is not stored
  *   GET    /api/photo-requests          open (and recently done) requests
@@ -40,6 +41,7 @@ const { parseTrackFile, toGpx, MAX_POINTS } = require('../trackfile');
 const { createWildlife } = require('../wildlife');
 const { createClosures } = require('../closures');
 const { lengthM, bbox, nearRoute, trimEnds, sampleAlong, climb } = require('../routegeo');
+const { createCoolMap, CELL_M, MIN_TOURS, MIN_PEOPLE } = require('../coolmap');
 
 const KINDS = ['gezeichnet', 'aufgezeichnet', 'importiert'];
 const VISIBILITY = ['privat', 'oeffentlich'];
@@ -95,7 +97,11 @@ const REQUEST_MIGRATIONS = [
 ];
 const REQUEST_DAYS = [7, 30, 90, 365];
 // Tours: sensor sums from FIT files (owner only).
-const TRACK_MIGRATIONS = [['sensors_json', 'TEXT']];
+const TRACK_MIGRATIONS = [
+  ['sensors_json', 'TEXT'],
+  // The owner shares the tour's temperatures, anonymously, for the map of cool stretches (src/coolmap.js).
+  ['share_temp', 'INTEGER NOT NULL DEFAULT 0'],
+];
 
 /** Sensor sums as sent by the client (from /api/tracks/parse) → checked copy, or null. */
 function readSensors(input) {
@@ -164,9 +170,11 @@ module.exports = function registerTracks(app, ctx) {
   const elevation = ctx.elevation || null;
   const push = ctx.push || null;
   const closures = createClosures(db);
+  let coolMap = null; // after the migrations below
   db.exec(SCHEMA);
   const trackCols = new Set(db.prepare('PRAGMA table_info(tracks)').all().map((c) => c.name));
   for (const [col, type] of TRACK_MIGRATIONS) if (!trackCols.has(col)) db.exec(`ALTER TABLE tracks ADD COLUMN ${col} ${type}`);
+  coolMap = createCoolMap(db, { unpack: unpackPoints });
   const reqCols = new Set(db.prepare('PRAGMA table_info(photo_requests)').all().map((c) => c.name));
   for (const [col, type] of REQUEST_MIGRATIONS) if (!reqCols.has(col)) db.exec(`ALTER TABLE photo_requests ADD COLUMN ${col} ${type}`);
   // What the request may see; without the accounts module (tests of this file alone): the public view.
@@ -188,6 +196,8 @@ module.exports = function registerTracks(app, ctx) {
   const mayRead = (user, t) => t.visibility === 'oeffentlich' || (user && (user.id === t.owner_id || isModerator(user)));
   const mayWrite = (user, t) => Boolean(user && (user.id === t.owner_id || isModerator(user)));
 
+  const hasTemp = (t) => Boolean(t.sensors_json && JSON.parse(t.sensors_json).some((x) => x.key === 'temp'));
+
   function summary(t, user) {
     const own = Boolean(user && user.id === t.owner_id);
     return {
@@ -205,6 +215,9 @@ module.exports = function registerTracks(app, ctx) {
       hasTime: Boolean(t.started_at),
       // Heart rate and the like: health data, for the owner only.
       sensors: own && t.sensors_json ? JSON.parse(t.sensors_json) : null,
+      // Temperatures along the tour, shared anonymously for the map of cool stretches (owner only).
+      hasTemp: own ? hasTemp(t) : null,
+      shareTemp: own ? Boolean(t.share_temp) : null,
       owner: t.visibility === 'oeffentlich' ? ownerName.get(t.owner_id)?.name ?? null : null,
       own,
       createdAt: new Date(t.created_at).toISOString(),
@@ -265,12 +278,13 @@ module.exports = function registerTracks(app, ctx) {
     const now = Date.now();
     const id = Number(db.prepare(`
       INSERT INTO tracks (owner_id, name, kind, activity, visibility, points_json, distance_m, start_lat, start_lon,
-                          min_lat, min_lon, max_lat, max_lon, started_at, ended_at, created_at, updated_at, sensors_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                          min_lat, min_lon, max_lat, max_lon, started_at, ended_at, created_at, updated_at, sensors_json, share_temp)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(req.user.id, clean(b.name, 120) || 'Tour', kind, clean(b.activity, 40), visibility, packPoints(points),
       lengthM(points), points[0].lat, points[0].lon, s, w, n, e,
       times.length ? Math.min(...times) : null, times.length ? Math.max(...times) : null, now, now,
-      kind === 'importiert' && readSensors(b.sensors) ? JSON.stringify(readSensors(b.sensors)) : null).lastInsertRowid);
+      kind === 'importiert' && readSensors(b.sensors) ? JSON.stringify(readSensors(b.sensors)) : null,
+      b.shareTemp === true && points.some((p) => p.temp !== undefined) ? 1 : 0).lastInsertRowid);
     const t = db.prepare('SELECT * FROM tracks WHERE id = ?').get(id);
     res.status(201).json({ ...summary(t, req.user), points });
   });
@@ -300,9 +314,16 @@ module.exports = function registerTracks(app, ctx) {
     if (!mayWrite(req.user, t)) return fail(res, req.user ? 403 : 401, 'Nur die eigene Tour lässt sich ändern');
     const b = req.body || {};
     if (b.visibility !== undefined && !VISIBILITY.includes(b.visibility)) return fail(res, 400, 'Sichtbarkeit muss privat oder oeffentlich sein');
+    // Sharing temperatures: only the owner decides, and only for a tour that has some.
+    let share = null;
+    if (b.shareTemp !== undefined) {
+      if (req.user.id !== t.owner_id) return fail(res, 403, 'Nur wer die Tour gespeichert hat, teilt ihre Temperaturen');
+      if (b.shareTemp && !hasTemp(t)) return fail(res, 400, 'Die Tour hat keine Temperaturen');
+      share = b.shareTemp ? 1 : 0;
+    }
     db.prepare(`UPDATE tracks SET name = COALESCE(?, name), activity = CASE WHEN ? THEN ? ELSE activity END,
-      visibility = COALESCE(?, visibility), updated_at = ? WHERE id = ?`)
-      .run(clean(b.name, 120), b.activity !== undefined ? 1 : 0, clean(b.activity, 40), b.visibility ?? null, Date.now(), id);
+      visibility = COALESCE(?, visibility), share_temp = COALESCE(?, share_temp), updated_at = ? WHERE id = ?`)
+      .run(clean(b.name, 120), b.activity !== undefined ? 1 : 0, clean(b.activity, 40), b.visibility ?? null, share, Date.now(), id);
     res.json(summary(trackById.get(id), req.user));
   });
 
@@ -312,7 +333,19 @@ module.exports = function registerTracks(app, ctx) {
     if (!t || !mayRead(req.user, t)) return fail(res, 404, 'Tour nicht gefunden');
     if (!mayWrite(req.user, t)) return fail(res, req.user ? 403 : 401, 'Nur die eigene Tour lässt sich löschen');
     db.prepare('DELETE FROM tracks WHERE id = ?').run(id);
+    coolMap.forget(id);
     res.status(204).end();
+  });
+
+  /* ---------- Map of cool stretches (shared tour temperatures) ---------- */
+
+  app.get('/api/cool-cells', (req, res) => {
+    const box = String(req.query.bbox || '').split(',').map(Number);
+    if (box.length !== 4 || !box.every(Number.isFinite) || box[0] >= box[2] || box[1] >= box[3]) {
+      return fail(res, 400, 'bbox: west,süd,ost,nord');
+    }
+    if (box[2] - box[0] > 0.5 || box[3] - box[1] > 0.3) return fail(res, 400, 'Ausschnitt zu gross – bitte näher heranzoomen');
+    res.json({ cells: coolMap.cells(box), cellM: CELL_M, minTours: MIN_TOURS, minPeople: MIN_PEOPLE });
   });
 
   /* ---------- Routing along paths (optional) ---------- */

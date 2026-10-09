@@ -738,6 +738,29 @@ und ein beliebiges Datum in Vergangenheit oder Zukunft:
 Der Tagesverlauf lässt sich mit dem Schieberegler, im Diagramm oder per Abspielen durchgehen. Der
 Sonnenstand wird lokal berechnet (NOAA-Algorithmus) und funktioniert für jedes Datum.
 
+### Kühle Abschnitte aus Touren
+
+*Kühle Abschnitte aus Touren* im Panel von *Sonne & Wetter* legt eine Karte über die Umgebung: Zellen von
+100 m, blau wo es kühler, rot wo es wärmer ist (bis ±2 °C, mit Tooltip). Sie entsteht aus den Temperaturen,
+die Sportuhren auf Touren messen und die ihre Besitzer teilen (siehe [Touren](#touren-und-fotoaufträge)).
+
+Eine einzelne Uhr kennt weder Wetter noch Tageszeit und sitzt am warmen Handgelenk. Deshalb zählt pro Tour
+nur, wie viel wärmer oder kühler eine Stelle war als der Rest **derselben Tour**:
+
+1. **Trägheit**: Der Fühler reagiert langsam; der Wert 60 s später gehört zur Stelle, an der man war.
+2. **Wetter und Tageszeit**: Eine Gerade durch Temperatur über Zeit (kleinste Quadrate) ist das Niveau der
+   Tour und ihr Verlauf (ein Morgenlauf wird wärmer). Was übrig bleibt, ist die örtliche Abweichung; die
+   Körperwärme steckt im Niveau und fällt mit heraus.
+3. Jede Tour zählt pro Zelle **einmal** (ihr Mittel dort), eine lange Pause wiegt nicht mehr als ein
+   Vorbeilaufen.
+
+Eine Zelle erscheint erst mit **mindestens 3 Touren von mindestens 2 Personen**, als Mittel ihrer Werte.
+Sie trägt keine Zeiten und keine Namen; die ersten und letzten 200 m jeder Tour zählen nicht. Die Ebene
+erscheint ab Zoom 13; der Schalter bleibt im Browser gespeichert. So zeigen sich mit der Zeit schattige
+Waldstücke, Bachtobel und Kaltluftsenken neben sonnigen Wiesen und Südhängen.
+
+![Kühle Abschnitte aus Touren: der Wald und ein Bachtobel kühler, eine Wiese wärmer](screenshots/kuehle-abschnitte.jpg)
+
 ### Horizontabschattung
 
 Der Geländehorizont (Copernicus-Höhenmodell über Open-Meteo, 36 Richtungen,
@@ -964,6 +987,12 @@ wird.
   (z. B. Garmin Tempe) misst genauer.
 
 ![Temperatur entlang einer Laufrunde: kühler im Wald, die Strecke ist danach eingefärbt](screenshots/sensoren-entlang.jpg)
+
+- **Temperatur teilen**: Hat eine Tour Temperaturen, bietet das Panel beim Speichern *Temperatur anonym zur Karte
+  kühler Abschnitte beitragen* an (aus, bis man es wählt); in *Meine Touren* lässt es sich mit *Temperatur
+  teilen* bzw. *nicht mehr teilen* jederzeit ändern. Geteilt werden nur die Abweichungen in 100-m-Zellen, ohne
+  Zeiten und ohne die Enden der Tour, und erst zusammen mit anderen sichtbar (siehe
+  [Kühle Abschnitte aus Touren](#kühle-abschnitte-aus-touren)). Puls und die übrigen Werte bleiben privat.
 
 - **Exportieren**: jede Route als GPX, mit Höhe und Zeit, wo vorhanden.
 - **Höhenprofil**: Unter der Länge zeigt das Panel das Profil der Route mit Auf- und Abstieg und tiefstem

@@ -496,6 +496,7 @@
         kind: T.route.kind,
         activity: $('tour-activity').value || null,
         visibility: $('tour-public').checked ? 'oeffentlich' : 'privat',
+        shareTemp: !$('tour-share-temp-wrap').hidden && $('tour-share-temp').checked,
         points: pts.map((p) => {
           const row = [p.lat, p.lon, p.ele ?? null, p.time ?? null];
           const sensors = Object.fromEntries(Object.keys(SERIES).filter((k) => Number.isFinite(p[k])).map((k) => [k, p[k]]));
@@ -808,6 +809,15 @@
           renderMine();
           if (T.showPublic) loadPublic();
         } }),
+        t.hasTemp ? el('button', {
+          type: 'button', class: 'link small', 'aria-pressed': String(t.shareTemp),
+          title: 'Anonym zur Karte kühler Abschnitte (Sonne & Wetter) beitragen',
+          text: t.shareTemp ? 'Temperatur nicht mehr teilen' : 'Temperatur teilen',
+          onclick: async () => {
+            await json(`/api/tracks/${t.id}`, { shareTemp: !t.shareTemp }, 'PATCH');
+            renderMine();
+          },
+        }) : '',
         t.hasTime ? el('button', { type: 'button', class: 'link small', text: 'Fotos zuordnen', onclick: () => {
           T.uploadTour = t.id;
           $('open-upload').click();
@@ -961,6 +971,8 @@
           el('label', { for: 'tour-activity', class: 'sr-only', text: 'Aktivität' }),
           el('select', { id: 'tour-activity' }),
           el('label', { class: 'toggle small' }, [el('input', { type: 'checkbox', id: 'tour-public' }), ' öffentlich (ohne Zeiten und ohne die ersten und letzten 200 m)']),
+          el('label', { class: 'toggle small', id: 'tour-share-temp-wrap', hidden: '' }, [el('input', { type: 'checkbox', id: 'tour-share-temp' }),
+            ' Temperatur anonym zur Karte kühler Abschnitte beitragen (ohne Zeiten, ohne die ersten und letzten 200 m)']),
           el('button', { type: 'button', id: 'tour-save', class: 'btn primary', text: 'Tour speichern' }),
         ]),
         el('p', { id: 'tour-status', class: 'small tour-status', 'aria-live': 'polite' }),
@@ -1018,6 +1030,7 @@
     $('tour-follow-wrap').hidden = !state.config.routing || Boolean(r.raw);
     if (!$('tour-name').matches(':focus')) $('tour-name').value = r.name || '';
     $('tour-save').disabled = pts.length < 2 || Boolean(T.recorder) || Boolean(r.savedId);
+    $('tour-share-temp-wrap').hidden = Boolean(r.savedId) || !pts.some((p) => Number.isFinite(p.temp));
     $('tour-gpx').disabled = pts.length < 2;
     $('tour-offline-save').disabled = !window.offlineMap?.supported() || pts.length < 2;
     $('tour-undo').disabled = !pts.length || Boolean(T.recorder);
