@@ -711,6 +711,7 @@
         el('div', { class: 'tour-modes', role: 'group', 'aria-label': 'Route erfassen' }, [
           el('button', { type: 'button', id: 'tour-draw', class: 'secondary', 'aria-pressed': 'true', text: 'Zeichnen' }),
           el('button', { type: 'button', id: 'tour-record', class: 'secondary', text: 'Aufzeichnen' }),
+          el('button', { type: 'button', id: 'tour-drive', class: 'secondary', title: 'Handy als Dashcam im Auto: Bilder und Route automatisch', text: 'Fahrtmodus', onclick: () => window.Drive?.open() }),
           el('label', { class: 'secondary file-btn', for: 'tour-file', text: 'Importieren' }),
           el('input', { type: 'file', id: 'tour-file', accept: '.gpx,.tcx,.kml,.geojson,.json,application/gpx+xml', hidden: '' }),
         ]),

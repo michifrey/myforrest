@@ -5,11 +5,9 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 
 ## Phase 2: Mehr und bessere Fotos
 
-- **Dashcam im Fahrzeug**: Eine Kamera im Auto des Forstdienstes macht den ganzen Tag alle paar Sekunden ein
-  Bild. Die Fahrt wird automatisch als Route erfasst und die Bilder automatisch hochgeladen. Weil das sehr
-  viele, oft fast gleiche Bilder sind, braucht es Auswahl und Deduplizierung beim Speichern: nur Bilder an
-  bestehenden Spots oder in festen Abständen entlang der Strecke behalten, Standzeiten und Doppelte
-  verwerfen, den Rest nur als Route speichern.
+- **Dashcam ausbauen**: Videos gängiger Dashcams direkt lesen (GPS als NMEA im MP4 bzw. in Begleitdateien,
+  z. B. Viofo, BlackVue), damit sie ohne GPX-Track gehen; Fahrtmodus im Hintergrund (braucht eine native
+  Hülle); Bilder aus dem Auto in der Zeitreise kennzeichnen und auf Wunsch ausblenden.
 
 - **360°-Rohdateien**: Insta360-`.insv` und GoPro-MAX-`.360` direkt lesen (Fischaugen stitchen, GPS aus dem
   Datei-Trailer). Braucht Beispieldateien der Kameras und deren Objektivdaten; bis dahin über den Export
@@ -63,6 +61,8 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 
 Aus früheren Versionen dieser Roadmap:
 
+- Fahrtmodus: das Handy als Dashcam im Auto, Route automatisch, Auswahl und Deduplizierung der Bilder auf dem
+  Gerät
 - Video statt Einzelbilder (GoPro mit GPMF, 360°-MP4, GPX), unscharfe Bilder werden ersetzt oder verworfen
 - 360°-Fotos beim Upload erkennen, Panoramen über eine Drehung der Kugel ausrichten und vergleichen
 - Spots mit gemischten Blickrichtungen auf Wunsch aufteilen

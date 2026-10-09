@@ -716,7 +716,7 @@ async function deletePhoto(p) {
 
 /* ---------- Own profile: figures and photos (also /#profil) ---------- */
 
-const ACTIVITY_LABEL = { joggen: 'Joggen', wandern: 'Wandern', biken: 'Biken', sonstiges: 'Sonstiges' };
+const ACTIVITY_LABEL = { joggen: 'Joggen', wandern: 'Wandern', biken: 'Biken', fahren: 'Fahrt (Dashcam)', sonstiges: 'Sonstiges' };
 const PROFILE_PAGE = 48;
 const profileDialog = el('dialog', { id: 'profile-dialog', class: 'mod-dialog profile-dialog', 'aria-labelledby': 'profile-title' });
 profileDialog.innerHTML = `
