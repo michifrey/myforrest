@@ -15,8 +15,9 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 - **Geschützte Funde**: Pilze per Bild erkennen (braucht ein Modell; Pl@ntNet kennt keine Pilze), die
   kantonalen Listen direkt von den Fachstellen bzw. Info Flora beziehen (sobald es dafür eine offene
   Schnittstelle gibt).
-- **Eigener Routing-Server**: Image von `deploy/brouter` in einer Registry bauen und gegen echte Routing-Daten
-  prüfen, ein eigenes Waldprofil (Forststrassen und Rückegassen bevorzugen, Wildruhezonen meiden).
+- **Eigener Routing-Server**: den ersten Lauf des Image-Workflows und echte Segmente von brouter.de prüfen;
+  die Wildruhezonen regelmässig selbst von geo.admin.ch laden statt aus einer Datei; Rückegassen nach
+  Holzschlag zeitweise sperren.
 - **Touren**: FIT-Dateien direkt lesen, Höhenprofil der Route, Abgleich mit Strava/Komoot per OAuth,
   Aufzeichnung im Hintergrund (braucht eine native Hülle, Browser stoppen GPS im Hintergrund),
   Benachrichtigung, wenn ein eigener Fotoauftrag erledigt wurde, Ablaufdatum für Aufträge.
@@ -61,6 +62,8 @@ Aus früheren Versionen dieser Roadmap:
 - Fahrtmodus: das Handy als Dashcam im Auto, Route automatisch, Auswahl und Deduplizierung der Bilder auf dem
   Gerät; GPS von Dashcam-Videos (NMEA, Novatek) direkt aus der Datei; Fahrtbilder in der Zeitreise markiert
   und ausblendbar
+- Eigener Routing-Server: Waldprofil (Forststrassen und Rückegassen zuerst), Wildruhezonen in der Schutzzeit
+  umgehen, BRouter-Image per GitHub-Workflow in der Registry
 - Video statt Einzelbilder (GoPro mit GPMF, 360°-MP4, GPX), unscharfe Bilder werden ersetzt oder verworfen
 - 360°-Fotos beim Upload erkennen, Panoramen über eine Drehung der Kugel ausrichten und vergleichen
 - Spots mit gemischten Blickrichtungen auf Wunsch aufteilen

@@ -56,6 +56,27 @@
   const requestLayer = L.layerGroup().addTo(map);
   const publicLayer = L.layerGroup();
   const hoverLayer = L.layerGroup();
+  // Wildlife rest areas in their protection period (WILDRUHE_GEOJSON on the server).
+  const wildlifeLayer = L.layerGroup();
+  let wildlifeTimer = null;
+  function loadWildlife() {
+    if (!T.open || !state.config.wildlifeZones) return;
+    clearTimeout(wildlifeTimer);
+    wildlifeTimer = setTimeout(async () => {
+      if (map.getZoom() < 11) { wildlifeLayer.clearLayers(); return; }
+      const b = map.getBounds();
+      try {
+        const fc = await api(`/api/wildlife-zones?bbox=${[b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((v) => v.toFixed(4)).join(',')}`);
+        wildlifeLayer.clearLayers();
+        L.geoJSON(fc, {
+          interactive: true,
+          style: { className: 'wildlife-zone' },
+          onEachFeature: (f, layer) => layer.bindTooltip(`${f.properties.name} · Wildruhezone (${f.properties.season}) – der Magnet führt aussen herum`, { sticky: true }),
+        }).addTo(wildlifeLayer);
+      } catch { /* not shown */ }
+    }, 300);
+  }
+  map.on('moveend', loadWildlife);
 
   /* ---------- Route geometry ---------- */
 
@@ -95,6 +116,11 @@
     if (!T.follow || !state.config.routing) return [a, b];
     try {
       const r = await api(`/api/route?points=${a.lat},${a.lon};${b.lat},${b.lon}`);
+      if (r.insideWildlifeZones?.length) {
+        setStatus(`Ein Wegpunkt liegt in der Wildruhezone ${r.insideWildlifeZones.join(', ')} – bitte Wege dort nicht verlassen oder den Punkt ausserhalb setzen.`);
+      } else if (r.wildlifeZones?.length) {
+        setStatus(`Der Magnet führt um Wildruhezonen herum (Schutzzeit): ${r.wildlifeZones.slice(0, 3).join(', ')}${r.wildlifeZones.length > 3 ? ' …' : ''}.`);
+      }
       return [a, ...r.points.slice(1, -1), b];
     } catch (err) {
       setStatus(`Routing nicht möglich (${err.message}) – gerade Linie gezeichnet.`);
@@ -812,6 +838,8 @@
       routeLayer.addTo(map);
       markLayer.addTo(map);
       suggestionLayer.addTo(map);
+      wildlifeLayer.addTo(map);
+      loadWildlife();
       setTab(T.tab);
       renderRoute();
       renderOffline();
@@ -820,6 +848,7 @@
       map.getContainer().classList.remove('tour-drawing');
       T.picking = false;
       suggestionLayer.remove();
+      wildlifeLayer.remove();
       // A recording keeps showing its line.
       if (!T.recorder) { routeLayer.remove(); markLayer.remove(); }
     }

@@ -43,6 +43,8 @@ src/openmeteo.js     Zeitreihen aus Archiv und Prognose von Open-Meteo zusammens
 src/routes/climate.js  Routen und Analyse-Hooks für Stürme, Phänologie-Referenz und Frostnächte
 src/elevation.js     Geländehöhe, Hangneigung, Exposition und Geländeform (Copernicus-DEM über Open-Meteo)
 src/exif.js          Aufnahmezeit, GPS und Blickrichtung aus den Bilddaten
+src/wildlife.js      Wildruhezonen (GeoJSON, WGS84/LV95, Schutzzeit) als Sperrflächen für BRouter
+src/lenient-fetch.js HTTP-Client für BRouters eigenen Server (Kopfzeilen nur mit \n)
 src/dashcam.js       GPS von Dashcams: NMEA-Text und Novatek-freeGPS-Blöcke im Video, NMEA-Dateien
 src/gpx.js           GPX-Parser
 src/mp4.js           MP4-Boxen lesen: Telemetrie-Spur, Startzeit, Dauer, 360°-Metadaten

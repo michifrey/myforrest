@@ -84,7 +84,8 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/tracks/:id.gpx`        | Tour als GPX                                             |
 | `PATCH`  | `/api/tracks/:id`            | `name`, `activity`, `visibility` (nur Besitzer oder Moderation) |
 | `DELETE` | `/api/tracks/:id`            | Tour löschen                                             |
-| `GET`    | `/api/route?points=lat,lon;lat,lon` | Weg zwischen Wegpunkten vom Routing-Dienst (`ROUTER_URL`); 501 ohne Dienst |
+| `GET`    | `/api/route?points=lat,lon;lat,lon` | Weg zwischen Wegpunkten vom Routing-Dienst (`ROUTER_URL`, Profil `ROUTER_PROFILE`); 501 ohne Dienst. Wildruhezonen in der Schutzzeit gehen als Sperrflächen mit: `wildlifeZones` (umgangen), `insideWildlifeZones` (ein Wegpunkt liegt darin) |
+| `GET`    | `/api/wildlife-zones?bbox=w,s,e,n` | Wildruhezonen in der Schutzzeit als GeoJSON (`name`, `season`), für die Karte; `wildlifeZones` in `/api/config` sagt, ob welche hinterlegt sind |
 | `POST`   | `/api/route-suggestions`     | Fotoaufträge, Spots mit Satelliten-Frühwarnung und lange nicht besuchte Spots nahe einer Route (`{ points, maxDistanceM }`), mit Abstand und Kilometer; die Route wird nicht gespeichert |
 | `GET`    | `/api/photo-requests`        | Offene Fotoaufträge (`?status=alle` auch erledigte), ohne Namen der anfragenden Person |
 | `POST`   | `/api/photo-requests`        | Fotoauftrag: `{ lat, lon, heading?, title, note? }` oder `{ spotId, title }` |

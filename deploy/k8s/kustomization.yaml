@@ -30,6 +30,8 @@ configMapGenerator:
       - METADATA_OWS_URL=http://localhost:8080/ows/
       # Path magnet through the own BRouter instead of brouter.de.
       - ROUTER_URL=http://brouter:17777/brouter
+      # Forest profile of the own BRouter (deploy/brouter/profiles).
+      - ROUTER_PROFILE=myforrest-wald
 images:
   # Built locally with podman and loaded into the cluster (start.sh); never pulled.
   - name: myforrest

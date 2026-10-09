@@ -218,7 +218,8 @@ map.geo.admin.ch. Ein Klick auf ein Objekt zeigt seine Angaben.
 *Touren & Aufträge* hält fest, wo man unterwegs ist. Eine Route lässt sich auf der Karte **zeichnen**
 (Klick für Klick; der Wege-Magnet zieht die Linie auf Wege und Pfade), mit dem Handy per GPS **aufzeichnen** oder als GPX, TCX, KML
 oder GeoJSON **importieren**. Gelbe Kilometer-Marken zeigen den Verlauf, jede Route geht auch als GPX
-wieder hinaus. Mit Konto lassen sich Touren speichern und veröffentlichen; andere sehen eine öffentliche
+wieder hinaus. Mit dem eigenen Routing-Server bevorzugt der Magnet Forststrassen und Rückegassen und führt
+während der Schutzzeit um **Wildruhezonen** herum, die die Karte beim Planen zeigt. Mit Konto lassen sich Touren speichern und veröffentlichen; andere sehen eine öffentliche
 Tour ohne Zeiten und ohne die ersten und letzten 200 m. Über eine Tour mit Zeitstempeln lassen sich im
 Upload auch Fotos ohne GPS verorten.
 
@@ -355,7 +356,7 @@ für den Wege-Magnet mit ([`deploy/brouter`](deploy/brouter/README.md)).
 | [REST-API](docs/api.md) | Alle Routen des Servers |
 | [Roadmap](docs/roadmap.md) | Was als Nächstes geplant ist |
 | [QGIS Server](deploy/qgis-server/README.md) und [Kubernetes](deploy/k8s/README.md) | Betrieb mit Geodiensten per Docker Compose oder Kubernetes |
-| [Eigener Routing-Server](deploy/brouter/README.md) | BRouter für den Wege-Magnet, mit Routing-Daten für die Schweiz |
+| [Eigener Routing-Server](deploy/brouter/README.md) | BRouter für den Wege-Magnet, mit Routing-Daten für die Schweiz, Waldprofil, Wildruhezonen und fertigem Image |
 
 ## Daten und Lizenz
 
