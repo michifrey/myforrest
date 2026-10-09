@@ -47,6 +47,7 @@ const insidePolygon = (poly, lat, lon) => insideRing(poly[0], lat, lon) && !poly
 
 const YEAR_KEYS = /^(year|jahr|year_acq|acq_year|inventory|inventar|inv_year|sgi_year|date|datum)$/i;
 const NAME_KEYS = ['name', 'Name', 'NAME', 'glacier_name', 'gletscher', 'Gletscher', 'gl_name', 'sgi-id', 'sgi_id', 'SGI'];
+const ID_KEYS = ['sgi-id', 'sgi_id', 'SGI', 'sgi', 'pk_sgi', 'glacier_id'];
 
 /** The inventory year in properties (1800–2100), or null. */
 function yearOf(props) {
@@ -75,8 +76,10 @@ function parseGlaciers(text, { year: fileYear = null } = {}) {
     const all = polygons.flatMap((p) => p[0]);
     const lons = all.map((p) => p[0]);
     const lats = all.map((p) => p[1]);
+    const idKey = ID_KEYS.find((k) => props[k] !== undefined && props[k] !== null && String(props[k]).trim());
     out.push({
       name: nameKey ? String(props[nameKey]).trim() : 'Gletscher',
+      id: idKey ? String(props[idKey]).trim() : null,
       year: yearOf(props) ?? fileYear,
       polygons,
       bbox: [Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)],
@@ -149,8 +152,12 @@ function createGlaciers({ files = process.env.GLETSCHER_GEOJSON || '' } = {}) {
     // The name: the glacier of the latest inventory nearby, else the one the place lay in before.
     const named = closest && closest.d <= radiusM ? closest.g.name : [...history].reverse().find((h) => h.name)?.name ?? null;
     if (!named && (!closest || closest.d > radiusM)) return null;
+    // SGI id (for the GLAMOS series): from the glacier named, in any inventory that has one.
+    const id = (closest && closest.d <= radiusM ? closest.g.id : null)
+      || candidates.find((g) => g.id && g.name === named)?.id || null;
     return {
       name: named,
+      id,
       latestYear,
       distanceM: closest ? Math.round(closest.d) : null,
       history,

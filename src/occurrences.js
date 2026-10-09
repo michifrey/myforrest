@@ -40,7 +40,8 @@ function licenseForExport(key) {
  */
 function parseFilters(q = {}) {
   const bad = (msg) => Object.assign(new Error(msg), { status: 400 });
-  const f = { species: null, neophytes: false, minScore: DEFAULT_MIN_SCORE, bbox: null, from: null, to: null };
+  const f = { species: null, neophytes: false, minScore: DEFAULT_MIN_SCORE, bbox: null, from: null, to: null, verified: false };
+  if (q.verified !== undefined) f.verified = ['1', 'true', 'ja', 'yes'].includes(String(q.verified).toLowerCase());
   if (q.species) f.species = String(q.species).slice(0, 200);
   if (q.neophytes !== undefined) f.neophytes = ['1', 'true', 'ja', 'yes'].includes(String(q.neophytes).toLowerCase());
   if (q.minScore !== undefined && q.minScore !== '') {
@@ -66,16 +67,34 @@ function parseFilters(q = {}) {
   return f;
 }
 
+/** Human review of a photo's identification (routes/species.js): confirmed, corrected or rejected. */
+const REVIEW_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS identification_reviews (
+    photo_id        INTEGER PRIMARY KEY REFERENCES photos (id) ON DELETE CASCADE,
+    status          TEXT NOT NULL CHECK (status IN ('bestaetigt', 'korrigiert', 'abgelehnt')),
+    scientific_name TEXT,            -- the species as confirmed or corrected
+    reviewer_id     INTEGER REFERENCES users (id) ON DELETE SET NULL,
+    reviewed_at     INTEGER NOT NULL
+  );
+`;
+const hasReviews = (db) => Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'identification_reviews'").get());
+
 /**
  * Occurrences matching the filters, oldest first. Each has the photo's
  * position and time, the best Pl@ntNet candidate and – if present – the photo
- * licence.
+ * licence. A human review overrides the candidate: rejected photos drop out,
+ * corrected ones carry the corrected species, and both confirmed and corrected
+ * ones count regardless of the score. `verified`: only reviewed occurrences.
  */
 function listOccurrences(db, filters = {}) {
   const f = { minScore: DEFAULT_MIN_SCORE, ...filters };
   const cols = columnsOf(db);
   const license = cols.has('license') ? 'p.license' : 'NULL';
-  const where = ['i.score >= ?'];
+  const reviews = hasReviews(db);
+  const reviewCols = reviews ? 'r.status AS review_status, r.scientific_name AS review_name, r.reviewed_at' : 'NULL AS review_status, NULL AS review_name, NULL AS reviewed_at';
+  const reviewJoin = reviews ? 'LEFT JOIN identification_reviews r ON r.photo_id = p.id' : '';
+  const where = reviews ? ["(i.score >= ? OR r.status IN ('bestaetigt', 'korrigiert'))", "COALESCE(r.status, '') <> 'abgelehnt'"] : ['i.score >= ?'];
+  if (f.verified) where.push(reviews ? "r.status IN ('bestaetigt', 'korrigiert')" : '0');
   // Photos hidden by moderators are never exported or mapped; protected finds only for those who may see them.
   if (f.visibleSql) where.push(`(${f.visibleSql})`);
   else {
@@ -101,9 +120,10 @@ function listOccurrences(db, filters = {}) {
   const rows = db.prepare(`
     SELECT p.id AS photo_id, p.spot_id, p.file, p.taken_at, p.lat, p.lon, p.location_source, p.note,
            ${license} AS license,
-           i.scientific_name, i.common_name, i.score, i.neophyte
+           i.scientific_name, i.common_name, i.score, i.neophyte, ${reviewCols}
     FROM identifications i
     JOIN photos p ON p.id = i.photo_id
+    ${reviewJoin}
     WHERE ${where.join(' AND ')}
       AND NOT EXISTS (
         SELECT 1 FROM identifications j
@@ -125,11 +145,18 @@ function listOccurrences(db, filters = {}) {
       uncertaintyM: r.location_source === 'spot' ? (f.spotRadiusM ?? 25) : (UNCERTAINTY_M[r.location_source] ?? null),
       note: r.note,
       license: licenseForExport(r.license),
-      scientificName: r.scientific_name,
-      commonName: r.common_name,
-      score: r.score,
-      // Stored flag, or the current list (the list may have grown since identification).
-      neophyte: r.neophyte || neophyteName(r.scientific_name),
+      ...(r.review_status === 'korrigiert' && r.review_name
+        ? { scientificName: r.review_name, commonName: null, score: r.score, neophyte: neophyteName(r.review_name) }
+        : {
+          scientificName: r.scientific_name,
+          commonName: r.common_name,
+          score: r.score,
+          // Stored flag, or the current list (the list may have grown since identification).
+          neophyte: r.neophyte || neophyteName(r.scientific_name),
+        }),
+      verification: r.review_status || null, // 'bestaetigt' | 'korrigiert' | null (automatic only)
+      reviewedAt: r.reviewed_at || null,
+      plantnetName: r.scientific_name,
     }))
     .filter((o) => (!f.neophytes || o.neophyte) && (!wanted || binomial(o.scientificName) === wanted));
 }
@@ -165,4 +192,4 @@ function speciesSummary(db, filters = {}) {
     .sort((a, b) => Boolean(b.neophyte) - Boolean(a.neophyte) || b.count - a.count || a.scientificName.localeCompare(b.scientificName));
 }
 
-module.exports = { listOccurrences, speciesSummary, parseFilters, licenseForExport, binomial, DEFAULT_MIN_SCORE, UNCERTAINTY_M };
+module.exports = { listOccurrences, speciesSummary, parseFilters, licenseForExport, binomial, DEFAULT_MIN_SCORE, UNCERTAINTY_M, REVIEW_SCHEMA };

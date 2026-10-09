@@ -24,6 +24,10 @@
  *
  *   /api/export/myforrest.pmtiles   one file, read with HTTP range requests
  *   /api/export/myforrest.mbtiles   SQLite, for QGIS, GDAL, tile servers
+ *   /api/export/myforrest-kacheln-lv95.gpkg   the LV95 tiles as a GeoPackage (src/gpkg-tiles.js)
+ *
+ * The export files are written tile by tile from the tile cache, so their size
+ * is not limited by memory.
  */
 
 const fs = require('node:fs');
@@ -34,8 +38,9 @@ const mercator = require('../tiles');
 const lv95 = require('../tiles-lv95');
 const { wgs84ToLv95 } = require('../lv95');
 const { createTileCache } = require('../tile-cache');
-const { writePmtiles } = require('../pmtiles');
+const { writePmtilesFile } = require('../pmtiles');
 const { writeMbtiles } = require('../mbtiles');
+const { gpkgTileGrid, writeVectorTilesGpkg } = require('../gpkg-tiles');
 
 const MVT = 'application/vnd.mapbox-vector-tile';
 const TILESETS_REL = 'http://www.opengis.net/def/rel/ogc/1.0/tilesets-vector';
@@ -230,16 +235,15 @@ module.exports = function registerOgcTiles(app, {
 
   const tilesetKey = (base, tmsId, set) => `${base}|${tmsId}|${set}`;
   const indexesOf = (tmsId, layers, base) => Object.fromEntries(layers.map((id) => [id, indexOf(tmsId, id, base)]));
-  const exportFile = (ext) => path.join(tilesDir, `myforrest.${ext}`);
+  const exportFile = (ext) => path.join(tilesDir, ext === 'gpkg' ? 'myforrest-kacheln-lv95.gpkg' : `myforrest.${ext}`);
   const exportInfoFile = () => path.join(tilesDir, 'export.json');
   const readExportInfo = () => {
     try { return JSON.parse(fs.readFileSync(exportInfoFile(), 'utf8')); } catch { return null; }
   };
 
-  /** PMTiles and MBTiles of the WebMercatorQuad dataset tiles, replaced atomically. */
+  /** PMTiles and MBTiles of the WebMercatorQuad dataset tiles, and a GeoPackage of the LV95 ones, replaced atomically. */
   function writeExports(base, version) {
     const key = tilesetKey(base, mercator.TMS_ID, 'dataset');
-    const tiles = cache.tiles(key, version);
     const bbox = bboxOfFeatures(DATASET_LAYERS.flatMap((id) => geodata.features(id, base)));
     const maxzoom = TMS[mercator.TMS_ID].precomputeZoom;
     const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2, Math.min(14, maxzoom)];
@@ -247,15 +251,28 @@ module.exports = function registerOgcTiles(app, {
     const name = 'MyForrest';
     const description = 'Ausbreitungsfronten, Spots und Pflanzenfunde als Vektorkacheln (WebMercatorQuad)';
     const tmp = (ext) => `${exportFile(ext)}.part`;
-    fs.writeFileSync(tmp('pmtiles'), writePmtiles(tiles, {
+    const written = writePmtilesFile(tmp('pmtiles'), { keys: cache.keys(key, version), read: (z, x, y) => cache.tile(key, version, z, x, y) }, {
       minzoom: 0, maxzoom, bounds: bbox, center,
       metadata: { name, description, attribution: ATTRIBUTION, vector_layers: vectorLayers },
-    }));
-    writeMbtiles(tmp('mbtiles'), tiles, {
+    });
+    writeMbtiles(tmp('mbtiles'), cache.each(key, version), {
       name, description, attribution: ATTRIBUTION, minzoom: 0, maxzoom, bounds: bbox, center, vector_layers: vectorLayers,
     });
-    for (const ext of ['pmtiles', 'mbtiles']) fs.renameSync(tmp(ext), exportFile(ext));
-    fs.writeFileSync(exportInfoFile(), JSON.stringify({ base, version, tiles: tiles.length, written_at: new Date().toISOString() }));
+    // LV95: the levels of the swisstopo grid that a GeoPackage tile matrix set can hold (see gpkg-tiles.js).
+    const lvKey = tilesetKey(base, lv95.TMS_ID, 'dataset');
+    const grid = gpkgTileGrid({ resolutions: lv95.RESOLUTIONS, origin: lv95.ORIGIN, extent: lv95.EXTENT_LV95, maxZoom: TMS[lv95.TMS_ID].precomputeZoom });
+    const [w, s] = wgs84ToLv95(bbox[1], bbox[0]);
+    const [e, n] = wgs84ToLv95(bbox[3], bbox[2]);
+    const gpkg = cache.current(lvKey, version) ? writeVectorTilesGpkg(tmp('gpkg'), {
+      table: 'myforrest', title: 'MyForrest (LV95-Kacheln)',
+      description: 'Ausbreitungsfronten, Spots und Pflanzenfunde als Vektorkacheln im Kachelgitter von swisstopo (EPSG:2056)',
+      grid, tiles: cache.each(lvKey, version), dataBounds: [Math.min(w, e), Math.min(s, n), Math.max(w, e), Math.max(s, n)],
+      layers: DATASET_LAYERS.map((id) => ({ name: id, description: COLLECTIONS[id].title, fields: COLLECTIONS[id].fields })),
+    }) : null;
+    for (const ext of gpkg ? ['pmtiles', 'mbtiles', 'gpkg'] : ['pmtiles', 'mbtiles']) fs.renameSync(tmp(ext), exportFile(ext));
+    fs.writeFileSync(exportInfoFile(), JSON.stringify({
+      base, version, tiles: written.tiles, gpkgTiles: gpkg?.tiles ?? null, written_at: new Date().toISOString(),
+    }));
   }
 
   /** Cuts every tileset that is not current for this base URL, then refreshes the exports. */
@@ -386,9 +403,9 @@ module.exports = function registerOgcTiles(app, {
 
   /* ---------- PMTiles and MBTiles ---------- */
 
-  const EXPORTS = { pmtiles: 'application/vnd.pmtiles', mbtiles: 'application/vnd.sqlite3' };
-  app.get('/api/export/myforrest.:ext(pmtiles|mbtiles)', (req, res) => {
-    const { ext } = req.params;
+  const EXPORTS = { pmtiles: 'application/vnd.pmtiles', mbtiles: 'application/vnd.sqlite3', gpkg: 'application/geopackage+sqlite3' };
+  app.get(['/api/export/myforrest.:ext(pmtiles|mbtiles)', '/api/export/myforrest-kacheln-lv95.gpkg'], (req, res) => {
+    const ext = req.params.ext || 'gpkg';
     res.set('Access-Control-Allow-Origin', '*');
     if (!cache) return res.status(404).json({ error: 'Die Vorberechnung der Kacheln ist ausgeschaltet (TILES_PRECOMPUTE=0)' });
     const base = baseUrl(req);

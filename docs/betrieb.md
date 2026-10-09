@@ -28,7 +28,9 @@
   Datenschutzerklärung.
 - Temperaturen von Touren fliessen nur in die Karte kühler Abschnitte ein, wenn wer die Tour gespeichert hat,
   das ausdrücklich wählt (Spalte `tracks.share_temp`, widerrufbar). Ausgeliefert werden nur 100-m-Zellen
-  mit mindestens 3 Touren von 2 Personen, ohne Zeiten, ohne Namen und ohne die ersten und letzten 200 m.
+  mit mindestens 3 Touren von 2 Personen, ohne Zeiten, ohne Namen und ohne die ersten und letzten 200 m. Für die
+  Eichung fragt der Server Open-Meteo nach der Lufttemperatur am Tag der Tour, für einen auf ~2 km gerundeten
+  Rasterpunkt (Tabelle `cool_checks`).
 - Ausgeblendete Fotos werden nicht mehr ausgeliefert, können aber noch bis zu 7 Tage im Browser-Cache von
   Personen liegen, die sie vorher gesehen haben.
 - Kartendaten © OpenStreetMap-Mitwirkende. Bei stärkerer Nutzung braucht es einen eigenen
@@ -93,17 +95,20 @@ ausserhalb von `docs/` zeigen auf GitHub (`https://github.com/michifrey/myforres
 
 | Quelle | Wofür | Hosts, die der Server erreichen muss |
 |--------|-------|--------------------------------------|
-| [Open-Meteo.com](https://open-meteo.com) (ERA5-Reanalyse, CC BY 4.0) | Wetter, Normalwerte, Böen, Geländehöhe | `archive-api.open-meteo.com`, `api.open-meteo.com` |
+| [Open-Meteo.com](https://open-meteo.com) (ERA5-Reanalyse, ICON-Prognose, CC BY 4.0) | Wetter, Normalwerte, Böen, Sturmwarnung (Felder von 0,1° mit Spots), Geländehöhe | `archive-api.open-meteo.com`, `api.open-meteo.com` |
 | Copernicus Sentinel-2 über [Earth Search](https://earth-search.aws.element84.com/v1) (Element 84, AWS Open Data) | Satellitenkontext NDVI/NDMI ab 2017, Frühwarnung | `earth-search.aws.element84.com`, `sentinel-cogs.s3.us-west-2.amazonaws.com` |
 | Landsat Collection 2 (USGS) über [Microsoft Planetary Computer](https://planetarycomputer.microsoft.com) | Satellitenkontext vor 2017 und Überlappung 2017–2018 | `planetarycomputer.microsoft.com`, `landsateuwest.blob.core.windows.net` |
-| Deutscher Wetterdienst, Open Data | Phänologie-Referenzdaten ([laden](installation.md#phänologie-referenzdaten-laden)) | `opendata.dwd.de` |
+| Deutscher Wetterdienst, Open Data | Phänologie-Referenzdaten, Jahres- und Sofortmelder ([laden](installation.md#phänologie-referenzdaten-laden)) | `opendata.dwd.de` |
+| MeteoSchweiz, Open Government Data | Phänologie-Referenzdaten Schweiz ([laden](installation.md#phänologie-referenzdaten-laden)) | `data.geo.admin.ch` |
 | [Pl@ntNet](https://my.plantnet.org) (optional, API-Key) | Pflanzenbestimmung | `my-api.plantnet.org` |
 | [BRouter](https://brouter.de) (Standard, `ROUTER_URL`) | Wege-Magnet: gezeichnete Touren folgen den Wegen; der Server schickt nur die Wegpunkte, ohne Konto oder IP der Person. Mit dem [eigenen BRouter](https://github.com/michifrey/myforrest/blob/main/deploy/brouter/README.md) bleibt das im eigenen Netz; dieser lädt nur seine Routing-Daten (OpenStreetMap, ODbL) | `brouter.de` (öffentlicher Dienst bzw. Download der Segmente) oder Host aus `ROUTER_URL` |
-| Push-Dienste der Browser (Google, Mozilla, Apple, Microsoft) | Push-Nachrichten der Frühwarnung | `fcm.googleapis.com`, `updates.push.services.mozilla.com`, `web.push.apple.com`, `*.notify.windows.com` |
+| Push-Dienste der Browser (Google, Mozilla, Apple, Microsoft) | Push-Nachrichten der Frühwarnung und der Sturmwarnung | `fcm.googleapis.com`, `updates.push.services.mozilla.com`, `web.push.apple.com`, `*.notify.windows.com` |
 | OpenStreetMap | Kartenkacheln (im Browser) | – |
 | swisstopo (geo.admin.ch) | Landeskarte und Luftbild der Vektorkarte LV95 (im Browser) | – |
 | swisstopo (geo.admin.ch), swissBOUNDARIES3D | Kanton eines Spots für die kantonalen Schutzlisten (einmal pro Spot) | `api3.geo.admin.ch` |
 | [Mapillary](https://www.mapillary.com) (optional, `MAPILLARY_TOKEN`; Bilder CC BY-SA 4.0) | Bilder im Durchgehen und auf der Karte, wo es keine eigenen gibt; nur der Server fragt an (Ausschnitt um einen Ort bzw. die Karte), der Browser lädt die Bilder von MyForrest | `graph.mapillary.com` und das Bild-CDN von Mapillary (`scontent*.fbcdn.net`) |
+| [GLAMOS](https://www.glamos.ch), Längenänderung | Kurve der Gletscherzunge (`GLAMOS_CSV`, lokale Datei) | – |
+| Offene Bildarchive, z. B. [ETH-Bibliothek, Bildarchiv](https://ba.e-pics.ethz.ch) (`ARCHIV_KATALOG`) | Vorschläge alter Aufnahmen; beim *Übernehmen* lädt der Server das Bild von der Adresse im Katalog | die Hosts der Bild-Adressen im Katalog |
 | Gletscherinventare, z. B. [GLAMOS](https://www.glamos.ch) (Swiss Glacier Inventory) | Gletscher-Spots, Umrisse pro Jahr (`GLETSCHER_GEOJSON`, lokale Dateien; Quellenangabe und Nutzungsbedingungen des Inventars beachten) | – |
 
 Im Browser laufen [Leaflet](https://leafletjs.com) (BSD-2-Clause) für die App-Karte und

@@ -42,11 +42,11 @@ const COLLECTIONS = {
   },
   findings: {
     title: 'Pflanzenfunde',
-    description: 'Automatische Pflanzenbestimmungen (Pl@ntNet, bestes Ergebnis pro Foto ab Score 0,2), Neophyten markiert.',
+    description: 'Automatische Pflanzenbestimmungen (Pl@ntNet, bestes Ergebnis pro Foto ab Score 0,2), Neophyten markiert; von Hand bestätigte oder korrigierte Funde gekennzeichnet, abgelehnte entfernt.',
     geometry: 'POINT',
     fields: {
       photo_id: 'INTEGER', scientific_name: 'TEXT', common_name: 'TEXT', neophyte: 'INTEGER', score: 'REAL',
-      taken_at: 'TEXT', uncertainty_m: 'REAL', url: 'TEXT', license: 'TEXT',
+      taken_at: 'TEXT', uncertainty_m: 'REAL', url: 'TEXT', license: 'TEXT', verification: 'TEXT',
     },
     time: ['taken_at'],
   },
@@ -78,7 +78,10 @@ function createGeodata({ db, spotRadiusM = 25 }) {
     const p = db.prepare(`SELECT COUNT(*) n, COALESCE(MAX(id), 0) m, COALESCE(SUM(${hasHidden ? 'hidden_at IS NOT NULL' : 0}), 0) h, COALESCE(SUM(${hasProtected ? 'protected' : 0}), 0) pr, COALESCE(SUM(spot_id * (id % 997 + 1)), 0) s FROM photos`).get();
     const i = db.prepare('SELECT COUNT(*) n, COALESCE(MAX(id), 0) m FROM identifications').get();
     const t = db.prepare('SELECT COUNT(*) n FROM photo_tags').get();
-    return `${p.n}:${p.m}:${p.h}:${p.pr}:${p.s}:${i.n}:${i.m}:${t.n}`;
+    // Human reviews of identifications (confirm, correct, reject) change the findings too.
+    const rv = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'identification_reviews'").get()
+      ? db.prepare('SELECT COUNT(*) n, COALESCE(MAX(reviewed_at), 0) m FROM identification_reviews').get() : { n: 0, m: 0 };
+    return `${p.n}:${p.m}:${p.h}:${p.pr}:${p.s}:${i.n}:${i.m}:${t.n}:${rv.n}:${rv.m}`;
   };
   const cache = new Map();
 
@@ -147,6 +150,7 @@ function createGeodata({ db, spotRadiusM = 25 }) {
       uncertainty_m: o.uncertaintyM,
       url: `${base}/uploads/${o.file}`,
       license: o.license,
+      verification: o.verification || 'automatisch',
     }));
   }
 

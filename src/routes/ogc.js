@@ -15,7 +15,8 @@ const os = require('node:os');
 const { createGeodata, COLLECTIONS, CRS84, LV95, toLv95, bboxOf } = require('../geodata');
 const { writeGeoPackage } = require('../gpkg');
 const { lv95ToWgs84 } = require('../lv95');
-const { metadataRecord } = require('../metadata');
+const { metadataRecord, recordUuid } = require('../metadata');
+const { featureCatalogue, catalogueUuid, collectionUuid, COLLECTION_TEXT } = require('../featurecatalogue');
 const { LICENSES, DEFAULT_LICENSE } = require('../moderation');
 
 const CRS_LIST = [CRS84, LV95];
@@ -120,6 +121,8 @@ module.exports = function registerOgc(app, {
         link(`${url}/items`, 'items', 'application/geo+json', `${c.title} (GeoJSON)`),
         link(`${url}/items?crs=${encodeURIComponent(LV95)}`, 'items', 'application/geo+json', `${c.title} (GeoJSON, LV95)`),
         link(`${url}/tiles`, 'http://www.opengis.net/def/rel/ogc/1.0/tilesets-vector', 'application/json', `${c.title} (Vektorkacheln)`),
+        link(`${base}/api/metadata/collections/${id}/geocat.xml`, 'describedby', 'application/xml', `Metadaten ${c.title} für geocat.ch (ISO 19139, GM03)`),
+        link(`${base}/api/metadata/objektkatalog.xml`, 'describedby', 'application/xml', 'Objektkatalog (ISO 19110)'),
       ],
     };
   }
@@ -166,6 +169,7 @@ module.exports = function registerOgc(app, {
         link(`${base}/api/export/myforrest.mbtiles`, 'enclosure', 'application/vnd.sqlite3', 'Vektorkacheln als MBTiles (WebMercatorQuad)'),
         link(`${base}/api/metadata/geocat.xml`, 'describedby', 'application/xml', 'Metadaten für geocat.ch (ISO 19139, Profil GM03)'),
         link(`${base}/api/metadata/iso19139.xml`, 'describedby', 'application/xml', 'Metadaten (ISO 19139)'),
+        link(`${base}/api/metadata/objektkatalog.xml`, 'describedby', 'application/xml', 'Objektkatalog: alle Collections und Felder (ISO 19110)'),
       ],
     });
   });
@@ -300,8 +304,8 @@ module.exports = function registerOgc(app, {
    * profile GM03 (ISO19139.che) to import into geocat.ch, iso19139.xml as plain
    * ISO 19139 for other catalogues.
    */
-  function metadataInfo(base) {
-    const feats = ['spots', 'photos', 'spread_fronts'].flatMap((id) => geodata.features(id, base));
+  function metadataInfo(base, ids = ['spots', 'photos', 'spread_fronts']) {
+    const feats = ids.flatMap((id) => geodata.features(id, base));
     let bbox = [5.9, 45.8, 10.5, 47.8]; // Switzerland until there is data
     if (feats.length) {
       bbox = [Infinity, Infinity, -Infinity, -Infinity];
@@ -323,19 +327,50 @@ module.exports = function registerOgc(app, {
       updated: added.last ?? now,
     };
   }
+  const contactOf = () => ({ organisation: metadata.organisation, email: metadata.email, city: metadata.city, country: metadata.country, url: metadata.url });
+  const today = () => new Date().toISOString().slice(0, 10);
+  const catalogueRef = (base, featureTypes) => ({ uuid: catalogueUuid(base), url: `${base}/api/metadata/objektkatalog.xml`, date: today(), featureTypes });
+  const recordOptions = (profile) => {
+    const license = LICENSES[DEFAULT_LICENSE];
+    return {
+      profile, uuid: metadata.uuid, owsUrl: metadata.owsUrl, opendataTerms: metadata.opendataTerms,
+      licenseUrl: license.url.replace(/deed\.\w+$/, ''), licenseLabel: license.label,
+    };
+  };
   for (const [file, profile] of [['geocat.xml', 'che'], ['iso19139.xml', 'iso']]) {
     app.get(`/api/metadata/${file}`, (req, res) => {
       const base = baseUrl(req);
-      const license = LICENSES[DEFAULT_LICENSE];
       res.set('Access-Control-Allow-Origin', '*');
-      res.type('application/xml').send(metadataRecord(metadataInfo(base), {
-        organisation: metadata.organisation, email: metadata.email, city: metadata.city, country: metadata.country, url: metadata.url,
-      }, {
-        profile, uuid: metadata.uuid, owsUrl: metadata.owsUrl, opendataTerms: metadata.opendataTerms,
-        licenseUrl: license.url.replace(/deed\.\w+$/, ''), licenseLabel: license.label,
+      res.type('application/xml').send(metadataRecord(metadataInfo(base), contactOf(), {
+        ...recordOptions(profile), catalogue: catalogueRef(base, Object.keys(COLLECTIONS)),
+      }));
+    });
+    /** One record per collection, as a part of the dataset record (parentIdentifier). */
+    app.get(`/api/metadata/collections/:id/${file}`, (req, res) => {
+      const { id } = req.params;
+      if (!COLLECTIONS[id]) return res.status(404).json({ error: 'Collection nicht gefunden' });
+      const base = baseUrl(req);
+      const url = `${base}/ogc/collections/${id}`;
+      const text = COLLECTION_TEXT[id];
+      const lang = (de) => ({ DE: de, FR: de, IT: de, EN: de });
+      res.set('Access-Control-Allow-Origin', '*');
+      res.type('application/xml').send(metadataRecord(metadataInfo(base, [id]), contactOf(), {
+        ...recordOptions(profile),
+        part: {
+          id, uuid: collectionUuid(recordUuid(base, metadata.uuid), id), title: text.title, abstract: text.abstract,
+          resources: [
+            { url: `${url}/items`, protocol: 'WWW:DOWNLOAD-URL', fn: 'download', name: `${id}.geojson`, text: lang(`Download: ${COLLECTIONS[id].title} als GeoJSON (OGC API – Features)`) },
+            { url: `${url}/tiles`, protocol: 'WWW:LINK', fn: 'information', name: `${id} (Vektorkacheln)`, text: lang(`${COLLECTIONS[id].title} als Vektorkacheln (OGC API – Tiles)`) },
+          ],
+        },
+        catalogue: catalogueRef(base, [id]),
       }));
     });
   }
+  app.get('/api/metadata/objektkatalog.xml', (req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.type('application/xml').send(featureCatalogue({ base: baseUrl(req), contact: contactOf(), date: today() }));
+  });
 
   app.get('/api/export/myforrest.gpkg', (req, res, next) => {
     const srs = req.query.crs === undefined || req.query.crs === '2056' ? 2056 : req.query.crs === '4326' ? 4326 : null;

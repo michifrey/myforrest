@@ -1538,6 +1538,7 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 .glacier-free { font-weight: 600; color: var(--ice); }
 .ice-chart .ice-bar { fill: var(--ice); }
 .ice-chart .ice-bar.free { fill: color-mix(in srgb, var(--ice) 35%, var(--surface)); }
+.length-chart .length-line { fill: none; stroke: var(--ice); stroke-width: 2.2; }
 .archive { margin: 0.8rem 0; }
 .archive summary { cursor: pointer; font-weight: 600; }
 .archive-form { display: grid; gap: 0.5rem; margin-top: 0.5rem; }
@@ -1635,3 +1636,25 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
   display: inline-block; width: 3.6rem; height: 0.55rem; border-radius: 999px; vertical-align: middle;
   background: linear-gradient(90deg, rgb(43, 108, 176), rgb(239, 227, 161), rgb(192, 57, 43));
 }
+
+/* Storm warning / after the storm (app.js, src/stormwatch.js) */
+.storm-banner {
+  margin: 0.6rem 0; padding: 0.6rem 0.8rem; border-radius: 12px;
+  background: color-mix(in srgb, var(--damage) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--damage) 35%, transparent);
+}
+.storm-banner p { margin: 0 0 0.3rem; }
+
+/* Review of automatic identifications (hotspots.js, tab "Prüfen") */
+.sp-review-list { list-style: none; margin: 0.4rem 0 0; padding: 0; display: grid; gap: 0.6rem; }
+.sp-review-item { display: grid; grid-template-columns: 72px 1fr; gap: 0.6rem; align-items: start; }
+.sp-review-thumb { padding: 0; border: 0; background: none; cursor: pointer; }
+.sp-review-thumb img { width: 72px; height: 54px; object-fit: cover; border-radius: 8px; display: block; }
+.sp-review-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin-top: 0.3rem; }
+.sp-review-actions select { max-width: 11rem; font-size: 0.82rem; }
+
+/* Archive pictures of open collections near a glacier or mountain spot (glacier.js) */
+.glacier-archives h4 { margin: 0.8rem 0 0.3rem; }
+.archive-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.archive-list li { display: grid; gap: 0.1rem; }
+.archive-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }

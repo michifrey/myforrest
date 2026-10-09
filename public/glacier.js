@@ -101,6 +101,39 @@
     ]);
   }
 
+  /** Cumulative length change of the tongue (GLAMOS), as a line from 0 at the first measurement. */
+  function lengthChart(len) {
+    const W = 360; const H = 120; const left = 44; const right = 8; const top = 8; const bottom = 20;
+    const pts = [{ year: len.firstYear, cumulative: 0 }, ...len.points];
+    const lo = Math.min(0, ...pts.map((p) => p.cumulative));
+    const hi = Math.max(0, ...pts.map((p) => p.cumulative));
+    const span = (hi - lo) || 1;
+    const x = (yr) => left + ((yr - len.firstYear) / Math.max(1, len.lastYear - len.firstYear)) * (W - left - right);
+    const y = (v) => top + (H - top - bottom) * ((hi - v) / span);
+    const fmtM = (v) => `${v < 0 ? '−' : ''}${Math.abs(Math.round(v)).toLocaleString('de-CH')} m`;
+    const nodes = [];
+    for (const v of [hi, (hi + lo) / 2, lo]) {
+      nodes.push(svg('line', { class: 'grid', x1: left, x2: W - right, y1: y(v), y2: y(v), 'stroke-dasharray': '2 3' }));
+      nodes.push(svg('text', { class: 'axis', x: left - 4, y: y(v) + 3, 'text-anchor': 'end' }, [fmtM(v)]));
+    }
+    nodes.push(svg('polyline', { class: 'length-line', points: pts.map((p) => `${x(p.year).toFixed(1)},${y(p.cumulative).toFixed(1)}`).join(' ') }));
+    for (const yr of [len.firstYear, Math.round((len.firstYear + len.lastYear) / 2), len.lastYear]) {
+      nodes.push(svg('text', { class: 'axis', x: x(yr), y: H - 6, 'text-anchor': 'middle' }, [String(yr)]));
+    }
+    const caption = `Längenänderung der Zunge seit ${len.firstYear}, aufsummiert`;
+    return el('div', { class: 'wx-chart veg-chart length-chart' }, [
+      el('h4', { text: 'Gletscherzunge (GLAMOS)' }),
+      el('p', { class: 'small', text: `${len.total < 0 ? 'Rückzug' : 'Vorstoss'} seit ${len.firstYear}: ${fmtM(len.total)} (${len.observations} Messungen bis ${len.lastYear})`
+        + (len.recentRate !== null ? ` · zuletzt ${len.recentRate < 0 ? '−' : '+'}${Math.abs(len.recentRate).toLocaleString('de-CH')} m pro Jahr` : '') }),
+      svg('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': caption }, nodes),
+      el('div', { class: 'sr-only' }, el('table', {}, [
+        el('caption', { text: caption }),
+        el('tr', {}, ['Jahr', 'Änderung', 'Summe'].map((h) => el('th', { text: h }))),
+        ...len.points.map((p) => el('tr', {}, [String(p.year), fmtM(p.change), fmtM(p.cumulative)].map((c) => el('td', { text: c })))),
+      ])),
+    ]);
+  }
+
   function archiveForm(spot) {
     const file = el('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,image/heic,.heic', required: '' });
     const date = el('input', { type: 'date', required: '', min: '1840-01-01', max: new Date().toISOString().slice(0, 10) });
@@ -204,14 +237,63 @@
     return parts;
   }
 
+  /** Archive pictures of open collections near the spot (ARCHIV_KATALOG), with one-click import. */
+  let archiveCache = null; // { spotId, data }: the panel is redrawn while satellite data loads
+  async function renderArchives(spot) {
+    const box = $('glacier-archives');
+    if (!box) return;
+    let data = archiveCache?.spotId === spot.id ? archiveCache.data : undefined;
+    if (data === undefined) {
+      try { data = await api(`/api/spots/${spot.id}/archive-suggestions`); } catch { data = null; }
+      archiveCache = { spotId: spot.id, data };
+    }
+    if (!data?.enabled || !data.items.length || state.spot?.id !== spot.id) { box.replaceChildren(); return; }
+    const logged = Boolean(window.Account?.user);
+    box.replaceChildren(
+      el('h4', { text: 'Archivbilder in der Nähe' }),
+      el('ul', { class: 'archive-list' }, data.items.slice(0, 6).map((it) => {
+        const status = el('span', { class: 'small muted', role: 'status' });
+        const take = it.photoId
+          ? el('span', { class: 'small', text: 'übernommen' })
+          : it.importable && logged
+            ? el('button', {
+              type: 'button', class: 'link small', text: 'Als Archivfoto übernehmen',
+              onclick: async (e) => {
+                e.target.disabled = true;
+                status.textContent = 'Wird geladen und ausgerichtet …';
+                try {
+                  await api(`/api/spots/${spot.id}/archive-suggestions/${encodeURIComponent(it.id)}`, { method: 'POST' });
+                  archiveCache = null;
+                  if (typeof openSpot === 'function') openSpot(spot.id);
+                } catch (err) {
+                  status.textContent = err.message;
+                  e.target.disabled = false;
+                }
+              },
+            })
+            : el('span', { class: 'small muted', text: it.importable ? 'Zum Übernehmen anmelden' : 'Lizenz erlaubt keine Übernahme' });
+        return el('li', {}, [
+          el('b', { text: `${it.year} · ${it.title}` }),
+          el('span', { class: 'small muted', text: [`${it.distanceM >= 1000 ? `${(it.distanceM / 1000).toFixed(1).replace('.', ',')} km` : `${it.distanceM} m`} entfernt`, it.source, it.license].filter(Boolean).join(' · ') }),
+          el('span', { class: 'archive-actions' }, [
+            it.page ? el('a', { class: 'link small', href: it.page, target: '_blank', rel: 'noopener', text: 'Im Archiv ansehen' }) : '',
+            take, status,
+          ]),
+        ]);
+      })),
+      el('p', { class: 'hint', text: 'Historische Fotos aus Sammlungen mit offener Lizenz, nach Standort und Blickrichtung. Übernommen werden sie als Archivfoto mit ihrem Datum und ihrer Lizenz; die Quelle steht in der Notiz.' }),
+    );
+  }
+
   function renderGlacier(spot, data) {
     const wrap = $('glacier-wrap');
     const body = $('glacier-body');
     const isGlacier = data.landscape === 'gletscher';
     $('glacier-title').textContent = data.landscape === 'gebirge' ? 'Schnee' : 'Gletscher';
     if (data.landscape === 'gebirge') {
-      body.replaceChildren(...renderSnow(spot, data));
+      body.replaceChildren(...renderSnow(spot, data), el('div', { id: 'glacier-archives', class: 'glacier-archives' }));
       wrap.hidden = false;
+      renderArchives(spot);
       return;
     }
     if (!isGlacier && !data.glacier) { wrap.hidden = true; return; }
@@ -229,6 +311,7 @@
     } else if (isGlacier && data.outlines) {
       parts.push(el('p', { class: 'muted small', text: 'Kein Gletscher der geladenen Inventare in der Nähe.' }));
     }
+    if (data.length?.points?.length) parts.push(lengthChart(data.length));
     const sat = data.satellite;
     if (sat.summers.length) {
       parts.push(iceChart(sat.summers));
@@ -243,12 +326,15 @@
       class: 'hint',
       text: [
         g ? 'Umrisse aus den Gletscherinventaren (z. B. GLAMOS, Swiss Glacier Inventory).' : '',
+        data.length ? `Längenänderung: Messreihe von GLAMOS (Glacier Monitoring Switzerland) für ${data.length.name}.` : '',
         sat.summers.length ? 'Eis im Spätsommer: der kleinste Monatswert Juli bis Oktober der Szenenklassifikation von Sentinel-2 (Schnee und Eis) im Umkreis von rund 40 m; auch Firn und Altschnee zählen als weiss.' : '',
         'Gletscher nur mit Erfahrung, Ausrüstung oder Bergführer betreten: Spalten sind oft verdeckt.',
       ].filter(Boolean).join(' '),
     }));
+    if (isGlacier) parts.push(el('div', { id: 'glacier-archives', class: 'glacier-archives' }));
     body.replaceChildren(...parts);
     wrap.hidden = false;
+    if (isGlacier) renderArchives(spot);
   }
 
   async function load(spot, polls = 0) {

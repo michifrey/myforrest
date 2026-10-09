@@ -117,7 +117,41 @@ test('Metadata endpoints use the data and the METADATA_* settings', async () => 
     assert.match(await (await fetch(`${base}/api/metadata/iso19139.xml`)).text(), /<gmd:MD_Metadata/);
     const landing = await (await fetch(`${base}/ogc`)).json();
     assert.deepEqual(landing.links.filter((l) => l.rel === 'describedby').map((l) => l.href),
-      [`${base}/api/metadata/geocat.xml`, `${base}/api/metadata/iso19139.xml`]);
+      [`${base}/api/metadata/geocat.xml`, `${base}/api/metadata/iso19139.xml`, `${base}/api/metadata/objektkatalog.xml`]);
+
+    // The feature catalogue (ISO 19110): every collection, every field, coded values listed.
+    const fcRes = await fetch(`${base}/api/metadata/objektkatalog.xml`);
+    assert.equal(fcRes.status, 200);
+    const fc = await fcRes.text();
+    assertWellFormed(fc);
+    const catUuid = /<gfc:FC_FeatureCatalogue [^>]*uuid="([^"]+)"/.exec(fc)[1];
+    assert.deepEqual([...fc.matchAll(/<gfc:typeName><gco:LocalName>([^<]+)</g)].map((m) => m[1]), ['spots', 'photos', 'findings', 'spread_fronts']);
+    const { COLLECTIONS } = require('../src/geodata');
+    const fields = Object.values(COLLECTIONS).reduce((n, c) => n + Object.keys(c.fields).length + 1, 0);
+    assert.equal((fc.match(/<gfc:FC_FeatureAttribute>/g) || []).length, fields, 'each field plus the geometry');
+    assert.match(fc, /<gco:LocalName>status<\/gco:LocalName>.*?<gfc:code><gco:CharacterString>schaden<\/gco:CharacterString><\/gfc:code>/s);
+    assert.match(fc, /<gco:LocalName>verification<\/gco:LocalName>.*?<gfc:code><gco:CharacterString>korrigiert</s);
+    assert.match(fc, /<gco:LocalName>area_m2<\/gco:LocalName><\/gfc:memberName><gfc:definition><gco:CharacterString>[^<]*Einheit: Quadratmeter \(m²\)/);
+    assert.ok(fc.includes('Forstverein Test'));
+    // The dataset record points to it.
+    assert.ok(xml.includes(`<gmd:featureCatalogueCitation uuidref="${catUuid}">`));
+    assert.equal((xml.match(/<gmd:featureTypes>/g) || []).length, 4);
+
+    // One record per collection: its own id, a part of the dataset record, its own title and access.
+    const mainUuid = /<gmd:fileIdentifier><gco:CharacterString>([^<]+)</.exec(xml)[1];
+    const part = await (await fetch(`${base}/api/metadata/collections/findings/geocat.xml`)).text();
+    assertWellFormed(part);
+    const partUuid = /<gmd:fileIdentifier><gco:CharacterString>([^<]+)</.exec(part)[1];
+    assert.notEqual(partUuid, mainUuid);
+    assert.ok(part.includes(`<gmd:parentIdentifier><gco:CharacterString>${mainUuid}</gco:CharacterString></gmd:parentIdentifier>`));
+    assert.match(part, /<gmd:title [^>]*><gco:CharacterString>MyForrest – Pflanzenfunde</);
+    assert.match(part, /codeListValue="fre"/);
+    assert.ok(part.includes(`<gmd:URL>${base}/ogc/collections/findings/items</gmd:URL>`));
+    assert.equal((part.match(/<gmd:featureTypes>/g) || []).length, 1);
+    assert.match(await (await fetch(`${base}/api/metadata/collections/spots/iso19139.xml`)).text(), /<gmd:MD_Metadata/);
+    assert.equal((await fetch(`${base}/api/metadata/collections/baeume/geocat.xml`)).status, 404);
+    const coll = await (await fetch(`${base}/ogc/collections/spots`)).json();
+    assert.ok(coll.links.some((l) => l.rel === 'describedby' && l.href === `${base}/api/metadata/collections/spots/geocat.xml`));
   } finally {
     await app.locals.idle();
     server.close();

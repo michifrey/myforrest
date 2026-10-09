@@ -38,6 +38,7 @@ src/trees.js         Waldbaumarten mit Phänologie, Trockenheitsempfindlichkeit 
 src/phenology.js     Korrektur der Herbstfärbung für Höhe, Exposition und Kaltluftseen
 src/phenoref.js      Phänologie-Referenzreihen (DWD-Jahresmelder, generisches CSV) und Stationsauswahl
 src/storms.js        Sturmereignisse aus Spitzenböen, Verknüpfung mit Windwurf
+src/stormwatch.js    Sturmwarnung aus der Böenprognose (ICON), Push vor und nach dem Sturm an Folgende und Regelmässige
 src/nightcool.js     Nächtliche Abkühlung in Senken aus Wind und Bewölkung
 src/openmeteo.js     Zeitreihen aus Archiv und Prognose von Open-Meteo zusammensetzen
 src/routes/climate.js  Routen und Analyse-Hooks für Stürme, Phänologie-Referenz und Frostnächte
@@ -47,7 +48,10 @@ src/closures.js      Sperrungen bei Holzerei (aus Holzschlag-Fotos und von Hand)
 src/wildlife.js      Wildruhezonen (GeoJSON, WGS84/LV95, Schutzzeit) als Sperrflächen für BRouter
 src/landscapes.js    Landschaftsprofile (Wald, Gletscher, Gebirge, Trockengebiet): Beobachtungen je Profil, welche Profile Schnee und Eis auswerten, Höhe für Gebirge-Spots
 src/glaciers.js      Gletscherumrisse aus Inventaren (GeoJSON, WGS84/LV95, Jahr aus Eigenschaft oder Dateiname): Eis pro Jahr an einem Ort, Abstand, Umrisse für die Karte
-src/routes/landscapes.js  Landschaft eines Spots setzen, Gletscher am Spot, Umrisse (/api/glaciers)
+src/glamos.js        Längenänderung der Gletscherzungen (GLAMOS-CSV): Zuordnung über SGI-Id oder Name, aufsummierte Kurve, Rate der letzten zehn Jahre
+src/archives.js      Katalog offener Archivbilder (CSV/GeoJSON, WGS84/LV95): Vorschläge in der Nähe und Blickrichtung, Lizenzprüfung, Download nur der Katalog-Adressen
+src/horizon-align.js Ausrichtung an der Horizontlinie (Trockengebiet, wo Dünen keine festen Punkte haben): Verschiebung aus der Korrelation der Skylines
+src/routes/landscapes.js  Landschaft eines Spots setzen, Gletscher am Spot (mit Längenänderung), Umrisse (/api/glaciers), Archivbild-Vorschläge
 src/lenient-fetch.js HTTP-Client für BRouters eigenen Server (Kopfzeilen nur mit \n)
 src/fit.js           FIT-Dateien von Sportuhren und Velocomputern lesen (record-Meldungen, komprimierte Zeitstempel,
                      Sensorwerte pro Punkt und Developer-Felder)
@@ -88,6 +92,8 @@ src/routes/organizations.js  Mitglieder einer Organisation aufnehmen, Einladunge
 src/routes/profile.js   Eigene Profilseite: Zahlen, eigene Fotos und Export als ZIP (nur für das eigene Konto)
 src/zip.js           ZIP-Archive als Stream schreiben (ohne Kompression, ZIP64 ab 4 GB), ohne Abhängigkeiten
 src/trackfile.js     Touren lesen (GPX, TCX, KML, GeoJSON, NMEA) und als GPX schreiben
+src/gpkg-tiles.js    Vektorkacheln im LV95-Gitter als GeoPackage (OGC-Erweiterung Vektorkacheln, Gitter mit exakt gleicher Fläche je Stufe)
+src/featurecatalogue.js  Objektkatalog (ISO 19110) und Texte der Metadaten pro Collection
 src/coolmap.js       Karte kühler Abschnitte: Tour-Temperaturen ohne Wetter, Tageszeit und Trägheit, in 100-m-Zellen über Touren gemittelt
 src/routegeo.js      Länge, Abstand zur Route und Position entlang der Route, Privatzone an den Enden
 src/sensitive.js     Sensible Arten (Orchideen, geschützte Pflanzen), deren Funde automatisch geschützt werden; kantonale Schutzlisten (CSV-Import)

@@ -136,4 +136,4 @@ function writeGeoPackage(file, layers, { srsId = 4326 } = {}) {
   }
 }
 
-module.exports = { writeGeoPackage, gpkgGeometry, wkb };
+module.exports = { writeGeoPackage, gpkgGeometry, wkb, SRS };

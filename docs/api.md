@@ -37,7 +37,10 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/export/myforrest.pmtiles` | Vektorkacheln des Datensatzes (WebMercatorQuad, Zoom 0–18) als PMTiles v3; mit Range-Anfragen; 503 während der Berechnung |
 | `GET`    | `/api/metadata/geocat.xml`     | Metadaten des Datensatzes nach GM03 (ISO19139.che) für geocat.ch |
 | `GET`    | `/api/metadata/iso19139.xml`   | Dieselben Metadaten als reines ISO 19139 |
+| `GET`    | `/api/metadata/collections/:id/geocat.xml` | Eintrag einer Collection (`spots`, `photos`, `findings`, `spread_fronts`) nach GM03, Teil des Datensatzes (`parentIdentifier`); ebenso `…/iso19139.xml` |
+| `GET`    | `/api/metadata/objektkatalog.xml` | Objektkatalog nach ISO 19110: Collections als Objektarten, alle Felder mit Definition, Datentyp, Einheit und Wertelisten |
 | `GET`    | `/api/export/myforrest.mbtiles` | Dieselben Kacheln als MBTiles 1.3 (SQLite); 503 während der Berechnung |
+| `GET`    | `/api/export/myforrest-kacheln-lv95.gpkg` | Die Vektorkacheln im LV95-Gitter von swisstopo (Stufen 15–26) als GeoPackage mit der OGC-Erweiterung für Vektorkacheln; 503 während der Berechnung |
 | `GET`    | `/ogc/tileMatrixSets[/{tms}]` | Kachelgitter (OGC Two Dimensional Tile Matrix Set): `WebMercatorQuad` und `SwissLV95` (EPSG:2056, Gitter von swisstopo) |
 | `GET`    | `/ogc/tiles[/{tms}]` | Vektorkacheln des Datensatzes: Liste und Tileset (für WebMercatorQuad zugleich TileJSON 3.0; für SwissLV95 mit Ausdehnung in LV95) |
 | `GET`    | `/ogc/tiles/{tms}/{z}/{y}/{x}` | Kachel (MVT) mit den Ebenen `spread_fronts`, `spots`, `findings`; 204 wenn leer |
@@ -47,13 +50,16 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/spots/:id/storms`      | Sturmereignisse am Spot (ab 12 Monate vor dem ersten Foto), mit verknüpften Windwurf-Fotos |
 | `GET`    | `/api/photos/:id/storm?to=`  | Wahrscheinlichster Sturm zwischen zwei Fotos             |
 | `GET`    | `/api/storms/spots`          | Spots mit Sturm seit dem ersten Foto (aus dem Cache; fehlende werden im Hintergrund geladen) |
-| `GET`    | `/api/phenoref`              | Geladene Phänologie-Reihen (Stationen, Beobachtungen, Arten) |
+| `GET`    | `/api/phenoref`              | Geladene Phänologie-Reihen (Stationen, Beobachtungen der Verfärbung, `leafout`: Beobachtungen des Austriebs, Arten) |
 | `GET`    | `/api/spots/:id/phenoref`    | Referenz für den Beginn der Herbstfärbung am Spot, pro Art mit Stationen |
-| `POST`   | `/api/phenoref/sync`         | DWD-Jahresmelder-Daten herunterladen (braucht Zugang zu `opendata.dwd.de`) |
-| `POST`   | `/api/phenoref/import?format=` | Datei als Text importieren: `generic` (CSV) oder `dwd&kind=stations\|plants\|phases\|observations&name=<Dateiname>` |
+| `GET`    | `/api/spots/:id/leafout?year=` | Laubaustrieb am Spot für ein Jahr (Standard: dieses): beobachtet (`year`) oder Mittel der letzten zehn Jahre (`year: null`), mit Stationen und `label` |
+| `POST`   | `/api/phenoref/sync`         | DWD-Jahres- und Sofortmelder herunterladen (braucht Zugang zu `opendata.dwd.de`); `?source=meteoschweiz`: Phänologie-OGD von MeteoSchweiz (`data.geo.admin.ch`) |
+| `POST`   | `/api/phenoref/import?format=` | Datei als Text importieren: `generic` (CSV), `dwd&kind=stations\|plants\|phases\|observations&name=<Dateiname>` oder `meteoschweiz&kind=parameters\|stations\|observations` |
 | `PATCH`  | `/api/spots/:id`             | Höhe (`{ elevation: 950 }`), Exposition (`{ exposition: 'S' }`, auch `'eben'`) und/oder Geländeform (`{ landform: 'senke' }`) von Hand setzen; `null` ermittelt den Wert neu |
 | `PUT`    | `/api/spots/:id/landscape`   | Landschaftsprofil von Hand setzen (`{ landscape: 'gletscher' }`); `null` bestimmt es neu (Gletscherumrisse) |
-| `GET`    | `/api/spots/:id/glacier`     | Gletscher am Spot: `glacier` (Name, `latestYear`, `distanceM` zum Eis des neusten Inventars, `history` mit `ice` pro Inventarjahr) und `satellite` (Schnee- und Eisanteil: `monthly`, `summers` mit dem Spätsommerwert pro Jahr, `iceFreeSince`, `meltOut` mit dem Monat der Ausaperung pro Jahr, `status`) |
+| `GET`    | `/api/spots/:id/glacier`     | Gletscher am Spot: `glacier` (Name, `latestYear`, `distanceM` zum Eis des neusten Inventars, `history` mit `ice` pro Inventarjahr, `id` als SGI-Id, falls vorhanden), `length` (Längenänderung aus GLAMOS: `total`, `firstYear`, `lastYear`, `recentRate` in m pro Jahr, `points` mit `year`, `change`, `cumulative`; sonst `null`) und `satellite` (Schnee- und Eisanteil: `monthly`, `summers` mit dem Spätsommerwert pro Jahr, `iceFreeSince`, `meltOut` mit dem Monat der Ausaperung pro Jahr, `status`) |
+| `GET`    | `/api/spots/:id/archive-suggestions` | Archivbilder aus dem Katalog (`ARCHIV_KATALOG`) in der Nähe: `enabled` und `items` (`id`, `title`, `year`, `date`, `distanceM`, `heading`, `source`, `license`, `page`, `importable`, `photoId`, falls schon übernommen) |
+| `POST`   | `/api/spots/:id/archive-suggestions/:itemId` | Archivbild als Archivfoto des Spots übernehmen (Anmeldung; 409, wenn die Lizenz es nicht erlaubt oder es schon übernommen ist; 502, wenn das Archiv das Bild nicht liefert); Antwort wie `POST /api/photos` |
 | `GET`    | `/api/glaciers?bbox=&year=`  | Gletscherumrisse als GeoJSON (vereinfacht, `name` und `year` pro Umriss), alle Inventare oder eines; `years` listet die Inventarjahre |
 | `POST`   | `/api/spots/:id/species`     | Baumart einem Spot zuordnen (`{ scientificName }`)       |
 | `DELETE` | `/api/spots/:id/species?name=` | Baumart vom Spot entfernen                             |
@@ -96,7 +102,7 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/closures?bbox=w,s,e,n` | Sperrungen bei Holzerei (`lat`, `lon`, `radiusM`, `reason`, `until`, `auto` = aus einem Holzschlag-Foto, `removable`) und ob das Konto Sperrungen setzen darf (`mayClose`) |
 | `POST`   | `/api/closures`              | PRO-Mitglieder und Moderation: Sperrung setzen (`{ spotId }` oder `{ lat, lon }`, `until` JJJJ-MM-TT bis in 12 Monaten, `radiusM` 20–500, Standard 100, `reason`); `/api/route` führt mit `nogos` darum herum und nennt sie in `closures` bzw. `insideClosures` |
 | `DELETE` | `/api/closures/:id`          | Sperrung aufheben (wer sie gesetzt hat, oder Moderation) |
-| `GET`    | `/api/cool-cells?bbox=w,s,e,n` | Karte kühler Abschnitte aus geteilten Tour-Temperaturen: `cells` (`lat`, `lon` der Zellmitte, `delta` °C gegenüber dem Rest derselben Touren, `tours`), `cellM`, `minTours`, `minPeople`; höchstens 0,5° × 0,3° |
+| `GET`    | `/api/cool-cells?bbox=w,s,e,n` | Karte kühler Abschnitte aus geteilten Tour-Temperaturen, optional `season=sommer\|winter` und `daytime=tag\|nacht` (nur Touren dieser Art; Touren, deren Uhr weit neben der Lufttemperatur des Wettermodells lag, zählen nie): `cells` (`lat`, `lon` der Zellmitte, `delta` °C gegenüber dem Rest derselben Touren, `tours`), `cellM`, `minTours`, `minPeople`; höchstens 0,5° × 0,3° |
 | `GET`    | `/api/wildlife-zones?bbox=w,s,e,n` | Wildruhezonen in der Schutzzeit als GeoJSON (`name`, `season`), für die Karte; `wildlifeZones` in `/api/config` sagt, ob welche hinterlegt sind |
 | `POST`   | `/api/route-suggestions`     | Fotoaufträge, Spots mit Satelliten-Frühwarnung und lange nicht besuchte Spots nahe einer Route (`{ points, maxDistanceM }`), mit Abstand und Kilometer; die Route wird nicht gespeichert |
 | `GET`    | `/api/photo-requests`        | Offene, nicht abgelaufene Fotoaufträge (`?status=alle` auch erledigte und abgelaufene, `status: 'abgelaufen'`), mit `expiresAt`, ohne Namen der anfragenden Person |
@@ -124,8 +130,11 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 
 | `POST`   | `/api/photos/:id/identify`   | Pflanzen bestimmen (Pl@ntNet)                            |
 | `GET`    | `/api/species`               | Arten mit Funden: Anzahl, Spots, Jahre, Neophyt ja/nein  |
-| `GET`    | `/api/occurrences`           | Funde (bestes Pl@ntNet-Ergebnis pro Foto). Filter für diese und die folgenden Routen: `species`, `neophytes=1`, `minScore` (Standard 0,2), `bbox=west,süd,ost,nord`, `from`/`to` (Datum) |
+| `GET`    | `/api/occurrences`           | Funde (bestes Pl@ntNet-Ergebnis pro Foto). Filter für diese und die folgenden Routen: `species`, `neophytes=1`, `minScore` (Standard 0,2), `bbox=west,süd,ost,nord`, `from`/`to` (Datum), `verified=1` (nur von Menschen geprüfte). Jeder Fund trägt `verification` (`bestaetigt`, `korrigiert` oder `null`); abgelehnte fehlen |
 | `GET`    | `/api/spread?species=`       | Ausbreitungsfronten einer Art: Umriss (`polygons` mit Lücken), Fläche, Teilbestände und Frontabstand pro Jahr, Rate und Richtung, dazu `patches` mit Rate, Richtung, Flächenzuwachs, Sprung und Zusammenwachsen (`until`, `mergedInto`, `absorbed`) pro Teilbestand, Umriss pro Jahr (`buffer` in m, Standard 25; `alpha` in m, Standard automatisch; `shape=convex` für die konvexe Hülle) |
+| `GET`    | `/api/identifications/review` | Prüfliste (PRO und Moderation): ungeprüfte Funde, neuste zuerst, mit allen Pl@ntNet-Kandidaten und `own` (eigenes Foto) |
+| `PUT`    | `/api/photos/:id/identification-review` | Bestimmung prüfen: `{ status: 'bestaetigt' \| 'abgelehnt' }` oder `{ status: 'korrigiert', scientificName }`; nicht das eigene Foto (ausser Moderation) |
+| `DELETE` | `/api/photos/:id/identification-review` | Prüfung zurücknehmen (wer geprüft hat oder Moderation) |
 | `GET`    | `/api/export/dwc.csv`        | Funde als Darwin-Core-Occurrence-CSV (Info Flora, GBIF)  |
 | `GET`    | `/api/export/inaturalist.csv` | Funde im CSV-Importformat von iNaturalist               |
 | `GET`    | `/api/spots/:id/vegetation`  | Grünanteil, Kronendach-Deckung, Lückenanteil und GCC pro Foto (`pending`: noch in Berechnung) |
@@ -142,6 +151,7 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/satellite/harmonization` | Angleichung von Landsat an Sentinel-2 pro Index und Satellit (Gerade oder Versatz, Monatspaare, Abstand vorher, Restabweichung) |
 | `POST`   | `/api/satellite/harmonization` | Sofort neu schätzen |
 | `GET`    | `/api/satellite/alerts`      | Frühwarnung: Spots, deren letzte Monate gegenüber derselben Jahreszeit der Vorjahre gefallen sind (Index, seit wann, wie stark, Sturm davor, ob ein Besuch lohnt, `calibration`: verwendete Schwelle) |
+| `GET`    | `/api/storm-warnings`        | Sturmwarnungen aus der Böenprognose und Stürme der letzten Woche: `warnings` (`cell` 0,1°-Feld, `lat`, `lon`, `date`, `gust` km/h – vor dem Sturm Prognose, danach gemessen –, `from16`, `label`, `phase` `vorher`\|`nachher`), `model`, `threshold` |
 | `GET`    | `/api/photos/:id/regions?to=` | Veränderte Regionen mit entscheidender Quelle (Regel/gelernt), Sicherheit, Nadelholzanteil, vermuteter Art und eigener Bestätigung |
 | `POST`   | `/api/photos/:id/region-labels` | Region bestätigen oder korrigieren (`{ to, index, class }`, `class: null` entfernt die Bestätigung) |
 | `GET`    | `/api/analysis/status`       | Stand des Lernmodells (Beispiele pro Klasse, Genauigkeit) und des Detektors (Bestätigungsquote pro Label) |

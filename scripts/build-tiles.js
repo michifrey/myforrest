@@ -21,7 +21,7 @@ const { createApp } = require('../src/app');
   const built = await app.locals.ogcTiles.precompute(base);
   if (!built.length) console.log(`Alle Kacheln für ${base} sind aktuell.`);
   for (const b of built) console.log(`${b.tileset.padEnd(32)} ${String(b.tiles).padStart(7)} Kacheln ${(b.bytes / 1024).toFixed(0).padStart(7)} KiB ${b.millis} ms`);
-  console.log(`Fertig in ${((Date.now() - started) / 1000).toFixed(1)} s. Exporte: data/tiles/myforrest.pmtiles und .mbtiles`);
+  console.log(`Fertig in ${((Date.now() - started) / 1000).toFixed(1)} s. Exporte: data/tiles/myforrest.pmtiles, .mbtiles und myforrest-kacheln-lv95.gpkg`);
   await app.locals.idle();
   app.locals.ogcTiles.close();
   process.exit(0);

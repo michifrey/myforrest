@@ -14,7 +14,8 @@
  *                                        around wildlife rest areas in their protection period (WILDRUHE_GEOJSON)
  *   GET    /api/wildlife-zones?bbox=    those areas as GeoJSON, for the map
  *   GET/POST/DELETE /api/closures       temporary closures during forestry work (src/closures.js)
- *   GET    /api/cool-cells?bbox=        map of cool stretches from shared tour temperatures (src/coolmap.js)
+ *   GET    /api/cool-cells?bbox=        map of cool stretches from shared tour temperatures (src/coolmap.js),
+ *                                        ?season=sommer|winter&daytime=tag|nacht
  *   POST   /api/route-suggestions       photo requests and spots worth a visit near a route (satellite early warning,
  *                                       series not continued for a year); the route is not stored
  *   GET    /api/photo-requests          open (and recently done) requests
@@ -41,7 +42,7 @@ const { parseTrackFile, toGpx, MAX_POINTS } = require('../trackfile');
 const { createWildlife } = require('../wildlife');
 const { createClosures } = require('../closures');
 const { lengthM, bbox, nearRoute, trimEnds, sampleAlong, climb } = require('../routegeo');
-const { createCoolMap, CELL_M, MIN_TOURS, MIN_PEOPLE } = require('../coolmap');
+const { createCoolMap, CELL_M, MIN_TOURS, MIN_PEOPLE, SEASONS, DAYTIMES } = require('../coolmap');
 
 const KINDS = ['gezeichnet', 'aufgezeichnet', 'importiert'];
 const VISIBILITY = ['privat', 'oeffentlich'];
@@ -174,7 +175,7 @@ module.exports = function registerTracks(app, ctx) {
   db.exec(SCHEMA);
   const trackCols = new Set(db.prepare('PRAGMA table_info(tracks)').all().map((c) => c.name));
   for (const [col, type] of TRACK_MIGRATIONS) if (!trackCols.has(col)) db.exec(`ALTER TABLE tracks ADD COLUMN ${col} ${type}`);
-  coolMap = createCoolMap(db, { unpack: unpackPoints });
+  coolMap = createCoolMap(db, { unpack: unpackPoints, weather: ctx.weather || null });
   const reqCols = new Set(db.prepare('PRAGMA table_info(photo_requests)').all().map((c) => c.name));
   for (const [col, type] of REQUEST_MIGRATIONS) if (!reqCols.has(col)) db.exec(`ALTER TABLE photo_requests ADD COLUMN ${col} ${type}`);
   // What the request may see; without the accounts module (tests of this file alone): the public view.
@@ -339,13 +340,15 @@ module.exports = function registerTracks(app, ctx) {
 
   /* ---------- Map of cool stretches (shared tour temperatures) ---------- */
 
-  app.get('/api/cool-cells', (req, res) => {
+  app.get('/api/cool-cells', async (req, res) => {
     const box = String(req.query.bbox || '').split(',').map(Number);
     if (box.length !== 4 || !box.every(Number.isFinite) || box[0] >= box[2] || box[1] >= box[3]) {
       return fail(res, 400, 'bbox: west,süd,ost,nord');
     }
     if (box[2] - box[0] > 0.5 || box[3] - box[1] > 0.3) return fail(res, 400, 'Ausschnitt zu gross – bitte näher heranzoomen');
-    res.json({ cells: coolMap.cells(box), cellM: CELL_M, minTours: MIN_TOURS, minPeople: MIN_PEOPLE });
+    const season = SEASONS.includes(req.query.season) ? req.query.season : null;
+    const daytime = DAYTIMES.includes(req.query.daytime) ? req.query.daytime : null;
+    res.json({ cells: await coolMap.cells(box, { season, daytime }), cellM: CELL_M, minTours: MIN_TOURS, minPeople: MIN_PEOPLE, season, daytime });
   });
 
   /* ---------- Routing along paths (optional) ---------- */
