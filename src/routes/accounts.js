@@ -45,6 +45,7 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const {
   SESSION_COOKIE, SESSION_TTL_MS, ROLES, hasPassword, parseCookies, serializeCookie, createLimiter, createAuth, isModerator, canSeeProtected, userJson,
+  proExpired, mayRenewPro, proValidDays, PRO_REMIND_DAYS, PRO_RENEW_DAYS,
 } = require('../auth');
 const { STATE_COOKIE, STATE_TTL_MS, createOAuth } = require('../oauth');
 const { createMailer } = require('../mail');
@@ -200,7 +201,8 @@ module.exports = function registerAccounts(app, ctx) {
         // Uploaders protect or release their own photos; PRO members and moderation any photo.
         if (!own && !canSeeProtected(req.user)) return fail(res, req.user ? 403 : 401, 'Nur wer das Foto hochgeladen hat, PRO-Mitglieder oder Moderation können den Schutz ändern');
         const on = body.protected === true || body.protected === 1 || body.protected === '1';
-        const reason = !on ? null : own && !canSeeProtected(req.user) ? 'upload' : isModerator(req.user) && !own ? 'moderation' : own ? 'upload' : 'pro';
+        // Released by hand: noted, so that a protection list or a new identification does not protect it again.
+        const reason = !on ? 'freigegeben' : own && !canSeeProtected(req.user) ? 'upload' : isModerator(req.user) && !own ? 'moderation' : own ? 'upload' : 'pro';
         db.prepare('UPDATE photos SET protected = ?, protected_reason = ? WHERE id = ?').run(on ? 1 : 0, reason, id);
         if (!own) mod.log(req.user, on ? 'protect' : 'unprotect', { photoId: id, targetUserId: photo.uploader_id });
       }
@@ -661,12 +663,16 @@ module.exports = function registerAccounts(app, ctx) {
 
   app.get('/api/users', adminOnly, (req, res) => {
     res.json(db.prepare(`
-      SELECT u.id, u.name, u.email, u.role, u.created_at, u.pro_status, u.organization, u.pro_note, u.pro_requested_at, COUNT(p.id) AS photos
+      SELECT u.id, u.name, u.email, u.role, u.created_at, u.pro_status, u.organization, u.pro_note, u.pro_requested_at,
+             u.pro_valid_until, u.pro_renewal_requested_at, COUNT(p.id) AS photos
       FROM users u LEFT JOIN photos p ON p.uploader_id = u.id GROUP BY u.id ORDER BY u.id`).all()
       .map((u) => ({
         id: u.id, name: u.name, email: u.email, role: u.role, photos: u.photos, createdAt: new Date(u.created_at).toISOString(),
         proStatus: u.pro_status || null, organization: u.organization || null, proNote: u.pro_note || null,
         proRequestedAt: u.pro_requested_at ? new Date(u.pro_requested_at).toISOString() : null,
+        proValidUntil: u.pro_status === 'verifiziert' && u.pro_valid_until ? new Date(u.pro_valid_until).toISOString() : null,
+        proExpired: proExpired(u),
+        proRenewalRequestedAt: u.pro_renewal_requested_at ? new Date(u.pro_renewal_requested_at).toISOString() : null,
       })));
   });
 
@@ -688,14 +694,22 @@ module.exports = function registerAccounts(app, ctx) {
   app.post('/api/auth/pro', (req, res) => {
     if (!req.user) return fail(res, 401, 'Bitte zuerst anmelden');
     if (!jsonOnly(req, res)) return;
-    if (req.user.pro_status === 'verifiziert') return fail(res, 409, 'Das Konto ist bereits PRO-Mitglied');
+    // A verified member asks for renewal near or after the end; PRO stays until then (status remains verified).
+    const renewal = req.user.pro_status === 'verifiziert';
+    if (renewal && !mayRenewPro(req.user)) {
+      return fail(res, 409, `Das Konto ist PRO-Mitglied bis ${new Date(req.user.pro_valid_until).toLocaleDateString('de-CH')}; verlängern lässt es sich ab ${PRO_RENEW_DAYS} Tagen vor dem Ablauf`);
+    }
     const organization = String(req.body?.organization || '').trim().slice(0, 160);
     const note = String(req.body?.note || '').trim().slice(0, 1000) || null;
     if (organization.length < 2) return fail(res, 400, 'Bitte die Organisation angeben (z. B. Forstamt, Naturschutzorganisation)');
     if (proPerUser.blocked(String(req.user.id))) return fail(res, 429, 'Zu viele Anträge – bitte morgen wieder');
     proPerUser.hit(String(req.user.id));
-    db.prepare("UPDATE users SET pro_status = 'angefragt', organization = ?, pro_note = ?, pro_requested_at = ?, pro_decided_at = NULL, pro_decided_by = NULL WHERE id = ?")
-      .run(organization, note, Date.now(), req.user.id);
+    if (renewal) {
+      db.prepare('UPDATE users SET organization = ?, pro_note = ?, pro_renewal_requested_at = ? WHERE id = ?').run(organization, note, Date.now(), req.user.id);
+    } else {
+      db.prepare("UPDATE users SET pro_status = 'angefragt', organization = ?, pro_note = ?, pro_requested_at = ?, pro_decided_at = NULL, pro_decided_by = NULL WHERE id = ?")
+        .run(organization, note, Date.now(), req.user.id);
+    }
     res.json(selfJson(auth.userById(req.user.id)));
   });
 
@@ -708,15 +722,62 @@ module.exports = function registerAccounts(app, ctx) {
     if (!['verifiziert', 'abgelehnt', 'entzogen'].includes(decision)) return fail(res, 400, 'decision: verifiziert, abgelehnt oder entzogen');
     const organization = req.body?.organization !== undefined ? String(req.body.organization).trim().slice(0, 160) : target.organization;
     if (decision === 'verifiziert' && !organization) return fail(res, 400, 'Bitte die Organisation angeben');
-    db.prepare('UPDATE users SET pro_status = ?, organization = ?, pro_decided_at = ?, pro_decided_by = ? WHERE id = ?')
-      .run(decision === 'entzogen' ? null : decision, organization || null, Date.now(), req.user.id, id);
+    // A verification holds for PRO_VALID_DAYS; a renewal adds them to the current end (or to today, once run out).
+    const now = Date.now();
+    const validUntil = decision === 'verifiziert'
+      ? Math.max(now, target.pro_status === 'verifiziert' ? target.pro_valid_until || now : now) + proValidDays() * 86400000 : null;
+    db.prepare(`UPDATE users SET pro_status = ?, organization = ?, pro_decided_at = ?, pro_decided_by = ?, pro_valid_until = ?,
+      pro_renewal_requested_at = NULL, pro_reminded_at = NULL WHERE id = ?`)
+      .run(decision === 'entzogen' ? null : decision, organization || null, now, req.user.id, validUntil, id);
     mod.log(req.user, `pro-${decision}`, { targetUserId: id, detail: organization || null });
     res.json(userJson(auth.userById(id)));
   });
 
+  /* ---------- Reminders before PRO runs out ---------- */
+
+  /**
+   * E-mails PRO members whose verification ends within PRO_REMIND_DAYS (once),
+   * and once more when it has run out. Runs daily; returns how many were sent.
+   */
+  async function remindPro(now = Date.now()) {
+    const fmt = (ms) => new Date(ms).toLocaleDateString('de-CH');
+    const link = publicUrl ? `${publicUrl.replace(/\/+$/, '')}/` : 'MyForrest';
+    let sent = 0;
+    const due = db.prepare(`SELECT * FROM users WHERE pro_status = 'verifiziert' AND pro_valid_until IS NOT NULL
+      AND pro_valid_until - ? <= ? AND pro_renewal_requested_at IS NULL`).all(now, PRO_REMIND_DAYS * 86400000);
+    for (const u of due) {
+      const ended = u.pro_valid_until <= now;
+      // Before the end: once from 30 days before; after it: once more.
+      const remindedFor = u.pro_reminded_at ?? 0;
+      if (ended ? remindedFor >= u.pro_valid_until : remindedFor >= u.pro_valid_until - PRO_REMIND_DAYS * 86400000) continue;
+      try {
+        await mailer.send({
+          to: u.email,
+          subject: ended ? 'MyForrest: PRO-Mitgliedschaft abgelaufen' : `MyForrest: PRO-Mitgliedschaft läuft am ${fmt(u.pro_valid_until)} ab`,
+          text: [
+            `Hallo ${u.name}`,
+            '',
+            ended
+              ? `Die PRO-Verifizierung deines Kontos (${u.organization}) ist am ${fmt(u.pro_valid_until)} abgelaufen. Geschützte Funde siehst du erst wieder, wenn sie verlängert ist.`
+              : `Die PRO-Verifizierung deines Kontos (${u.organization}) gilt bis ${fmt(u.pro_valid_until)}. Sie wird jedes Jahr bestätigt.`,
+            '',
+            `Bitte bestätige deine Angaben: ${link} → Konto-Menü → PRO-Mitgliedschaft → Verlängern.`,
+          ].join('\n'),
+        });
+        db.prepare('UPDATE users SET pro_reminded_at = ? WHERE id = ?').run(now, u.id);
+        sent++;
+      } catch (err) {
+        console.error(`Erinnerung an PRO-Konto ${u.id} fehlgeschlagen: ${err.message}`);
+      }
+    }
+    return sent;
+  }
+  if (ctx.proReminders !== false) setInterval(() => remindPro().catch(() => {}), 24 * 3600 * 1000).unref?.();
+
   /* ---------- Helpers for app.js ---------- */
 
   return {
+    remindPro,
     canSeeHidden,
     /** SQL condition for visible photo rows (alias `p` by default) in this request. */
     visibleSql: (req, alias) => visibleSql(view(req), alias),

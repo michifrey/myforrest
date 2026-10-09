@@ -158,12 +158,26 @@ const USER_MIGRATIONS = [
   ['pro_decided_at', 'INTEGER'],
   ['pro_decided_by', 'INTEGER'],
   ['email_verified_at', 'INTEGER'], // set by the confirmation link, a password reset or an identity provider
+  // PRO is granted for a year at a time and confirmed again (renewal request, admin decision).
+  ['pro_valid_until', 'INTEGER'],
+  ['pro_renewal_requested_at', 'INTEGER'],
+  ['pro_reminded_at', 'INTEGER'], // last reminder e-mail about the end of PRO
 ];
+
+const DAY = 86400000;
+/** How long a PRO verification holds (PRO_VALID_DAYS, default a year). */
+const proValidDays = () => Math.max(1, Number(process.env.PRO_VALID_DAYS) || 365);
+/** From this many days before the end, PRO members are reminded and may ask for renewal. */
+const PRO_RENEW_DAYS = 60;
+const PRO_REMIND_DAYS = 30;
 
 function createAuth(db, { adminEmail = null } = {}) {
   db.exec(SCHEMA);
   const cols = new Set(db.prepare('PRAGMA table_info(users)').all().map((c) => c.name));
   for (const [col, type] of USER_MIGRATIONS) if (!cols.has(col)) db.exec(`ALTER TABLE users ADD COLUMN ${col} ${type}`);
+  // Verifications from before PRO was limited: a year from the decision, at least another 30 days from now.
+  db.prepare(`UPDATE users SET pro_valid_until = MAX(COALESCE(pro_decided_at, ?) + ?, ? + ?)
+    WHERE pro_status = 'verifiziert' AND pro_valid_until IS NULL`).run(Date.now(), proValidDays() * DAY, Date.now(), PRO_REMIND_DAYS * DAY);
   // A precomputed hash so that logins for unknown accounts take as long as real ones.
   let dummyHash = null;
   const dummy = async () => (dummyHash ??= await hashPassword(randomToken()));
@@ -470,8 +484,13 @@ function createAuth(db, { adminEmail = null } = {}) {
 const hasPassword = (user) => String(user?.password_hash || '').startsWith('scrypt$');
 
 const isModerator = (user) => Boolean(user && (user.role === 'moderator' || user.role === 'admin'));
-/** Verified PRO members, moderation and administration see protected finds. */
-const isPro = (user) => Boolean(user && user.pro_status === 'verifiziert');
+/** Verified PRO members (whose verification has not run out), moderation and administration see protected finds. */
+const isPro = (user, now = Date.now()) => Boolean(user && user.pro_status === 'verifiziert' && (!user.pro_valid_until || user.pro_valid_until > now));
+/** PRO verified once but run out: renew to see protected finds again. */
+const proExpired = (user, now = Date.now()) => Boolean(user && user.pro_status === 'verifiziert' && user.pro_valid_until && user.pro_valid_until <= now);
+/** A PRO member may ask for renewal from PRO_RENEW_DAYS before the end, and after it. */
+const mayRenewPro = (user, now = Date.now()) => Boolean(user && user.pro_status === 'verifiziert' && user.pro_valid_until && user.pro_valid_until - now <= PRO_RENEW_DAYS * DAY);
+const iso = (ms) => (ms ? new Date(ms).toISOString() : null);
 const canSeeProtected = (user) => isPro(user) || isModerator(user);
 
 /** Public view of an account (never the e-mail of others or the hash). */
@@ -489,11 +508,16 @@ const userJson = (u, { self = false, identities } = {}) => (u ? {
     defaultLicense: u.default_license,
     proStatus: u.pro_status || null,
     organizationRequested: u.organization || null,
+    proValidUntil: u.pro_status === 'verifiziert' ? iso(u.pro_valid_until) : null,
+    proExpired: proExpired(u),
+    proRenewable: mayRenewPro(u),
+    proRenewalRequestedAt: iso(u.pro_renewal_requested_at),
   } : {}),
 } : null);
 
 module.exports = {
   ROLES, SESSION_COOKIE, SESSION_TTL_MS, VERIFY_TTL_MS, RESET_TTL_MS,
   hashPassword, verifyPassword, parseCookies, serializeCookie, createLimiter, createAuth, isModerator, isPro, canSeeProtected,
+  proExpired, mayRenewPro, proValidDays, PRO_RENEW_DAYS, PRO_REMIND_DAYS,
   hasPassword, userJson,
 };

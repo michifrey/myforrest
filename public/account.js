@@ -97,7 +97,8 @@ function renderNav() {
       ...(u.emailVerified ? [] : [el('span', { class: 'menu-unverified small', text: 'E-Mail-Adresse noch nicht bestätigt' })]),
     ]),
     ...(u.emailVerified ? [] : [item('Bestätigungslink senden', resendVerification)]),
-    item(u.pro ? 'PRO-Mitgliedschaft' : u.proStatus === 'angefragt' ? 'PRO: Antrag in Prüfung' : 'PRO-Mitgliedschaft beantragen', openPro),
+    item(u.proExpired ? 'PRO abgelaufen – verlängern' : u.proRenewable && !u.proRenewalRequestedAt ? `PRO läuft am ${fmtDate(u.proValidUntil)} ab – verlängern`
+      : u.pro ? 'PRO-Mitgliedschaft' : u.proStatus === 'angefragt' ? 'PRO: Antrag in Prüfung' : 'PRO-Mitgliedschaft beantragen', openPro),
     u.hasPassword ? item('Passwort ändern', () => openAuth('change')) : item('Passwort festlegen', setPasswordByMail),
     ...providerItems,
     ...(isMod() ? [item('Moderation', () => openModeration('reported'))] : []),
@@ -515,6 +516,7 @@ modDialog.innerHTML = `
     <button type="button" role="tab" data-tab="hidden" aria-selected="false">Ausgeblendet</button>
     <button type="button" role="tab" data-tab="log" aria-selected="false">Protokoll</button>
     <button type="button" role="tab" data-tab="users" aria-selected="false" data-admin>Konten</button>
+    <button type="button" role="tab" data-tab="lists" aria-selected="false" data-admin>Schutzlisten</button>
   </div>
   <div id="mod-body" class="mod-body" aria-live="polite"></div>`;
 document.body.append(modDialog);
@@ -523,13 +525,13 @@ modDialog.querySelectorAll('[role="tab"]').forEach((t) => t.addEventListener('cl
 let modTab = 'reported';
 
 function openModeration(tab = 'reported') {
-  modDialog.querySelector('[data-admin]').hidden = Account.user?.role !== 'admin';
+  modDialog.querySelectorAll('[data-admin]').forEach((t) => { t.hidden = Account.user?.role !== 'admin'; });
   modDialog.showModal();
   showModTab(tab);
 }
 Account.openModeration = openModeration;
 
-const TAB_TITLE = { reported: 'Gemeldete Fotos', hidden: 'Ausgeblendete Fotos', log: 'Protokoll', users: 'Konten & Rollen' };
+const TAB_TITLE = { reported: 'Gemeldete Fotos', hidden: 'Ausgeblendete Fotos', log: 'Protokoll', users: 'Konten & Rollen', lists: 'Schutzlisten der Kantone' };
 
 async function showModTab(tab) {
   modTab = tab;
@@ -540,6 +542,7 @@ async function showModTab(tab) {
   try {
     if (tab === 'log') return renderLog(await api('/api/moderation/log'));
     if (tab === 'users') return renderUsers(await api('/api/users'));
+    if (tab === 'lists') return renderLists(await api('/api/protected-species'));
     const q = await api('/api/moderation/queue');
     $('mod-count').textContent = q.reported.length ? String(q.reported.length) : '';
     const items = tab === 'reported' ? q.reported : q.hidden.map((photo) => ({ photo, reports: [] }));
@@ -602,16 +605,25 @@ function proCell(u) {
       }
     },
   });
-  const parts = [el('span', { text: u.proStatus ? `${PRO_LABEL[u.proStatus]}${u.organization ? ` · ${u.organization}` : ''}` : '–' })];
+  const label = u.proExpired ? 'abgelaufen' : PRO_LABEL[u.proStatus];
+  const parts = [el('span', { text: u.proStatus ? `${label}${u.organization ? ` · ${u.organization}` : ''}` : '–' })];
+  if (u.proValidUntil) parts.push(el('span', { class: `muted small${u.proExpired ? ' danger' : ''}`, text: `${u.proExpired ? 'abgelaufen am' : 'gültig bis'} ${fmtDate(u.proValidUntil)}` }));
+  if (u.proRenewalRequestedAt) parts.push(el('span', { class: 'small pro-renewal', text: `Verlängerung beantragt am ${fmtDate(u.proRenewalRequestedAt)}` }));
   if (u.proNote) parts.push(el('span', { class: 'muted small', text: u.proNote }));
   if (u.proStatus === 'angefragt') parts.push(el('span', { class: 'pro-actions' }, [decide('verifiziert', 'Verifizieren', 'secondary'), decide('abgelehnt', 'Ablehnen')]));
-  if (u.proStatus === 'verifiziert') parts.push(decide('entzogen', 'PRO entziehen', 'link small danger'));
+  if (u.proStatus === 'verifiziert') {
+    parts.push(el('span', { class: 'pro-actions' }, [
+      ...(u.proRenewalRequestedAt || u.proExpired ? [decide('verifiziert', 'Um ein Jahr verlängern', 'secondary')] : []),
+      decide('entzogen', 'PRO entziehen', 'link small danger'),
+    ]));
+  }
   return el('td', { class: 'pro-cell' }, parts);
 }
 
 function renderUsers(users) {
-  // Open PRO applications first.
-  users = [...users].sort((a, b) => (b.proStatus === 'angefragt') - (a.proStatus === 'angefragt') || a.id - b.id);
+  // Open PRO applications and renewals first.
+  const open = (u) => u.proStatus === 'angefragt' || Boolean(u.proRenewalRequestedAt);
+  users = [...users].sort((a, b) => open(b) - open(a) || a.id - b.id);
   $('mod-body').replaceChildren(el('table', { class: 'mod-users' }, [
     el('thead', {}, el('tr', {}, ['Name', 'E-Mail', 'Fotos', 'Rolle', 'PRO'].map((h) => el('th', { text: h })))),
     el('tbody', {}, users.map((u) => {
@@ -630,6 +642,42 @@ function renderUsers(users) {
       return el('tr', {}, [el('td', { text: u.name }), el('td', { text: u.email }), el('td', { text: String(u.photos) }), el('td', {}, sel), proCell(u)]);
     })),
   ]));
+}
+
+/** Admins: the cantonal protection lists (CSV import, removal). */
+function renderLists(lists) {
+  const file = el('input', { type: 'file', accept: '.csv,text/csv,text/plain', id: 'lists-file' });
+  const msg = el('p', { class: 'small', 'aria-live': 'polite' });
+  file.addEventListener('change', async () => {
+    const f = file.files[0];
+    if (!f) return;
+    try {
+      const r = await api('/api/protected-species/import', { method: 'POST', headers: { 'Content-Type': 'text/csv' }, body: await f.text() });
+      renderLists(await api('/api/protected-species'));
+      $('lists-msg').textContent = `${r.imported} Einträge für ${r.cantons.join(', ') || '–'} geladen`
+        + `${r.protectedPhotos ? `, ${r.protectedPhotos} bereits bestimmte Funde jetzt geschützt` : ''}`
+        + `${r.skipped.length ? `; ${r.skipped.length} Zeilen übersprungen (z. B. Zeile ${r.skipped[0].line}: ${r.skipped[0].reason})` : ''}.`;
+    } catch (err) {
+      msg.textContent = err.message;
+    }
+  });
+  msg.id = 'lists-msg';
+  $('mod-body').replaceChildren(
+    el('p', { class: 'muted small', text: 'Zusätzlich zur eingebauten Liste (alle einheimischen Orchideen, Enziane, Edelweiss …) schützen diese Listen Funde, die Pl@ntNet als eine der Arten erkennt, im jeweiligen Kanton; «CH» gilt überall. Ist der Kanton eines Spots unbekannt, zählt jede Liste.' }),
+    lists.length ? el('table', { class: 'mod-users' }, [
+      el('thead', {}, el('tr', {}, ['Kanton', 'Einträge', 'Quelle', 'Geladen', ''].map((h) => el('th', { text: h })))),
+      el('tbody', {}, lists.map((l) => el('tr', {}, [
+        el('td', { text: l.canton }), el('td', { text: String(l.entries) }), el('td', { text: l.sources.join(', ') || '–' }), el('td', { text: fmtDate(l.loadedAt) }),
+        el('td', {}, el('button', { type: 'button', class: 'link small danger', text: 'Entfernen', onclick: async () => {
+          if (!confirm(`Schutzliste ${l.canton} entfernen? Bereits geschützte Funde bleiben geschützt.`)) return;
+          await api(`/api/protected-species/${l.canton}`, { method: 'DELETE' });
+          showModTab('lists');
+        } })),
+      ]))),
+    ]) : el('p', { class: 'muted', text: 'Noch keine kantonalen Listen geladen.' }),
+    el('label', { class: 'lists-import', for: 'lists-file' }, ['CSV laden (Spalten kanton;art;status;quelle – ersetzt die Listen dieser Kantone): ', file]),
+    msg,
+  );
 }
 
 async function moderate(photoId, action, body) {
@@ -758,13 +806,22 @@ function openPro() {
   const u = Account.user;
   const close = el('button', { type: 'button', class: 'link', text: 'Schliessen', onclick: () => proDialog.close() });
   const intro = el('p', { class: 'muted', text: 'PRO-Mitglieder sind verifizierte Fachleute und Organisationen, etwa Forstdienste, kantonale Fachstellen oder Naturschutzorganisationen. Sie sehen geschützte Funde (seltene Pflanzen, Pilzstellen, Horste) mit genauer Lage. Alle anderen sehen davon nur ein 5-km-Raster, damit solche Orte nicht geplündert oder zertrampelt werden.' });
-  const body = [el('p', { class: 'eyebrow', text: 'PRO-Mitgliedschaft' }), el('h2', { id: 'pro-title', text: u.pro ? `PRO · ${u.organization}` : 'Geschützte Funde sehen' }), intro];
-  if (u.pro) {
-    body.push(el('p', { text: 'Dein Konto ist verifiziert. Du siehst geschützte Funde und kannst Fotos schützen oder den Schutz aufheben.' }), el('div', { class: 'actions' }, close));
+  const body = [el('p', { class: 'eyebrow', text: 'PRO-Mitgliedschaft' }), el('h2', { id: 'pro-title', text: u.pro || u.proExpired ? `PRO · ${u.organizationRequested}` : 'Geschützte Funde sehen' }), intro];
+  // Verification holds for a year; from 60 days before the end (and after it) it can be renewed.
+  const renewing = u.proExpired || (u.proRenewable && !u.proRenewalRequestedAt);
+  if (u.pro && !renewing) {
+    body.push(
+      el('p', { text: `Dein Konto ist verifiziert${u.proValidUntil ? ` bis ${fmtDate(u.proValidUntil)}` : ''}. Du siehst geschützte Funde und kannst Fotos schützen oder den Schutz aufheben.` }),
+      ...(u.proRenewalRequestedAt ? [el('p', { class: 'small', text: `Verlängerung beantragt am ${fmtDate(u.proRenewalRequestedAt)}; sie wird geprüft.` })] : []),
+      el('p', { class: 'muted small', text: 'Die Verifizierung gilt ein Jahr. Rund einen Monat vor dem Ablauf kommt eine Erinnerung per E-Mail.' }),
+      el('div', { class: 'actions' }, close),
+    );
   } else {
     const msg = el('p', { class: 'auth-error', role: 'alert', hidden: '' });
-    const status = u.proStatus === 'angefragt' ? 'Dein Antrag wird geprüft. Du kannst ihn hier ergänzen.'
-      : u.proStatus === 'abgelehnt' ? 'Dein letzter Antrag wurde abgelehnt. Du kannst einen neuen stellen.' : '';
+    const status = u.proExpired ? `Deine PRO-Verifizierung ist am ${fmtDate(u.proValidUntil)} abgelaufen. Bestätige deine Angaben, damit sie verlängert wird.`
+      : renewing ? `Deine PRO-Verifizierung läuft am ${fmtDate(u.proValidUntil)} ab. Bestätige deine Angaben, damit sie um ein Jahr verlängert wird.`
+        : u.proStatus === 'angefragt' ? 'Dein Antrag wird geprüft. Du kannst ihn hier ergänzen.'
+          : u.proStatus === 'abgelehnt' ? 'Dein letzter Antrag wurde abgelehnt. Du kannst einen neuen stellen.' : '';
     const org = el('input', { id: 'pro-org', required: '', maxlength: '160', placeholder: 'z. B. Forstrevier Adlisberg, WWF Zürich', value: u.organizationRequested || '' });
     const note = el('textarea', { id: 'pro-note', rows: '3', maxlength: '1000', placeholder: 'Funktion, Kontakt für die Prüfung, Website der Organisation' });
     const form = el('form', { method: 'dialog', class: 'pro-form' }, [
@@ -772,7 +829,7 @@ function openPro() {
       el('label', { for: 'pro-org', text: 'Organisation' }), org,
       el('label', { for: 'pro-note', text: 'Angaben für die Prüfung' }), note,
       msg,
-      el('div', { class: 'actions' }, [close, el('button', { type: 'submit', class: 'btn primary', text: 'Antrag senden' })]),
+      el('div', { class: 'actions' }, [close, el('button', { type: 'submit', class: 'btn primary', text: renewing ? 'Verlängerung beantragen' : 'Antrag senden' })]),
     ]);
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -781,7 +838,7 @@ function openPro() {
         Account.user = { ...Account.user, ...me };
         renderNav();
         proDialog.close();
-        alert('Danke! Eine Administratorin oder ein Administrator prüft den Antrag.');
+        alert(renewing ? 'Danke! Die Verlängerung wird geprüft; bis dahin gilt die bisherige Verifizierung.' : 'Danke! Eine Administratorin oder ein Administrator prüft den Antrag.');
       } catch (err) {
         msg.textContent = err.message;
         msg.hidden = false;

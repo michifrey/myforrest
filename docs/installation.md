@@ -51,6 +51,8 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | – | Aktiviert „Mit Google anmelden“ (siehe [unten](#anmelden-mit-google-und-github)) |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | – | Aktiviert „Mit GitHub anmelden“ |
 | `ROUTER_URL`       | `https://brouter.de/brouter` | Routing-Dienst im Format von [BRouter](https://brouter.de) für den Wege-Magnet beim Zeichnen von Touren; leer (`ROUTER_URL=`) = aus, dann gerade Linien. Für den Betrieb einen [eigenen BRouter](../deploy/brouter/README.md) nehmen, z. B. `http://brouter:17777/brouter` |
+| `PRO_VALID_DAYS`   | `365`    | Wie lange eine PRO-Verifizierung gilt, bevor sie bestätigt werden muss |
+| `CANTON_LOOKUP_URL` | geo.admin.ch | Dienst für den Kanton eines Spots (swisstopo identify); leer = aus, dann zählt jede kantonale Schutzliste |
 | `SENSITIVE_SPECIES` | – | Weitere Gattungen oder Arten (kommagetrennt), deren Funde automatisch geschützt werden, z. B. `Trollius,Lilium bulbiferum` |
 | `ROUTER_PROFILE`   | `hiking-mountain` | BRouter-Profil für das Routing |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | erzeugt | Schlüssel für Web Push (base64url); ohne sie erzeugt der Server beim ersten Start ein Paar und speichert es in der Datenbank |

@@ -28,6 +28,7 @@ src/harmonize.js     Angleichung von Landsat an Sentinel-2 aus den Überlappungs
 src/calibration.js   Kalibrierung der Frühwarnung und der Rückgänge zwischen Fotos an bestätigten Schäden (Rückrechnung ohne Blick nach vorn, F1, Kreuzvalidierung nach Spots, pro Waldtyp)
 src/webpush.js       Web Push ohne Abhängigkeiten: VAPID (RFC 8292) und Verschlüsselung aes128gcm (RFC 8291)
 src/routes/push.js   Push-Abos, Spot folgen/stummschalten, Frühwarnungen an regelmässige Besucher
+src/canton.js        Kanton eines Spots über geo.admin.ch (für die kantonalen Schutzlisten)
 src/forest-type.js   Waldtyp eines Spots (Laub/Nadel/Misch) aus Baumarten, Nadelholzanteil der Fotos oder dem winterlichen NDVI
 src/utm.js           Umrechnung WGS84 ↔ UTM (Projektion der Sentinel-2-Kacheln)
 src/routes/vegetation.js  API für Vegetationsdichte und NDVI, Hintergrund-Berechnung
@@ -73,7 +74,7 @@ src/moderation.js    Lizenzen, Meldungen, Ausblenden und Protokoll
 src/routes/accounts.js  Routen für Konten und Moderation, CSRF-Schutz, Rechte auf Fotos
 src/trackfile.js     Touren lesen (GPX, TCX, KML, GeoJSON) und als GPX schreiben
 src/routegeo.js      Länge, Abstand zur Route und Position entlang der Route, Privatzone an den Enden
-src/sensitive.js     Sensible Arten (Orchideen, geschützte Pflanzen), deren Funde automatisch geschützt werden
+src/sensitive.js     Sensible Arten (Orchideen, geschützte Pflanzen), deren Funde automatisch geschützt werden; kantonale Schutzlisten (CSV-Import)
 src/routes/protection.js  Geschützte Funde als 5-km-Raster für alle ohne PRO-Status
 src/routes/tracks.js Touren, Routing-Proxy, Fotoaufträge (Erfüllung beim Upload) und Vorschläge entlang der Route
 deploy/qgis-server/  Vorlage: MyForrest + QGIS Server (WMS/WMTS/WFS) + BRouter + nginx per Docker Compose
