@@ -66,4 +66,28 @@ function inventories() {
   };
 }
 
-module.exports = { NAME, ENDS, outline, iceToday, inLake, elevation, inventories, LAKE };
+/**
+ * GLAMOS length change of the demo glacier (as glamos.ch publishes it): yearly from 1960, the tongue
+ * retreating faster since the 1990s, a short advance around 1980.
+ */
+function glamosCsv() {
+  const rows = ['glacier name;glacier id;start date of observation;end date of observation;length change'];
+  for (let y = 1960; y < 2025; y++) {
+    const rate = y < 1975 ? -6 : y < 1986 ? 4 : y < 1995 ? -9 : y < 2010 ? -16 : -24;
+    const wobble = Math.round(Math.sin(y * 1.7) * 5);
+    rows.push(`${NAME};X00-00;${y}-09-15;${y + 1}-09-15;${rate + wobble}`);
+  }
+  return rows.join('\n') + '\n';
+}
+
+/** An archive catalogue with pictures around the tongue (made up, in the format of ARCHIV_KATALOG). */
+function archiveCsv() {
+  return `id;title;date;lat;lon;heading;source;license;page;image
+demo-1911;${NAME}, Zunge vom Talboden aus;1911-08;46.5985;8.4004;175;ETH-Bibliothek Zürich, Bildarchiv;Public Domain Mark;https://ba.e-pics.ethz.ch/;https://archiv.demo.invalid/1911.jpg
+demo-1934;Gletschertor mit Gletscherbach;1934-07-22;46.6008;8.4011;190;ETH-Bibliothek Zürich, Bildarchiv;CC BY-SA 4.0;https://ba.e-pics.ethz.ch/;https://archiv.demo.invalid/1934.jpg
+demo-1952;Blick talaufwärts, Ansichtskarte;1952;46.5962;8.3998;180;Sammlung Ansichtskarten;Alle Rechte vorbehalten;https://ba.e-pics.ethz.ch/;
+demo-1979;Gletscherzunge und Moräne, Luftbild;1979-09-03;46.6021;8.4031;;Luftbilder swisstopo (LUBIS);CC BY 4.0;https://map.geo.admin.ch/;https://archiv.demo.invalid/1979.jpg
+`;
+}
+
+module.exports = { NAME, ENDS, outline, iceToday, inLake, elevation, inventories, LAKE, glamosCsv, archiveCsv };

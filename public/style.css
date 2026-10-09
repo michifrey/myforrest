@@ -1534,6 +1534,7 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 .glacier-free { font-weight: 600; color: var(--ice); }
 .ice-chart .ice-bar { fill: var(--ice); }
 .ice-chart .ice-bar.free { fill: color-mix(in srgb, var(--ice) 35%, var(--surface)); }
+.length-chart .length-line { fill: none; stroke: var(--ice); stroke-width: 2.2; }
 .archive { margin: 0.8rem 0; }
 .archive summary { cursor: pointer; font-weight: 600; }
 .archive-form { display: grid; gap: 0.5rem; margin-top: 0.5rem; }
@@ -1647,3 +1648,9 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 .sp-review-thumb img { width: 72px; height: 54px; object-fit: cover; border-radius: 8px; display: block; }
 .sp-review-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin-top: 0.3rem; }
 .sp-review-actions select { max-width: 11rem; font-size: 0.82rem; }
+
+/* Archive pictures of open collections near a glacier or mountain spot (glacier.js) */
+.glacier-archives h4 { margin: 0.8rem 0 0.3rem; }
+.archive-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.archive-list li { display: grid; gap: 0.1rem; }
+.archive-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }

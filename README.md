@@ -368,6 +368,13 @@ App, seit wann der Gletscher den Ort freigegeben hat. **Archivfotos** wie alte P
 ihr Datum von Hand und werden auf die neuen Fotos ausgerichtet; im Vorher/Nachher (rechts) liegt die Postkarte
 von 1928 neben 2025.
 
+<p align="center"><img src="docs/screenshots/gletscher-archiv.jpg" width="38%" alt="Längenänderung der Gletscherzunge aus GLAMOS und Archivbilder in der Nähe"></p>
+
+Mit den Messreihen von **GLAMOS** zeigt der Gletscher-Teil, wie weit sich die Zunge seit Beginn der Messungen
+zurückgezogen hat und wie schnell zuletzt. Aus einem Katalog offener **Bildarchive** (z. B. ETH-Bibliothek)
+schlägt er alte Aufnahmen aus der Nähe und in passender Blickrichtung vor; mit einer Lizenz, die es erlaubt,
+übernimmt man sie mit einem Klick als datiertes Archivfoto des Spots.
+
 <p align="center"><img src="docs/screenshots/gebirge.jpg" width="38%" alt="Gebirge-Spot auf einer Alpweide mit der Schneeschmelze pro Jahr"></p>
 
 Spots über 2100 m ohne Baumarten werden **Gebirge**-Spots (brauner Marker) mit Beobachtungen wie Felssturz,
@@ -375,7 +382,8 @@ Murgang, Lawine, Rutschung, Permafrost und Verbuschung der Alpweide. Ihr Teil *S
 welchem Monat der Schnee schmilzt, und vergleicht die ersten mit den letzten Jahren, hier eine Alpweide, die
 heute rund sechs Wochen früher aper ist und auf der Grünerlen einwachsen. Für **Trockengebiete** gibt es ein
 eigenes Profil (Wanderdüne, Bodenerosion, Vegetationsverlust, Überweidung, Versalzung), gewählt beim Hochladen;
-dort meldet der NDVI den Verlust an Vegetation.
+dort meldet der NDVI den Verlust an Vegetation. Weil wandernde Dünen keine festen Punkte haben, richtet die
+App Fotos dort an der Horizontlinie aus.
 
 ## Was MyForrest kann
 
@@ -400,7 +408,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   als Push-Nachricht an alle, die den Spot regelmässig besuchen.
 - **[Landschaften und Gletscher](docs/funktionen.md#landschaften-und-gletscher)**: Profile für Wald, Gletscher,
   Gebirge und Trockengebiet mit eigenen Beobachtungen; Gletscherumrisse aus Inventaren (z. B. GLAMOS) pro Jahr, Eis im Spätsommer
-  und Schneeschmelze aus Sentinel-2, Archivfotos mit Datum von Hand.
+  und Schneeschmelze aus Sentinel-2, Längenänderung der Zunge aus GLAMOS, Archivfotos mit Datum von Hand und
+  Vorschläge aus offenen Bildarchiven; im Trockengebiet Ausrichtung am Horizont.
 - **[Kartenmodi](docs/funktionen.md#kartenmodi)**: Sonnenstand, Schatten und Einstrahlung inklusive
   Geländehorizont sowie Hotspots und Ausbreitungsfronten von Neophyten.
 - **[Pflanzen und Baumarten](docs/funktionen.md#pflanzen-und-baumarten)**: Pflanzenbestimmung mit Pl@ntNet,

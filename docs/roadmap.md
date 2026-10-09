@@ -25,12 +25,12 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
   Hintergrund (braucht eine native Hülle, Browser stoppen GPS im Hintergrund); die Karte kühler Abschnitte
   mit Messnetzen in der Nähe vergleichen (z. B. Stadtklima-Messnetze), sobald es genug echte Touren gibt.
 
-- **Landschaften ausbauen**: im Trockengebiet Ausrichtung am Horizont, wo Dünen keine festen Punkte haben,
-  und längere Offline-Zeiten; im Gebirge Routing mit SAC-Skala und Gefahrenkarten (Steinschlag, Lawinen);
-  ein Name der App für mehr als den Wald.
-- **Gletscher ausbauen**: Längenänderung der Zunge aus den GLAMOS-Messreihen am Spot zeigen; schuttbedecktes
-  Eis mit einem eigenen Index (z. B. NDSI und Temperatur) erkennen; Archivbilder aus Sammlungen mit offener
-  Lizenz (z. B. ETH-Bibliothek) als Vorschlag am passenden Standort anbieten.
+- **Landschaften ausbauen**: im Trockengebiet längere Offline-Zeiten und die Ausrichtung am Horizont mit echten
+  Wüstenfotos prüfen (auch Drehung und Zoom, nicht nur Verschiebung); im Gebirge Routing mit SAC-Skala und
+  Gefahrenkarten (Steinschlag, Lawinen); ein Name der App für mehr als den Wald.
+- **Gletscher ausbauen**: schuttbedecktes Eis mit einem eigenen Index (z. B. NDSI und Temperatur) erkennen; die
+  GLAMOS-Dateien und einen Archiv-Katalog aus dem Bildarchiv der ETH-Bibliothek mit echten Daten einlesen (bisher
+  nur mit Beispieldateien im selben Format geprüft).
 
 ## Phase 3: Automatische Auswertung
 
@@ -92,6 +92,8 @@ Aus früheren Versionen dieser Roadmap:
 - Mapillary-Bilder im Durchgehen und auf der Karte, wo es keine eigenen gibt (über den Server, mit Urheber und Lizenz)
 - Landschaftsprofile Gletscher, Gebirge und Trockengebiet: Umrisse aus Gletscherinventaren pro Jahr, Eis im Spätsommer und
   Schneeschmelze aus Sentinel-2, Archivfotos mit Datum von Hand, Beobachtungen und Auswertung je Landschaft
+- Gletscher: Längenänderung der Zunge aus den GLAMOS-Messreihen, Archivbilder aus offenen Sammlungen als Vorschlag
+  am passenden Standort (Übernahme nur mit passender Lizenz); im Trockengebiet Ausrichtung am Horizont
 - Spots mit gemischten Blickrichtungen auf Wunsch aufteilen
 - Karte und Spots entlang einer Route offline speichern; Benachrichtigung, wenn ein Upload im Hintergrund
   abgelehnt wurde

@@ -48,7 +48,10 @@ src/closures.js      Sperrungen bei Holzerei (aus Holzschlag-Fotos und von Hand)
 src/wildlife.js      Wildruhezonen (GeoJSON, WGS84/LV95, Schutzzeit) als Sperrflächen für BRouter
 src/landscapes.js    Landschaftsprofile (Wald, Gletscher, Gebirge, Trockengebiet): Beobachtungen je Profil, welche Profile Schnee und Eis auswerten, Höhe für Gebirge-Spots
 src/glaciers.js      Gletscherumrisse aus Inventaren (GeoJSON, WGS84/LV95, Jahr aus Eigenschaft oder Dateiname): Eis pro Jahr an einem Ort, Abstand, Umrisse für die Karte
-src/routes/landscapes.js  Landschaft eines Spots setzen, Gletscher am Spot, Umrisse (/api/glaciers)
+src/glamos.js        Längenänderung der Gletscherzungen (GLAMOS-CSV): Zuordnung über SGI-Id oder Name, aufsummierte Kurve, Rate der letzten zehn Jahre
+src/archives.js      Katalog offener Archivbilder (CSV/GeoJSON, WGS84/LV95): Vorschläge in der Nähe und Blickrichtung, Lizenzprüfung, Download nur der Katalog-Adressen
+src/horizon-align.js Ausrichtung an der Horizontlinie (Trockengebiet, wo Dünen keine festen Punkte haben): Verschiebung aus der Korrelation der Skylines
+src/routes/landscapes.js  Landschaft eines Spots setzen, Gletscher am Spot (mit Längenänderung), Umrisse (/api/glaciers), Archivbild-Vorschläge
 src/lenient-fetch.js HTTP-Client für BRouters eigenen Server (Kopfzeilen nur mit \n)
 src/fit.js           FIT-Dateien von Sportuhren und Velocomputern lesen (record-Meldungen, komprimierte Zeitstempel,
                      Sensorwerte pro Punkt und Developer-Felder)

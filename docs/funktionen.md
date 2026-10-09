@@ -685,9 +685,20 @@ einen sandfarbenen Marker; der Filter oben links hat eine Gruppe *Landschaft*.
 **Trockengebiete**: Dort bleiben NDVI und NDMI aus Sentinel-2 (ausserhalb Europas ebenfalls verfügbar) das
 Mass für Vegetationsverlust und Wüstenbildung; die Frühwarnung meldet einen Rückgang gegenüber denselben
 Monaten der Vorjahre. Wetter und Normalwerte kommen weltweit von Open-Meteo. Die Schweizer Dienste
-(Kanton, Wildruhezonen, Landeskarte) greifen dort nicht. Grenzen: Auf wandernden Dünen fehlen feste
-Bezugspunkte, die automatische Ausrichtung braucht Fels, Bauten oder den Horizont im Bild; ohne sie bleibt
-das Foto unausgerichtet und wird nur nebeneinander verglichen.
+(Kanton, Wildruhezonen, Landeskarte) greifen dort nicht.
+
+**Ausrichtung am Horizont**: Auf wandernden Dünen fehlen feste Bezugspunkte, an denen die gewöhnliche
+Ausrichtung zwei Fotos aufeinanderlegt. Findet sie in einem Trockengebiet nichts, sucht die App in beiden
+Fotos die **Horizontlinie** (pro Bildspalte die erste Zeile von oben, die nicht mehr Himmel ist: hell und
+mindestens so blau wie rot, anders als Sand und Fels) und schiebt die beiden Linien gegeneinander. Die
+Verschiebung mit der besten Übereinstimmung gibt den seitlichen Versatz, der mittlere Höhenunterschied den
+senkrechten. Übernommen wird das nur, wenn die Linien sehr gut übereinstimmen (Korrelation mindestens 0,85
+auf mindestens der halben Bildbreite) und der Horizont Form hat; ein flacher Horizont ergibt keinen Versatz.
+
+Grenzen: Nur Verschiebung, keine Drehung oder Zoom (wer vom gleichen Standort mit gleicher Brennweite
+fotografiert, braucht nicht mehr); ein Horizont aus wandernden Dünen verändert sich selbst, das Foto liegt dann
+nur ungefähr; ohne Himmel im Bild (bedeckt und weiss-grau gegen hellen Sand) bleibt es unausgerichtet und wird
+nur nebeneinander verglichen.
 
 ### Gletscherumrisse
 
@@ -713,6 +724,23 @@ Der Kartenknopf **Gletscher** zeichnet die Umrisse aller Inventare übereinander
 gestrichelt, das neuste kräftig. Ein Klick auf ein Jahr in der Legende zeigt nur dieses Inventar. Die Umrisse
 erscheinen ab Zoomstufe 9 und werden für die Karte vereinfacht (Toleranz etwa ein Zweitausendstel des
 Ausschnitts, mindestens 5 m).
+
+### Längenänderung (GLAMOS)
+
+GLAMOS misst an rund 100 Schweizer Gletschern jedes Jahr, wie weit sich die Zunge zurückgezogen oder
+vorgestossen hat. Mit der Messreihe als CSV (`GLAMOS_CSV`, von glamos.ch → Daten → Längenänderung; mehrere
+Dateien durch Kommas getrennt) zeigt der Gletscher-Teil eines Spots die **Kurve der aufsummierten
+Längenänderung** und fasst sie zusammen: *Rückzug seit 1960: −725 m (65 Messungen bis 2025) · zuletzt
+−23,7 m pro Jahr* (Mittel der letzten zehn Jahre).
+
+Die Spalten werden an ihren Namen erkannt (Englisch oder Deutsch: Gletschername, SGI-Id, Beginn und Ende der
+Messperiode, Längenänderung), das Trennzeichen darf Komma, Semikolon oder Tabulator sein, Kommentarzeilen
+(`#`) werden übersprungen. Zugeordnet wird über die **SGI-Id** des Gletschers aus dem Inventar (`sgi-id`,
+`sgi_id`, `pk_sgi` …), sonst über den Namen ohne *Gletscher*, *Glacier*, *Ghiacciaio*, *Vadret* («Vadret da
+Morteratsch» passt zu «Morteratsch»). Die Messreihe gilt für die Zunge des ganzen Gletschers, nicht für den
+Ort des Spots.
+
+![Längenänderung aus GLAMOS und Archivbilder in der Nähe](screenshots/gletscher-archiv.jpg)
 
 ### Eis im Spätsommer (Sentinel-2)
 
@@ -759,6 +787,36 @@ erscheint im Zeitverlauf (*Archivfoto*) und im Vorher/Nachher-Vergleich. Über d
 
 Für Archivbilder gilt die Lizenz wie für alle Fotos: Hochladen darf man nur, was man selbst aufgenommen hat
 oder unter einer passenden Lizenz verwenden darf.
+
+**Archivbilder in der Nähe**: Mit einem Katalog offener Bildarchive (`ARCHIV_KATALOG`) schlägt der Gletscher-
+bzw. Gebirge-Teil eines Spots alte Aufnahmen vor, die höchstens 2 km entfernt sind und, wenn beide eine
+Blickrichtung haben, höchstens 60° davon abweichen, die nächsten zuerst. Jeder Vorschlag nennt Jahr, Titel,
+Abstand, Quelle und Lizenz und führt mit *Im Archiv ansehen* zur Seite des Archivs. Angemeldete übernehmen ein
+Bild mit **Übernehmen** als Archivfoto des Spots: Der Server lädt es von der Bild-Adresse des Katalogs, datiert
+es auf das Katalogdatum, legt es an den Spot, richtet es aus und schreibt Titel, Quelle, Lizenz und Link in die
+Notiz. Das Foto trägt die Lizenz des Archivbilds, nicht die Standardlizenz des Kontos.
+
+Übernommen werden nur Bilder, deren Lizenz das erlaubt: gemeinfrei (Public Domain, CC0), CC BY, CC BY-SA und
+CC BY-NC-SA. Bei anderen Lizenzen («Alle Rechte vorbehalten», CC BY-ND, unbekannt) bleibt es beim Link. Jedes
+Bild wird pro Spot einmal übernommen; danach verweist der Vorschlag auf das Foto.
+
+Der Katalog ist eine Datei, die der Betreiber zusammenstellt, etwa aus dem Bildarchiv der ETH-Bibliothek
+(e-pics, viele Gletscher- und Bergaufnahmen gemeinfrei oder CC BY-SA) oder den Luftbildern von swisstopo:
+CSV (Komma oder Semikolon) oder GeoJSON-Punkte mit
+
+| Spalte | Inhalt |
+|--------|--------|
+| `id` | Kennung im Katalog (Pflicht) |
+| `title` | Titel |
+| `date` | Aufnahmedatum: `1932`, `1932-08` oder `1932-08-14` (Pflicht; ohne Monat gilt Juli, ohne Tag der 15.) |
+| `lat`, `lon` oder `e`, `n` | Standort in WGS84 oder LV95 (Pflicht) |
+| `heading` | Blickrichtung in Grad (freiwillig) |
+| `source`, `license` | Quelle und Lizenz, wie sie das Archiv angibt |
+| `page` | Seite des Bilds im Archiv |
+| `image` | Adresse der Bilddatei (nur `https`; nötig für *Übernehmen*) |
+
+Der Server ruft nur die Bild-Adressen aus dem Katalog ab, nichts, was jemand im Browser angibt, und nur
+Bilddateien bis 30 MB.
 
 **Sicherheit**: Der Gletscher-Teil erinnert daran, Gletscher nur mit Erfahrung, Ausrüstung oder Bergführer zu
 betreten. Der Wege-Magnet führt nicht über Gletscher; das gewählte BRouter-Profil (`hiking-mountain`) meidet sie.

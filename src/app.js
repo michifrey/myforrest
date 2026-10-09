@@ -12,6 +12,8 @@ const { distanceM, isValidCoord, positionAt } = require('./geo');
 const { lenientFetch } = require('./lenient-fetch');
 const { createWildlife } = require('./wildlife');
 const { createGlaciers } = require('./glaciers');
+const { createGlamos } = require('./glamos');
+const { createArchives } = require('./archives');
 const { createMapillary } = require('./mapillary');
 const { LANDSCAPES, ICE_LANDSCAPES, MOUNTAIN_MIN_M, FOREST_ONLY_TAGS, isLandscape, landscapeOf } = require('./landscapes');
 const { parseTrackPoints } = require('./gpx');
@@ -23,6 +25,7 @@ const sharp = require('sharp');
 const { TAGS, parseTags } = require('./tags');
 const { identifyPlant } = require('./plantnet');
 const { alignImages, alignPanoramas, extractFeatures } = require('./align');
+const { alignOnHorizon } = require('./horizon-align');
 const sphere = require('./sphere');
 const { IDENTITY, multiply, invert } = require('./homography');
 const { computeChange, renderHeatmap } = require('./change');
@@ -91,6 +94,10 @@ function createApp({
   pushOptions = {},
   // Glacier outlines (src/glaciers.js): GeoJSON files of glacier inventories, comma-separated.
   glacierFiles = process.env.GLETSCHER_GEOJSON || '',
+  // Length change series of glacier tongues (src/glamos.js): GLAMOS CSV files, comma-separated.
+  glamosFiles = process.env.GLAMOS_CSV || '',
+  // Catalogue of openly licensed archive pictures (src/archives.js): CSV/GeoJSON files, comma-separated; and how to fetch them.
+  archiveFiles = process.env.ARCHIV_KATALOG || '', archiveFetch = fetch,
   // Spots without a profile above this height become mountain spots (src/landscapes.js); 0 = off.
   mountainMinM = MOUNTAIN_MIN_M,
   // Storm warnings from the forecast (src/stormwatch.js): hours between checks, 0 = off.
@@ -244,7 +251,8 @@ function createApp({
    * Aligns a photo into its spot's common frame (that of the first aligned
    * photo of the same kind). Tries the reference photo first, then aligned
    * photos closest in time, and chains the transforms. Leaves the photo
-   * unaligned on failure. Panoramas are aligned by a rotation (sphere.js).
+   * unaligned on failure. Panoramas are aligned by a rotation (sphere.js);
+   * photos in arid spots fall back to the skyline (horizon-align.js).
    */
   async function alignPhoto(photoId, refPhotoId = null) {
     const photo = getPhoto.get(photoId);
@@ -273,6 +281,16 @@ function createApp({
       if (r) {
         setAlignment.run(JSON.stringify(multiply(JSON.parse(ref.align_h), r.h)), r.inliers, photo.id);
         return;
+      }
+    }
+    // In a dune field nothing stays in place but the skyline (src/horizon-align.js).
+    if (!photo.panorama && db.prepare('SELECT landscape FROM spots WHERE id = ?').get(photo.spot_id)?.landscape === 'trocken') {
+      for (const ref of aligned.slice(0, 3)) {
+        const r = await alignOnHorizon(path.join(uploadDir, photo.file), path.join(uploadDir, ref.file)).catch(() => null);
+        if (r) {
+          setAlignment.run(JSON.stringify(multiply(JSON.parse(ref.align_h), r.h)), r.columns, photo.id);
+          return;
+        }
       }
     }
     setAlignment.run(null, null, photo.id);
@@ -1241,7 +1259,10 @@ function createApp({
   for (const { id } of db.prepare('SELECT id FROM spots WHERE landscape IS NULL AND (? OR elevation >= ?)').all(glaciers.enabled() ? 1 : 0, mountainMinM > 0 ? mountainMinM : 1e9)) {
     classifySpot(id);
   }
-  require('./routes/landscapes')(app, { db, glaciers, vegetation, accounts, classifySpot, spotJson, idParam });
+  require('./routes/landscapes')(app, {
+    db, glaciers, glamos: createGlamos({ files: glamosFiles }), archives: createArchives({ files: archiveFiles, fetchImpl: archiveFetch }),
+    processUpload, tmpDir, vegetation, accounts, classifySpot, spotJson, idParam,
+  });
   Object.assign(tours, require('./routes/tracks')(app, {
     db, spotRadiusM, satelliteAlerts: vegetation.alerts, routerUrl, routerFetch, routerProfile, accounts, wildlife, elevation: elevationService, push,
     weather,
