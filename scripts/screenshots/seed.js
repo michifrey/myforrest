@@ -172,6 +172,21 @@ async function main() {
   const orchid = await upload(orchidFile, { lat: 47.37960, lon: 8.58520, takenAt: '2026-06-04T10:30:00+02:00', utcOffsetMinutes: 120,
     activity: 'wandern', protected: '1', note: 'Frauenschuh, 14 blühende Stängel' });
   identify.run(orchid.id, 'Cypripedium calceolus', 'Frauenschuh', 0.86, null, Date.now());
+  // Before the photo requests, so its panoramas do not fulfil them.
+  // A 360° recording along the forest track (walk-through): six panoramas ~40 m apart, heading north-east.
+  const walkSeq = 'demo-360-waldweg';
+  const walkStart = { lat: 47.37360, lon: 8.57245 };
+  for (let i = 0; i < 6; i++) {
+    const file = path.join(IMG, `pano-${i}.jpg`);
+    await scene.renderPano(700 + i * 3, { season: 'summer', jitter: 300 + i }, file);
+    const p = await upload(file, {
+      lat: (walkStart.lat + i * 0.00028).toFixed(6), lon: (walkStart.lon + i * 0.00034).toFixed(6),
+      takenAt: `2026-07-0${2 + Math.floor(i / 6)}T09:${String(10 + i).padStart(2, '0')}:00+02:00`, utcOffsetMinutes: 120,
+      activity: 'wandern', sequenceId: walkSeq,
+    });
+    // The panorama's middle looks along the track (360° cameras write this as GPano pose heading).
+    db.prepare('UPDATE photos SET heading = 40 WHERE id = ?').run(p.id);
+  }
   // Photo requests: a place on the track, the beetle stand again, and the stream bank.
   const requests = [
     { lat: 47.37445, lon: 8.57395, heading: 45, title: 'Neue Lichtung am Waldweg', note: 'Vom Weg aus Richtung Nordost, damit die Lücke im Kronendach zu sehen ist' },

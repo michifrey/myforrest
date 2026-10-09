@@ -11,6 +11,7 @@
   const ROUTE_KEY = 'myforrest-drive-route'; // the route of a drive in progress (survives a reload)
   const UNSAVED_KEY = 'myforrest-drive-unsaved'; // routes that could not be saved yet (offline)
   const SETTINGS_KEY = 'myforrest-drive-settings';
+  const TRIP_KEY = 'myforrest-drive-trip'; // sequence id of the drive in progress
   const INTERVALS = [2, 3, 5, 10];
   const SPACINGS = [[50, '50 m'], [100, '100 m'], [150, '150 m'], [300, '300 m'], [0, 'nur an Spots']];
   const store = {
@@ -144,6 +145,8 @@
     if (Number.isFinite(frame.heading)) fd.append('heading', String(Math.round(frame.heading)));
     fd.append('takenAt', at);
     fd.append('activity', 'fahren');
+    // The pictures of one drive form a sequence for the walk-through.
+    if (D.trip) fd.append('sequenceId', D.trip);
     if (decision.spotId) fd.append('spotId', String(decision.spotId));
     try {
       await offlineQueue.add(fd);
@@ -231,6 +234,9 @@
     D.selector = driveSelect.createSelector(spots, D.settings.everyM ? { everyM: D.settings.everyM } : { onlySpots: true });
     Object.assign(D, { running: true, frames: new Map(), shots: 0, bytesSeen: 0, bytesKept: 0, kept: { spot: 0, abstand: 0 }, route: store.get(ROUTE_KEY, []), started: Date.now() });
     if (D.route.length) D.started = D.route[0].time;
+    // One drive, one sequence: kept across a reload as long as the route is.
+    D.trip = (D.route.length && store.get(TRIP_KEY, null)) || (crypto.randomUUID ? crypto.randomUUID() : `fahrt-${Date.now()}`);
+    store.set(TRIP_KEY, D.trip);
     D.watch = navigator.geolocation.watchPosition(onPosition, (err) => status(`GPS: ${err.message}`), { enableHighAccuracy: true, maximumAge: 1000, timeout: 30000 });
     D.timer = setInterval(() => shoot().catch((err) => status(err.message)), D.settings.interval * 1000);
     D.flushTimer = setInterval(sendQueue, 60000);

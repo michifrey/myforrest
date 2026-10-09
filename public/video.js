@@ -355,6 +355,9 @@
     }
   }
 
+  // Also used by the walk-through (walk.js).
+  window.PanoViewer = PanoViewer;
+
   const COMPASS = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'];
   const compass = (deg) => COMPASS[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
 

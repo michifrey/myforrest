@@ -153,6 +153,7 @@ function createApp({
     locationSource: p.location_source,
     panorama: Boolean(p.panorama),
     videoTime: p.video_time ?? null,
+    sequenceId: p.sequence_id ?? null,
     activity: p.activity,
     note: p.note,
     tags: tagsOf.all(p.id).map((r) => r.tag),
@@ -648,6 +649,8 @@ function createApp({
     const fallbackTime = b.takenAt ? Date.parse(b.takenAt) : NaN;
     const activity = ACTIVITIES.includes(b.activity) ? b.activity : null;
     const note = b.note ? String(b.note).slice(0, 2000) : null;
+    // Photos of one recording (drive, upload batch) form a sequence for the walk-through.
+    const sequenceId = /^[A-Za-z0-9-]{8,64}$/.test(String(b.sequenceId || '')) ? String(b.sequenceId) : null;
     const tags = parseTags(b.tags);
     const protect = ['1', 'true', 'on'].includes(String(b.protected));
     // Repeat photos taken at a known spot (rephotography) are pinned to that spot.
@@ -740,10 +743,10 @@ function createApp({
           : assignSpot(db, pos.lat, pos.lon, spotRadiusM, panorama ? null : heading, headingToleranceDeg);
         const id = Number(db.prepare(`
           INSERT INTO photos (spot_id, file, original_name, taken_at, lat, lon, heading, altitude,
-                              location_source, activity, note, created_at, panorama)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                              location_source, activity, note, created_at, panorama, sequence_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(spotId, file, f.originalname.slice(0, 255), takenAt, pos.lat, pos.lon, heading, meta.altitude,
-          source, activity, note, Date.now(), panorama ? 1 : 0).lastInsertRowid);
+          source, activity, note, Date.now(), panorama ? 1 : 0, sequenceId).lastInsertRowid);
         setTags(id, tags);
         accounts.stampPhoto(id, owner);
         if (protect) db.prepare("UPDATE photos SET protected = 1, protected_reason = 'upload' WHERE id = ?").run(id);
@@ -1115,6 +1118,7 @@ function createApp({
   require('./routes/species')(app, { db, spotRadiusM, visibleSql: accounts.visibleSql });
   require('./routes/profile')(app, { db, thumbs, accounts, uploadDir, rateLimits });
   require('./routes/protection')(app, { db, accounts, sensitiveLists, cantons, reprotect });
+  require('./routes/walk')(app, { db, accounts, thumbs });
   require('./routes/ogc')(app, { db, spotRadiusM, dataDir, background, tiles: tileOptions });
   require('./routes/video')(app, { db, uploadDir, tmpDir, spotRadiusM, activities: ACTIVITIES, photoJson, getPhoto, setTags, alignPhoto, analyzeChange, analyzeContext, background, safeAlign });
   const push = require('./routes/push')(app, { db, idParam, adminEmail, ...pushOptions });

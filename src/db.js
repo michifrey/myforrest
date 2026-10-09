@@ -133,6 +133,8 @@ const MIGRATIONS = [
   // Protection of sensitive finds (rare plants, fungi): only verified PRO members see them exactly.
   ['photos', 'protected', 'INTEGER NOT NULL DEFAULT 0'],
   ['photos', 'protected_reason', 'TEXT'], // 'upload' | 'art' | 'pro' | 'moderation'
+  // Walk-through (routes/walk.js): photos of one recording (video, drive, upload batch) in order of time.
+  ['photos', 'sequence_id', 'TEXT'],
 ];
 
 function openDb(file) {
@@ -142,6 +144,7 @@ function openDb(file) {
     const exists = db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column);
     if (!exists) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
   }
+  db.exec('CREATE INDEX IF NOT EXISTS photos_sequence ON photos (sequence_id, taken_at)');
   return db;
 }
 

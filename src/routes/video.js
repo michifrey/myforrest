@@ -220,6 +220,8 @@ module.exports = function videoRoutes(app, ctx) {
     const created = [];
     const skipped = [];
     const touchedSpots = new Set();
+    // The frames of one video form a sequence: the walk-through steps along them (routes/walk.js).
+    const sequenceId = crypto.randomUUID();
     let panorama = panoramaChoice === '1' ? true : panoramaChoice === '0' ? false : null;
     // Motion blur (shaky bike, fast turns): the sharpest frame within ±0.25 s, blurry ones are dropped.
     const picker = createFramePicker({ duration: duration > 0.05 ? duration - 0.05 : Infinity });
@@ -267,11 +269,11 @@ module.exports = function videoRoutes(app, ctx) {
         if (touchedSpots.has(spotId)) return null;
         const id = Number(db.prepare(`
           INSERT INTO photos (spot_id, file, original_name, taken_at, lat, lon, heading, altitude,
-                              location_source, activity, note, created_at, panorama, video_time)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                              location_source, activity, note, created_at, panorama, video_time, sequence_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(spotId, file, label.slice(0, 255), timeAt(frame.t), frame.lat, frame.lon, frame.heading,
           frame.alt === null ? null : Math.round(frame.alt * 10) / 10, source, activity, note, Date.now(),
-          panorama ? 1 : 0, Math.round(frame.t * 1000) / 1000).lastInsertRowid);
+          panorama ? 1 : 0, Math.round(frame.t * 1000) / 1000, sequenceId).lastInsertRowid);
         setTags(id, tags);
         if (protect) db.prepare("UPDATE photos SET protected = 1, protected_reason = 'upload' WHERE id = ?").run(id);
         refreshSpot(db, spotId);
