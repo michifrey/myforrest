@@ -139,6 +139,26 @@ async function weatherFetch(url) {
   return new Response('offline', { status: 503 });
 }
 
+// A stand-in for the Overpass API (path network of the walk-through): the forest track of the 360° recording
+// (seed.js), which starts at the windthrow spot and first runs north before it turns north-east, and a side path.
+const track = (i) => ({ lat: 47.37360 + i * 0.00028, lon: 8.57245 + i * 0.00034 });
+const WAYS = [
+  [[47.37300, 8.57180], [47.37327, 8.57203], [47.37362, 8.57210], ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => [track(i).lat, track(i).lon])],
+  [[47.37327, 8.57203], [47.37290, 8.57262], [47.37262, 8.57340]],
+  [[track(3).lat, track(3).lon], [47.37490, 8.57300], [47.37560, 8.57270]],
+];
+async function overpassFetch() {
+  let node = 1;
+  const ids = new Map();
+  const idOf = ([lat, lon]) => { const k = `${lat},${lon}`; if (!ids.has(k)) ids.set(k, node++); return ids.get(k); };
+  return Response.json({
+    elements: WAYS.map((w, i) => ({
+      type: 'way', id: 100 + i, tags: { highway: i === 0 ? 'track' : 'path' },
+      nodes: w.map(idOf), geometry: w.map(([lat, lon]) => ({ lat, lon })),
+    })),
+  });
+}
+
 const work = process.env.DEMO_DIR || path.join(__dirname, '.demo');
 // DEMO_GLETSCHER=1 also gets the GLAMOS length change and an archive catalogue; the archive pictures are drawn.
 const glacierDir = path.join(work, 'gletscher');
@@ -157,6 +177,7 @@ const app = createApp({
     glamosFiles: path.join(glacierDir, 'glamos-laenge.csv'), archiveFiles: path.join(glacierDir, 'archiv-katalog.csv'), archiveFetch,
   } : {}),
   weatherFetch,
+  waynetUrl: 'https://overpass.demo.invalid/api/interpreter', waynetFetch: overpassFetch,
   tileOptions: { precompute: false },
   // Sign-in buttons for the screenshots; the demo never talks to Google, GitHub, Microsoft, Switch or AGOV.
   oauthProviders: {

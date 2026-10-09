@@ -343,7 +343,15 @@ Einmal gesehene Bilder gehen auch ohne Empfang, im Wald und in den Bergen.
 
 Die Schritte gehen **weich**: Ein 360°-Bild dreht sich zuerst zum gewählten Pfeil, dann zoomt das alte Bild
 in Gehrichtung und blendet aus, während das neue leicht herangezoomt ankommt; zurück zoomt es heraus, und ein
-Wechsel der *Zeit* blendet nur über.
+Wechsel der *Zeit* blendet nur über. Zwischen zwei flachen Fotos mit gemeinsamen Bildmerkmalen hat der Schritt
+**Tiefe**: Das alte Bild wandert dorthin, wo sein Inhalt im neuen liegt, statt nur zu zoomen.
+
+<p align="center"><img src="docs/screenshots/durchgehen-wegnetz.jpg" width="720" alt="Durchgehen am Windwurf-Spot: Pfeile entlang der Wege, die kleine Karte zeigt das Wegnetz und die Wege der Pfeile gestrichelt"></p>
+
+Mit dem **Wegnetz** aus OpenStreetMap (`WEGNETZ_URL`) führen Pfeile entlang der Wege zu eigenen Bildern bis
+300 m weit. Sie zeigen dorthin, wo der Weg wegführt, nicht in die Luftlinie, und nennen die Länge auf dem Weg;
+hier führt der Weg zuerst nach Norden, bevor er zur 360°-Aufnahme abbiegt, und ein Seitenweg geht nach
+Südosten.
 
 <p>
   <img src="docs/screenshots/durchgehen-mapillary.jpg" width="32%" alt="Durchgehen mit blaugrünen Pfeilen zu Mapillary-Bildern quer zum Waldweg">
@@ -413,7 +421,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
 - **[Spots und Zeitreise](docs/funktionen.md#spots-und-zeitreise)**: Fotos am selben Ort und mit derselben
   Blickrichtung werden automatisch zu Spots zusammengefasst und lassen sich als Zeitreihe durchblättern;
   360°-Aufnahmen und Bilderreihen lassen sich [wie Street View durchgehen](docs/funktionen.md#durchgehen-wie-street-view),
-  wo eigene Bilder fehlen mit [Mapillary](docs/funktionen.md#mapillary).
+  entlang der Wege aus OpenStreetMap und mit Schritten, die das alte Bild ins neue übergehen lassen; wo eigene Bilder
+  fehlen, mit [Mapillary](docs/funktionen.md#mapillary).
 - **[Bildanalyse](docs/funktionen.md#bildanalyse)**: automatische Ausrichtung, Veränderungs-Heatmap,
   Einordnung der Veränderungen (Windwurf, Auflichtung, Verfärbung, neuer Bewuchs), die aus Bestätigungen
   dazulernt, Objekterkennung für liegende Stämme und Holzpolter sowie Vegetationsdichte pro Foto.
@@ -506,7 +515,7 @@ jedes Dokument hier im Repository und auf der Website.
 Kartendaten © OpenStreetMap-Mitwirkende, Landeskarte und Luftbild © swisstopo. Wetterdaten von
 [Open-Meteo.com](https://open-meteo.com) (ERA5, CC BY 4.0). Enthält modifizierte Copernicus-Sentinel-Daten;
 Landsat-Daten mit freundlicher Genehmigung des U.S. Geological Survey. Phänologie-Daten: Deutscher
-Wetterdienst und MeteoSchweiz. Pflanzenbestimmung mit Pl@ntNet. Bilder von Mapillary (CC BY-SA 4.0) mit Urheber im Bild. Gletscherumrisse aus den geladenen Inventaren, z. B.
+Wetterdienst und MeteoSchweiz. Pflanzenbestimmung mit Pl@ntNet. Bilder von Mapillary (CC BY-SA 4.0) mit Urheber im Bild. Wegnetz © OpenStreetMap-Mitwirkende (ODbL). Gletscherumrisse aus den geladenen Inventaren, z. B.
 GLAMOS. Details unter [Datenquellen](docs/betrieb.md#externe-datenquellen-und-netzzugang).
 
 Der Code steht unter der [Apache-Lizenz 2.0](LICENSE).

@@ -236,11 +236,30 @@ Distanz darunter:
 - **Gold: zu anderen Spots** im Umkreis von 80 m. Pro Spot zählt ein Bild, ein Panorama wenn vorhanden,
   sonst das Bild, das zeitlich am nächsten am gerade betrachteten liegt. Pro Himmelsrichtung (45°) steht nur
   der nächste Spot, damit der Ring lesbar bleibt.
+- **Gold mit weissem Rand: entlang der Wege** (mit Wegnetz, siehe unten) zu eigenen Bildern bis 300 m weit,
+  gemessen auf den Wegen. Der Pfeil zeigt dorthin, wo der Weg von hier wegführt, nicht in die Luftlinie.
 - **Blaugrün: zu Mapillary-Bildern** im Umkreis von 80 m, wenn Mapillary eingerichtet ist (siehe unten), und
   nur in Himmelsrichtungen ohne eigene Bilder: Eigene Bilder haben Vorrang, Mapillary füllt die Lücken.
 
-Liegen zwei Ziele weniger als 25° auseinander, bleibt das erste (Reihe vor Spot vor Mapillary), damit sich
-die Pfeile nicht überdecken.
+Liegen zwei Ziele weniger als 25° auseinander, bleibt das erste (Reihe vor Weg vor Spot vor Mapillary), damit
+sich die Pfeile nicht überdecken.
+
+![Durchgehen mit Pfeilen entlang der Wege: der Weg führt zuerst nach Norden, ein Seitenweg nach Südosten](screenshots/durchgehen-wegnetz.jpg)
+
+**Entlang der Wege**: Mit einem Wegnetz (`WEGNETZ_URL`, eine Overpass-API für OpenStreetMap, z. B.
+`https://overpass-api.de/api/interpreter`) setzt die App den Standort des Bilds auf den nächsten Weg (höchstens
+25 m entfernt) und sucht von dort entlang der Wege und Strassen die kürzesten Wege zu eigenen Bildern bis 300 m.
+Ein Bild zählt, wenn es höchstens 25 m neben einem Weg liegt. Die Richtung des Pfeils ist die, in die der Weg
+15 m nach dem Start führt; so zeigt ein Pfeil zu einem Spot hinter einer Kurve in die Kurve hinein, und der
+Tooltip nennt die Länge auf dem Weg und die Luftlinie. Pro Richtung, in die ein Weg wegführt, bleibt das
+nächste Bild. Ein Spot, den ein Weg erreicht, erscheint nicht noch einmal als goldener Pfeil. Die kleine Karte
+zeigt das Wegnetz grau und die Wege der Pfeile gestrichelt.
+
+Das Wegnetz kommt pro Feld von rund 1,1 × 0,75 km und wird 30 Tage zwischengespeichert. Zur Overpass-API geht
+nur der Ausschnitt des Felds, nichts über die Bilder oder wer sie anschaut. Wege, die man zu Fuss nicht gehen
+darf (Autobahnen, `access=private`, `foot=no`), fehlen. Ist die Overpass-API nicht erreichbar, bleiben die
+anderen Pfeile. Grenzen: Das Wegnetz ist so gut wie OpenStreetMap am Ort; Trampelpfade, die dort fehlen, kennt
+die App nicht. Wege gehen von eigenen Bildern aus, nicht von Mapillary-Bildern.
 
 **Weiche Übergänge**: Bei einem 360°-Bild dreht sich der Blick zuerst zum gewählten Pfeil (bis 0,6 s,
 kürzer bei kleinen Drehungen). Dann bleibt das bisherige Bild als Standbild stehen, bis das nächste geladen ist,
@@ -249,6 +268,17 @@ Panorama kommt dabei leicht herangezoomt an und gleitet auf sein normales Blickf
 liegt mehr als 110° neben dem Blick) zoomt das Standbild heraus, ohne vorher umzudrehen, und ein Wechsel der
 *Zeit* blendet nur über. Wer im Betriebssystem weniger Bewegung eingestellt hat, bekommt nur eine kurze
 Überblendung. Während eines Schritts nimmt die Ansicht keinen zweiten an.
+
+**Schritte mit Tiefe**: Zwischen zwei flachen Fotos, die genug gemeinsame Bildmerkmale haben, zoomt das alte
+Bild nicht nur, sondern wandert dorthin, wo sein Inhalt im neuen Bild liegt, und das neue kommt von dort, wo
+es im alten lag. Das ergibt einen Morph entlang der gemeinsamen Merkmale statt eines blossen Zooms. Die
+Transformation (eine Homographie) rechnet der Server mit derselben Bildregistrierung wie die Ausrichtung
+(siehe [Bildanalyse](#automatische-feinausrichtung)); bei Fotos desselben, schon ausgerichteten Spots nimmt er
+deren Ausrichtung. Er rechnet sie einmal pro Paar, je eine nach der anderen, und speichert sie. Die Ansicht
+fragt sie für die nächsten Schritte schon im Voraus an. Fehlt sie nach 1,2 s, ist sie unplausibel (Bildmitte
+ausserhalb des Bildschirms, Massstab unter ¼ oder über 4) oder passen die Bilder nicht zusammen, gibt es den
+gewohnten Zoom. Grenzen: Eine Homographie beschreibt eine Ebene; Vordergrund und Hintergrund bewegen sich
+deshalb gleich, echte Parallaxe gibt es nicht. Panoramen und Mapillary-Bilder bekommen den Zoom.
 
 Beim Schritt bleibt die Blickrichtung erhalten: Wer nach Osten schaut und weitergeht, schaut im nächsten
 Panorama wieder nach Osten. Die Richtung der Bildmitte kommt aus dem Video bzw. aus `GPano:PoseHeadingDegrees`

@@ -12,10 +12,14 @@
  * Steps are soft: a panorama first turns towards the chosen way, then the
  * old view zooms ahead (or back) and fades while the new one arrives slightly
  * zoomed in; a change of date crossfades (only a short fade with reduced motion).
+ * With the path network (WEGNETZ_URL) arrows also follow the paths to own
+ * pictures up to 300 m away, pointing where the path leaves. Between two flat
+ * photos that share enough features a step has depth: the old picture moves
+ * into its place in the new one (a homography from the server) while it fades.
  * With Mapillary set up, blue arrows lead to Mapillary pictures where there
  * are no own ones, and one can walk on there (ids "m<id>"); their creator and
  * licence stand at the top. A map layer shows Mapillary pictures to start from.
- * API: GET /api/walk/:photoId, /api/walk/mapillary/:id (src/routes/walk.js).
+ * API: GET /api/walk/:photoId, /api/walk/mapillary/:id, /api/walk/transition/:from/:to (src/routes/walk.js).
  * Uses the globals of app.js ($, el, api, state, fmtDate) and video.js (PanoViewer).
  */
 (function walkMode() {
@@ -84,8 +88,10 @@
       const rad = (rel * Math.PI) / 180;
       const ahead = Math.cos(rad);
       const what = l.kind === 'weg' ? (l.direction === 'vor' ? 'Weiter auf der Aufnahme' : 'Zurück auf der Aufnahme')
-        : l.kind === 'mapillary' ? `Mapillary-Bild${l.creator ? ` von ${l.creator}` : ''}` : `Spot ${l.spotId}`;
-      const label = l.kind === 'weg' ? (l.direction === 'vor' ? 'Weiter' : 'Zurück') : l.kind === 'mapillary' ? 'Zum Mapillary-Bild' : `Zu Spot ${l.spotId}`;
+        : l.kind === 'mapillary' ? `Mapillary-Bild${l.creator ? ` von ${l.creator}` : ''}`
+          : l.kind === 'pfad' ? `Auf dem Weg zu Spot ${l.spotId} (Luftlinie ${fmtDist(l.straightM)})` : `Spot ${l.spotId}`;
+      const label = l.kind === 'weg' ? (l.direction === 'vor' ? 'Weiter' : 'Zurück') : l.kind === 'mapillary' ? 'Zum Mapillary-Bild'
+        : l.kind === 'pfad' ? `Auf dem Weg zu Spot ${l.spotId}` : `Zu Spot ${l.spotId}`;
       const b = el('button', {
         type: 'button',
         class: `walk-arrow ${l.kind}${l.source === 'mapillary' ? ' from-mapillary' : ''}${Math.abs(rel) < 35 ? ' ahead' : ''}`,
@@ -106,13 +112,19 @@
     if (W.map) return;
     W.map = L.map('walk-map', { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoom: false });
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(W.map);
+    W.ways = L.layerGroup().addTo(W.map);
     W.track = L.polyline([], { className: 'walk-track', weight: 4, interactive: false }).addTo(W.map);
     W.dots = L.layerGroup().addTo(W.map);
     W.marker = L.marker([0, 0], { icon: L.divIcon({ className: '', html: '<span class="walk-me"><i></i></span>', iconSize: [0, 0] }), interactive: false, keyboard: false }).addTo(W.map);
   }
   function renderMap() {
     ensureMap();
-    const { photo, track, links } = W.data;
+    const { photo, track, links, paths = [] } = W.data;
+    W.map.setView([photo.lat, photo.lon], 17, { animate: false });
+    // The path network around, and the paths the arrows follow (after setView: Leaflet draws only on a placed map).
+    W.ways.clearLayers();
+    for (const w of paths) L.polyline(w, { className: 'walk-way', weight: 2, interactive: false }).addTo(W.ways);
+    for (const l of links) if (l.path) L.polyline(l.path, { className: 'walk-way-to', weight: 3, interactive: false }).addTo(W.ways);
     W.track.setLatLngs(track.length > 1 ? track : []);
     W.dots.clearLayers();
     for (const l of links) L.circleMarker([l.lat, l.lon], { radius: 4, className: `walk-dot ${l.kind}`, interactive: false }).addTo(W.dots);
@@ -190,21 +202,85 @@
     node.remove();
   }
 
-  /** A step along an arrow: turn towards it, then walk. */
+  /* ---------- Steps with depth (flat photos) ---------- */
+
+  // 3×3 matrices as flat row-major arrays, like src/homography.js.
+  const mul3 = (a, b) => [0, 1, 2].flatMap((i) => [0, 1, 2].map((j) => a[i * 3] * b[j] + a[i * 3 + 1] * b[3 + j] + a[i * 3 + 2] * b[6 + j]));
+  function inv3(m) {
+    const [a, b, c, d, e, f, g, h, i] = m;
+    const A = e * i - f * h; const B = -(d * i - f * g); const C = d * h - e * g;
+    const det = a * A + b * B + c * C;
+    if (!det) return null;
+    return [A, -(b * i - c * h), b * f - c * e, B, a * i - c * g, -(a * f - c * d), C, -(a * h - b * g), a * e - b * d].map((v) => v / det);
+  }
+  const unit = (m) => m.map((v) => v / m[8]);
+  const lerp3 = (a, b, t) => a.map((v, k) => v + (b[k] - v) * t);
+  const css3 = (m) => `matrix3d(${m[0]},${m[3]},0,${m[6]},${m[1]},${m[4]},0,${m[7]},0,0,1,0,${m[2]},${m[5]},0,${m[8]})`;
+  /** Normalised image coordinates → screen pixels of an <img> shown with object-fit: contain. */
+  function shown(img) {
+    const w = img.clientWidth; const h = img.clientHeight;
+    const k = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+    const dw = img.naturalWidth * k; const dh = img.naturalHeight * k;
+    return [dw, 0, (w - dw) / 2, 0, dh, (h - dh) / 2, 0, 0, 1];
+  }
+
+  /** How the current photo lies in photo `toId` ({ h } from the server), asked at most once per pair. */
+  const transitions = new Map();
+  function transitionTo(toId) {
+    const from = W.data?.photo;
+    if (!from || from.panorama || from.source || isMapillary(toId)) return Promise.resolve(null);
+    const key = `${from.id}:${toId}`;
+    if (!transitions.has(key)) transitions.set(key, api(`/api/walk/transition/${from.id}/${toId}`).then((r) => r.h).catch(() => null));
+    return transitions.get(key);
+  }
+
+  /**
+   * Moves the still of the old photo to where its content lies in the new one, while the new photo
+   * comes from where it lay in the old: a morph along their common features. False when the
+   * transform is implausible on this screen (then the usual zoom is used).
+   */
+  async function morphStill(node, h) {
+    if (!node || node.tagName !== 'IMG' || flat.hidden || !flat.naturalWidth || !node.naturalWidth) return false;
+    const M = unit(mul3(mul3(shown(flat), h), inv3(shown(node)) || [1, 0, 0, 0, 1, 0, 0, 0, 1]));
+    const back = inv3(M);
+    if (!back) return false;
+    // The middle of the old picture must stay on screen and the scale between 1/4 and 4.
+    const w = root.clientWidth; const hh = root.clientHeight;
+    const [x, y, z] = [M[0] * w / 2 + M[1] * hh / 2 + M[2], M[3] * w / 2 + M[4] * hh / 2 + M[5], M[6] * w / 2 + M[7] * hh / 2 + M[8]];
+    const scale = Math.sqrt(Math.abs(M[0] * M[4] - M[1] * M[3]));
+    if (z <= 0 || x / z < -0.25 * w || x / z > 1.25 * w || y / z < -0.25 * hh || y / z > 1.25 * hh || scale < 0.25 || scale > 4) return false;
+    const I = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+    const B = unit(back);
+    node.style.transformOrigin = '0 0';
+    flat.style.transformOrigin = '0 0';
+    await frames(700, (t) => {
+      node.style.transform = css3(lerp3(I, M, t));
+      node.style.opacity = String(1 - t);
+      flat.style.transform = css3(lerp3(B, I, t));
+    });
+    flat.style.transform = '';
+    node.remove();
+    return true;
+  }
+
+  /** A step along an arrow: turn towards it, then walk (between flat photos with depth, if they match). */
   async function step(link) {
     if (!W.data || W.stepping) return;
     W.stepping = true;
     try {
       const rel = norm(link.bearing - W.view);
       const back = link.direction === 'zurueck' || Math.abs(rel) > 110;
+      const flatStep = !reduceMotion() && !W.data.photo.panorama && !link.panorama && !W.data.photo.source && link.source !== 'mapillary';
+      // The transform is usually there already (asked ahead); a slow answer does not hold the step up.
+      const h = flatStep ? await Promise.race([transitionTo(link.id), new Promise((r) => setTimeout(() => r(null), 1200))]) : null;
       if (!back && !reduceMotion() && W.data.photo.panorama && !canvas.hidden && pano?.ok) await turnTo(link.bearing);
-      await go(link.id, { kind: back ? 'zurueck' : 'vor', rel: back ? 0 : norm(link.bearing - W.view) });
+      await go(link.id, { kind: back ? 'zurueck' : 'vor', rel: back ? 0 : norm(link.bearing - W.view), h });
     } finally {
       W.stepping = false;
     }
   }
 
-  async function go(photoId, { dir = W.view, initial = false, kind = 'zeit', rel = 0 } = {}) {
+  async function go(photoId, { dir = W.view, initial = false, kind = 'zeit', rel = 0, h = null } = {}) {
     const token = ++W.token;
     root.querySelectorAll('.walk-still').forEach((n) => n.remove());
     const cover = initial ? null : still();
@@ -249,13 +325,15 @@
       setView(p.heading ?? (initial ? 0 : dir), false);
     }
     root.classList.remove('loading');
-    fadeStill(cover, kind, rel);
     renderMap();
+    if (!(h && await morphStill(cover, h))) fadeStill(cover, kind, rel);
     history.replaceState(null, '', `#durchgehen=${p.id}`);
     // The next steps are fetched ahead: smoother, and available offline afterwards.
     for (const l of data.links) {
       const img = new Image();
       img.src = l.panorama ? l.url : (l.largeUrl || l.url);
+      // Between flat photos also how they lie in each other, for a step with depth.
+      if (!p.panorama && !l.panorama && !mly && l.source !== 'mapillary') transitionTo(l.id);
     }
   }
 

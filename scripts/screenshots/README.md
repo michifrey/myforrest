@@ -7,7 +7,7 @@ ohne echte Fotos, ohne Netz und ohne API-Schlüssel reproduzierbar sind.
 | Datei | Aufgabe |
 |-------|---------|
 | `scene.js` | Zeichnet Demo-Waldfotos (Windwurf mit Verjüngung, Borkenkäfer, Springkraut, Goldrute, frühe Verfärbung) |
-| `demo-server.js` | Startet die echte App mit einem synthetischen Open-Meteo-Ersatz (Wetter, Stürme, Nächte, Höhenmodell) |
+| `demo-server.js` | Startet die echte App mit einem synthetischen Open-Meteo-Ersatz (Wetter, Stürme, Nächte, Höhenmodell) und einem Overpass-Ersatz (Wegnetz am Waldweg) |
 | `seed.js` | Lädt die Demo-Fotos über die API hoch und ergänzt Pl@ntNet-Bestimmungen und Sentinel-/Landsat-Szenen direkt in der Datenbank |
 | `tiles.js` | Platzhalter-Kacheln für OpenStreetMap (Web Mercator) und die Landeskarte grau (LV95) |
 | `shoot.js` | Nimmt mit Playwright alle Screenshots auf und baut das Zeitraffer-GIF und das GIF eines Schritts im Durchgehen (`uebergang`, aus einer Videoaufnahme) |
