@@ -12,6 +12,11 @@
  * Italian and English (PT_FreeText): the federal rules of geocat.ch ask for
  * at least German and French. Extent, dates and online resources are taken
  * from the data and the server's address.
+ *
+ * With `options.part` the record describes one collection (its own title,
+ * abstract, extent and access, `parentIdentifier` = the dataset record);
+ * with `options.catalogue` it points to the feature catalogue (ISO 19110,
+ * src/featurecatalogue.js) in contentInfo.
  */
 
 const crypto = require('node:crypto');
@@ -207,9 +212,14 @@ const OPENDATA_TERMS = ['terms_open', 'terms_by', 'terms_ask', 'terms_by_ask'];
  *
  * info: { base, bbox: [w, s, e, n] (WGS84), firstPhoto, lastPhoto, created, updated (ms) }
  * contact: { organisation, email, city, country, url }
- * options: { profile: 'che' | 'iso', uuid, owsUrl, opendataTerms, licenseUrl, licenseLabel }
+ * options: { profile: 'che' | 'iso', uuid, owsUrl, opendataTerms, licenseUrl, licenseLabel,
+ *            part: { id, uuid, title, abstract, resources: [{ url, protocol, fn, name, text }] },
+ *            catalogue: { uuid, url, date, featureTypes: [id, …] } }
  */
 function metadataRecord(info, contact, options = {}) {
+  const part = options.part || null;
+  const mainUuid = recordUuid(info.base, options.uuid);
+  const datasetUri = part ? `${info.base}/ogc/collections/${part.id}` : `${info.base}/ogc`;
   const che = options.profile !== 'iso';
   const el = (cheName, isoName) => (che ? [`che:${cheName}`, ` gco:isoType="gmd:${isoName}"`] : [`gmd:${isoName}`, '']);
   const [root, rootIso] = el('CHE_MD_Metadata', 'MD_Metadata');
@@ -238,6 +248,7 @@ function metadataRecord(info, contact, options = {}) {
     + `<gmd:function>${code('CI_OnLineFunctionCode', fn)}</gmd:function>`
     + '</gmd:CI_OnlineResource></gmd:onLine>';
   const resources = [
+    ...(part?.resources || []),
     ...RESOURCES.map((r) => ({ ...r, url: `${base}${r.path}` })),
     ...(options.owsUrl ? OWS.map(([protocol, service, text]) => ({
       url: `${options.owsUrl}?SERVICE=${service}&REQUEST=GetCapabilities`, protocol, fn: 'information', name: 'myforrest', text,
@@ -255,26 +266,27 @@ function metadataRecord(info, contact, options = {}) {
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <${root}${rootIso} xmlns:gmd="${NS.gmd}" xmlns:gco="${NS.gco}" xmlns:gml="${NS.gml}" xmlns:gmx="${NS.gmx}" xmlns:xlink="${NS.xlink}" xmlns:xsi="${NS.xsi}"${che ? ` xmlns:che="${NS.che}"` : ''}>`
-    + `<gmd:fileIdentifier>${str(recordUuid(base, options.uuid))}</gmd:fileIdentifier>`
+    + `<gmd:fileIdentifier>${str(part ? part.uuid : mainUuid)}</gmd:fileIdentifier>`
     + `<gmd:language><gmd:LanguageCode codeList="http://www.loc.gov/standards/iso639-2/" codeListValue="ger"/></gmd:language>`
     + `<gmd:characterSet>${code('MD_CharacterSetCode', 'utf8')}</gmd:characterSet>`
+    + (part ? `<gmd:parentIdentifier>${str(mainUuid)}</gmd:parentIdentifier>` : '')
     + `<gmd:hierarchyLevel>${code('MD_ScopeCode', 'dataset')}</gmd:hierarchyLevel>`
     + `<gmd:contact>${responsible('pointOfContact')}</gmd:contact>`
     + `<gmd:dateStamp><gco:DateTime>${new Date(info.updated).toISOString().slice(0, 19)}</gco:DateTime></gmd:dateStamp>`
     + `<gmd:metadataStandardName>${str(che ? 'GM03 2+ (ISO 19115:2003 / ISO 19139, SN 612050)' : 'ISO 19115:2003/19139')}</gmd:metadataStandardName>`
     + `<gmd:metadataStandardVersion>${str(che ? '2+' : '1.0')}</gmd:metadataStandardVersion>`
-    + `<gmd:dataSetURI>${str(`${base}/ogc`)}</gmd:dataSetURI>`
+    + `<gmd:dataSetURI>${str(datasetUri)}</gmd:dataSetURI>`
     + LANGUAGES.map(([id, iso3]) => `<gmd:locale><gmd:PT_Locale id="${id}"><gmd:languageCode><gmd:LanguageCode codeList="http://www.loc.gov/standards/iso639-2/" codeListValue="${iso3}"/></gmd:languageCode>`
       + `<gmd:characterEncoding>${code('MD_CharacterSetCode', 'utf8')}</gmd:characterEncoding></gmd:PT_Locale></gmd:locale>`).join('')
     + ['EPSG:2056', 'EPSG:4326'].map((c) => `<gmd:referenceSystemInfo><gmd:MD_ReferenceSystem><gmd:referenceSystemIdentifier><gmd:RS_Identifier><gmd:code>${str(c)}</gmd:code></gmd:RS_Identifier></gmd:referenceSystemIdentifier></gmd:MD_ReferenceSystem></gmd:referenceSystemInfo>`).join('')
     + `<gmd:identificationInfo><${ident}${identIso}>`
     + '<gmd:citation><gmd:CI_Citation>'
-    + free('title', TEXT.title) + free('alternateTitle', TEXT.alternateTitle)
+    + free('title', part ? part.title : TEXT.title) + free('alternateTitle', TEXT.alternateTitle)
     + date(day(info.created), 'creation') + date(day(info.updated), 'revision')
-    + `<gmd:identifier><gmd:MD_Identifier><gmd:code>${str(`${base}/ogc`)}</gmd:code></gmd:MD_Identifier></gmd:identifier>`
+    + `<gmd:identifier><gmd:MD_Identifier><gmd:code>${str(datasetUri)}</gmd:code></gmd:MD_Identifier></gmd:identifier>`
     + `<gmd:citedResponsibleParty>${responsible('owner')}</gmd:citedResponsibleParty>`
     + '</gmd:CI_Citation></gmd:citation>'
-    + free('abstract', TEXT.abstract) + free('purpose', TEXT.purpose)
+    + free('abstract', part ? part.abstract : TEXT.abstract) + free('purpose', TEXT.purpose)
     + `<gmd:status>${code('MD_ProgressCode', 'onGoing')}</gmd:status>`
     + `<gmd:pointOfContact>${responsible('pointOfContact')}</gmd:pointOfContact>`
     + `<gmd:resourceMaintenance><gmd:MD_MaintenanceInformation><gmd:maintenanceAndUpdateFrequency>${code('MD_MaintenanceFrequencyCode', 'continual')}</gmd:maintenanceAndUpdateFrequency></gmd:MD_MaintenanceInformation></gmd:resourceMaintenance>`
@@ -301,6 +313,14 @@ function metadataRecord(info, contact, options = {}) {
       + `<gml:endPosition>${day(info.lastPhoto)}</gml:endPosition></gml:TimePeriod></gmd:extent></gmd:EX_TemporalExtent></gmd:temporalElement>` : '')
     + '</gmd:EX_Extent></gmd:extent>'
     + `</${ident}></gmd:identificationInfo>`
+    + (options.catalogue ? '<gmd:contentInfo><gmd:MD_FeatureCatalogueDescription>'
+      + '<gmd:includedWithDataset><gco:Boolean>false</gco:Boolean></gmd:includedWithDataset>'
+      + options.catalogue.featureTypes.map((t) => `<gmd:featureTypes><gco:LocalName>${esc(t)}</gco:LocalName></gmd:featureTypes>`).join('')
+      + `<gmd:featureCatalogueCitation uuidref="${esc(options.catalogue.uuid)}"><gmd:CI_Citation>`
+      + `<gmd:title>${str('Objektkatalog MyForrest')}</gmd:title>${date(options.catalogue.date, 'revision')}`
+      + `<gmd:identifier><gmd:MD_Identifier><gmd:code>${str(options.catalogue.url)}</gmd:code></gmd:MD_Identifier></gmd:identifier>`
+      + '</gmd:CI_Citation></gmd:featureCatalogueCitation>'
+      + '</gmd:MD_FeatureCatalogueDescription></gmd:contentInfo>' : '')
     + '<gmd:distributionInfo><gmd:MD_Distribution>'
     + FORMATS.map(([name, version]) => `<gmd:distributionFormat><gmd:MD_Format><gmd:name>${str(name)}</gmd:name><gmd:version>${str(version)}</gmd:version></gmd:MD_Format></gmd:distributionFormat>`).join('')
     + `<gmd:transferOptions><gmd:MD_DigitalTransferOptions>${resources.map(online).join('')}</gmd:MD_DigitalTransferOptions></gmd:transferOptions>`

@@ -59,8 +59,8 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 
 - **Kubernetes**: Das Startskript gegen einen echten podman-Cluster (kind/minikube) testen; Ingress mit
   HTTPS und ein Helm-Chart für den Betrieb ausserhalb des eigenen Rechners.
-- **Metadaten**: Einträge pro Collection und einen Objektkatalog (Feature Catalogue) für geocat.ch; den Weg
-  zu opendata.swiss einmal mit einem echten Konto durchspielen.
+- **Metadaten**: Collection-Einträge und Objektkatalog gegen die Schemas und Schematron-Regeln von geocat.ch
+  prüfen; den Weg zu opendata.swiss einmal mit einem echten Konto durchspielen.
 - **Kacheln**: die LV95-Kacheln in einer Form, die QGIS direkt öffnet (GDAL liest Vektorkacheln in GeoPackage noch
   nicht), etwa als gerenderte Rasterkacheln im selben Gitter; den Kachel-Speicher für ganz grosse Datenmengen auf
   mehrere Dateien verteilen.
@@ -117,5 +117,6 @@ Aus früheren Versionen dieser Roadmap:
   Kachelgitter
 - Geodienste: OGC API – Features und Tiles (auch im LV95-Kachelgitter, vorberechnet, PMTiles/MBTiles),
   Vektorkarten, QGIS Server, Metadaten für geocat.ch (GM03)
+- Metadaten pro Collection (Teil des Datensatzes) und Objektkatalog nach ISO 19110
 - Betrieb mit Docker Compose und Kubernetes (podman-Startskript)
 - Konten: Anmelden mit Google und GitHub, E-Mail bestätigen, Passwort zurücksetzen und ändern, Konto löschen, Profilseite mit eigenen Fotos, Anzeigename und E-Mail-Adresse ändern, Export der eigenen Daten, Microsoft, SWITCH edu-ID, AGOV und weitere OpenID-Connect-Dienste, dauerhafte Rate-Limits, auch hinter einem Reverse Proxy (`TRUST_PROXY`)

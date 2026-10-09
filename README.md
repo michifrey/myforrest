@@ -412,7 +412,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
     und als PMTiles/MBTiles zum Herunterladen (Kachel für Kachel geschrieben, auch für sehr grosse Datenmengen),
     die LV95-Kacheln als GeoPackage.
   - Zwei Vektorkarten: MapLibre in Web Mercator, OpenLayers auf der Landeskarte von swisstopo.
-  - Metadaten für geocat.ch und opendata.swiss (GM03/ISO 19139).
+  - Metadaten für geocat.ch und opendata.swiss (GM03/ISO 19139), auch pro Collection, mit Objektkatalog
+    (ISO 19110).
   - Ein fertiges QGIS-Projekt für QGIS Server (WMS/WMTS/WFS) für Geoportale wie map.geo.admin.ch.
 - **[Touren und Fotoaufträge](docs/funktionen.md#touren-und-fotoaufträge)**: Routen zeichnen, per GPS
   aufzeichnen oder importieren (GPX, FIT, TCX, KML, GeoJSON, NMEA), als GPX exportieren und speichern; Fotoaufträge

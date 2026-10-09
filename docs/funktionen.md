@@ -988,6 +988,17 @@ einbinden.
     Französisch verlangen).
   - **Einstellungen**: Kontakt und Katalog über die Variablen `METADATA_*`
     (siehe [Installation](installation.md#umgebungsvariablen)).
+  - **Eintrag pro Collection**: `/api/metadata/collections/<id>/geocat.xml` (bzw. `iso19139.xml`) beschreibt jede
+    Collection einzeln (Spots, Fotos, Pflanzenfunde, Ausbreitungsfronten): eigener Titel und eigene Zusammenfassung in
+    vier Sprachen, eigene Ausdehnung und eigener Zeitraum, Download als GeoJSON und Vektorkacheln der Collection. Er
+    ist Teil des Datensatzes (`parentIdentifier` = Kennung des Datensatzes), seine Kennung bleibt ebenfalls gleich.
+  - **Objektkatalog (ISO 19110)**: `/api/metadata/objektkatalog.xml` beschreibt jede Collection als Objektart und
+    jedes Feld mit Definition, Datentyp und Einheit (z. B. *area_m2 – Besiedelte Fläche … Einheit: Quadratmeter*),
+    Felder mit festen Werten samt Liste (Status, Befunde, Herkunft der Position, Aktivität, Lizenz, Prüfstatus).
+    Datensatz und Collection-Einträge verweisen in `contentInfo` darauf (`MD_FeatureCatalogueDescription`), die
+    Startseite der OGC API und jede Collection verlinken Metadaten und Katalog (`describedby`). Collection-Einträge
+    und Objektkatalog sind bisher nur auf wohlgeformtes XML geprüft, nicht gegen die Schemas (vom Prüfrechner aus
+    nicht erreichbar).
 
 Ausgeblendete (moderierte) Fotos erscheinen in keinem Dienst.
 
@@ -996,8 +1007,9 @@ Ausgeblendete (moderierte) Fotos erscheinen in keinem Dienst.
 1. **Angaben setzen**: `PUBLIC_URL` (die Links im Datensatz zeigen sonst auf die Adresse der Anfrage),
    `METADATA_ORGANISATION` und `METADATA_EMAIL`, bei QGIS Server auch `METADATA_OWS_URL`.
 2. **Konto bei geocat.ch**: Organisationen erhalten ein Konto über das Team von geocat.ch bei swisstopo
-   (geocat.ch → Kontakt). Dort `/api/metadata/geocat.xml` als XML importieren. Nach Änderungen denselben
-   Datensatz erneut importieren; die gleiche Kennung ersetzt den bestehenden Eintrag.
+   (geocat.ch → Kontakt). Dort `/api/metadata/geocat.xml` als XML importieren, auf Wunsch auch die Einträge der
+   Collections und den Objektkatalog. Nach Änderungen denselben Datensatz erneut importieren; die gleiche Kennung
+   ersetzt den bestehenden Eintrag.
 3. **Weiter auf opendata.swiss**: opendata.swiss übernimmt Einträge aus geocat.ch, die das Schlagwort
    `opendata.swiss` und Nutzungsbedingungen von opendata.swiss tragen. `METADATA_OPENDATA_TERMS` setzt
    beides, mit einem der Werte `terms_open`, `terms_by`, `terms_ask` oder `terms_by_ask`. Die
