@@ -655,3 +655,54 @@ test('photos kept anonymous; accounts without password confirm with their name; 
     assert.equal((await del(admin, { photos: 'anonymize', password: 'geheim-1234' })).status, 409);
   });
 });
+
+test('profile: own figures and photos, hidden ones without files, nothing of others', async () => {
+  await withServer({}, async (base) => {
+    const admin = client(base);
+    await admin.register('admin@example.org', 'Admin');
+    const anna = client(base);
+    await anna.register('anna@example.org', 'Anna Wald');
+    assert.equal((await client(base).req('/api/profile')).status, 401);
+    assert.equal((await client(base).req('/api/profile/photos')).status, 401);
+
+    const up = async (c, lat, fields = {}) => (await (await c.upload('nogps.jpg', { lat: String(lat), lon: '8.1', activity: 'joggen', ...fields })).json()).created[0];
+    const first = await up(admin, 47.1); // someone else's series …
+    const repeat = await up(anna, 47.1); // … that Anna continues
+    const own = await up(anna, 47.3);
+    const secret = await up(anna, 47.5);
+    assert.equal(repeat.spotId, first.spotId);
+    assert.equal((await anna.req(`/api/photos/${secret.id}`, { method: 'PATCH', json: { protected: true } })).status, 200);
+    assert.equal((await admin.req(`/api/moderation/photos/${own.id}/hide`, { method: 'POST', json: { reason: 'Person erkennbar' } })).status, 200);
+
+    const p = await (await anna.req('/api/profile')).json();
+    assert.equal(p.name, 'Anna Wald');
+    assert.equal(p.photos, 3);
+    assert.equal(p.spots, 3);
+    assert.equal(p.repeatSpots, 1, 'one series continued');
+    assert.equal(p.hidden, 1);
+    assert.equal(p.protected, 1);
+    assert.deepEqual(p.activities, [{ activity: 'joggen', photos: 3 }]);
+    assert.equal(p.tracks, 0);
+
+    const all = await (await anna.req('/api/profile/photos')).json();
+    assert.equal(all.total, 3);
+    assert.deepEqual(all.photos.map((x) => x.id).sort(), [repeat.id, own.id, secret.id].sort());
+    const hidden = all.photos.find((x) => x.id === own.id);
+    assert.equal(hidden.hidden, true);
+    assert.equal(hidden.hiddenReason, 'Person erkennbar');
+    assert.equal(hidden.url, undefined, 'no file URL for a hidden photo');
+    const prot = all.photos.find((x) => x.id === secret.id);
+    assert.equal(prot.protected, true);
+    assert.equal((await anna.req(prot.thumbUrl)).status, 200, 'the uploader sees an own protected photo');
+    assert.equal(all.photos.find((x) => x.id === repeat.id).spotPhotos, 2);
+
+    assert.deepEqual((await (await anna.req('/api/profile/photos?filter=geschuetzt')).json()).photos.map((x) => x.id), [secret.id]);
+    assert.deepEqual((await (await anna.req('/api/profile/photos?filter=ausgeblendet')).json()).photos.map((x) => x.id), [own.id]);
+    const page = await (await anna.req('/api/profile/photos?limit=2&offset=2')).json();
+    assert.equal(page.total, 3);
+    assert.equal(page.photos.length, 1);
+
+    // The admin's profile lists only the admin's own photo.
+    assert.deepEqual((await (await admin.req('/api/profile/photos')).json()).photos.map((x) => x.id), [first.id]);
+  });
+});
