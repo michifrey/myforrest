@@ -310,7 +310,8 @@ authForm.addEventListener('submit', async (e) => {
     renderNav();
     fillLicenseSelect();
     await refreshViews();
-    if (data.verification) alert(VERIFY_MESSAGE[data.verification](data.user.email));
+    // Accepting an invitation confirms the address: no extra notice then.
+    if (data.verification && !pendingInvite.get()) alert(VERIFY_MESSAGE[data.verification](data.user.email));
     if (wasReset) alert('Dein neues Passwort ist gespeichert. Du bist angemeldet; auf anderen Geräten bist du abgemeldet.');
     const next = afterAuth;
     afterAuth = null;
@@ -1036,17 +1037,30 @@ function orgCard(o, { manage, reload }) {
     el('p', { class: `small${o.valid ? '' : ' org-invalid'}`, text: status }),
     el('ul', { class: 'org-members' }, rows),
   ];
+  // Open invitations (leads and admins only).
+  if (o.invites?.length) {
+    parts.push(el('p', { class: 'small org-invites-title', text: 'Offene Einladungen' }), el('ul', { class: 'org-members' }, o.invites.map((i) => el('li', { class: 'org-member' }, [
+      el('span', {}, [el('strong', { text: i.email }), el('span', { class: 'muted small', text: ` · ${ORG_ROLE[i.role]} · gültig bis ${fmtDate(i.expiresAt)}` })]),
+      el('span', { class: 'pro-actions' }, el('button', {
+        type: 'button', class: 'link small danger', text: 'Zurückziehen',
+        onclick: () => act(() => api(`/api/organizations/${o.id}/invites/${i.id}`, { method: 'DELETE' })),
+      })),
+    ]))));
+  }
   if (manage) {
     const account = el('input', { id: `org-add-${o.id}`, required: '', maxlength: '200', placeholder: 'Name oder E-Mail-Adresse des Kontos', autocomplete: 'off' });
     const role = el('select', { 'aria-label': 'Rolle' }, Object.entries(ORG_ROLE).reverse().map(([k, label]) => el('option', { value: k, text: label })));
     const form = el('form', { class: 'org-add' }, [
       el('label', { for: `org-add-${o.id}`, text: 'Mitglied aufnehmen' }),
       el('div', { class: 'org-add-row' }, [account, role, el('button', { type: 'submit', class: 'btn primary', text: 'Aufnehmen' })]),
-      el('p', { class: 'muted small', text: 'Die Person braucht ein Konto mit bestätigter E-Mail-Adresse. Sie bekommt eine Mitteilung per E-Mail und sieht geschützte Funde, solange die Organisation verifiziert ist.' }),
+      el('p', { class: 'muted small', text: 'Mit Name oder E-Mail-Adresse eines bestehenden Kontos. Ohne Konto geht an die E-Mail-Adresse eine Einladung, mit der die Person sich registriert. Mitglieder sehen geschützte Funde, solange die Organisation verifiziert ist.' }),
     ]);
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      act(() => jsonPost(base, { account: account.value, role: role.value }));
+      act(async () => {
+        const r = await jsonPost(base, { account: account.value, role: role.value });
+        if (r.invited) alert(`Noch kein Konto mit ${r.invited}: Eine Einladung ist unterwegs (14 Tage gültig).`);
+      });
     });
     parts.push(form);
   }
@@ -1117,8 +1131,68 @@ async function resetFromLink() {
   return true;
 }
 
+/* ---------- Invitation into an organisation: /#einladung=<token> ---------- */
+
+const INVITE_KEY = 'myforrest-invite';
+const pendingInvite = {
+  get: () => { try { return sessionStorage.getItem(INVITE_KEY); } catch { return null; } },
+  set: (t) => { try { if (t) sessionStorage.setItem(INVITE_KEY, t); else sessionStorage.removeItem(INVITE_KEY); } catch { /* private mode */ } },
+};
+
+async function acceptInvite(token) {
+  try {
+    const orgs = await jsonPost('/api/organizations/invites/accept', { token });
+    pendingInvite.set(null);
+    Account.user = (await api('/api/auth/me')).user;
+    renderNav();
+    await refreshViews();
+    alert(`Willkommen bei ${orgs.find((o) => o)?.name || 'der Organisation'}! Du siehst jetzt geschützte Funde, solange die Organisation verifiziert ist.`);
+    openOrgs();
+  } catch (err) {
+    // Wrong account: keep the link for logging in with the invited address.
+    if (!/gilt für/.test(err.message)) pendingInvite.set(null);
+    alert(err.message);
+  }
+}
+
+/** Opens the link from the e-mail; also continues after logging in with Google/GitHub. */
+async function inviteFromLink() {
+  const m = location.hash.match(/^#einladung=([\w-]+)$/);
+  if (m) {
+    history.replaceState(null, '', `${location.pathname}${location.search}`);
+    pendingInvite.set(m[1]);
+  }
+  const token = pendingInvite.get();
+  if (!token) return false;
+  let info;
+  try {
+    info = await jsonPost('/api/organizations/invites/lookup', { token });
+  } catch (err) {
+    pendingInvite.set(null);
+    alert(err.message);
+    return true;
+  }
+  const what = `Einladung in ${info.organization}${info.role === 'leitung' ? ' (Leitung)' : ''} für ${info.email}`;
+  if (Account.user) {
+    if (Account.user.email.toLowerCase() === info.email.toLowerCase() || !m) {
+      if (confirm(`${what} annehmen?`)) await acceptInvite(token);
+      else pendingInvite.set(null);
+    } else {
+      alert(`${what}. Du bist als ${Account.user.email} angemeldet – bitte abmelden und mit ${info.email} anmelden oder registrieren.`);
+    }
+    return true;
+  }
+  openAuth(info.hasAccount ? 'login' : 'register', {
+    intro: `${what}. ${info.hasAccount ? 'Melde dich mit dieser Adresse an' : 'Erstelle ein Konto mit dieser Adresse'}, um sie anzunehmen.`,
+    then: () => acceptInvite(token),
+  });
+  authForm.login.value = info.email;
+  return true;
+}
+
 function authReturn() {
   if (location.hash.startsWith('#reset=')) return resetFromLink();
+  if (location.hash.startsWith('#einladung=')) return inviteFromLink();
   if (location.hash === '#profil') {
     history.replaceState(null, '', `${location.pathname}${location.search}`);
     return openProfile();
@@ -1126,7 +1200,8 @@ function authReturn() {
   const q = new URLSearchParams(location.search);
   const error = q.get('auth_error');
   const result = q.get('auth');
-  if (!error && !result) return;
+  // An invitation opened before logging in with Google/GitHub continues here.
+  if (!error && !result) return pendingInvite.get() ? inviteFromLink() : undefined;
   q.delete('auth_error');
   q.delete('auth');
   const provider = Account.providers.find((p) => p.id === q.get('provider'));
@@ -1143,6 +1218,7 @@ function authReturn() {
   } else if (result === 'created' && Account.user) {
     alert(`Willkommen, ${Account.user.name}! Dein Konto ist angelegt. Deine Fotos werden unter diesem Namen genannt.`);
   }
+  if (pendingInvite.get() && Account.user) inviteFromLink();
 }
 
 /* ---------- Init ---------- */

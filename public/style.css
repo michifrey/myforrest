@@ -1336,6 +1336,7 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 .org-add label { font-weight: 600; font-size: 0.85rem; }
 .org-add-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .org-add-row input { flex: 1 1 14rem; min-width: 0; }
+.org-invites-title { font-weight: 600; margin: 0.6rem 0 0; }
 
 /* Own profile */
 .profile-dialog { width: min(960px, calc(100vw - 32px)); }

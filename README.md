@@ -240,11 +240,15 @@ Naturschutzverordnungen, Rote Liste) als CSV. Eine Art gilt dann dort als gesch�
 den Kanton fragt der Server einmal pro Spot bei geo.admin.ch ab. Funde, die schon vorher bestimmt wurden,
 werden beim Laden einer Liste nachtr채glich gesch체tzt.
 
-<p align="center"><img src="docs/screenshots/organisation.jpg" width="420" alt="Organisation mit Leitung und Mitgliedern, Formular zum Aufnehmen"></p>
+<p align="center">
+  <img src="docs/screenshots/organisation.jpg" width="420" alt="Organisation mit Leitung, offenen Einladungen und Formular zum Aufnehmen">
+  <img src="docs/screenshots/einladung.jpg" width="300" alt="Konto erstellen 체ber eine Einladung, E-Mail-Adresse vorausgef체llt">
+</p>
 
 Ein Forstrevier oder eine Fachstelle muss nicht jede Person einzeln verifizieren lassen: Wer verifiziert ist,
-leitet die **Organisation** und nimmt Kolleginnen und Kollegen mit Konto auf. Sie sehen gesch체tzte Funde,
-solange eine Person der Leitung verifiziert ist, und die Leitung l채sst sich weitergeben.
+leitet die **Organisation** und nimmt Kolleginnen und Kollegen auf; wer noch kein Konto hat, bekommt eine
+**Einladung per E-Mail** und registriert sich 체ber den Link. Mitglieder sehen gesch체tzte Funde, solange eine
+Person der Leitung verifiziert ist, und die Leitung l채sst sich weitergeben.
 
 ### 12. Konto: E-Mail, Google oder GitHub
 

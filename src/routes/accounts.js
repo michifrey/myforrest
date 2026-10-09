@@ -55,9 +55,13 @@ const {
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 // Writes that stay open to anonymous visitors even with requireLogin.
-const OPEN_WRITES = [/^\/auth\/(login|register|logout|password\/forgot|password\/reset)$/, /^\/photos\/\d+\/report$/];
+const OPEN_WRITES = [
+  /^\/auth\/(login|register|logout|password\/forgot|password\/reset)$/, /^\/photos\/\d+\/report$/,
+  /^\/organizations\/invites\/lookup$/, // what an invitation link is about, before logging in
+];
 // Writes an account with an unconfirmed address may still make with requireVerifiedEmail.
-const UNVERIFIED_WRITES = [/^\/auth\//, ...OPEN_WRITES];
+// Accepting an invitation confirms the address it was sent to.
+const UNVERIFIED_WRITES = [/^\/auth\//, /^\/organizations\/invites\/accept$/, ...OPEN_WRITES];
 
 const sameString = (a, b) => {
   const x = Buffer.from(String(a));

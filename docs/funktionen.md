@@ -828,9 +828,20 @@ prüfen lassen muss, gibt es **Organisationen**:
   die Organisation, die sie im Antrag genannt hat. Gleiche Namen (ohne Rücksicht auf Gross-/Kleinschreibung
   und Leerzeichen) ergeben dieselbe Organisation; mehrere verifizierte Personen teilen sich dann die Leitung.
 - **Mitglieder aufnehmen**: Im Konto-Menü unter *Organisation* nimmt die Leitung Konten über Namen oder
-  E-Mail-Adresse auf, als *Mitglied* oder in die *Leitung*. Die Person braucht ein Konto mit bestätigter
-  E-Mail-Adresse und bekommt eine Mitteilung per E-Mail. Höchstens 200 Mitglieder pro Organisation,
-  50 Aufnahmen pro Tag und Konto.
+  E-Mail-Adresse auf, als *Mitglied* oder in die *Leitung*. Konten mit bestätigter E-Mail-Adresse kommen
+  sofort dazu und bekommen eine Mitteilung per E-Mail. Höchstens 200 Mitglieder und offene Einladungen pro
+  Organisation, 50 Aufnahmen pro Tag und Konto.
+- **Einladen ohne Konto**: Gibt es zur E-Mail-Adresse noch kein Konto (oder keines mit bestätigter Adresse),
+  geht eine **Einladung** mit einem Link (`/#einladung=…`, 14 Tage gültig) an diese Adresse; in der Datenbank
+  steht nur der SHA-256 des Tokens. Der Link zeigt, wer einlädt, und öffnet *Konto erstellen* mit der
+  vorausgefüllten Adresse (oder *Anmelden*, wenn es schon ein Konto gibt; Google und GitHub gehen auch).
+  Danach ist die Person Mitglied, und ihre Adresse gilt als bestätigt, weil der Link an sie ging. Annehmen
+  kann nur ein Konto mit genau der eingeladenen Adresse; ein weitergeleiteter Link nützt niemand anderem.
+  Die Leitung sieht offene Einladungen mit Ablaufdatum und kann sie zurückziehen; eine neue Einladung an
+  dieselbe Adresse ersetzt die alte.
+
+![Konto erstellen über eine Einladung](screenshots/einladung.jpg)
+
 - **Was Mitglieder sehen**: geschützte Funde wie ein PRO-Mitglied, ohne eigenen Antrag; im PRO-Dialog steht
   „Du siehst geschützte Funde als Mitglied von …“. Die Leitung sieht die E-Mail-Adressen der Mitglieder,
   Mitglieder nur die Namen.
@@ -846,8 +857,8 @@ prüfen lassen muss, gibt es **Organisationen**:
   Organisation.
 - **Admins**: Der Tab *Organisationen* in der Moderation zeigt alle Organisationen mit Mitgliedern; Admins
   können dort aufnehmen, Rollen ändern und entfernen. Die Kontenliste zeigt bei jedem Konto seine
-  Organisationen („über Organisation“). Aufnahmen, Rollenwechsel, Entfernen und Austritte stehen im
-  Moderationsprotokoll.
+  Organisationen („über Organisation“). Aufnahmen, Einladungen, Rollenwechsel, Entfernen und Austritte
+  stehen im Moderationsprotokoll.
 - **Bestehende Verifizierungen**: Beim ersten Start leitet jedes verifizierte Konto die Organisation, die es
   angegeben hat.
 

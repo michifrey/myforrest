@@ -73,7 +73,7 @@ src/oauth.js         Anmelden mit Google und GitHub (OAuth 2.0 mit PKCE), ohne A
 src/mail.js          E-Mail-Versand über SMTP (TLS/STARTTLS, AUTH PLAIN) für Bestätigungs- und Reset-Links
 src/moderation.js    Lizenzen, Meldungen, Ausblenden und Protokoll
 src/routes/accounts.js  Routen für Konten und Moderation, CSRF-Schutz, Rechte auf Fotos
-src/routes/organizations.js  Mitglieder einer Organisation aufnehmen, Rollen, austreten
+src/routes/organizations.js  Mitglieder einer Organisation aufnehmen, Einladungen per E-Mail, Rollen, austreten
 src/routes/profile.js   Eigene Profilseite: Zahlen und eigene Fotos (nur für das eigene Konto)
 src/trackfile.js     Touren lesen (GPX, TCX, KML, GeoJSON) und als GPX schreiben
 src/routegeo.js      Länge, Abstand zur Route und Position entlang der Route, Privatzone an den Enden

@@ -5,12 +5,18 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 
 ## Phase 2: Mehr und bessere Fotos
 
+- **Dashcam im Fahrzeug**: Eine Kamera im Auto des Forstdienstes macht den ganzen Tag alle paar Sekunden ein
+  Bild. Die Fahrt wird automatisch als Route erfasst und die Bilder automatisch hochgeladen. Weil das sehr
+  viele, oft fast gleiche Bilder sind, braucht es Auswahl und Deduplizierung beim Speichern: nur Bilder an
+  bestehenden Spots oder in festen Abständen entlang der Strecke behalten, Standzeiten und Doppelte
+  verwerfen, den Rest nur als Route speichern.
+
 - **360°-Rohdateien**: Insta360-`.insv` und GoPro-MAX-`.360` direkt lesen (Fischaugen stitchen, GPS aus dem
   Datei-Trailer). Braucht Beispieldateien der Kameras und deren Objektivdaten; bis dahin über den Export
   als 360°-MP4.
 - **Geschützte Funde**: Pilze per Bild erkennen (braucht ein Modell; Pl@ntNet kennt keine Pilze), die
   kantonalen Listen direkt von den Fachstellen bzw. Info Flora beziehen (sobald es dafür eine offene
-  Schnittstelle gibt); Einladungen in eine Organisation für Personen ohne Konto.
+  Schnittstelle gibt).
 - **Eigener Routing-Server**: Image von `deploy/brouter` in einer Registry bauen und gegen echte Routing-Daten
   prüfen, ein eigenes Waldprofil (Forststrassen und Rückegassen bevorzugen, Wildruhezonen meiden).
 - **Touren**: FIT-Dateien direkt lesen, Höhenprofil der Route, Abgleich mit Strava/Komoot per OAuth,
@@ -64,7 +70,8 @@ Aus früheren Versionen dieser Roadmap:
   abgelehnt wurde
 - Schutzlisten je Kanton laden (Kanton des Spots über geo.admin.ch); PRO-Verifizierung auf ein Jahr befristet,
   mit Erinnerung und Verlängerung
-- Organisationen mit mehreren Mitgliedern: die verifizierte Leitung nimmt Kolleginnen und Kollegen auf
+- Organisationen mit mehreren Mitgliedern: die verifizierte Leitung nimmt Kolleginnen und Kollegen auf, auch per
+  Einladung an eine E-Mail-Adresse ohne Konto
 - Sturmereignisse aus Böen mit Windwurf-Funden verknüpfen
 - DWD-Phänologie als Referenz für den Beginn der Herbstfärbung
 - Nächtliche Abkühlung in Senken aus Wind und Bewölkung
