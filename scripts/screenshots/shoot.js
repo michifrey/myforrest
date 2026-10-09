@@ -1,6 +1,6 @@
 'use strict';
 // Takes the README screenshots from the demo server (see README.md here).
-// Usage: node shoot.js [hero map spot satellite sun species vektor touren walk uebergang schutz konto profil timelapse compare upload gletscher mobile]
+// Usage: node shoot.js [hero map spot satellite sun species vektor touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher mobile]
 // «mapillary» needs the demo server started with DEMO_MAPILLARY=1 (a Mapillary stand-in, see README.md).
 // «gletscher» uses the glacier demo server (BASE_GLETSCHER, default http://localhost:3124; see README.md).
 const path = require('path');
@@ -208,6 +208,23 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.evaluate((id) => Walk.open(id), ids[1]);
     await settle(page, 4000);
     await page.screenshot({ path: out('durchgehen.jpg'), ...jpg });
+    await page.close();
+  }
+
+  if (want('wegnetz')) {
+    // Walk-through from the windthrow spot: the path first runs north, then to the 360° recording.
+    const page = await ctx.newPage();
+    await page.goto(`${BASE}/`);
+    await settle(page, 2000);
+    const id = await page.evaluate(async () => {
+      const spots = await (await fetch('/api/spots')).json();
+      const s = spots.reduce((a, b) => (Math.hypot(b.lat - 47.37327, b.lon - 8.57203) < Math.hypot(a.lat - 47.37327, a.lon - 8.57203) ? b : a));
+      const d = await (await fetch(`/api/spots/${s.id}`)).json();
+      return d.photos[d.photos.length - 1].id;
+    });
+    await page.evaluate((x) => Walk.open(x), id);
+    await settle(page, 4000);
+    await page.screenshot({ path: out('durchgehen-wegnetz.jpg'), ...jpg });
     await page.close();
   }
 

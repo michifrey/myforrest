@@ -61,7 +61,8 @@ src/mp4.js           MP4-Boxen lesen: Telemetrie-Spur, Startzeit, Dauer, 360°-M
 src/gpmf.js          GoPro-Telemetrie (GPMF): GPS5/GPS9, GPSU, SCAL
 src/video.js         Bilder entlang der Strecke planen, Blickrichtung, Schärfe und Wahl des schärfsten Bildes, ffmpeg-Aufruf
 src/routes/video.js  Video-Upload und Fortschritt (/api/videos)
-src/routes/walk.js   Durchgehen: Nachbarbilder entlang einer Reihe, zu Spots und zu Mapillary-Bildern in der Nähe (/api/walk, /api/mapillary)
+src/routes/walk.js   Durchgehen: Nachbarbilder entlang einer Reihe, entlang der Wege, zu Spots und zu Mapillary-Bildern in der Nähe, Schritte mit Tiefe (/api/walk, /api/mapillary)
+src/waynet.js        Wegnetz aus OpenStreetMap (Overpass, pro Feld zwischengespeichert): Standort auf den Weg setzen, kürzeste Wege zu Bildern, Richtung, in die der Weg wegführt
 src/mapillary.js     Mapillary API v4: Suche pro Feld (zwischengespeichert), Bild über den Server (Token bleibt dort), Urheber und Lizenz
 src/geo.js           Distanzen und Interpolation auf dem Track
 src/plantnet.js      Anbindung an die Pl@ntNet-API

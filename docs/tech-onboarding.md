@@ -233,6 +233,9 @@ ohne die jeweilige Funktion weiter.
 | `AGOV_ISSUER`, `OIDC_ISSUER` | Anmelden mit AGOV / eigenem OIDC-Dienst | beim Anmelden | nur wenn gesetzt |
 | SMTP-Server aus `SMTP_URL` | E-Mails | Registrierung, Passwort vergessen | Port **465** (`smtps://`) oder **587** (`smtp://` + STARTTLS) |
 | `DETECTOR_URL` | externer Objektdetektor | beim ersten Abruf der Erkennungen eines Fotos | nur wenn gesetzt |
+| `WEGNETZ_URL`, z. B. `overpass-api.de` | Wegnetz im Durchgehen (OpenStreetMap) | pro Feld von rund 1 km², alle 30 Tage | nur wenn gesetzt; eigene Overpass-Instanz möglich |
+| `graph.mapillary.com` und die Bild-Hosts von Mapillary | Mapillary-Bilder im Durchgehen | pro Feld, eine Woche zwischengespeichert | nur mit `MAPILLARY_TOKEN` |
+| Hosts der Bild-Adressen in `ARCHIV_KATALOG` | Archivbild übernehmen | auf Knopfdruck | nur wenn gesetzt |
 
 Beim Bauen der Images zusätzlich: `registry.npmjs.org` (npm), `deb.debian.org` (ffmpeg), Docker Hub bzw.
 `ghcr.io` (Basis-Images), `github.com` (BRouter-Release).

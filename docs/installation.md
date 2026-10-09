@@ -66,6 +66,7 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 | `WILDRUHE_GEOJSON` | – | GeoJSON-Datei mit Wildruhezonen (WGS84 oder LV95, z. B. BAFU-Datensatz von geo.admin.ch); der Wege-Magnet führt während der Schutzzeit um sie herum |
 | `HOLZSCHLAG_SPERRE_TAGE` | `42` | So lange sperrt ein Foto mit *Holzschlag / Rodung* die Wege 80 m darum herum für den Wege-Magnet |
 | `WILDRUHE_SEASON`  | `12-20/04-30` | Schutzzeit (Monat-Tag/Monat-Tag) für Zonen ohne eigene Angabe; `immer` = ganzjährig |
+| `WEGNETZ_URL` | – | Overpass-API für das Wegnetz aus OpenStreetMap (z. B. `https://overpass-api.de/api/interpreter` oder eine eigene Instanz); im Durchgehen führen Pfeile dann entlang der Wege ([Details](funktionen.md#durchgehen-wie-street-view)) |
 | `MAPILLARY_TOKEN` | – | Client-Token von [Mapillary](https://www.mapillary.com/dashboard/developers) (`MLY|…`): Mapillary-Bilder im Durchgehen und auf der Karte, wo es keine eigenen gibt ([Details](funktionen.md#mapillary)) |
 | `GEBIRGE_AB_M` | `2100` | Ab dieser Höhe (m ü. M.) wird ein Spot ohne Profil, Baumarten und Wald-Beobachtungen ein Gebirge-Spot; `0` = aus |
 | `GLAMOS_CSV` | – | Längenänderung der Gletscherzungen von GLAMOS als CSV (mehrere durch Kommas getrennt); zeigt die Kurve im Gletscher-Teil eines Spots ([Details](funktionen.md#längenänderung-glamos)) |

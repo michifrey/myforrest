@@ -106,6 +106,7 @@ ausserhalb von `docs/` zeigen auf GitHub (`https://github.com/michifrey/myforres
 | OpenStreetMap | Kartenkacheln (im Browser) | – |
 | swisstopo (geo.admin.ch) | Landeskarte und Luftbild der Vektorkarte LV95 (im Browser) | – |
 | swisstopo (geo.admin.ch), swissBOUNDARIES3D | Kanton eines Spots für die kantonalen Schutzlisten (einmal pro Spot) | `api3.geo.admin.ch` |
+| [OpenStreetMap](https://www.openstreetmap.org) über eine Overpass-API (optional, `WEGNETZ_URL`; Daten © OpenStreetMap-Mitwirkende, ODbL) | Wegnetz im Durchgehen; pro Feld von rund 1 km² nur der Ausschnitt, 30 Tage zwischengespeichert | Host von `WEGNETZ_URL`, z. B. `overpass-api.de` |
 | [Mapillary](https://www.mapillary.com) (optional, `MAPILLARY_TOKEN`; Bilder CC BY-SA 4.0) | Bilder im Durchgehen und auf der Karte, wo es keine eigenen gibt; nur der Server fragt an (Ausschnitt um einen Ort bzw. die Karte), der Browser lädt die Bilder von MyForrest | `graph.mapillary.com` und das Bild-CDN von Mapillary (`scontent*.fbcdn.net`) |
 | [GLAMOS](https://www.glamos.ch), Längenänderung | Kurve der Gletscherzunge (`GLAMOS_CSV`, lokale Datei) | – |
 | Offene Bildarchive, z. B. [ETH-Bibliothek, Bildarchiv](https://ba.e-pics.ethz.ch) (`ARCHIV_KATALOG`) | Vorschläge alter Aufnahmen; beim *Übernehmen* lädt der Server das Bild von der Adresse im Katalog | die Hosts der Bild-Adressen im Katalog |

@@ -15,6 +15,7 @@ const { createGlaciers } = require('./glaciers');
 const { createGlamos } = require('./glamos');
 const { createArchives } = require('./archives');
 const { createMapillary } = require('./mapillary');
+const { createWaynet } = require('./waynet');
 const { LANDSCAPES, ICE_LANDSCAPES, MOUNTAIN_MIN_M, FOREST_ONLY_TAGS, isLandscape, landscapeOf } = require('./landscapes');
 const { parseTrackPoints } = require('./gpx');
 const { readPhotoMeta, imageExtension } = require('./exif');
@@ -104,6 +105,7 @@ function createApp({
   stormWarnHours = Number(process.env.STURM_WARN_HOURS ?? 3),
   // Mapillary pictures in the walk-through and on the map (src/mapillary.js); off without a token.
   mapillaryToken = process.env.MAPILLARY_TOKEN || '', mapillaryFetch = fetch,
+  waynetUrl = process.env.WEGNETZ_URL || '', waynetFetch = fetch,
   // Reverse proxies whose X-Forwarded-For counts (Express 'trust proxy'), so rate limits see the client's
   // address instead of the proxy's. Off by default: otherwise anyone could fake the header.
   trustProxy = parseTrustProxy(process.env.TRUST_PROXY),
@@ -141,6 +143,7 @@ function createApp({
   // Glacier inventories (GLETSCHER_GEOJSON): glacier spots, the outlines on the map, where the ice was.
   const glaciers = createGlaciers({ files: glacierFiles });
   const mapillary = createMapillary({ db, dataDir, token: mapillaryToken, fetchImpl: mapillaryFetch });
+  const waynet = createWaynet({ db, url: waynetUrl, fetchImpl: waynetFetch });
   app.locals.remindPro = accounts.remindPro;
   // Protection lists per canton (src/sensitive.js) and the canton of each spot (src/canton.js).
   const sensitiveLists = createSensitiveLists(db);
@@ -1238,7 +1241,16 @@ function createApp({
   require('./routes/species')(app, { db, spotRadiusM, visibleSql: accounts.visibleSql });
   require('./routes/profile')(app, { db, thumbs, accounts, uploadDir, rateLimits });
   require('./routes/protection')(app, { db, accounts, sensitiveLists, cantons, reprotect });
-  require('./routes/walk')(app, { db, accounts, thumbs, mapillary });
+  /**
+   * How flat photo `a` lies in flat photo `b` (normalised homography a → b) for a walk step with depth:
+   * from the alignment when both are aligned in the same spot's frame, else by matching their features.
+   */
+  async function photoTransition(a, b) {
+    const back = a.spot_id === b.spot_id && a.align_h && b.align_h ? invert(JSON.parse(b.align_h)) : null;
+    if (back) return { h: multiply(back, JSON.parse(a.align_h)).map((v) => Math.round(v * 1e9) / 1e9), inliers: null };
+    return alignImages(path.join(uploadDir, a.file), path.join(uploadDir, b.file), { getFeatures: cachedFeatures });
+  }
+  require('./routes/walk')(app, { db, accounts, thumbs, mapillary, waynet, transition: photoTransition });
   require('./routes/ogc')(app, { db, spotRadiusM, dataDir, background, tiles: tileOptions });
   require('./routes/video')(app, { db, uploadDir, tmpDir, spotRadiusM, activities: ACTIVITIES, photoJson, getPhoto, setTags, alignPhoto, analyzeChange, analyzeContext, background, safeAlign, classifySpot });
   const push = require('./routes/push')(app, { db, idParam, adminEmail, ...pushOptions });
