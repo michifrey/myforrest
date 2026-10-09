@@ -228,7 +228,8 @@ map.geo.admin.ch. Ein Klick auf ein Objekt zeigt seine Angaben.
 (Klick für Klick; der Wege-Magnet zieht die Linie auf Wege und Pfade), mit dem Handy per GPS **aufzeichnen** oder als GPX, FIT
 (Sportuhr, Velocomputer), TCX, KML oder GeoJSON **importieren**. Ein **Höhenprofil** zeigt Auf- und Abstieg. Gelbe Kilometer-Marken zeigen den Verlauf, jede Route geht auch als GPX
 wieder hinaus. Mit dem eigenen Routing-Server bevorzugt der Magnet Forststrassen und Rückegassen und führt
-während der Schutzzeit um **Wildruhezonen** herum, die die Karte beim Planen zeigt. Mit Konto lassen sich Touren speichern und veröffentlichen; andere sehen eine öffentliche
+während der Schutzzeit um **Wildruhezonen** herum, die die Karte beim Planen zeigt, ebenso um **Holzerei**: Ein
+Foto mit *Holzschlag* sperrt die Stelle sechs Wochen, der Forstdienst sperrt Wege mit Enddatum. Mit Konto lassen sich Touren speichern und veröffentlichen; andere sehen eine öffentliche
 Tour ohne Zeiten und ohne die ersten und letzten 200 m. Über eine Tour mit Zeitstempeln lassen sich im
 Upload auch Fotos ohne GPS verorten.
 
@@ -426,6 +427,7 @@ für den Wege-Magnet mit ([`deploy/brouter`](deploy/brouter/README.md)).
 | Dokument | Inhalt |
 |----------|--------|
 | [Funktionen im Detail](docs/funktionen.md) | Alle Funktionen mit Verfahren, Schwellenwerten und Grenzen |
+| [Tech-Onboarding](docs/tech-onboarding.md) | Selbst hosten: Voraussetzungen, Speicherplatz, Lizenzen, Ports, Zertifikate, ausgehende Verbindungen, Checkliste |
 | [Installation und Konfiguration](docs/installation.md) | Voraussetzungen, HTTPS fürs Handy, Umgebungsvariablen, externer Detektor, Phänologie-Daten |
 | [Betrieb, Datenschutz und Datenquellen](docs/betrieb.md) | Hinweise für einen öffentlichen Betrieb, externe Dienste und Quellenangaben |
 | [Architektur](docs/architektur.md) | Aufbau des Codes, Module im Überblick |

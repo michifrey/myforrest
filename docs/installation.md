@@ -44,6 +44,7 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 | `LANDSAT_TOKEN_URL`| Planetary Computer | Adresse für das anonyme Token, mit dem die Landsat-Links signiert werden |
 | `SATELLITE_WATCH_HOURS` | `24` | Abstand der Frühwarn-Runde über alle Spots in Stunden; `0` = aus |
 | `REQUIRE_LOGIN`    | –        | `1`: Uploads und Änderungen nur mit Konto      |
+| `TRUST_PROXY`      | –        | Reverse Proxy, dessen `X-Forwarded-For` gilt, damit die Rate-Limits die Adresse der Person sehen statt die des Proxys: Anzahl Proxys (`1`), Adressen oder Netze (`loopback`, `uniquelocal`, `10.0.0.0/8`) oder `true` für alle; leer = keinem Proxy vertrauen (siehe [Betrieb](betrieb.md#vor-einem-öffentlichen-betrieb)) |
 | `ADMIN_EMAIL`      | –        | Dieses Konto wird Admin (sonst das erste Konto) |
 | `REQUIRE_VERIFIED_EMAIL` | – | `1`: Uploads und Änderungen nur mit bestätigter E-Mail-Adresse (schliesst `REQUIRE_LOGIN` ein) |
 | `SMTP_URL`         | –        | Mailserver für Bestätigungslinks, z. B. `smtps://user:passwort@smtp.example.org` (siehe [unten](#e-mail-versand)); ohne ihn stehen die Links im Server-Log |
@@ -61,6 +62,7 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 | `SENSITIVE_SPECIES` | – | Weitere Gattungen oder Arten (kommagetrennt), deren Funde automatisch geschützt werden, z. B. `Trollius,Lilium bulbiferum` |
 | `ROUTER_PROFILE`   | `hiking-mountain` | BRouter-Profil für das Routing; mit dem eigenen BRouter `myforrest-wald` (Waldprofil, siehe [deploy/brouter](../deploy/brouter/README.md)) |
 | `WILDRUHE_GEOJSON` | – | GeoJSON-Datei mit Wildruhezonen (WGS84 oder LV95, z. B. BAFU-Datensatz von geo.admin.ch); der Wege-Magnet führt während der Schutzzeit um sie herum |
+| `HOLZSCHLAG_SPERRE_TAGE` | `42` | So lange sperrt ein Foto mit *Holzschlag / Rodung* die Wege 80 m darum herum für den Wege-Magnet |
 | `WILDRUHE_SEASON`  | `12-20/04-30` | Schutzzeit (Monat-Tag/Monat-Tag) für Zonen ohne eigene Angabe; `immer` = ganzjährig |
 | `MAPILLARY_TOKEN` | – | Client-Token von [Mapillary](https://www.mapillary.com/dashboard/developers) (`MLY|…`): Mapillary-Bilder im Durchgehen und auf der Karte, wo es keine eigenen gibt ([Details](funktionen.md#mapillary)) |
 | `GEBIRGE_AB_M` | `2100` | Ab dieser Höhe (m ü. M.) wird ein Spot ohne Profil, Baumarten und Wald-Beobachtungen ein Gebirge-Spot; `0` = aus |
@@ -228,5 +230,6 @@ Docker-Compose-Vorlage und auf Kubernetes läuft er schon mit; allein startet er
 
 ## Weiter
 
+- [Tech-Onboarding](tech-onboarding.md): alles fürs Hosten auf einen Blick (Speicher, Lizenzen, Ports, Zertifikate, ausgehende Verbindungen)
 - [Betrieb, Datenschutz und Datenquellen](betrieb.md): was vor einem öffentlichen Betrieb zu beachten ist
 - [Architektur](architektur.md) und [REST-API](api.md)

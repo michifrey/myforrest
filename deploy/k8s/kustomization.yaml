@@ -32,6 +32,8 @@ configMapGenerator:
       - ROUTER_URL=http://brouter:17777/brouter
       # Forest profile of the own BRouter (deploy/brouter/profiles).
       - ROUTER_PROFILE=myforrest-wald
+      # nginx in front (private pod addresses): rate limits per client from X-Forwarded-For.
+      - TRUST_PROXY=uniquelocal
 images:
   # Built locally with podman and loaded into the cluster (start.sh); never pulled.
   - name: myforrest

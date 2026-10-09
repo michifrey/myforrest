@@ -910,6 +910,21 @@ wird.
   sagt, um welche Zonen die Route geführt wurde; liegt ein Wegpunkt in einer Zone, weist es darauf hin.
 
 ![Wildruhezone beim Planen einer Route](screenshots/wildruhezonen.jpg)
+
+- **Sperrungen bei Holzerei**: Wo gerade Holz geschlagen wird, führt der Magnet aussen herum (BRouter-
+  Sperrkreise). Eine Sperrung entsteht
+  - **automatisch** aus einem öffentlichen Foto mit der Beobachtung *Holzschlag / Rodung* (von Hand getaggt
+    oder vom Detektor erkannt): 80 m um den Spot, 6 Wochen ab dem Aufnahmetag (`HOLZSCHLAG_SPERRE_TAGE`).
+    Geschützte Funde sperren nie etwas, sonst würde ihr Ort sichtbar;
+  - **von Hand** durch verifizierte PRO-Mitglieder (Forstdienst) und die Moderation: *Holzerei: Wege hier
+    vorübergehend sperren* im Spot-Panel, mit Enddatum (höchstens ein Jahr) und Grund, 100 m um den Spot.
+    Wer sie gesetzt hat, oder die Moderation hebt sie auf der Karte wieder auf. Eine Sperrung von Hand
+    ersetzt die automatische am selben Spot.
+
+  Beim Planen zeigt die Karte Sperrungen orange gestrichelt mit Grund und Enddatum; das Panel sagt, um
+  welche Sperrungen der Magnet herumgeführt hat, und warnt, wenn ein Wegpunkt in einer liegt.
+
+![Sperrung nach einem Holzschlag-Foto: der Magnet nimmt den Pfad](screenshots/sperrung.jpg)
 - **Aufzeichnen**: Das Handy zeichnet die Strecke per GPS auf (Punkte ab ±40 m Genauigkeit, mindestens 4 m
   auseinander, mit Zeit und Höhe). Der Bildschirm bleibt dabei an (Wake Lock), denn Browser stoppen GPS
   für Seiten im Hintergrund. Die Punkte liegen laufend im Browser; nach einem Neuladen lässt sich die

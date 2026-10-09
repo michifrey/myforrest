@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { createApp } = require('../src/app');
+const { createApp, parseTrustProxy } = require('../src/app');
 const { hashPassword, verifyPassword, parseCookies, createLimiter } = require('../src/auth');
 
 const fixture = (name) => new Blob([fs.readFileSync(path.join(__dirname, 'fixtures', name))], { type: 'image/jpeg' });
@@ -956,4 +956,30 @@ test('a login lockout outlasts a restart of the app', async () => {
   } finally {
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
+});
+
+test('TRUST_PROXY: rate limits per client address behind a reverse proxy', async () => {
+  assert.equal(parseTrustProxy(undefined), false);
+  assert.equal(parseTrustProxy(' '), false);
+  assert.equal(parseTrustProxy('false'), false);
+  assert.equal(parseTrustProxy('true'), true);
+  assert.equal(parseTrustProxy('1'), 1);
+  assert.equal(parseTrustProxy('loopback, 10.0.0.0/8'), 'loopback, 10.0.0.0/8');
+
+  const register = (base, email, ip) => fetch(`${base}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip },
+    body: JSON.stringify({ email, name: email.split('@')[0], password: 'geheim-1234' }),
+  });
+  // Without trustProxy every request comes from the proxy: one client uses up the limit for all.
+  await withServer({ rateLimits: { registerPerIp: 1 } }, async (base) => {
+    assert.equal((await register(base, 'anna@example.org', '203.0.113.1')).status, 201);
+    assert.equal((await register(base, 'ben@example.org', '203.0.113.2')).status, 429);
+  });
+  // With trustProxy the limit applies per client address from X-Forwarded-For.
+  await withServer({ rateLimits: { registerPerIp: 1 }, trustProxy: 'loopback' }, async (base) => {
+    assert.equal((await register(base, 'anna@example.org', '203.0.113.1')).status, 201);
+    assert.equal((await register(base, 'ben@example.org', '203.0.113.2')).status, 201);
+    assert.equal((await register(base, 'cleo@example.org', '203.0.113.1')).status, 429);
+  });
 });
