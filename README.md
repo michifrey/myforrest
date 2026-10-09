@@ -10,6 +10,11 @@ freigab und wie früh der Schnee heute schmilzt.
 
 ![Startseite von MyForrest](docs/screenshots/hero.jpg)
 
+Die Startseite wechselt alle acht Sekunden zwischen Wald, Gletscher, Gebirge und Wüste, jede Landschaft mit
+eigener gezeichneter Szene, Farbstimmung und Überschrift; die Knöpfe unter der Überschrift halten eine fest.
+
+![Die vier Landschaften der Startseite: Wald, Gletscher, Gebirge und Wüste](docs/screenshots/hero-landschaften.jpg)
+
 ## Die App im Überblick
 
 Die Idee ist einfach: Wer regelmässig dieselben Wege läuft, kommt immer wieder an denselben Stellen

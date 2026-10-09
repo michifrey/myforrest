@@ -34,6 +34,15 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.goto(`${BASE}/`);
     await settle(page, 3500);
     await page.screenshot({ path: out('hero.jpg'), ...jpg });
+    // The four landscapes of the start page, as a 2 × 2 grid.
+    const sharp = require('sharp');
+    const tiles = [];
+    for (const [i, name] of ['wald', 'gletscher', 'gebirge', 'wueste'].entries()) {
+      await page.click(`.scene-pick button[data-scene="${name}"]`);
+      await settle(page, 3200);
+      tiles.push({ input: await sharp(await page.screenshot()).resize(720, 450).toBuffer(), left: (i % 2) * 724, top: Math.floor(i / 2) * 454 });
+    }
+    await sharp({ create: { width: 1444, height: 904, channels: 3, background: '#ffffff' } }).composite(tiles).jpeg({ quality: 82 }).toFile(out('hero-landschaften.jpg'));
     await page.close();
   }
 
