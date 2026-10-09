@@ -56,7 +56,8 @@ src/mp4.js           MP4-Boxen lesen: Telemetrie-Spur, Startzeit, Dauer, 360°-M
 src/gpmf.js          GoPro-Telemetrie (GPMF): GPS5/GPS9, GPSU, SCAL
 src/video.js         Bilder entlang der Strecke planen, Blickrichtung, Schärfe und Wahl des schärfsten Bildes, ffmpeg-Aufruf
 src/routes/video.js  Video-Upload und Fortschritt (/api/videos)
-src/routes/walk.js   Durchgehen: Nachbarbilder entlang einer Reihe und zu Spots in der Nähe (/api/walk)
+src/routes/walk.js   Durchgehen: Nachbarbilder entlang einer Reihe, zu Spots und zu Mapillary-Bildern in der Nähe (/api/walk, /api/mapillary)
+src/mapillary.js     Mapillary API v4: Suche pro Feld (zwischengespeichert), Bild über den Server (Token bleibt dort), Urheber und Lizenz
 src/geo.js           Distanzen und Interpolation auf dem Track
 src/plantnet.js      Anbindung an die Pl@ntNet-API
 src/neophytes.js     Liste invasiver Neophyten (Schwarze Liste CH / BfN)
@@ -99,7 +100,7 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
                      hotspots.js den Kartenmodus „Arten & Neophyten“,
                      tours.js den Kartenmodus „Touren & Aufträge“ (Route zeichnen, aufzeichnen, importieren, Fotoaufträge),
                      video.js den Video-Upload und die 360°-Ansicht,
-                     walk.js das Durchgehen wie Street View,
+                     walk.js das Durchgehen wie Street View (mit Mapillary-Bildern und deren Kartenebene),
                      vegetation.js die Diagramme zu Vegetationsdichte und NDVI,
                      glacier.js Landschaft des Spots, Gletscher- und Schnee-Teil, Archivfotos und Gletscherumrisse auf der Karte,
                      account.js Konto-Menü, Lizenz, Melden und Moderation;

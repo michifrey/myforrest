@@ -64,6 +64,7 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 | `WILDRUHE_GEOJSON` | – | GeoJSON-Datei mit Wildruhezonen (WGS84 oder LV95, z. B. BAFU-Datensatz von geo.admin.ch); der Wege-Magnet führt während der Schutzzeit um sie herum |
 | `HOLZSCHLAG_SPERRE_TAGE` | `42` | So lange sperrt ein Foto mit *Holzschlag / Rodung* die Wege 80 m darum herum für den Wege-Magnet |
 | `WILDRUHE_SEASON`  | `12-20/04-30` | Schutzzeit (Monat-Tag/Monat-Tag) für Zonen ohne eigene Angabe; `immer` = ganzjährig |
+| `MAPILLARY_TOKEN` | – | Client-Token von [Mapillary](https://www.mapillary.com/dashboard/developers) (`MLY|…`): Mapillary-Bilder im Durchgehen und auf der Karte, wo es keine eigenen gibt ([Details](funktionen.md#mapillary)) |
 | `GEBIRGE_AB_M` | `2100` | Ab dieser Höhe (m ü. M.) wird ein Spot ohne Profil, Baumarten und Wald-Beobachtungen ein Gebirge-Spot; `0` = aus |
 | `GLETSCHER_GEOJSON` | – | Gletscherinventare als GeoJSON (WGS84 oder LV95, mehrere durch Kommas getrennt, z. B. GLAMOS SGI 1850, 1973, 2016); erkennt Gletscher-Spots, zeigt die Umrisse pro Jahr und wo früher Eis lag ([Details](funktionen.md#gletscherumrisse)) |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | erzeugt | Schlüssel für Web Push (base64url); ohne sie erzeugt der Server beim ersten Start ein Paar und speichert es in der Datenbank |

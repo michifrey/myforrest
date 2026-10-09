@@ -12,6 +12,7 @@ const { distanceM, isValidCoord, positionAt } = require('./geo');
 const { lenientFetch } = require('./lenient-fetch');
 const { createWildlife } = require('./wildlife');
 const { createGlaciers } = require('./glaciers');
+const { createMapillary } = require('./mapillary');
 const { LANDSCAPES, ICE_LANDSCAPES, MOUNTAIN_MIN_M, FOREST_ONLY_TAGS, isLandscape, landscapeOf } = require('./landscapes');
 const { parseTrackPoints } = require('./gpx');
 const { readPhotoMeta, imageExtension } = require('./exif');
@@ -90,6 +91,8 @@ function createApp({
   glacierFiles = process.env.GLETSCHER_GEOJSON || '',
   // Spots without a profile above this height become mountain spots (src/landscapes.js); 0 = off.
   mountainMinM = MOUNTAIN_MIN_M,
+  // Mapillary pictures in the walk-through and on the map (src/mapillary.js); off without a token.
+  mapillaryToken = process.env.MAPILLARY_TOKEN || '', mapillaryFetch = fetch,
   // Reverse proxies whose X-Forwarded-For counts (Express 'trust proxy'), so rate limits see the client's
   // address instead of the proxy's. Off by default: otherwise anyone could fake the header.
   trustProxy = parseTrustProxy(process.env.TRUST_PROXY),
@@ -126,6 +129,7 @@ function createApp({
   const wildlife = createWildlife();
   // Glacier inventories (GLETSCHER_GEOJSON): glacier spots, the outlines on the map, where the ice was.
   const glaciers = createGlaciers({ files: glacierFiles });
+  const mapillary = createMapillary({ db, dataDir, token: mapillaryToken, fetchImpl: mapillaryFetch });
   app.locals.remindPro = accounts.remindPro;
   // Protection lists per canton (src/sensitive.js) and the canton of each spot (src/canton.js).
   const sensitiveLists = createSensitiveLists(db);
@@ -492,7 +496,7 @@ function createApp({
   app.get('/api/config', (req, res) => {
     res.json({
       tags: TAGS, activities: ACTIVITIES, plantnet: Boolean(plantnetKey), spotRadiusM, routing: Boolean(routerUrl), wildlifeZones: wildlife.enabled(),
-      landscapes: LANDSCAPES, glaciers: glaciers.enabled() ? { years: glaciers.years() } : null,
+      landscapes: LANDSCAPES, glaciers: glaciers.enabled() ? { years: glaciers.years() } : null, mapillary: mapillary.enabled(),
     });
   });
 
@@ -1211,7 +1215,7 @@ function createApp({
   require('./routes/species')(app, { db, spotRadiusM, visibleSql: accounts.visibleSql });
   require('./routes/profile')(app, { db, thumbs, accounts, uploadDir, rateLimits });
   require('./routes/protection')(app, { db, accounts, sensitiveLists, cantons, reprotect });
-  require('./routes/walk')(app, { db, accounts, thumbs });
+  require('./routes/walk')(app, { db, accounts, thumbs, mapillary });
   require('./routes/ogc')(app, { db, spotRadiusM, dataDir, background, tiles: tileOptions });
   require('./routes/video')(app, { db, uploadDir, tmpDir, spotRadiusM, activities: ACTIVITIES, photoJson, getPhoto, setTags, alignPhoto, analyzeChange, analyzeContext, background, safeAlign, classifySpot });
   const push = require('./routes/push')(app, { db, idParam, adminEmail, ...pushOptions });

@@ -309,6 +309,18 @@ Blickrichtung bleibt beim Schritt erhalten, *Zeit* wechselt zu einem anderen Jah
 kleine Karte zeigt, wo man steht und wohin man schaut. Mit der Tastatur geht es mit W/S vor und zurück.
 Einmal gesehene Bilder gehen auch ohne Empfang, im Wald und in den Bergen.
 
+<p>
+  <img src="docs/screenshots/durchgehen-mapillary.jpg" width="32%" alt="Durchgehen mit blaugrünen Pfeilen zu Mapillary-Bildern quer zum Waldweg">
+  <img src="docs/screenshots/mapillary.jpg" width="32%" alt="Auf einem Mapillary-Bild mit Urheber und Lizenz oben links">
+  <img src="docs/screenshots/mapillary-karte.jpg" width="32%" alt="Kartenebene Mapillary mit Bildpunkten entlang eines Pfads">
+</p>
+
+Wo es noch keine eigenen Bilder gibt, füllt **Mapillary** die Lücken (mit `MAPILLARY_TOKEN`): Blaugrüne Pfeile
+führen zu Mapillary-Bildern in Richtungen ohne eigene Bilder (links), und man geht auf ihnen weiter, mit
+Urheber und Lizenz oben (Mitte). Der Kartenknopf *Mapillary* zeigt die Bilder als Punkte, ein Klick startet
+das Durchgehen dort (rechts). Nur der Server spricht mit Mapillary; die Bilder kommen von MyForrest und gehen
+nach dem ersten Ansehen auch offline. (Die Mapillary-Bilder im Screenshot sind Demo-Panoramen.)
+
 ### 14. Gletscher und Gebirge
 
 <p>
@@ -355,7 +367,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   Hand. Als installierbare App funktioniert der Upload auch ohne Empfang im Wald und wird später gesendet.
 - **[Spots und Zeitreise](docs/funktionen.md#spots-und-zeitreise)**: Fotos am selben Ort und mit derselben
   Blickrichtung werden automatisch zu Spots zusammengefasst und lassen sich als Zeitreihe durchblättern;
-  360°-Aufnahmen und Bilderreihen lassen sich [wie Street View durchgehen](docs/funktionen.md#durchgehen-wie-street-view).
+  360°-Aufnahmen und Bilderreihen lassen sich [wie Street View durchgehen](docs/funktionen.md#durchgehen-wie-street-view),
+  wo eigene Bilder fehlen mit [Mapillary](docs/funktionen.md#mapillary).
 - **[Bildanalyse](docs/funktionen.md#bildanalyse)**: automatische Ausrichtung, Veränderungs-Heatmap,
   Einordnung der Veränderungen (Windwurf, Auflichtung, Verfärbung, neuer Bewuchs), die aus Bestätigungen
   dazulernt, Objekterkennung für liegende Stämme und Holzpolter sowie Vegetationsdichte pro Foto.
@@ -428,7 +441,7 @@ für den Wege-Magnet mit ([`deploy/brouter`](deploy/brouter/README.md)).
 Kartendaten © OpenStreetMap-Mitwirkende, Landeskarte und Luftbild © swisstopo. Wetterdaten von
 [Open-Meteo.com](https://open-meteo.com) (ERA5, CC BY 4.0). Enthält modifizierte Copernicus-Sentinel-Daten;
 Landsat-Daten mit freundlicher Genehmigung des U.S. Geological Survey. Phänologie-Daten: Deutscher
-Wetterdienst. Pflanzenbestimmung mit Pl@ntNet. Gletscherumrisse aus den geladenen Inventaren, z. B.
+Wetterdienst. Pflanzenbestimmung mit Pl@ntNet. Bilder von Mapillary (CC BY-SA 4.0) mit Urheber im Bild. Gletscherumrisse aus den geladenen Inventaren, z. B.
 GLAMOS. Details unter [Datenquellen](docs/betrieb.md#externe-datenquellen-und-netzzugang).
 
 Der Code steht unter der [Apache-Lizenz 2.0](LICENSE).
