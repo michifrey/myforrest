@@ -754,12 +754,24 @@ nur, wie viel wärmer oder kühler eine Stelle war als der Rest **derselben Tour
 3. Jede Tour zählt pro Zelle **einmal** (ihr Mittel dort), eine lange Pause wiegt nicht mehr als ein
    Vorbeilaufen.
 
+**Geeicht am Wettermodell**: Für die Mitte jeder Tour holt der Server die Lufttemperatur dieser Stunde aus dem
+Wettermodell (Open-Meteo, ERA5 bzw. Prognose; nur ein Rasterpunkt auf ~2 km gerundet und der Tag gehen dorthin).
+Liegt das Niveau der Uhr mehr als 3 °C darunter oder mehr als 15 °C darüber, war sie wohl unter dem Ärmel oder in
+der Tasche, und die Tour zählt nicht. Geprüft wird einmal pro Tour; ohne Modell (offline, zu frisch) zählt sie.
+
+**Jahres- und Tageszeit**: Ein Wald ist an einem Sommernachmittag kühler als die Wiese, in einer klaren Nacht
+oft wärmer. Jede Tour bekommt deshalb ein Halbjahr (Sommer April–September, Winter Oktober–März) und eine
+Tageszeit (Sonne über oder unter dem Horizont in der Mitte der Tour). Standardmässig zählen nur Touren, die zu
+Datum und Uhrzeit passen, die in *Sonne & Wetter* gewählt sind; *alle Touren* nimmt alles zusammen. Mit der
+Lufttemperatur des Modells zur gewählten Stunde schätzt der Tooltip die Temperatur in der Zelle
+(*≈ 18.4 °C um 14:00 (Luft laut Wettermodell 20.3 °C)*).
+
 Eine Zelle erscheint erst mit **mindestens 3 Touren von mindestens 2 Personen**, als Mittel ihrer Werte.
 Sie trägt keine Zeiten und keine Namen; die ersten und letzten 200 m jeder Tour zählen nicht. Die Ebene
 erscheint ab Zoom 13; der Schalter bleibt im Browser gespeichert. So zeigen sich mit der Zeit schattige
 Waldstücke, Bachtobel und Kaltluftsenken neben sonnigen Wiesen und Südhängen.
 
-![Kühle Abschnitte aus Touren: der Wald und ein Bachtobel kühler, eine Wiese wärmer](screenshots/kuehle-abschnitte.jpg)
+![Kühle Abschnitte aus Touren an einem Sommernachmittag: der Wald und ein Bachtobel kühler, eine Wiese wärmer](screenshots/kuehle-abschnitte.jpg)
 
 ### Horizontabschattung
 

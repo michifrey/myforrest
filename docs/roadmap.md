@@ -23,8 +23,7 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
   aus ihren eigenen Systemen übernehmen (z. B. Holzschlag-Planung der Kantone).
 - **Touren**: Abgleich mit Strava/Komoot per OAuth (braucht dort registrierte Apps), Aufzeichnung im
   Hintergrund (braucht eine native Hülle, Browser stoppen GPS im Hintergrund); die Karte kühler Abschnitte
-  mit Messungen fester Stationen eichen (echte Lufttemperatur statt nur Abweichungen) und nach Jahreszeit und
-  Tageszeit trennen (am Mittag im Sommer, in klaren Nächten).
+  mit Messnetzen in der Nähe vergleichen (z. B. Stadtklima-Messnetze), sobald es genug echte Touren gibt.
 
 - **Landschaften ausbauen**: im Trockengebiet Ausrichtung am Horizont, wo Dünen keine festen Punkte haben,
   und längere Offline-Zeiten; im Gebirge Routing mit SAC-Skala und Gefahrenkarten (Steinschlag, Lawinen);
@@ -82,7 +81,8 @@ Aus früheren Versionen dieser Roadmap:
   führt darum herum
 - Touren: FIT-Dateien direkt lesen, mit Sensorwerten und Developer-Feldern (z. B. Laufleistung), auch aus GPX
   und TCX; Höhenprofil der Route, wahlweise mit Puls, Leistung oder Temperatur entlang der Strecke; Karte kühler
-  Abschnitte aus den geteilten Temperaturen vieler Touren; Push-Nachricht bei erledigtem Fotoauftrag, Ablaufdatum
+  Abschnitte aus den geteilten Temperaturen vieler Touren, geeicht am Wettermodell und getrennt nach Jahres- und
+  Tageszeit; Push-Nachricht bei erledigtem Fotoauftrag, Ablaufdatum
   für Aufträge
 - Video statt Einzelbilder (GoPro mit GPMF, 360°-MP4, GPX), unscharfe Bilder werden ersetzt oder verworfen
 - 360°-Fotos beim Upload erkennen, Panoramen über eine Drehung der Kugel ausrichten und vergleichen

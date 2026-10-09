@@ -1228,6 +1228,7 @@ function createApp({
   require('./routes/landscapes')(app, { db, glaciers, vegetation, accounts, classifySpot, spotJson, idParam });
   Object.assign(tours, require('./routes/tracks')(app, {
     db, spotRadiusM, satelliteAlerts: vegetation.alerts, routerUrl, routerFetch, routerProfile, accounts, wildlife, elevation: elevationService, push,
+    weather,
   }));
   require('./routes/analysis')(app, {
     db, uploadDir, getPhoto, idParam, background, changeBetween, spotTrees, terrainOf, refreshIrregularities, detectorUrl, detectorFetch,

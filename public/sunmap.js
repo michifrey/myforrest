@@ -10,6 +10,9 @@
  * "Kühle Abschnitte aus Touren" lays the map of cool stretches over it:
  * cells of 100 m from the temperatures people share with their tours
  * (src/coolmap.js), blue where it is cooler than the rest of the same tours.
+ * By default only tours of the chosen season (summer/winter) and time of day
+ * (sun up or down) count; with the model's air temperature of that hour the
+ * tooltip estimates the temperature in the cell.
  * Relies on globals from app.js (map, state, api, el, $) and sun.js (Sun).
  */
 (function sunMode() {
@@ -202,11 +205,30 @@
     const i = Math.min(1, Math.floor(x));
     return `rgb(${stops[i].map((v, j) => Math.round(v + (stops[i + 1][j] - v) * (x - i))).join(',')})`;
   }
-  async function drawCool() {
-    const token = ++coolToken;
+  /** Season and time of day of the chosen date and minute, as the server classes tours. */
+  function coolMoment() {
+    const t = dayStart(sm.date || isoLocal(new Date())) + sm.minute * 60000;
+    const p = place();
+    const month = new Date(t).getMonth() + 1;
+    return {
+      t,
+      season: month >= 4 && month <= 9 ? 'sommer' : 'winter',
+      daytime: Sun.position(t, p.lat, p.lon).altitude > 0 ? 'tag' : 'nacht',
+    };
+  }
+  let coolKey = '';
+  async function drawCool({ force = false } = {}) {
     const status = $('cool-status');
-    if (!coolOn()) { coolLayer.clearLayers(); status.hidden = true; return; }
+    $('cool-match').hidden = !coolOn();
+    if (!coolOn()) { coolLayer.clearLayers(); status.hidden = true; coolKey = ''; return; }
     status.hidden = false;
+    const moment = coolMoment();
+    const matching = $('cool-match').value === 'zeit';
+    const filter = matching ? `&season=${moment.season}&daytime=${moment.daytime}` : '';
+    const key = `${map.getBounds().toBBoxString()}${filter}:${map.getZoom()}`;
+    if (!force && key === coolKey) return redrawCoolTooltips(moment);
+    coolKey = key;
+    const token = ++coolToken;
     if (map.getZoom() < COOL_MIN_ZOOM) {
       coolLayer.clearLayers();
       status.textContent = 'Zum Anzeigen näher heranzoomen.';
@@ -215,7 +237,7 @@
     const b = map.getBounds();
     let data;
     try {
-      data = await api(`/api/cool-cells?bbox=${[b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((v) => v.toFixed(5)).join(',')}`);
+      data = await api(`/api/cool-cells?bbox=${[b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((v) => v.toFixed(5)).join(',')}${filter}`);
     } catch (err) {
       if (token === coolToken) status.textContent = err.message;
       return;
@@ -226,21 +248,40 @@
     for (const c of data.cells) {
       const dLat = half / 111320;
       const dLon = half / (111320 * Math.cos((c.lat * Math.PI) / 180));
-      const text = `${fmtNum(Math.abs(c.delta), 1)} °C ${c.delta < 0 ? 'kühler' : 'wärmer'} als der Rest derselben Touren · ${c.tours} Touren`;
-      L.rectangle([[c.lat - dLat, c.lon - dLon], [c.lat + dLat, c.lon + dLon]], {
+      const cell = L.rectangle([[c.lat - dLat, c.lon - dLon], [c.lat + dLat, c.lon + dLon]], {
         stroke: false, fillColor: coolColor(c.delta), fillOpacity: 0.6, className: 'cool-cell',
-      }).bindTooltip(text, { sticky: true }).addTo(coolLayer);
+      });
+      cell.coolData = c;
+      cell.bindTooltip('', { sticky: true }).addTo(coolLayer);
     }
+    redrawCoolTooltips(moment);
+    const which = matching
+      ? `nur Touren im ${moment.season === 'sommer' ? 'Sommerhalbjahr' : 'Winterhalbjahr'} ${moment.daytime === 'tag' ? 'bei Tag' : 'bei Nacht'} (wie die gewählte Zeit)`
+      : 'alle Jahres- und Tageszeiten';
     status.replaceChildren(
       el('span', { class: 'cool-ramp', 'aria-hidden': 'true' }),
-      ` kühler ↔ wärmer als der Rest derselben Touren (±2 °C). ${data.cells.length ? `${data.cells.length} Zellen` : 'Hier noch keine Zellen'}`
-        + ` à ${data.cellM} m, je ab ${data.minTours} Touren von ${data.minPeople} Personen, die ihre Temperatur teilen.`,
+      ` kühler ↔ wärmer als der Rest derselben Touren (±2 °C), ${which}. ${data.cells.length ? `${data.cells.length} Zellen` : 'Hier noch keine Zellen'}`
+        + ` (${data.cellM} m, je ab ${data.minTours} Touren von ${data.minPeople} Personen, die ihre Temperatur teilen).`,
     );
+  }
+  /** Tooltips: the deviation and, with the model's air temperature of the chosen hour, an estimate for the cell. */
+  function redrawCoolTooltips(moment) {
+    const air = weatherAt(moment.t)?.temp;
+    coolLayer.eachLayer((cell) => {
+      const c = cell.coolData;
+      if (!c) return;
+      const dev = `${fmtNum(Math.abs(c.delta), 1)} °C ${c.delta < 0 ? 'kühler' : 'wärmer'} als der Rest derselben Touren · ${c.tours} Touren`;
+      // Two lines; all parts are numbers and fixed words (no user text).
+      cell.setTooltipContent(Number.isFinite(air)
+        ? `<b>≈ ${fmtNum(air + c.delta, 1)} °C</b> um ${clock(moment.t)} (Luft laut Wettermodell ${fmtNum(air, 1)} °C)<br>${dev}`
+        : dev);
+    });
   }
   $('cool-toggle').addEventListener('change', () => {
     try { localStorage.setItem('myforrest.cool', $('cool-toggle').checked ? '1' : ''); } catch { /* private mode */ }
-    drawCool();
+    drawCool({ force: true });
   });
+  $('cool-match').addEventListener('change', () => drawCool({ force: true }));
   try { $('cool-toggle').checked = localStorage.getItem('myforrest.cool') === '1'; } catch { /* private mode */ }
   map.on('moveend', () => coolOn() && drawCool());
 
@@ -459,6 +500,7 @@
     $('sun-slider').value = String(minute);
     renderPanel();
     drawMap();
+    if (coolOn()) drawCool(); // another season or time of day, or only new tooltips
     for (const line of document.querySelectorAll('#sun-charts .now')) {
       line.setAttribute('x1', xOf(minute));
       line.setAttribute('x2', xOf(minute));
@@ -499,6 +541,7 @@
       sm.weather = wx;
       renderPanel();
       renderCharts();
+      if (coolOn()) drawCool(); // model air temperature for the tooltips
     } catch {
       // Panel already shows the astronomical part.
     }

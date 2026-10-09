@@ -28,7 +28,9 @@
   Datenschutzerklärung.
 - Temperaturen von Touren fliessen nur in die Karte kühler Abschnitte ein, wenn wer die Tour gespeichert hat,
   das ausdrücklich wählt (Spalte `tracks.share_temp`, widerrufbar). Ausgeliefert werden nur 100-m-Zellen
-  mit mindestens 3 Touren von 2 Personen, ohne Zeiten, ohne Namen und ohne die ersten und letzten 200 m.
+  mit mindestens 3 Touren von 2 Personen, ohne Zeiten, ohne Namen und ohne die ersten und letzten 200 m. Für die
+  Eichung fragt der Server Open-Meteo nach der Lufttemperatur am Tag der Tour, für einen auf ~2 km gerundeten
+  Rasterpunkt (Tabelle `cool_checks`).
 - Ausgeblendete Fotos werden nicht mehr ausgeliefert, können aber noch bis zu 7 Tage im Browser-Cache von
   Personen liegen, die sie vorher gesehen haben.
 - Kartendaten © OpenStreetMap-Mitwirkende. Bei stärkerer Nutzung braucht es einen eigenen

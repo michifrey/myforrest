@@ -154,6 +154,11 @@
       <div id="sun-charts"></div>
       <div class="cool-box">
         <label class="toggle small"><input type="checkbox" id="cool-toggle"> Kühle Abschnitte aus Touren</label>
+        <label class="sr-only" for="cool-match">Welche Touren</label>
+        <select id="cool-match" class="small" hidden>
+          <option value="zeit">passend zu Jahres- und Tageszeit</option>
+          <option value="alle">alle Touren</option>
+        </select>
         <p id="cool-status" class="muted small" hidden></p>
       </div>
       <p id="sun-source" class="wx-source"></p>
