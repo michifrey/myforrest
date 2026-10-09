@@ -24,6 +24,12 @@
       "short_name": "Beitragen",
       "url": "./?action=upload",
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Fahrtmodus (Dashcam)",
+      "short_name": "Fahrt",
+      "url": "./?action=fahrt",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }

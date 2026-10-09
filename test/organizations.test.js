@@ -80,11 +80,11 @@ test('a verified lead adds colleagues, who see protected finds as long as the or
     const col = client(base, db);
     const colUser = await col.register('Waldarbeiterin');
     assert.equal((await col.req(`/api/spots/${find.spotId}`)).status, 404);
-    // Only existing accounts with a confirmed address; by name or e-mail.
+    // Only existing accounts with a confirmed address; by name or e-mail (unknown addresses get an invitation, see below).
     const unconfirmed = client(base, db);
     await unconfirmed.register('Neuling', { confirmed: false });
     assert.equal((await lead.req(`/api/organizations/${org.id}/members`, { method: 'POST', json: { account: 'Neuling' } })).status, 404);
-    assert.equal((await lead.req(`/api/organizations/${org.id}/members`, { method: 'POST', json: { account: 'niemand@example.org' } })).status, 404);
+    assert.equal((await lead.req(`/api/organizations/${org.id}/members`, { method: 'POST', json: { account: 'Niemand' } })).status, 404);
     const added = await lead.req(`/api/organizations/${org.id}/members`, { method: 'POST', json: { account: 'waldarbeiterin@example.org' } });
     assert.equal(added.status, 201);
     assert.equal((await added.json()).members.length, 2);
@@ -164,4 +164,72 @@ test('verifications from before organisations: each verified account leads the o
   const u = { id: 9, pro_status: null, org_pro_until: Date.now() + DAY };
   assert.deepEqual([isPro(u), isPro({ ...u, org_pro_until: Date.now() - DAY })], [true, false]);
   db.close();
+});
+
+test('an invitation by e-mail brings in someone without an account, only with the invited address', async () => {
+  await withServer(async (base, app, mails) => {
+    const db = app.locals.db;
+    const admin = client(base, db);
+    await admin.register('Admina');
+    const lead = client(base, db);
+    const leadUser = await lead.register('Förster');
+    await lead.json('/api/auth/pro', { method: 'POST', json: { organization: 'Pro Natura Zürich' } });
+    await admin.json(`/api/users/${leadUser.id}/pro`, { method: 'POST', json: { decision: 'verifiziert' } });
+    const [org] = await lead.json('/api/organizations/mine');
+
+    // No account with this address: an invitation link instead of an error.
+    const res = await lead.req(`/api/organizations/${org.id}/members`, { method: 'POST', json: { account: 'Neu@Example.org' } });
+    assert.equal(res.status, 202);
+    const body = await res.json();
+    assert.equal(body.invited, 'Neu@Example.org');
+    assert.deepEqual(body.organization.invites.map((i) => [i.email, i.role]), [['Neu@Example.org', 'mitglied']]);
+    const mail = mails.at(-1);
+    assert.equal(mail.to, 'Neu@Example.org');
+    assert.match(mail.subject, /Einladung in Pro Natura Zürich/);
+    const token = mail.text.match(/#einladung=([\w-]+)/)[1];
+    assert.ok(!JSON.stringify(db.prepare('SELECT * FROM org_invites').all()).includes(token), 'only the hash is stored');
+    // Inviting again replaces the link; the old one is dead.
+    await lead.req(`/api/organizations/${org.id}/members`, { method: 'POST', json: { account: 'neu@example.org', role: 'leitung' } });
+    const token2 = mails.at(-1).text.match(/#einladung=([\w-]+)/)[1];
+    assert.equal((await lead.json(`/api/organizations/mine`))[0].invites.length, 1);
+    const anon = client(base, db);
+    assert.equal((await anon.req('/api/organizations/invites/lookup', { method: 'POST', json: { token } })).status, 404);
+    // The link, before logging in: what it is about.
+    const info = await anon.json('/api/organizations/invites/lookup', { method: 'POST', json: { token: token2 } });
+    assert.deepEqual([info.organization, info.email, info.role, info.hasAccount], ['Pro Natura Zürich', 'neu@example.org', 'leitung', false]);
+    assert.equal((await anon.req('/api/organizations/invites/accept', { method: 'POST', json: { token: token2 } })).status, 401);
+
+    // Someone else with the forwarded link: refused.
+    const other = client(base, db);
+    await other.register('Fremd');
+    assert.equal((await other.req('/api/organizations/invites/accept', { method: 'POST', json: { token: token2 } })).status, 409);
+    // The invited person registers (address not confirmed yet) and accepts: member, address confirmed.
+    const neu = client(base, db);
+    const b = await neu.json('/api/auth/register', { method: 'POST', json: { email: 'neu@example.org', name: 'Neue Person', password: 'geheim-1234' } });
+    neu.csrf = b.csrfToken;
+    const joined = await neu.json('/api/organizations/invites/accept', { method: 'POST', json: { token: token2 } });
+    assert.deepEqual([joined[0].name, joined[0].role], ['Pro Natura Zürich', 'leitung']);
+    const me = await neu.me();
+    assert.deepEqual([me.pro, me.emailVerified, me.organization], [true, true, 'Pro Natura Zürich']);
+    assert.equal((await neu.req('/api/organizations/invites/accept', { method: 'POST', json: { token: token2 } })).status, 404, 'used up');
+    assert.equal((await lead.json('/api/organizations/mine'))[0].invites.length, 0);
+
+    // Withdrawing; members do not see invitations; expired ones are gone.
+    await lead.req(`/api/organizations/${org.id}/members`, { method: 'POST', json: { account: 'spaeter@example.org' } });
+    let mine = (await lead.json('/api/organizations/mine'))[0];
+    const col = client(base, db);
+    const colUser = await col.register('Kollege');
+    await lead.json(`/api/organizations/${org.id}/members`, { method: 'POST', json: { account: 'Kollege' } });
+    assert.equal((await col.json('/api/organizations/mine'))[0].invites, undefined);
+    assert.ok(colUser.id);
+    assert.equal((await lead.req(`/api/organizations/${org.id}/invites/${mine.invites[0].id}`, { method: 'DELETE' })).status, 200);
+    await lead.req(`/api/organizations/${org.id}/members`, { method: 'POST', json: { account: 'alt@example.org' } });
+    const oldToken = mails.at(-1).text.match(/#einladung=([\w-]+)/)[1];
+    db.prepare('UPDATE org_invites SET expires_at = ?').run(Date.now() - 1);
+    mine = (await lead.json('/api/organizations/mine'))[0];
+    assert.equal(mine.invites.length, 0);
+    assert.equal((await anon.req('/api/organizations/invites/lookup', { method: 'POST', json: { token: oldToken } })).status, 404);
+    const log = (await admin.json('/api/moderation/log')).map((l) => l.action);
+    for (const a of ['org-eingeladen', 'org-einladung-angenommen']) assert.ok(log.includes(a), a);
+  });
 });

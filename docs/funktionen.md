@@ -64,6 +64,36 @@ nächstgelegenen Stelle gezogen. So füllt jede Runde dieselben Spots weiter.
   beim Upload. Fortschritt (Hochladen, Bilder extrahieren) und Ergebnis (Bilder, Strecke, Spots) werden
   im Upload-Dialog angezeigt.
 
+### Fahrtmodus (Dashcam im Auto)
+
+![Fahrtmodus während der Fahrt](screenshots/fahrtmodus.jpg)
+
+Wer viel mit dem Auto im Wald unterwegs ist (Forstdienst, Revierfahrten), kann ein Handy in einer Halterung
+an der Scheibe als **Dashcam** nutzen. *Touren & Aufträge → Fahrtmodus* (oder die Verknüpfung *Fahrtmodus*
+der installierten App, `/?action=fahrt`) zeigt eine dunkle Vollbildansicht für das Auto:
+
+- **Aufnahme**: Die Kamera nach vorn macht alle 2, 3, 5 oder 10 Sekunden ein Bild (Standard 3 s). Das GPS
+  zeichnet die Strecke auf (ein Punkt alle 25 m); beim Beenden wird sie als private Tour *Fahrt …* mit der
+  Aktivität *Fahrt (Dashcam)* gespeichert, ohne Netz später. Der Bildschirm bleibt an (Wake Lock), weil
+  Browser Kamera und GPS im Hintergrund anhalten. Ein Konto ist nötig.
+- **Auswahl auf dem Gerät** (`public/drive-select.js`): Bei einem Bild alle 3 s kommen an einem Arbeitstag
+  rund 10 000 Bilder zusammen, die meisten fast gleich. Vor dem Speichern entscheidet das Handy über jedes:
+  - verworfen ohne genaues GPS (über ±50 m), im **Stillstand** (unter 3,6 km/h), wenn es **unscharf** ist
+    (Varianz des Laplace-Filters unter 35 % des laufenden Medians) und zwischen zwei behaltenen Bildern;
+  - **an einem bekannten Spot** (innerhalb von 40 m, in seiner Blickrichtung ±60°) wird das Bild behalten,
+    das dem Spot am nächsten ist, einmal pro Fahrt. So bekommen die Spots am Weg bei jeder Fahrt ein neues
+    Wiederholungsfoto;
+  - **entlang der Strecke** wird alle 150 m ein Bild behalten (einstellbar: 50, 100, 150 oder 300 m oder
+    *nur an Spots*), ausser es sieht **gleich aus wie das letzte** behaltene (Differenz-Hash, höchstens 6
+    von 64 Bit verschieden, z. B. im Kolonnenverkehr).
+- **Hochladen**: Behaltene Bilder kommen mit Ort, Fahrtrichtung als Blickrichtung, Zeit und der Aktivität
+  *Fahrt* in die Upload-Warteschlange und werden im Hintergrund gesendet, auch nach einem Funkloch. Die Anzeige
+  zählt gemachte und behaltene Bilder, die Strecke, den gesparten Speicher und warum Bilder verworfen wurden.
+- **Auf dem Server** gilt zusätzlich: Pro Konto und Ort (Spot-Radius) wird innerhalb von 12 Stunden nur ein
+  Fahrtbild gespeichert, falls doch einmal zwei kommen (zweites Gerät, erneut gesendete Warteschlange).
+- **Echte Dashcams**: Deren Videos lassen sich schon heute über *Foto beitragen* hochladen (mit GPX-Track
+  oder GoPro-Telemetrie); daraus wird etwa alle 25 m ein Bild gezogen, siehe *Videos statt Einzelbilder*.
+
 ### HEIC-Fotos vom iPhone
 
 `.heic`/`.heif` werden angenommen und als JPEG gespeichert. Die Umwandlung
@@ -828,9 +858,20 @@ prüfen lassen muss, gibt es **Organisationen**:
   die Organisation, die sie im Antrag genannt hat. Gleiche Namen (ohne Rücksicht auf Gross-/Kleinschreibung
   und Leerzeichen) ergeben dieselbe Organisation; mehrere verifizierte Personen teilen sich dann die Leitung.
 - **Mitglieder aufnehmen**: Im Konto-Menü unter *Organisation* nimmt die Leitung Konten über Namen oder
-  E-Mail-Adresse auf, als *Mitglied* oder in die *Leitung*. Die Person braucht ein Konto mit bestätigter
-  E-Mail-Adresse und bekommt eine Mitteilung per E-Mail. Höchstens 200 Mitglieder pro Organisation,
-  50 Aufnahmen pro Tag und Konto.
+  E-Mail-Adresse auf, als *Mitglied* oder in die *Leitung*. Konten mit bestätigter E-Mail-Adresse kommen
+  sofort dazu und bekommen eine Mitteilung per E-Mail. Höchstens 200 Mitglieder und offene Einladungen pro
+  Organisation, 50 Aufnahmen pro Tag und Konto.
+- **Einladen ohne Konto**: Gibt es zur E-Mail-Adresse noch kein Konto (oder keines mit bestätigter Adresse),
+  geht eine **Einladung** mit einem Link (`/#einladung=…`, 14 Tage gültig) an diese Adresse; in der Datenbank
+  steht nur der SHA-256 des Tokens. Der Link zeigt, wer einlädt, und öffnet *Konto erstellen* mit der
+  vorausgefüllten Adresse (oder *Anmelden*, wenn es schon ein Konto gibt; Google und GitHub gehen auch).
+  Danach ist die Person Mitglied, und ihre Adresse gilt als bestätigt, weil der Link an sie ging. Annehmen
+  kann nur ein Konto mit genau der eingeladenen Adresse; ein weitergeleiteter Link nützt niemand anderem.
+  Die Leitung sieht offene Einladungen mit Ablaufdatum und kann sie zurückziehen; eine neue Einladung an
+  dieselbe Adresse ersetzt die alte.
+
+![Konto erstellen über eine Einladung](screenshots/einladung.jpg)
+
 - **Was Mitglieder sehen**: geschützte Funde wie ein PRO-Mitglied, ohne eigenen Antrag; im PRO-Dialog steht
   „Du siehst geschützte Funde als Mitglied von …“. Die Leitung sieht die E-Mail-Adressen der Mitglieder,
   Mitglieder nur die Namen.
@@ -846,8 +887,8 @@ prüfen lassen muss, gibt es **Organisationen**:
   Organisation.
 - **Admins**: Der Tab *Organisationen* in der Moderation zeigt alle Organisationen mit Mitgliedern; Admins
   können dort aufnehmen, Rollen ändern und entfernen. Die Kontenliste zeigt bei jedem Konto seine
-  Organisationen („über Organisation“). Aufnahmen, Rollenwechsel, Entfernen und Austritte stehen im
-  Moderationsprotokoll.
+  Organisationen („über Organisation“). Aufnahmen, Einladungen, Rollenwechsel, Entfernen und Austritte
+  stehen im Moderationsprotokoll.
 - **Bestehende Verifizierungen**: Beim ersten Start leitet jedes verifizierte Konto die Organisation, die es
   angegeben hat.
 

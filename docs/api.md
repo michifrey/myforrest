@@ -9,7 +9,7 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/spots?tag=…`           | Alle Spots mit Anzahl Fotos, Zeitraum, Tags, Blickrichtung (`heading`) und Vorschaubild (`latestThumbUrl`) |
 | `GET`    | `/api/spots/:id`             | Ein Spot mit Blickrichtung und allen Fotos chronologisch (jedes Foto mit `url`, `thumbUrl` und `largeUrl`, `panorama` für 360°-Bilder und `alignment`: bei Fotos die Homographie `h`, bei Panoramen `kind: 'rotation'` mit der Drehung `r`, `yaw` und `tilt`) |
 | `GET`    | `/thumbs/:datei`             | Vorschaubilder (WebP)                                    |
-| `POST`   | `/api/photos`                | Upload (multipart: `photos[]` als JPEG, PNG, WebP oder HEIC, optional `spotId` und `refPhotoId` für Wiederholungsfotos, `requestId` für einen Fotoauftrag, `protected=1` für einen geschützten Fund, `license`, `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `utcOffsetMinutes`, `clockShiftSeconds`) |
+| `POST`   | `/api/photos`                | Upload (multipart: `photos[]` als JPEG, PNG, WebP oder HEIC, optional `spotId` und `refPhotoId` für Wiederholungsfotos, `requestId` für einen Fotoauftrag, `protected=1` für einen geschützten Fund, `license`, `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity` (`joggen`, `wandern`, `biken`, `fahren`, `sonstiges`), `heading` (Blickrichtung in Grad, wenn das Foto keine im EXIF hat), `note`, `utcOffsetMinutes`, `clockShiftSeconds`). Mit `activity=fahren` (Fahrtmodus) wird pro Konto und Ort innerhalb von 12 Stunden nur ein Bild gespeichert, weitere stehen in `skipped` |
 | `POST`   | `/api/videos`                | Video-Upload (multipart: `video`, optional `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `clockShiftSeconds`, `frameDistanceM`, `frameIntervalS`, `panorama` = `auto`/`1`/`0`, `async=1` für Hintergrundverarbeitung) |
 | `GET`    | `/api/videos/jobs/:id`       | Fortschritt und Ergebnis eines Video-Uploads mit `async=1` |
 | `GET`    | `/api/videos/config`         | ffmpeg verfügbar? Standardabstand und -intervall         |
@@ -99,7 +99,10 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `POST`   | `/api/users/:id/pro`         | Admin: PRO-Antrag entscheiden (`{ decision: 'verifiziert' \| 'abgelehnt' \| 'entzogen', organization? }`); verifiziert leitet die Person danach die Organisation |
 | `GET`    | `/api/organizations/mine`    | Eigene Organisationen mit Rolle, `validUntil`, `valid` und Mitgliedern (E-Mail-Adressen nur für die Leitung) |
 | `GET`    | `/api/organizations`         | Admin: alle Organisationen mit Mitgliedern |
-| `POST`   | `/api/organizations/:id/members` | Leitung, Admin: Konto aufnehmen (`{ account: Name oder E-Mail, role?: 'mitglied' \| 'leitung' }`); nur Konten mit bestätigter Adresse, nur solange die Organisation gilt; 201 |
+| `POST`   | `/api/organizations/:id/members` | Leitung, Admin: Konto aufnehmen (`{ account: Name oder E-Mail, role?: 'mitglied' \| 'leitung' }`); nur solange die Organisation gilt. 201 für ein Konto mit bestätigter Adresse; 202 mit `invited` für eine E-Mail-Adresse ohne solches Konto (Einladung per E-Mail) |
+| `DELETE` | `/api/organizations/:id/invites/:inviteId` | Leitung, Admin: Einladung zurückziehen (offene Einladungen stehen in `invites` der Organisation) |
+| `POST`   | `/api/organizations/invites/lookup` | Was hinter einem Einladungslink steht (`{ token }` → `organization`, `email`, `role`, `expiresAt`, `hasAccount`); auch ohne Anmeldung, 30 pro Stunde und IP |
+| `POST`   | `/api/organizations/invites/accept` | Einladung annehmen (`{ token }`), angemeldet mit der eingeladenen Adresse (sonst 409); bestätigt die Adresse |
 | `PATCH`  | `/api/organizations/:id/members/:userId` | Leitung, Admin: Rolle ändern (`{ role }`); die letzte Person der Leitung bleibt (409) |
 | `DELETE` | `/api/organizations/:id/members/:userId` | Leitung, Admin: Mitglied entfernen; das Mitglied selbst: austreten |
 | `GET`    | `/api/protected/cells`       | Geschützte Funde, die man nicht sehen darf, als 5-km-Quadrate (`bbox`, `spots`); leer für PRO-Mitglieder |

@@ -29,9 +29,25 @@ const SCHEMA = `
     PRIMARY KEY (org_id, user_id)
   );
   CREATE INDEX IF NOT EXISTS org_members_user ON org_members(user_id);
+  -- Invitations for people without an account (yet): a link by e-mail, only its SHA-256 is stored.
+  CREATE TABLE IF NOT EXISTS org_invites (
+    id INTEGER PRIMARY KEY,
+    org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    email TEXT NOT NULL COLLATE NOCASE,
+    role TEXT NOT NULL CHECK (role IN ('leitung', 'mitglied')),
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at INTEGER NOT NULL,
+    created_by INTEGER,
+    expires_at INTEGER NOT NULL,
+    UNIQUE (org_id, email)
+  );
 `;
 
+const crypto = require('node:crypto');
+
 const ROLES = ['leitung', 'mitglied'];
+const INVITE_TTL_MS = 14 * 86400000;
+const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const MAX_MEMBERS = 200;
 
 /** Same organisation whatever the case and spacing: "WWF  zürich" = "WWF Zürich". */
@@ -74,6 +90,10 @@ function createOrganizations(db) {
   const get = (id) => byId.get(id) || null;
   const roleOf = (orgId, userId) => membership.get(orgId, userId)?.role || null;
 
+  /** Members and open invitations together (for MAX_MEMBERS). */
+  const size = (orgId) => db.prepare(`SELECT (SELECT COUNT(*) FROM org_members WHERE org_id = ?)
+    + (SELECT COUNT(*) FROM org_invites WHERE org_id = ? AND expires_at > ?) AS n`).get(orgId, orgId, Date.now()).n;
+
   /** Adds an account or changes its role; returns false when the organisation is full. */
   function setMember(orgId, userId, role, by = null) {
     if (!ROLES.includes(role)) throw new Error(`Rolle muss eine von ${ROLES.join(', ')} sein`);
@@ -81,7 +101,7 @@ function createOrganizations(db) {
       db.prepare('UPDATE org_members SET role = ? WHERE org_id = ? AND user_id = ?').run(role, orgId, userId);
       return true;
     }
-    if (db.prepare('SELECT COUNT(*) AS n FROM org_members WHERE org_id = ?').get(orgId).n >= MAX_MEMBERS) return false;
+    if (size(orgId) >= MAX_MEMBERS) return false;
     db.prepare('INSERT INTO org_members (org_id, user_id, role, added_at, added_by) VALUES (?, ?, ?, ?, ?)').run(orgId, userId, role, Date.now(), by);
     return true;
   }
@@ -127,8 +147,48 @@ function createOrganizations(db) {
       valid: Boolean(until && until > Date.now()),
       createdAt: iso(org.created_at),
       members: members(org.id, opts),
+      // Open invitations: for the lead and admins only.
+      ...(opts?.withEmail ? { invites: invites(org.id) } : {}),
     };
   }
+
+  /* ---------- Invitations for people without an account ---------- */
+
+  const invites = (orgId) => db.prepare('SELECT id, email, role, created_at, expires_at FROM org_invites WHERE org_id = ? AND expires_at > ? ORDER BY email')
+    .all(orgId, Date.now()).map((i) => ({ id: i.id, email: i.email, role: i.role, createdAt: iso(i.created_at), expiresAt: iso(i.expires_at) }));
+
+  /**
+   * Invites an address; a new invitation to the same address replaces the
+   * old one. Returns the token for the link, or null when the organisation is full.
+   */
+  function invite(orgId, email, role, by) {
+    if (!ROLES.includes(role)) throw new Error(`Rolle muss eine von ${ROLES.join(', ')} sein`);
+    const old = db.prepare('SELECT id FROM org_invites WHERE org_id = ? AND email = ?').get(orgId, email);
+    if (!old && size(orgId) >= MAX_MEMBERS) return null;
+    const token = crypto.randomBytes(32).toString('base64url');
+    const now = Date.now();
+    db.prepare('DELETE FROM org_invites WHERE org_id = ? AND email = ?').run(orgId, email);
+    db.prepare('INSERT INTO org_invites (org_id, email, role, token_hash, created_at, created_by, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(orgId, email, role, sha256(token), now, by, now + INVITE_TTL_MS);
+    return token;
+  }
+
+  /** The open invitation behind a link (with the organisation's name), or null. */
+  function inviteByToken(token) {
+    if (typeof token !== 'string' || token.length > 100) return null;
+    return db.prepare(`SELECT i.*, o.name AS org_name FROM org_invites i JOIN organizations o ON o.id = i.org_id
+      WHERE i.token_hash = ? AND i.expires_at > ?`).get(sha256(token), Date.now()) || null;
+  }
+
+  /** Accepting: the account joins (its role stays if it is already a member) and the invitation is used up. */
+  function acceptInvite(inv, userId) {
+    if (!roleOf(inv.org_id, userId)) {
+      db.prepare('INSERT INTO org_members (org_id, user_id, role, added_at, added_by) VALUES (?, ?, ?, ?, ?)').run(inv.org_id, userId, inv.role, Date.now(), inv.created_by);
+    }
+    db.prepare('DELETE FROM org_invites WHERE id = ?').run(inv.id);
+  }
+
+  const withdrawInvite = (orgId, inviteId) => db.prepare('DELETE FROM org_invites WHERE org_id = ? AND id = ?').run(orgId, inviteId).changes > 0;
 
   /** The organisations of an account, with its role in each. */
   function of(userId, { withMembers = false } = {}) {
@@ -156,7 +216,10 @@ function createOrganizations(db) {
     }
   }
 
-  return { ensure, get, roleOf, setMember, removeMember, leads, verified, members, json, of, all, dependants, MAX_MEMBERS };
+  return {
+    ensure, get, roleOf, setMember, removeMember, leads, verified, members, json, of, all, dependants,
+    invite, inviteByToken, acceptInvite, withdrawInvite, MAX_MEMBERS,
+  };
 }
 
-module.exports = { createOrganizations, withOrgPro, nameKey, ORG_ROLES: ROLES, MAX_MEMBERS };
+module.exports = { createOrganizations, withOrgPro, nameKey, ORG_ROLES: ROLES, MAX_MEMBERS, INVITE_TTL_MS };

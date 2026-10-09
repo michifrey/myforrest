@@ -35,7 +35,9 @@ const {
   altitudeShift, aspectShift, coldPoolShift, expectedColourDoy, aspectLabel, aspectFromCompass, COMPASS, LANDFORMS, landform,
 } = require('./phenology');
 
-const ACTIVITIES = ['joggen', 'wandern', 'biken', 'sonstiges'];
+const ACTIVITIES = ['joggen', 'wandern', 'biken', 'fahren', 'sonstiges'];
+// Drive mode (dashcam): at most one picture per account and place within this time.
+const DRIVE_REPEAT_MS = 12 * 3600 * 1000;
 /** Without GPano metadata: exactly 2:1 and at least this wide (360° cameras: 5376 px and more). */
 const PANORAMA_MIN_WIDTH = 3000;
 const isPanoramaSize = (w, h) => w >= PANORAMA_MIN_WIDTH && Math.abs(w / h - 2) < 0.02;
@@ -623,6 +625,15 @@ function createApp({
     res.status(status).json(body);
   }
 
+  /** A drive picture by the same account near this place within DRIVE_REPEAT_MS? */
+  function driveRepeat(userId, pos, takenAt) {
+    const dLat = spotRadiusM / 111320;
+    const dLon = dLat / Math.cos((pos.lat * Math.PI) / 180);
+    return Boolean(db.prepare(`SELECT 1 FROM photos WHERE activity = 'fahren' AND uploader_id = ?
+      AND lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? AND taken_at BETWEEN ? AND ? LIMIT 1`)
+      .get(userId, pos.lat - dLat, pos.lat + dLat, pos.lon - dLon, pos.lon + dLon, takenAt - DRIVE_REPEAT_MS, takenAt + DRIVE_REPEAT_MS));
+  }
+
   async function processUpload(files, gpxFile, b, req) {
     if (!files.length) return [400, { error: 'Keine Fotos übermittelt' }];
     const owner = accounts.uploadOwner(req); // uploader and licence
@@ -649,6 +660,8 @@ function createApp({
       if (!targetSpot) return [400, { error: 'Spot nicht gefunden' }];
     }
     const refPhotoId = Number.isSafeInteger(Number(b.refPhotoId)) ? Number(b.refPhotoId) : null;
+    // View direction from the device (drive mode: the course) when the picture has none in its EXIF.
+    const sentHeading = b.heading !== undefined && b.heading !== '' && Number.isFinite(Number(b.heading)) ? ((Number(b.heading) % 360) + 360) % 360 : null;
     const nearSpot = (p) => distanceM(p, targetSpot) <= Math.max(4 * spotRadiusM, 100);
     const track = gpxFile ? parseGpx(await fsp.readFile(gpxFile.path, 'utf8')) : [];
     if (gpxFile && !track.length) {
@@ -712,7 +725,13 @@ function createApp({
       const dims = await sharp(jpeg || buf).metadata().catch(() => ({}));
       const panorama = meta.projection ? meta.projection === 'equirectangular' : isPanoramaSize(dims.width, dims.height);
       // A panorama looks everywhere: its heading (centre of the image) says nothing about which spot it belongs to.
-      const heading = panorama ? (meta.poseHeading ?? meta.heading) : meta.heading;
+      const heading = panorama ? (meta.poseHeading ?? meta.heading) : (meta.heading ?? sentHeading);
+      // Drive mode picks its pictures on the device; this catches what still repeats
+      // (a second device, a resent queue): one picture per account, place and half day.
+      if (activity === 'fahren' && owner.userId && driveRepeat(owner.userId, pos, takenAt)) {
+        skipped.push({ name: f.originalname, reason: 'Fahrt: hier gibt es von dir schon ein Bild aus den letzten Stunden' });
+        continue;
+      }
       const file = `${crypto.randomUUID()}.${ext}`;
       if (jpeg) await fsp.writeFile(path.join(uploadDir, file), jpeg);
       else await fsp.rename(f.path, path.join(uploadDir, file));
