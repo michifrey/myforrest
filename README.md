@@ -2,6 +2,13 @@
 
 **Street View für die Natur, über die Zeit.**
 
+📖 **Dokumentation: [michifrey.github.io/myforrest](https://michifrey.github.io/myforrest/)** ·
+[Funktionen](https://michifrey.github.io/myforrest/funktionen/) ·
+[Installation](https://michifrey.github.io/myforrest/installation/) ·
+[REST-API](https://michifrey.github.io/myforrest/api/) ·
+[Roadmap](https://michifrey.github.io/myforrest/roadmap/) ·
+[Android-App](https://github.com/michifrey/myforrest/releases/latest/download/myforrest.apk)
+
 Beim Joggen, Wandern oder Biken fallen immer wieder Sturmschäden, Borkenkäfernester, neue
 Lichtungen oder sich ausbreitende Neophyten auf. MyForrest sammelt Fotos solcher Orte und legt
 sie zeitlich übereinander. So wird sichtbar, wie sich der Wald an einem Ort über Monate und Jahre
@@ -397,7 +404,8 @@ App Fotos dort an der Horizontlinie aus.
 ## Was MyForrest kann
 
 Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen unter
-[Funktionen im Detail](docs/funktionen.md).
+[Funktionen im Detail](docs/funktionen.md) (auch auf der
+[Doku-Website](https://michifrey.github.io/myforrest/funktionen/)).
 
 - **[Fotos erfassen](docs/funktionen.md#fotos-erfassen-und-verorten)**: Handyfotos (auch HEIC vom iPhone),
   Action-Cam-Serien mit GPX-Track und Videos von GoPro oder 360°-Kameras. Verortung über GPS, GPX oder von
@@ -414,7 +422,9 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   Höhe, Exposition, Kaltluftseen sowie Satellitendaten (NDVI und Feuchteindex NDMI aus Sentinel-2, vor 2017
   Landsat) als unabhängige Bestätigung und als Frühwarnung für Spots ohne neue Fotos, deren Schwellen sich an
   bestätigten Schäden eichen (getrennt für Laub- und Nadelwald) und an zurückgehaltenen Spots geprüft werden,
-  als Push-Nachricht an alle, die den Spot regelmässig besuchen.
+  als Push-Nachricht an alle, die den Spot regelmässig besuchen. **Sturmwarnung** aus der Böenprognose mit der
+  Bitte, betroffene Spots nach dem Sturm zu besuchen; **Laubaustrieb** aus den Phänologie-Daten von MeteoSchweiz
+  und DWD, damit Spätfrost erst nach dem Austrieb zählt.
 - **[Landschaften und Gletscher](docs/funktionen.md#landschaften-und-gletscher)**: Profile für Wald, Gletscher,
   Gebirge und Trockengebiet mit eigenen Beobachtungen; Gletscherumrisse aus Inventaren (z. B. GLAMOS) pro Jahr, Eis im Spätsommer
   und Schneeschmelze aus Sentinel-2, Längenänderung der Zunge aus GLAMOS, Archivfotos mit Datum von Hand und
@@ -422,7 +432,9 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
 - **[Kartenmodi](docs/funktionen.md#kartenmodi)**: Sonnenstand, Schatten und Einstrahlung inklusive
   Geländehorizont sowie Hotspots und Ausbreitungsfronten von Neophyten.
 - **[Pflanzen und Baumarten](docs/funktionen.md#pflanzen-und-baumarten)**: Pflanzenbestimmung mit Pl@ntNet,
-  Erkennung invasiver Neophyten, Artenbestand pro Spot und Export zu Info Flora, GBIF und iNaturalist.
+  Erkennung invasiver Neophyten, Artenbestand pro Spot, Prüfung der Bestimmungen durch Fachleute, Export
+  (auf Wunsch nur geprüfter Funde) zu Info Flora, GBIF und iNaturalist und Hotspots pro 100 Fotos gegen
+  ungleich verteilten Suchaufwand.
 - **[Offene Geodaten](docs/funktionen.md#offene-geodaten-für-gis-und-geoportale)**:
   - Alle Daten als OGC API – Features und GeoPackage, in WGS84 oder den Schweizer Landeskoordinaten LV95
     wie bei swisstopo.
@@ -435,7 +447,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   - Ein fertiges QGIS-Projekt für QGIS Server (WMS/WMTS/WFS) für Geoportale wie map.geo.admin.ch.
 - **[Touren und Fotoaufträge](docs/funktionen.md#touren-und-fotoaufträge)**: Routen zeichnen, per GPS
   aufzeichnen oder importieren (GPX, FIT, TCX, KML, GeoJSON, NMEA), als GPX exportieren und speichern; Fotoaufträge
-  ohne Zeit und Namen und Vorschläge entlang der eigenen Route.
+  ohne Zeit und Namen und Vorschläge entlang der eigenen Route; eine Karte kühler Abschnitte aus den
+  Temperaturen vieler Touren, geeicht am Wettermodell, nach Jahres- und Tageszeit.
 - **[Geschützte Funde](docs/funktionen.md#geschützte-funde-und-pro-mitglieder)**: seltene Arten und Pilzstellen
   nur für verifizierte PRO-Mitglieder (Forstdienst, Naturschutz), öffentlich nur als 5-km-Raster;
   Organisationen nehmen ihre Mitglieder selbst auf.
@@ -469,20 +482,21 @@ für den Wege-Magnet mit ([`deploy/brouter`](deploy/brouter/README.md)).
 
 Die Doku gibt es auch als **Website** mit Suche, hellem und dunklem Design und *Seite bearbeiten*-Knopf:
 **[michifrey.github.io/myforrest](https://michifrey.github.io/myforrest/)**, später unter docs.myforrest.xyz. Sie
-entsteht aus `docs/*.md` (MkDocs Material) und wird bei jedem Merge neu veröffentlicht.
+entsteht aus `docs/*.md` (MkDocs Material) und wird bei jedem Merge neu veröffentlicht. Die Tabelle verlinkt
+jedes Dokument hier im Repository und auf der Website.
 
 <p align="center"><img src="docs/screenshots/doku-website.jpg" width="640" alt="Startseite der Doku-Website mit Navigation und Suche"></p>
 
 | Dokument | Inhalt |
 |----------|--------|
-| [Funktionen im Detail](docs/funktionen.md) | Alle Funktionen mit Verfahren, Schwellenwerten und Grenzen |
-| [Android-App](docs/android.md) | Fahrtmodus und Aufzeichnung im Hintergrund, Installieren, selbst bauen und signieren |
-| [Tech-Onboarding](docs/tech-onboarding.md) | Selbst hosten: Voraussetzungen, Speicherplatz, Lizenzen, Ports, Zertifikate, ausgehende Verbindungen, Checkliste |
-| [Installation und Konfiguration](docs/installation.md) | Voraussetzungen, HTTPS fürs Handy, Umgebungsvariablen, externer Detektor, Phänologie-Daten |
-| [Betrieb, Datenschutz und Datenquellen](docs/betrieb.md) | Hinweise für einen öffentlichen Betrieb, externe Dienste und Quellenangaben |
-| [Architektur](docs/architektur.md) | Aufbau des Codes, Module im Überblick |
-| [REST-API](docs/api.md) | Alle Routen des Servers |
-| [Roadmap](docs/roadmap.md) | Was als Nächstes geplant ist |
+| [Funktionen im Detail](docs/funktionen.md) · [Website](https://michifrey.github.io/myforrest/funktionen/) | Alle Funktionen mit Verfahren, Schwellenwerten und Grenzen |
+| [Android-App](docs/android.md) · [Website](https://michifrey.github.io/myforrest/android/) | Fahrtmodus und Aufzeichnung im Hintergrund, Installieren, selbst bauen und signieren |
+| [Tech-Onboarding](docs/tech-onboarding.md) · [Website](https://michifrey.github.io/myforrest/tech-onboarding/) | Selbst hosten: Voraussetzungen, Speicherplatz, Lizenzen, Ports, Zertifikate, ausgehende Verbindungen, Checkliste |
+| [Installation und Konfiguration](docs/installation.md) · [Website](https://michifrey.github.io/myforrest/installation/) | Voraussetzungen, HTTPS fürs Handy, Umgebungsvariablen, externer Detektor, Phänologie-Daten |
+| [Betrieb, Datenschutz und Datenquellen](docs/betrieb.md) · [Website](https://michifrey.github.io/myforrest/betrieb/) | Hinweise für einen öffentlichen Betrieb, externe Dienste und Quellenangaben |
+| [Architektur](docs/architektur.md) · [Website](https://michifrey.github.io/myforrest/architektur/) | Aufbau des Codes, Module im Überblick |
+| [REST-API](docs/api.md) · [Website](https://michifrey.github.io/myforrest/api/) | Alle Routen des Servers |
+| [Roadmap](docs/roadmap.md) · [Website](https://michifrey.github.io/myforrest/roadmap/) | Was als Nächstes geplant ist |
 | [QGIS Server](deploy/qgis-server/README.md) und [Kubernetes](deploy/k8s/README.md) | Betrieb mit Geodiensten per Docker Compose oder Kubernetes |
 | [Eigener Routing-Server](deploy/brouter/README.md) | BRouter für den Wege-Magnet, mit Routing-Daten für die Schweiz, Waldprofil, Wildruhezonen und fertigem Image |
 
