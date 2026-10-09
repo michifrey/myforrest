@@ -61,6 +61,31 @@ Push-Dienste der Browser (`fcm.googleapis.com`, `*.push.services.mozilla.com`, `
 `*.notify.windows.com`, erweiterbar mit `PUSH_HOSTS`). Die Nachricht ist Ende-zu-Ende verschlüsselt; der
 Push-Dienst sieht nur, dass eine Nachricht an ein Gerät geht.
 
+## Doku-Website
+
+Die Doku in `docs/*.md` wird zusätzlich als Website veröffentlicht: MkDocs Material (`mkdocs.yml`), gebaut und
+über GitHub Pages ausgeliefert vom Workflow `.github/workflows/docs.yml`, bei jeder Änderung an `docs/` auf `main`.
+Pull Requests bauen sie nur, streng (`--strict`): Ein kaputter Link oder Anker lässt den Check scheitern.
+
+**Einmal einrichten** (im Repository auf GitHub):
+
+1. *Settings → Pages → Build and deployment → Source*: **GitHub Actions** wählen.
+2. *Actions → Doku-Website → Run workflow* (oder die nächste Änderung an `docs/` abwarten). Die Website steht
+   dann unter `https://michifrey.github.io/myforrest/`.
+
+**Eigene Domain** (z. B. `docs.myforrest.xyz`), sobald die Domain registriert ist:
+
+1. Beim DNS-Anbieter einen Eintrag `docs` vom Typ **CNAME** auf `michifrey.github.io` setzen.
+2. *Settings → Pages → Custom domain*: `docs.myforrest.xyz` eintragen, warten bis die DNS-Prüfung grün ist,
+   dann *Enforce HTTPS* einschalten (das Zertifikat stellt GitHub aus).
+3. *Settings → Secrets and variables → Actions → Variables*: `DOCS_URL` = `https://docs.myforrest.xyz/` anlegen
+   (für Links, Sitemap und Suche) und den Workflow einmal neu laufen lassen.
+
+**Lokal ansehen**: `pip install -r requirements-docs.txt`, dann `mkdocs serve` (http://127.0.0.1:8000, lädt bei
+jeder Änderung neu). Eine neue Seite in `docs/` gehört auch in `nav` in `mkdocs.yml`. Links zwischen den Seiten
+bleiben relativ (`installation.md#…`), damit sie auf GitHub und auf der Website gehen; Links auf Dateien
+ausserhalb von `docs/` zeigen auf GitHub (`https://github.com/michifrey/myforrest/blob/main/…`).
+
 ## Externe Datenquellen und Netzzugang
 
 | Quelle | Wofür | Hosts, die der Server erreichen muss |
@@ -70,7 +95,7 @@ Push-Dienst sieht nur, dass eine Nachricht an ein Gerät geht.
 | Landsat Collection 2 (USGS) über [Microsoft Planetary Computer](https://planetarycomputer.microsoft.com) | Satellitenkontext vor 2017 und Überlappung 2017–2018 | `planetarycomputer.microsoft.com`, `landsateuwest.blob.core.windows.net` |
 | Deutscher Wetterdienst, Open Data | Phänologie-Referenzdaten ([laden](installation.md#phänologie-referenzdaten-laden)) | `opendata.dwd.de` |
 | [Pl@ntNet](https://my.plantnet.org) (optional, API-Key) | Pflanzenbestimmung | `my-api.plantnet.org` |
-| [BRouter](https://brouter.de) (Standard, `ROUTER_URL`) | Wege-Magnet: gezeichnete Touren folgen den Wegen; der Server schickt nur die Wegpunkte, ohne Konto oder IP der Person. Mit dem [eigenen BRouter](../deploy/brouter/README.md) bleibt das im eigenen Netz; dieser lädt nur seine Routing-Daten (OpenStreetMap, ODbL) | `brouter.de` (öffentlicher Dienst bzw. Download der Segmente) oder Host aus `ROUTER_URL` |
+| [BRouter](https://brouter.de) (Standard, `ROUTER_URL`) | Wege-Magnet: gezeichnete Touren folgen den Wegen; der Server schickt nur die Wegpunkte, ohne Konto oder IP der Person. Mit dem [eigenen BRouter](https://github.com/michifrey/myforrest/blob/main/deploy/brouter/README.md) bleibt das im eigenen Netz; dieser lädt nur seine Routing-Daten (OpenStreetMap, ODbL) | `brouter.de` (öffentlicher Dienst bzw. Download der Segmente) oder Host aus `ROUTER_URL` |
 | Push-Dienste der Browser (Google, Mozilla, Apple, Microsoft) | Push-Nachrichten der Frühwarnung | `fcm.googleapis.com`, `updates.push.services.mozilla.com`, `web.push.apple.com`, `*.notify.windows.com` |
 | OpenStreetMap | Kartenkacheln (im Browser) | – |
 | swisstopo (geo.admin.ch) | Landeskarte und Luftbild der Vektorkarte LV95 (im Browser) | – |

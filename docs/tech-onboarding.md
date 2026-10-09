@@ -24,8 +24,8 @@ docker run -d -p 3000:3000 -v myforrest-data:/app/data \
 
 ### Vollausbau: mit Geodiensten und eigenem Routing
 
-Die Vorlagen [`deploy/qgis-server`](../deploy/qgis-server/README.md) (Docker Compose) und
-[`deploy/k8s`](../deploy/k8s/README.md) (Kubernetes) starten zusätzlich:
+Die Vorlagen [`deploy/qgis-server`](https://github.com/michifrey/myforrest/blob/main/deploy/qgis-server/README.md) (Docker Compose) und
+[`deploy/k8s`](https://github.com/michifrey/myforrest/blob/main/deploy/k8s/README.md) (Kubernetes) starten zusätzlich:
 
 | Dienst | Image | Wofür | Nötig? |
 |--------|-------|-------|--------|
@@ -108,7 +108,7 @@ Dateikopie. Backups enthalten auch gelöschte Konten, bis sie ersetzt werden (si
 
 ### MyForrest selbst
 
-Der Code steht unter der **Apache-Lizenz 2.0** ([`LICENSE`](../LICENSE)): Betrieb, Anpassung und kommerzielle
+Der Code steht unter der **Apache-Lizenz 2.0** ([`LICENSE`](https://github.com/michifrey/myforrest/blob/main/LICENSE)): Betrieb, Anpassung und kommerzielle
 Nutzung sind erlaubt; Lizenztext und Copyright-Hinweise bleiben erhalten, Änderungen werden gekennzeichnet.
 
 ### Abhängigkeiten (npm, Produktion)
@@ -167,7 +167,7 @@ Alles andere bleibt intern.
 
 Uploads sind gross (Videos bis 4 GB): Im Proxy die Body-Grösse entsprechend erlauben (nginx:
 `client_max_body_size 4g`) und lange Timeouts setzen (`proxy_read_timeout 600s`), siehe
-[`deploy/qgis-server/nginx.conf`](../deploy/qgis-server/nginx.conf).
+[`deploy/qgis-server/nginx.conf`](https://github.com/michifrey/myforrest/blob/main/deploy/qgis-server/nginx.conf).
 
 ## 5. Zertifikate
 

@@ -1,7 +1,7 @@
 # Funktionen im Detail
 
 Diese Seite beschreibt alle Funktionen des Prototyps ausführlich, inklusive der verwendeten Verfahren.
-Einen kürzeren Überblick mit Screenshots gibt das [README](../README.md).
+Einen kürzeren Überblick mit Screenshots gibt das [README](https://github.com/michifrey/myforrest#readme).
 
 **Inhalt**
 
@@ -811,7 +811,7 @@ einbinden.
 - **GeoPackage**: `/api/export/myforrest.gpkg` liefert alle Collections als eine Datei (LV95, mit
   `?crs=4326` in WGS84), ohne GDAL direkt mit SQLite geschrieben. Die Fusszeile der App verlinkt beides.
 - **QGIS Server**: Für WMS, WMTS und WFS mit eigener Gestaltung, wie sie Geoportale wie map.geo.admin.ch
-  einbinden, liegt unter [`deploy/qgis-server`](../deploy/qgis-server/README.md) ein fertiges QGIS-Projekt
+  einbinden, liegt unter [`deploy/qgis-server`](https://github.com/michifrey/myforrest/blob/main/deploy/qgis-server/README.md) ein fertiges QGIS-Projekt
   mit Stilen in den Farben der App (Ausbreitungsfronten nach Jahr, Spots nach Befund mit Pfeil in
   Blickrichtung, Neophyten hervorgehoben) und eine Docker-Compose-Vorlage: MyForrest, QGIS Server und
   nginx, dazu ein Dienst, der das GeoPackage alle 15 Minuten neu exportiert.
@@ -909,7 +909,7 @@ wird.
   RunnerMaps. Dafür fragt der Server einen BRouter-Dienst an (Standard `brouter.de`, Profil `hiking-mountain`,
   anpassbar mit `ROUTER_URL` und `ROUTER_PROFILE`, siehe [Installation](installation.md#umgebungsvariablen));
   der Browser spricht ihn nie direkt an. Ohne Magnet oder ohne Dienst entstehen gerade Linien.
-- **Eigener Routing-Server mit Waldprofil**: Mit dem eigenen BRouter ([`deploy/brouter`](../deploy/brouter/README.md))
+- **Eigener Routing-Server mit Waldprofil**: Mit dem eigenen BRouter ([`deploy/brouter`](https://github.com/michifrey/myforrest/blob/main/deploy/brouter/README.md))
   gilt das Profil `myforrest-wald`: Forststrassen zuerst, Rückegassen fast gleich gut, dann Pfade; Strassen
   mit Verkehr werden umgangen, Autobahnen und schwierige Bergwege (ab SAC T5) nie genommen.
 - **Wildruhezonen**: Ist eine Datei mit den Zonen hinterlegt (`WILDRUHE_GEOJSON`, z. B. der BAFU-Datensatz von

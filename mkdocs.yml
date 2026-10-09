@@ -1,0 +1,77 @@
+# Doku-Website (Projekt-Wiki) aus docs/*.md – gebaut mit MkDocs Material, veröffentlicht über GitHub Pages
+# (.github/workflows/docs.yml). Lokal: pip install -r requirements-docs.txt && mkdocs serve
+site_name: MyForrest – Doku
+site_description: Wald im Wandel – Funktionen, Installation, Betrieb, Architektur und API von MyForrest
+# Adresse der Website: die Repository-Variable DOCS_URL (z. B. https://docs.myforrest.xyz/), sonst GitHub Pages.
+site_url: !ENV [DOCS_URL, 'https://michifrey.github.io/myforrest/']
+repo_url: https://github.com/michifrey/myforrest
+repo_name: michifrey/myforrest
+edit_uri: edit/main/docs/
+docs_dir: docs
+copyright: MyForrest · Inhalte unter der Lizenz des Repositorys
+
+nav:
+  - Startseite: index.md
+  - Funktionen: funktionen.md
+  - Selbst hosten:
+      - Tech-Onboarding: tech-onboarding.md
+      - Installation und Konfiguration: installation.md
+      - Betrieb und Datenschutz: betrieb.md
+  - Entwickeln:
+      - Architektur: architektur.md
+      - REST-API: api.md
+  - Roadmap: roadmap.md
+
+theme:
+  name: material
+  language: de
+  icon:
+    logo: material/pine-tree
+    repo: fontawesome/brands/github
+  favicon: assets/favicon.png
+  palette:
+    - media: '(prefers-color-scheme: light)'
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle: { icon: material/weather-night, name: Dunkles Design }
+    - media: '(prefers-color-scheme: dark)'
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle: { icon: material/weather-sunny, name: Helles Design }
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.action.edit
+    - content.code.copy
+
+plugins:
+  - search:
+      lang: de
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      # Anker wie auf GitHub (mit Umlauten), damit dieselben Links in beiden Ansichten gehen.
+      slugify: !!python/object/apply:pymdownx.slugs.slugify { kwds: { case: lower } }
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.details
+
+extra_css:
+  - assets/doku.css
+
+validation:
+  links:
+    anchors: warn

@@ -433,6 +433,12 @@ für den Wege-Magnet mit ([`deploy/brouter`](deploy/brouter/README.md)).
 
 ## Dokumentation
 
+Die Doku gibt es auch als **Website** mit Suche, hellem und dunklem Design und *Seite bearbeiten*-Knopf:
+**[michifrey.github.io/myforrest](https://michifrey.github.io/myforrest/)**, später unter docs.myforrest.xyz. Sie
+entsteht aus `docs/*.md` (MkDocs Material) und wird bei jedem Merge neu veröffentlicht.
+
+<p align="center"><img src="docs/screenshots/doku-website.jpg" width="640" alt="Startseite der Doku-Website mit Navigation und Suche"></p>
+
 | Dokument | Inhalt |
 |----------|--------|
 | [Funktionen im Detail](docs/funktionen.md) | Alle Funktionen mit Verfahren, Schwellenwerten und Grenzen |
