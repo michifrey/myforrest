@@ -291,20 +291,34 @@
       if (!this.gl || this.frame) return;
       this.frame = requestAnimationFrame(() => {
         this.frame = 0;
-        const { gl, canvas } = this;
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        const w = Math.max(1, Math.round(canvas.clientWidth * dpr));
-        const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
-        if (canvas.width !== w || canvas.height !== h) [canvas.width, canvas.height] = [w, h];
-        gl.viewport(0, 0, w, h);
-        const rad = Math.PI / 180;
-        gl.uniform1f(this.u.yaw, this.yaw * rad);
-        gl.uniform1f(this.u.pitch, this.pitch * rad);
-        gl.uniform1f(this.u.tanHalf, Math.tan((this.fov * rad) / 2));
-        gl.uniform1f(this.u.aspect, w / h);
-        if (this.loaded) gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-        this.onView?.(this);
+        this.render();
       });
+    }
+
+    /** A still of the current view as a 2D canvas (the WebGL buffer is only readable right after drawing). */
+    snapshot() {
+      if (!this.gl || !this.loaded) return null;
+      this.render();
+      const copy = document.createElement('canvas');
+      [copy.width, copy.height] = [this.canvas.width, this.canvas.height];
+      copy.getContext('2d').drawImage(this.canvas, 0, 0);
+      return copy;
+    }
+
+    render() {
+      const { gl, canvas } = this;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const w = Math.max(1, Math.round(canvas.clientWidth * dpr));
+      const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
+      if (canvas.width !== w || canvas.height !== h) [canvas.width, canvas.height] = [w, h];
+      gl.viewport(0, 0, w, h);
+      const rad = Math.PI / 180;
+      gl.uniform1f(this.u.yaw, this.yaw * rad);
+      gl.uniform1f(this.u.pitch, this.pitch * rad);
+      gl.uniform1f(this.u.tanHalf, Math.tan((this.fov * rad) / 2));
+      gl.uniform1f(this.u.aspect, w / h);
+      if (this.loaded) gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      this.onView?.(this);
     }
 
     bindInput() {

@@ -101,7 +101,7 @@ public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet d
                      hotspots.js den Kartenmodus „Arten & Neophyten“,
                      tours.js den Kartenmodus „Touren & Aufträge“ (Route zeichnen, aufzeichnen, importieren, Fotoaufträge),
                      video.js den Video-Upload und die 360°-Ansicht,
-                     walk.js das Durchgehen wie Street View (mit Mapillary-Bildern und deren Kartenebene),
+                     walk.js das Durchgehen wie Street View (weiche Übergänge, Mapillary-Bilder und deren Kartenebene),
                      vegetation.js die Diagramme zu Vegetationsdichte und NDVI,
                      glacier.js Landschaft des Spots, Gletscher- und Schnee-Teil, Archivfotos und Gletscherumrisse auf der Karte,
                      account.js Konto-Menü, Lizenz, Melden und Moderation;

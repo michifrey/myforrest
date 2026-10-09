@@ -239,6 +239,14 @@ Distanz darunter:
 Liegen zwei Ziele weniger als 25° auseinander, bleibt das erste (Reihe vor Spot vor Mapillary), damit sich
 die Pfeile nicht überdecken.
 
+**Weiche Übergänge**: Bei einem 360°-Bild dreht sich der Blick zuerst zum gewählten Pfeil (bis 0,6 s,
+kürzer bei kleinen Drehungen). Dann bleibt das bisherige Bild als Standbild stehen, bis das nächste geladen ist,
+und zoomt in Gehrichtung auf (bei flachen Fotos zur Seite des Pfeils hin), während es ausblendet; das neue
+Panorama kommt dabei leicht herangezoomt an und gleitet auf sein normales Blickfeld zurück. Zurück (der Pfeil
+liegt mehr als 110° neben dem Blick) zoomt das Standbild heraus, ohne vorher umzudrehen, und ein Wechsel der
+*Zeit* blendet nur über. Wer im Betriebssystem weniger Bewegung eingestellt hat, bekommt nur eine kurze
+Überblendung. Während eines Schritts nimmt die Ansicht keinen zweiten an.
+
 Beim Schritt bleibt die Blickrichtung erhalten: Wer nach Osten schaut und weitergeht, schaut im nächsten
 Panorama wieder nach Osten. Die Richtung der Bildmitte kommt aus dem Video bzw. aus `GPano:PoseHeadingDegrees`
 der 360°-Kamera. Fehlt sie, nimmt die App Norden an, und die Pfeile stimmen nur ungefähr. *Zeit* oben wechselt
