@@ -373,7 +373,7 @@
           class: 'hint',
           text: (state.spot.landscape || 'wald') === 'wald'
             ? 'Aus den Bildfarben geschätzt, bei ausgerichteten Fotos im gemeinsamen Bildausschnitt des Spots. Grün = Laub und Nadeln; Kronendach-Deckung = Anteil der oberen Bildhälfte ohne sichtbaren Himmel.'
-            : 'Aus den Bildfarben geschätzt, bei ausgerichteten Fotos im gemeinsamen Bildausschnitt des Spots. Grün = Pflanzen, die sich ansiedeln.',
+            : 'Aus den Bildfarben geschätzt, bei ausgerichteten Fotos im gemeinsamen Bildausschnitt des Spots. Grün = Pflanzen: wie sie sich ansiedeln oder verschwinden.',
         }));
       }
     }

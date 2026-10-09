@@ -128,7 +128,8 @@ Dashcams (GPS direkt aus der Datei: NMEA, Novatek) oder 360°-Kameras, aus denen
 werden. Ort und Zeit kommen aus den EXIF- bzw.
 Telemetriedaten. Fotos ohne GPS lassen sich über einen GPX-Track verorten (dafür gibt es unter
 *Zeitabgleich für GPX* Zeitzone und Korrektur für die Kamera-Uhr) oder von Hand auf der Karte bzw. über
-den aktuellen Standort. Dazu kommen Aktivität, Landschaft (Wald, Gletscher oder automatisch erkannt; sie
+den aktuellen Standort. Dazu kommen Aktivität, Landschaft (Wald, Gletscher, Gebirge, Trockengebiet oder
+automatisch erkannt; sie
 bestimmt, welche Beobachtungen zur Wahl stehen), Beobachtungen, eine Notiz und die Lizenz (Standard
 CC BY-SA 4.0). Als installierte App landen Uploads ohne Empfang in einer Warteschlange und gehen später raus;
 lehnt der Server einen davon ab, während die App zu ist, meldet das eine Benachrichtigung.
@@ -331,7 +332,9 @@ von 1928 neben 2025.
 Spots über 2100 m ohne Baumarten werden **Gebirge**-Spots (brauner Marker) mit Beobachtungen wie Felssturz,
 Murgang, Lawine, Rutschung, Permafrost und Verbuschung der Alpweide. Ihr Teil *Schnee* zeigt pro Jahr, in
 welchem Monat der Schnee schmilzt, und vergleicht die ersten mit den letzten Jahren, hier eine Alpweide, die
-heute rund sechs Wochen früher aper ist und auf der Grünerlen einwachsen.
+heute rund sechs Wochen früher aper ist und auf der Grünerlen einwachsen. Für **Trockengebiete** gibt es ein
+eigenes Profil (Wanderdüne, Bodenerosion, Vegetationsverlust, Überweidung, Versalzung), gewählt beim Hochladen;
+dort meldet der NDVI den Verlust an Vegetation.
 
 ## Was MyForrest kann
 
@@ -353,8 +356,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   Landsat) als unabhängige Bestätigung und als Frühwarnung für Spots ohne neue Fotos, deren Schwellen sich an
   bestätigten Schäden eichen (getrennt für Laub- und Nadelwald) und an zurückgehaltenen Spots geprüft werden,
   als Push-Nachricht an alle, die den Spot regelmässig besuchen.
-- **[Landschaften und Gletscher](docs/funktionen.md#landschaften-und-gletscher)**: Profile für Wald, Gletscher und
-  Gebirge mit eigenen Beobachtungen; Gletscherumrisse aus Inventaren (z. B. GLAMOS) pro Jahr, Eis im Spätsommer
+- **[Landschaften und Gletscher](docs/funktionen.md#landschaften-und-gletscher)**: Profile für Wald, Gletscher,
+  Gebirge und Trockengebiet mit eigenen Beobachtungen; Gletscherumrisse aus Inventaren (z. B. GLAMOS) pro Jahr, Eis im Spätsommer
   und Schneeschmelze aus Sentinel-2, Archivfotos mit Datum von Hand.
 - **[Kartenmodi](docs/funktionen.md#kartenmodi)**: Sonnenstand, Schatten und Einstrahlung inklusive
   Geländehorizont sowie Hotspots und Ausbreitungsfronten von Neophyten.

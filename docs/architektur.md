@@ -44,7 +44,7 @@ src/routes/climate.js  Routen und Analyse-Hooks für Stürme, Phänologie-Refere
 src/elevation.js     Geländehöhe, Hangneigung, Exposition und Geländeform (Copernicus-DEM über Open-Meteo)
 src/exif.js          Aufnahmezeit, GPS und Blickrichtung aus den Bilddaten
 src/wildlife.js      Wildruhezonen (GeoJSON, WGS84/LV95, Schutzzeit) als Sperrflächen für BRouter
-src/landscapes.js    Landschaftsprofile (Wald, Gletscher, Gebirge): Beobachtungen je Profil, welche Profile Schnee und Eis auswerten, Höhe für Gebirge-Spots
+src/landscapes.js    Landschaftsprofile (Wald, Gletscher, Gebirge, Trockengebiet): Beobachtungen je Profil, welche Profile Schnee und Eis auswerten, Höhe für Gebirge-Spots
 src/glaciers.js      Gletscherumrisse aus Inventaren (GeoJSON, WGS84/LV95, Jahr aus Eigenschaft oder Dateiname): Eis pro Jahr an einem Ort, Abstand, Umrisse für die Karte
 src/routes/landscapes.js  Landschaft eines Spots setzen, Gletscher am Spot, Umrisse (/api/glaciers)
 src/lenient-fetch.js HTTP-Client für BRouters eigenen Server (Kopfzeilen nur mit \n)

@@ -10,6 +10,8 @@
  *              of late summer from the Sentinel-2 scene classification
  *   gebirge    mountains above the forest: rockfall, debris flows, avalanches,
  *              shrubs on alpine pastures; NDVI and when the snow melts
+ *   trocken    drylands, deserts: moving dunes, erosion, loss of plant cover;
+ *              NDVI (chosen at upload or by hand, never guessed)
  *
  * Tags are one vocabulary (src/tags.js); a profile lists the ones offered for
  * its spots. Tags shared by several profiles (paths, rockfall) are listed in each.
@@ -29,6 +31,10 @@ const LANDSCAPES = {
   gebirge: {
     label: 'Gebirge',
     tags: ['felssturz', 'murgang', 'lawine', 'rutschung', 'permafrost', 'verbuschung', 'neophyt', 'wegschaden'],
+  },
+  trocken: {
+    label: 'Trockengebiet',
+    tags: ['wanderduene', 'bodenerosion', 'vegetationsverlust', 'ueberweidung', 'versalzung', 'neophyt', 'wegschaden'],
   },
 };
 const DEFAULT_LANDSCAPE = 'wald';

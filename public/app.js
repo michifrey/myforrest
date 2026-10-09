@@ -1505,11 +1505,12 @@ async function stormNote(a, b, change, current) {
     $('upload-tags').append(el('label', { 'data-landscapes': where.join(' ') }, [el('input', { type: 'checkbox', value: key }), label]));
   }
   $('tag-filter').append(tagGroup);
-  // The upload offers the observations of the chosen landscape (all when it is recognised automatically).
+  // The upload offers the observations of the chosen landscape (those of the forest while it is recognised
+  // automatically; choosing a landscape shows its own).
   $('upload-landscape').addEventListener('change', () => {
-    const chosen = $('upload-landscape').value;
+    const chosen = $('upload-landscape').value || 'wald';
     for (const label of $('upload-tags').children) {
-      const fits = !chosen || label.dataset.landscapes.split(' ').includes(chosen);
+      const fits = !label.dataset.landscapes || label.dataset.landscapes.split(' ').includes(chosen);
       label.hidden = !fits;
       if (!fits) label.querySelector('input').checked = false;
     }

@@ -276,6 +276,7 @@
     const r = await baseLoadSpots(...args);
     $('legend-ice').hidden = !(state.spots || []).some((s) => s.landscape === 'gletscher');
     $('legend-rock').hidden = !(state.spots || []).some((s) => s.landscape === 'gebirge');
+    $('legend-sand').hidden = !(state.spots || []).some((s) => s.landscape === 'trocken');
     return r;
   };
 

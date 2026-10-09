@@ -256,6 +256,10 @@ test('mountain spots: above the tree line without signs of forest', async () => 
     assert.equal((await (await patch(c.spotId, { elevation: 600 })).json()).landscape, 'wald');
     const config = await json(`${base}/api/config`);
     assert.ok(config.landscapes.gebirge.tags.includes('lawine'));
+    // Drylands only by choice.
+    const d = await upload(base, { lat: 30.1, lon: -2.1, takenAt: '2024-07-20T10:00:00Z', landscape: 'trocken', tags: 'wanderduene,sturmschaden' });
+    assert.equal((await json(`${base}/api/spots/${d.spotId}`)).landscape, 'trocken');
+    assert.deepEqual(d.tags, ['sturmschaden', 'wanderduene']);
   });
 });
 

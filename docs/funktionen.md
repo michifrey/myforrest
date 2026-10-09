@@ -132,7 +132,8 @@ An Gletscher-Spots stehen andere Beobachtungen zur Wahl (siehe [Landschaften](#l
 Gletscherzunge/Rückzug, Gletschersee, Spalten/Séracs, Schuttbedeckung, Toteis/Einbruch,
 Felssturz/Steinschlag, Murgang, Pioniervegetation im Vorfeld und Weg/Erosion; an Gebirge-Spots
 Felssturz, Murgang, Lawine/Lawinenzug, Rutschung/Hangmure, Permafrost/Blockgletscher, Verbuschung der
-Alpweide, Neophyt und Weg/Erosion.
+Alpweide, Neophyt und Weg/Erosion; in Trockengebieten Wanderdüne/Sandverwehung, Bodenerosion/Rinnen,
+Vegetationsverlust, Überweidung, Versalzung/Salzkruste, Neophyt und Weg/Erosion.
 
 ### Installierbare App mit Offline-Upload
 
@@ -568,16 +569,18 @@ Veränderungen und die Geschichte, die der Satellit erzählt. Dafür hat jeder S
 | **Wald** (Standard) | Sturmschaden, Borkenkäfer, Trockenschaden, Totholz, Holzschlag, Verjüngung, frühe Verfärbung, Frost, Neophyt, Weg | Windwurf, Auflichtung, Verfärbung, neuer Bewuchs | NDVI, NDMI, Frühwarnung |
 | **Gletscher** | Gletscherzunge/Rückzug, Gletschersee, Spalten, Schuttbedeckung, Toteis, Felssturz, Murgang, Pioniervegetation, Weg | nur «Veränderung», ohne Waldklassen | Eis im Spätsommer |
 | **Gebirge** | Felssturz, Murgang, Lawine, Rutschung, Permafrost, Verbuschung der Alpweide, Neophyt, Weg | nur «Veränderung», ohne Waldklassen | NDVI, NDMI und Schneeschmelze |
+| **Trockengebiet** | Wanderdüne, Bodenerosion, Vegetationsverlust, Überweidung, Versalzung, Neophyt, Weg | nur «Veränderung», ohne Waldklassen | NDVI, NDMI (Vegetationsverlust, Frühwarnung) |
 
 So kommt ein Spot zu seinem Profil:
 
 - **Beim Hochladen** wählt man unter *Landschaft* ein Profil oder lässt es *automatisch erkennen*. Das
-  Formular zeigt dann nur die Beobachtungen dieses Profils.
+  Formular zeigt dann nur die Beobachtungen dieses Profils, bei *automatisch* die des Waldes.
 - **Automatisch**: Liegt ein neuer Spot auf dem Eis eines Gletscherinventars, in einem früheren Inventar
   oder höchstens 500 m vom Eis des neusten Inventars entfernt, wird er ein Gletscher-Spot (Gletscherumrisse
   siehe unten). Liegt ein Spot über 2100 m ü. M. (`GEBIRGE_AB_M`) und gibt es dort keine Baumarten und keine
   Wald-Beobachtungen, wird er ein Gebirge-Spot, sobald seine Höhe bekannt ist (Höhenmodell oder von Hand);
-  ein Lärchenwald an der Waldgrenze bleibt Wald. Sonst bleibt ein Spot ohne Wahl ein Wald-Spot.
+  ein Lärchenwald an der Waldgrenze bleibt Wald. Trockengebiete erkennt die App nicht selbst; sie werden
+  beim Hochladen oder im Spot gewählt. Sonst bleibt ein Spot ohne Wahl ein Wald-Spot.
 - **Von Hand**: Im Spot steht unter den Koordinaten das Profil mit seiner Herkunft (*Standard*, *beim
   Hochladen gewählt*, *erkannt an den Gletscherumrissen*, *von Hand gesetzt*); *ändern* setzt es neu,
   *automatisch* lässt es wieder bestimmen.
@@ -595,8 +598,15 @@ Ausserhalb des Waldes:
 - fallen Herbstfärbung, Baumarten und die Kronendach-Deckung weg; der Grünanteil der Fotos bleibt (er
   zeigt, wie Pflanzen ein Gletschervorfeld besiedeln).
 
-Auf der Karte haben Gletscher-Spots einen blauen, Gebirge-Spots einen braunen Marker; der Filter oben links
-hat eine Gruppe *Landschaft*.
+Auf der Karte haben Gletscher-Spots einen blauen, Gebirge-Spots einen braunen und Spots in Trockengebieten
+einen sandfarbenen Marker; der Filter oben links hat eine Gruppe *Landschaft*.
+
+**Trockengebiete**: Dort bleiben NDVI und NDMI aus Sentinel-2 (ausserhalb Europas ebenfalls verfügbar) das
+Mass für Vegetationsverlust und Wüstenbildung; die Frühwarnung meldet einen Rückgang gegenüber denselben
+Monaten der Vorjahre. Wetter und Normalwerte kommen weltweit von Open-Meteo. Die Schweizer Dienste
+(Kanton, Wildruhezonen, Landeskarte) greifen dort nicht. Grenzen: Auf wandernden Dünen fehlen feste
+Bezugspunkte, die automatische Ausrichtung braucht Fels, Bauten oder den Horizont im Bild; ohne sie bleibt
+das Foto unausgerichtet und wird nur nebeneinander verglichen.
 
 ### Gletscherumrisse
 

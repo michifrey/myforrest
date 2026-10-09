@@ -26,6 +26,12 @@ const TAGS = {
   rutschung: 'Rutschung / Hangmure',
   permafrost: 'Permafrost / Blockgletscher',
   verbuschung: 'Verbuschung der Alpweide',
+  // Drylands
+  wanderduene: 'Wanderdüne / Sandverwehung',
+  bodenerosion: 'Bodenerosion / Rinnen',
+  vegetationsverlust: 'Vegetationsverlust',
+  ueberweidung: 'Überweidung',
+  versalzung: 'Versalzung / Salzkruste',
 };
 
 const isTag = (t) => Object.prototype.hasOwnProperty.call(TAGS, t);
