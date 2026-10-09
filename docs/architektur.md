@@ -95,6 +95,8 @@ src/routes/protection.js  Geschützte Funde als 5-km-Raster für alle ohne PRO-S
 src/routes/tracks.js Touren, Routing-Proxy, Fotoaufträge (Erfüllung beim Upload) und Vorschläge entlang der Route
 deploy/qgis-server/  Vorlage: MyForrest + QGIS Server (WMS/WMTS/WFS) + BRouter + nginx per Docker Compose
 deploy/brouter/      Eigener Routing-Server (BRouter) für den Wege-Magnet, lädt seine Routing-Daten selbst
+deploy/vps/           Vorlage: MyForrest + Caddy (HTTPS automatisch) per Docker Compose für einen VPS, siehe hosting.md
+deploy/synology/      Vorlage: MyForrest für den Container Manager einer Synology NAS, siehe hosting.md
 Dockerfile           Container für MyForrest (mit ffmpeg)
 docs/                Dokumentation; docs/screenshots/ enthält die Bilder für das README
 mkdocs.yml           Doku-Website aus docs/ (MkDocs Material), gebaut und veröffentlicht von .github/workflows/docs.yml

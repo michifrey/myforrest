@@ -459,6 +459,7 @@ entsteht aus `docs/*.md` (MkDocs Material) und wird bei jedem Merge neu veröffe
 | [Android-App](docs/android.md) | Fahrtmodus und Aufzeichnung im Hintergrund, Installieren, selbst bauen und signieren |
 | [Tech-Onboarding](docs/tech-onboarding.md) | Selbst hosten: Voraussetzungen, Speicherplatz, Lizenzen, Ports, Zertifikate, ausgehende Verbindungen, Checkliste |
 | [Installation und Konfiguration](docs/installation.md) | Voraussetzungen, HTTPS fürs Handy, Umgebungsvariablen, externer Detektor, Phänologie-Daten |
+| [Eigener Server: VPS und Synology](docs/hosting.md) | Dauerbetrieb mit Docker: VPS mit Caddy (HTTPS automatisch) oder Synology NAS mit Container Manager |
 | [Betrieb, Datenschutz und Datenquellen](docs/betrieb.md) | Hinweise für einen öffentlichen Betrieb, externe Dienste und Quellenangaben |
 | [Architektur](docs/architektur.md) | Aufbau des Codes, Module im Überblick |
 | [REST-API](docs/api.md) | Alle Routen des Servers |
