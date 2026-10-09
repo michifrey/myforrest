@@ -57,6 +57,9 @@ gibt die Zonen in der Nähe einer Anfrage während ihrer Schutzzeit als Sperrfl�
 Schutzzeit kommt aus dem Text einer Zone („20.12. bis 30.4.“, „ganzjährig“), sonst aus `WILDRUHE_SEASON`
 (Standard `12-20/04-30`). Liegt ein Wegpunkt selbst in einer Zone, wird diese nicht gesperrt, sondern genannt.
 
+**Sperrungen bei Holzerei** (aus Fotos mit *Holzschlag* und von Hand durch den Forstdienst, `src/closures.js`) gehen
+als Sperrkreise mit (`nogos=lon,lat,radius|…`); geprüft mit dem echten BRouter 1.7.7.
+
 ## Fertiges Image
 
 Ein GitHub-Workflow (`.github/workflows/brouter-image.yml`) baut das Image bei jeder Änderung in

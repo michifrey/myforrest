@@ -59,21 +59,40 @@
   // Wildlife rest areas in their protection period (WILDRUHE_GEOJSON on the server).
   const wildlifeLayer = L.layerGroup();
   let wildlifeTimer = null;
+  // Wildlife rest areas and closures during forestry work, while planning (from zoom 11).
   function loadWildlife() {
-    if (!T.open || !state.config.wildlifeZones) return;
+    if (!T.open) return;
     clearTimeout(wildlifeTimer);
     wildlifeTimer = setTimeout(async () => {
       if (map.getZoom() < 11) { wildlifeLayer.clearLayers(); return; }
       const b = map.getBounds();
-      try {
-        const fc = await api(`/api/wildlife-zones?bbox=${[b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((v) => v.toFixed(4)).join(',')}`);
-        wildlifeLayer.clearLayers();
+      const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((v) => v.toFixed(4)).join(',');
+      const [fc, closed] = await Promise.all([
+        state.config.wildlifeZones ? api(`/api/wildlife-zones?bbox=${bbox}`).catch(() => null) : null,
+        api(`/api/closures?bbox=${bbox}`).catch(() => null),
+      ]);
+      wildlifeLayer.clearLayers();
+      if (fc) {
         L.geoJSON(fc, {
           interactive: true,
           style: { className: 'wildlife-zone' },
           onEachFeature: (f, layer) => layer.bindTooltip(`${f.properties.name} · Wildruhezone (${f.properties.season}) – der Magnet führt aussen herum`, { sticky: true }),
         }).addTo(wildlifeLayer);
-      } catch { /* not shown */ }
+      }
+      for (const c of closed?.closures || []) {
+        const circle = L.circle([c.lat, c.lon], { radius: c.radiusM, className: 'closure-zone' })
+          .bindTooltip(`Gesperrt bis ${fmtDate(c.until)}: ${c.reason} – der Magnet führt aussen herum`, { sticky: true });
+        if (c.removable) {
+          circle.bindPopup(() => el('div', {}, [
+            el('p', { class: 'eyebrow', text: 'Sperrung' }), el('strong', { text: c.reason }),
+            el('p', { class: 'muted small', text: `bis ${fmtDate(c.until)} · ${Math.round(c.radiusM)} m` }),
+            el('button', { type: 'button', class: 'link small danger', text: 'Sperrung aufheben', onclick: async () => {
+              try { await api(`/api/closures/${c.id}`, { method: 'DELETE' }); map.closePopup(); loadWildlife(); } catch (err) { alert(err.message); }
+            } }),
+          ]));
+        }
+        circle.addTo(wildlifeLayer);
+      }
     }, 300);
   }
   map.on('moveend', loadWildlife);
@@ -116,7 +135,11 @@
     if (!T.follow || !state.config.routing) return [a, b];
     try {
       const r = await api(`/api/route?points=${a.lat},${a.lon};${b.lat},${b.lon}`);
-      if (r.insideWildlifeZones?.length) {
+      if (r.insideClosures?.length) {
+        setStatus(`Ein Wegpunkt liegt in einer Sperrung (${r.insideClosures.map((c) => `${c.reason}, bis ${fmtDate(c.until)}`).join('; ')}) – dort wird gerade geholzt.`);
+      } else if (r.closures?.length) {
+        setStatus(`Der Magnet führt um ${r.closures.length === 1 ? 'eine Sperrung' : `${r.closures.length} Sperrungen`} herum: ${r.closures.slice(0, 2).map((c) => `${c.reason}, bis ${fmtDate(c.until)}`).join('; ')}.`);
+      } else if (r.insideWildlifeZones?.length) {
         setStatus(`Ein Wegpunkt liegt in der Wildruhezone ${r.insideWildlifeZones.join(', ')} – bitte Wege dort nicht verlassen oder den Punkt ausserhalb setzen.`);
       } else if (r.wildlifeZones?.length) {
         setStatus(`Der Magnet führt um Wildruhezonen herum (Schutzzeit): ${r.wildlifeZones.slice(0, 3).join(', ')}${r.wildlifeZones.length > 3 ? ' …' : ''}.`);
@@ -990,6 +1013,23 @@
   });
   $('tour-show-public').addEventListener('change', (e) => { T.showPublic = e.target.checked; loadPublic(); });
   $('request-photo')?.addEventListener('click', () => state.spot && Tours.requestForSpot(state.spot));
+  // PRO members and moderation: close the paths around a spot during logging.
+  $('closure-spot')?.addEventListener('click', async () => {
+    const s = state.spot;
+    if (!s) return;
+    const inFour = new Date(Date.now() + 28 * 86400000).toISOString().slice(0, 10);
+    const until = prompt(`Wege um Spot ${s.id} sperren (Holzerei). Bis wann? (JJJJ-MM-TT)`, inFour);
+    if (!until) return;
+    const reason = prompt('Grund (wird auf der Karte gezeigt)', 'Holzerei') || 'Holzerei';
+    try {
+      const c = await json('/api/closures', { spotId: s.id, until, reason, radiusM: 100 });
+      const text = `Gesperrt bis ${fmtDate(c.until)}: Der Wege-Magnet führt 100 m um Spot ${s.id} herum.`;
+      if (window.pwaNotify) window.pwaNotify(text); else alert(text);
+      loadWildlife();
+    } catch (err) {
+      alert(err.message);
+    }
+  });
 
   // The last route of this browser, and a recording interrupted by a reload.
   try {

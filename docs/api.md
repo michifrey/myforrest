@@ -90,6 +90,9 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `PATCH`  | `/api/tracks/:id`            | `name`, `activity`, `visibility` (nur Besitzer oder Moderation) |
 | `DELETE` | `/api/tracks/:id`            | Tour löschen                                             |
 | `GET`    | `/api/route?points=lat,lon;lat,lon` | Weg zwischen Wegpunkten vom Routing-Dienst (`ROUTER_URL`, Profil `ROUTER_PROFILE`); 501 ohne Dienst. Wildruhezonen in der Schutzzeit gehen als Sperrflächen mit: `wildlifeZones` (umgangen), `insideWildlifeZones` (ein Wegpunkt liegt darin) |
+| `GET`    | `/api/closures?bbox=w,s,e,n` | Sperrungen bei Holzerei (`lat`, `lon`, `radiusM`, `reason`, `until`, `auto` = aus einem Holzschlag-Foto, `removable`) und ob das Konto Sperrungen setzen darf (`mayClose`) |
+| `POST`   | `/api/closures`              | PRO-Mitglieder und Moderation: Sperrung setzen (`{ spotId }` oder `{ lat, lon }`, `until` JJJJ-MM-TT bis in 12 Monaten, `radiusM` 20–500, Standard 100, `reason`); `/api/route` führt mit `nogos` darum herum und nennt sie in `closures` bzw. `insideClosures` |
+| `DELETE` | `/api/closures/:id`          | Sperrung aufheben (wer sie gesetzt hat, oder Moderation) |
 | `GET`    | `/api/wildlife-zones?bbox=w,s,e,n` | Wildruhezonen in der Schutzzeit als GeoJSON (`name`, `season`), für die Karte; `wildlifeZones` in `/api/config` sagt, ob welche hinterlegt sind |
 | `POST`   | `/api/route-suggestions`     | Fotoaufträge, Spots mit Satelliten-Frühwarnung und lange nicht besuchte Spots nahe einer Route (`{ points, maxDistanceM }`), mit Abstand und Kilometer; die Route wird nicht gespeichert |
 | `GET`    | `/api/photo-requests`        | Offene, nicht abgelaufene Fotoaufträge (`?status=alle` auch erledigte und abgelaufene, `status: 'abgelaufen'`), mit `expiresAt`, ohne Namen der anfragenden Person |
