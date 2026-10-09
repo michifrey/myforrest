@@ -1623,3 +1623,11 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 
 /* Closures during forestry work (tours.js, src/closures.js) */
 .closure-zone { stroke: #c2611d; stroke-width: 2; stroke-dasharray: 3 4; fill: #c2611d; fill-opacity: 0.15; }
+
+/* Cool stretches from shared tour temperatures (sunmap.js) */
+.cool-box { margin: 0.6rem 0 0.2rem; }
+.cool-box p { margin: 0.25rem 0 0; }
+.cool-ramp {
+  display: inline-block; width: 3.6rem; height: 0.55rem; border-radius: 999px; vertical-align: middle;
+  background: linear-gradient(90deg, rgb(43, 108, 176), rgb(239, 227, 161), rgb(192, 57, 43));
+}

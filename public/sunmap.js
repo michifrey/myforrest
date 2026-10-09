@@ -7,6 +7,9 @@
  * and the coming ~16 days – measured or forecast radiation and rain.
  * The terrain horizon (from the elevation model) blocks the sun behind
  * hills and mountains and narrows the sky for diffuse light.
+ * "Kühle Abschnitte aus Touren" lays the map of cool stretches over it:
+ * cells of 100 m from the temperatures people share with their tours
+ * (src/coolmap.js), blue where it is cooler than the rest of the same tours.
  * Relies on globals from app.js (map, state, api, el, $) and sun.js (Sun).
  */
 (function sunMode() {
@@ -14,6 +17,8 @@
   const RING_PX = 110; // radius of the sun-path diagram on screen
   const sunLayer = L.layerGroup();
   const rainLayer = L.layerGroup();
+  const coolLayer = L.layerGroup();
+  const COOL_MIN_ZOOM = 13;
   const sm = {
     open: false,
     date: null,
@@ -185,6 +190,59 @@
       }).addTo(rainLayer);
     }
   }
+
+  /* ---------- Cool stretches from shared tour temperatures ---------- */
+
+  let coolToken = 0;
+  const coolOn = () => sm.open && $('cool-toggle').checked;
+  /** -2 °C (blue) … 0 (pale) … +2 °C (red), like the temperature along a tour. */
+  function coolColor(delta) {
+    const stops = [[43, 108, 176], [239, 227, 161], [192, 57, 43]];
+    const x = (Math.max(-2, Math.min(2, delta)) + 2) / 2; // 0..2
+    const i = Math.min(1, Math.floor(x));
+    return `rgb(${stops[i].map((v, j) => Math.round(v + (stops[i + 1][j] - v) * (x - i))).join(',')})`;
+  }
+  async function drawCool() {
+    const token = ++coolToken;
+    const status = $('cool-status');
+    if (!coolOn()) { coolLayer.clearLayers(); status.hidden = true; return; }
+    status.hidden = false;
+    if (map.getZoom() < COOL_MIN_ZOOM) {
+      coolLayer.clearLayers();
+      status.textContent = 'Zum Anzeigen näher heranzoomen.';
+      return;
+    }
+    const b = map.getBounds();
+    let data;
+    try {
+      data = await api(`/api/cool-cells?bbox=${[b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((v) => v.toFixed(5)).join(',')}`);
+    } catch (err) {
+      if (token === coolToken) status.textContent = err.message;
+      return;
+    }
+    if (token !== coolToken || !coolOn()) return;
+    coolLayer.clearLayers();
+    const half = data.cellM / 2;
+    for (const c of data.cells) {
+      const dLat = half / 111320;
+      const dLon = half / (111320 * Math.cos((c.lat * Math.PI) / 180));
+      const text = `${fmtNum(Math.abs(c.delta), 1)} °C ${c.delta < 0 ? 'kühler' : 'wärmer'} als der Rest derselben Touren · ${c.tours} Touren`;
+      L.rectangle([[c.lat - dLat, c.lon - dLon], [c.lat + dLat, c.lon + dLon]], {
+        stroke: false, fillColor: coolColor(c.delta), fillOpacity: 0.6, className: 'cool-cell',
+      }).bindTooltip(text, { sticky: true }).addTo(coolLayer);
+    }
+    status.replaceChildren(
+      el('span', { class: 'cool-ramp', 'aria-hidden': 'true' }),
+      ` kühler ↔ wärmer als der Rest derselben Touren (±2 °C). ${data.cells.length ? `${data.cells.length} Zellen` : 'Hier noch keine Zellen'}`
+        + ` à ${data.cellM} m, je ab ${data.minTours} Touren von ${data.minPeople} Personen, die ihre Temperatur teilen.`,
+    );
+  }
+  $('cool-toggle').addEventListener('change', () => {
+    try { localStorage.setItem('myforrest.cool', $('cool-toggle').checked ? '1' : ''); } catch { /* private mode */ }
+    drawCool();
+  });
+  try { $('cool-toggle').checked = localStorage.getItem('myforrest.cool') === '1'; } catch { /* private mode */ }
+  map.on('moveend', () => coolOn() && drawCool());
 
   /* ---------- Panel ---------- */
 
@@ -459,6 +517,8 @@
     if (open) {
       sunLayer.addTo(map);
       rainLayer.addTo(map);
+      coolLayer.addTo(map);
+      drawCool();
       if (!sm.date) {
         const now = new Date();
         sm.minute = Math.floor((now.getHours() * 60 + now.getMinutes()) / 5) * 5;
@@ -471,6 +531,8 @@
       stop();
       sunLayer.remove();
       rainLayer.remove();
+      coolLayer.remove();
+      drawCool();
     }
   }
 

@@ -190,7 +190,9 @@ Der Kartenmodus *Sonne & Wetter* zeigt für ein beliebiges Datum und eine Uhrzei
 Sonnenstand, den Schatten eines 25-m-Baums und die Richtung von Auf- und Untergang. Der Geländehorizont aus
 dem Höhenmodell blockiert die Sonne hinter Hügeln (*Sonne ab 05:29*, *Sonne bis 20:36*). Das Panel nennt
 Sonnenhöhe, Einstrahlung bei klarem Himmel und gemessen, Himmelssicht, Sonnenstunden und Regen. An jedem
-Spot steht die Regenmenge des Tages.
+Spot steht die Regenmenge des Tages. *Kühle Abschnitte aus Touren* legt eine Karte darüber, wo es kühler oder
+wärmer ist, aus den Temperaturen, die Läuferinnen und Läufer mit ihren Touren anonym teilen (bereinigt um
+Wetter, Tageszeit und Körperwärme, erst ab drei Touren von zwei Personen pro 100-m-Zelle).
 
 ### 8. Arten & Neophyten
 
