@@ -454,5 +454,15 @@ module.exports = function registerVegetation(app, {
     setInterval(watchOnce, watchHours * 3600000).unref?.();
   }
 
-  return { analyzePhoto, backfill, alerts: allAlerts };
+  /** Snow and ice share of a glacier spot (src/sentinel.js iceSeries), fetching the scenes when due. */
+  function ice(id) {
+    if (!sentinel) return { status: 'disabled', monthly: [], summers: [], iceFreeSince: null, meltOut: [] };
+    if (sentinel.needsRefresh(id)) refreshNdvi(id);
+    const st = sentinel.series(id);
+    return { status: refreshing.has(id) ? 'pending' : st.error ? 'offline' : 'ready', error: st.error, ...sentinel.ice(id) };
+  }
+  /** The spot became a glacier spot: its scenes are read again for the snow and ice share. */
+  const satelliteDue = (id) => db.prepare('UPDATE spot_ndvi SET complete = 0 WHERE spot_id = ?').run(id);
+
+  return { analyzePhoto, backfill, alerts: allAlerts, ice, satelliteDue };
 };

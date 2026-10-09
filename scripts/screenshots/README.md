@@ -11,6 +11,8 @@ ohne echte Fotos, ohne Netz und ohne API-Schlüssel reproduzierbar sind.
 | `seed.js` | Lädt die Demo-Fotos über die API hoch und ergänzt Pl@ntNet-Bestimmungen und Sentinel-/Landsat-Szenen direkt in der Datenbank |
 | `tiles.js` | Platzhalter-Kacheln für OpenStreetMap (Web Mercator) und die Landeskarte grau (LV95) |
 | `shoot.js` | Nimmt mit Playwright alle Screenshots auf und baut das Zeitraffer-GIF |
+| `glacier-demo.js` | Der erfundene Demo-Gletscher: Umrisse 1850, 1973 und 2016, heutiges Eis und See, Gelände |
+| `seed-gletscher.js` | Eigener Datensatz für die Gletscher- und Gebirge-Bilder: Inventare, Fotos seit 2017, zwei Archivfotos, eine Alpweide, Schnee- und Eisanteil |
 
 Voraussetzungen: Node.js ≥ 22.5, `ffmpeg`, ImageMagick (`convert`) und Playwright mit Chromium.
 
@@ -22,7 +24,20 @@ node --disable-warning=ExperimentalWarning scripts/screenshots/seed.js
 node scripts/screenshots/shoot.js         # alle Bilder, oder z. B. «shoot.js map spot»
 ```
 
-Arbeitsdateien (Datenbank, Fotos, Kachel-Cache, GIF-Einzelbilder) liegen in `scripts/screenshots/.demo`.
+Die Gletscher- und Gebirge-Bilder (`gletscher*.jpg`, `gebirge.jpg`) kommen aus einem zweiten Demo-Server, damit die Wald-Karte unverändert
+bleibt:
+
+```bash
+rm -rf scripts/screenshots/.demo-gletscher
+DEMO_DIR=scripts/screenshots/.demo-gletscher DEMO_GLETSCHER=1 PORT=3124 \
+  node --disable-warning=ExperimentalWarning scripts/screenshots/demo-server.js &
+DEMO_DIR=scripts/screenshots/.demo-gletscher node --disable-warning=ExperimentalWarning scripts/screenshots/seed-gletscher.js
+sleep 15                                      # Höhen der Spots (Gebirge-Erkennung) im Hintergrund
+node scripts/screenshots/shoot.js gletscher   # BASE_GLETSCHER, Standard http://localhost:3124
+```
+
+Arbeitsdateien (Datenbank, Fotos, Kachel-Cache, GIF-Einzelbilder) liegen in `scripts/screenshots/.demo`
+bzw. `.demo-gletscher`.
 Umgebungsvariablen: `PORT` bzw. `BASE` (Adresse des Demo-Servers), `OUT` (Zielordner der Bilder),
 `DEMO_DIR` (Arbeitsordner), `CHROMIUM_PATH` (eigenes Chromium statt dem von Playwright).
 

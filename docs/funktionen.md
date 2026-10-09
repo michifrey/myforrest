@@ -9,6 +9,7 @@ Einen kürzeren Überblick mit Screenshots gibt das [README](../README.md).
 - [Spots und Zeitreise](#spots-und-zeitreise)
 - [Bildanalyse](#bildanalyse)
 - [Wetter, Klima und Gelände](#wetter-klima-und-gelände)
+- [Landschaften und Gletscher](#landschaften-und-gletscher)
 - [Kartenmodi](#kartenmodi)
 - [Touren und Fotoaufträge](#touren-und-fotoaufträge)
 - [Pflanzen und Baumarten](#pflanzen-und-baumarten)
@@ -127,6 +128,12 @@ Analyse und Ausrichtung arbeiten weiter mit dem Original.
 
 Sturmschaden/Windwurf, Borkenkäfer, Trockenschaden, Totholz,
 Holzschlag, Verjüngung, Neophyt, Weg/Erosion, dazu eine Notiz. Die Karte lässt sich danach filtern.
+An Gletscher-Spots stehen andere Beobachtungen zur Wahl (siehe [Landschaften](#landschaftsprofile)):
+Gletscherzunge/Rückzug, Gletschersee, Spalten/Séracs, Schuttbedeckung, Toteis/Einbruch,
+Felssturz/Steinschlag, Murgang, Pioniervegetation im Vorfeld und Weg/Erosion; an Gebirge-Spots
+Felssturz, Murgang, Lawine/Lawinenzug, Rutschung/Hangmure, Permafrost/Blockgletscher, Verbuschung der
+Alpweide, Neophyt und Weg/Erosion; in Trockengebieten Wanderdüne/Sandverwehung, Bodenerosion/Rinnen,
+Vegetationsverlust, Überweidung, Versalzung/Salzkruste, Neophyt und Weg/Erosion.
 
 ### Installierbare App mit Offline-Upload
 
@@ -548,6 +555,132 @@ Sturmereignisse) im Zeitraum bzw. in den Monaten davor.
 - Ohne genügend bestätigte Schäden bleiben die Schwellen Anfangswerte.
 - Ohne Internetzugang bleibt der Bereich leer und wird später erneut versucht. Fällt nur Landsat aus,
   läuft Sentinel-2 weiter.
+
+## Landschaften und Gletscher
+
+MyForrest begann im Wald. Spots, Wiederholungsfotos, Ausrichtung, Vergleich, Touren und Durchgehen
+funktionieren aber in jeder Landschaft. Was sich unterscheidet, sind die Beobachtungen, die Auswertung der
+Veränderungen und die Geschichte, die der Satellit erzählt. Dafür hat jeder Spot ein **Landschaftsprofil**.
+
+### Landschaftsprofile
+
+| Profil | Beobachtungen | Veränderungen | Satellit |
+|--------|---------------|---------------|----------|
+| **Wald** (Standard) | Sturmschaden, Borkenkäfer, Trockenschaden, Totholz, Holzschlag, Verjüngung, frühe Verfärbung, Frost, Neophyt, Weg | Windwurf, Auflichtung, Verfärbung, neuer Bewuchs | NDVI, NDMI, Frühwarnung |
+| **Gletscher** | Gletscherzunge/Rückzug, Gletschersee, Spalten, Schuttbedeckung, Toteis, Felssturz, Murgang, Pioniervegetation, Weg | nur «Veränderung», ohne Waldklassen | Eis im Spätsommer |
+| **Gebirge** | Felssturz, Murgang, Lawine, Rutschung, Permafrost, Verbuschung der Alpweide, Neophyt, Weg | nur «Veränderung», ohne Waldklassen | NDVI, NDMI und Schneeschmelze |
+| **Trockengebiet** | Wanderdüne, Bodenerosion, Vegetationsverlust, Überweidung, Versalzung, Neophyt, Weg | nur «Veränderung», ohne Waldklassen | NDVI, NDMI (Vegetationsverlust, Frühwarnung) |
+
+So kommt ein Spot zu seinem Profil:
+
+- **Beim Hochladen** wählt man unter *Landschaft* ein Profil oder lässt es *automatisch erkennen*. Das
+  Formular zeigt dann nur die Beobachtungen dieses Profils, bei *automatisch* die des Waldes.
+- **Automatisch**: Liegt ein neuer Spot auf dem Eis eines Gletscherinventars, in einem früheren Inventar
+  oder höchstens 500 m vom Eis des neusten Inventars entfernt, wird er ein Gletscher-Spot (Gletscherumrisse
+  siehe unten). Liegt ein Spot über 2100 m ü. M. (`GEBIRGE_AB_M`) und gibt es dort keine Baumarten und keine
+  Wald-Beobachtungen, wird er ein Gebirge-Spot, sobald seine Höhe bekannt ist (Höhenmodell oder von Hand);
+  ein Lärchenwald an der Waldgrenze bleibt Wald. Trockengebiete erkennt die App nicht selbst; sie werden
+  beim Hochladen oder im Spot gewählt. Sonst bleibt ein Spot ohne Wahl ein Wald-Spot.
+- **Von Hand**: Im Spot steht unter den Koordinaten das Profil mit seiner Herkunft (*Standard*, *beim
+  Hochladen gewählt*, *erkannt an den Gletscherumrissen*, *von Hand gesetzt*); *ändern* setzt es neu,
+  *automatisch* lässt es wieder bestimmen.
+
+Eine Wahl beim Hochladen gilt nur, solange der Spot noch kein Profil hat oder nur ein erkanntes; ein von Hand
+gesetztes Profil ändert nur eine Hand. Ändert sich das Profil, werden die Veränderungen der Fotos neu
+eingeordnet und die Auffälligkeiten neu bewertet.
+
+Ausserhalb des Waldes:
+
+- ordnet die Bildanalyse Veränderungen keiner Waldklasse zu (ein Gletschervorfeld hat keinen Windwurf); die
+  Heatmap und der Anteil der veränderten Fläche bleiben;
+- zählen von den Auffälligkeiten nur die des Wetters (Trockenheit, Nässe, Wärme, Stürme), nicht Laub,
+  Spätfrost an Trieben oder Borkenkäfer;
+- fallen Herbstfärbung, Baumarten und die Kronendach-Deckung weg; der Grünanteil der Fotos bleibt (er
+  zeigt, wie Pflanzen ein Gletschervorfeld besiedeln).
+
+Auf der Karte haben Gletscher-Spots einen blauen, Gebirge-Spots einen braunen und Spots in Trockengebieten
+einen sandfarbenen Marker; der Filter oben links hat eine Gruppe *Landschaft*.
+
+**Trockengebiete**: Dort bleiben NDVI und NDMI aus Sentinel-2 (ausserhalb Europas ebenfalls verfügbar) das
+Mass für Vegetationsverlust und Wüstenbildung; die Frühwarnung meldet einen Rückgang gegenüber denselben
+Monaten der Vorjahre. Wetter und Normalwerte kommen weltweit von Open-Meteo. Die Schweizer Dienste
+(Kanton, Wildruhezonen, Landeskarte) greifen dort nicht. Grenzen: Auf wandernden Dünen fehlen feste
+Bezugspunkte, die automatische Ausrichtung braucht Fels, Bauten oder den Horizont im Bild; ohne sie bleibt
+das Foto unausgerichtet und wird nur nebeneinander verglichen.
+
+### Gletscherumrisse
+
+Die Umrisse kommen aus Gletscherinventaren als GeoJSON-Dateien (`GLETSCHER_GEOJSON`, mehrere durch Kommas
+getrennt), in WGS84 oder LV95. Für die Schweiz eignen sich die Inventare von
+[GLAMOS](https://www.glamos.ch) (Swiss Glacier Inventory 1850, 1973, 2010 und 2016), weltweit das Randolph
+Glacier Inventory oder GLIMS. Shapefiles werden mit GDAL umgewandelt:
+
+```bash
+ogr2ogr -f GeoJSON -t_srs EPSG:2056 sgi_2016.geojson SGI_2016_glaciers.shp
+```
+
+Das **Inventarjahr** steht in einer Eigenschaft (`year`, `jahr`, `year_acq`, `inventory` …) oder im
+Dateinamen (`sgi_1973.geojson`), der **Name** in `name`, `gletscher` oder `sgi-id`. Inseln im Eis (Löcher der
+Polygone) zählen als eisfrei. Die Dateien werden beim ersten Gebrauch gelesen und erneut, wenn sie sich
+ändern.
+
+Für einen Spot nennt die App den Gletscher, den Abstand zum Eis des neusten Inventars (*auf dem Eis* oder
+*Eisrand 2016: 330 m entfernt*) und pro Inventar, ob hier Eis lag (*Hier lag 1850 und 1973 Eis, 2016 nicht
+mehr*).
+
+Der Kartenknopf **Gletscher** zeichnet die Umrisse aller Inventare übereinander, ältere heller und
+gestrichelt, das neuste kräftig. Ein Klick auf ein Jahr in der Legende zeigt nur dieses Inventar. Die Umrisse
+erscheinen ab Zoomstufe 9 und werden für die Karte vereinfacht (Toleranz etwa ein Zweitausendstel des
+Ausschnitts, mindestens 5 m).
+
+### Eis im Spätsommer (Sentinel-2)
+
+Für Gletscher-Spots liest die App aus denselben Sentinel-2-Szenen wie für den NDVI die
+Szenenklassifikation (SCL) aus: Von den Pixeln, die der Satellit sieht (ohne Wolken, Schatten und fehlende
+Daten), welcher Anteil ist **Schnee oder Eis** (Klasse 11)? Gemessen wird über die 20-m-Pixel im Umkreis von
+rund 20 m, also etwa 40 × 40 m.
+
+- Pro Monat zählt der Median der Szenen.
+- Pro Jahr zählt der **kleinste Monatswert von Juli bis Oktober**: Dann ist der Winterschnee weg, und was
+  weiss bleibt, ist Eis (oder Firn).
+- **Eisfrei seit**: Liegen die letzten Spätsommer alle unter 50 %, nachdem es vorher mindestens einen mit Eis
+  gab, nennt die App das erste eisfreie Jahr: *Seit dem Spätsommer 2021 liegt hier kein Eis mehr*.
+
+Schon gelesene Szenen eines Spots, der zum Gletscher-Spot wird, werden einmal neu gelesen. Wald-Spots lesen
+die Klassifikation zwar mit, brauchen sie aber nicht.
+
+**Grenzen**
+- Firn und Altschnee zählen als weiss; im Nährgebiet eines Gletschers bleibt der Anteil deshalb hoch.
+- Schuttbedecktes Eis sieht der Satellit als Fels: Dort zeigt der Anteil weniger Eis, als da ist.
+- Nur Sentinel-2 (ab 2017); Landsat liefert keine Klassifikation in dieser Form.
+
+### Schneeschmelze (Gebirge)
+
+Für Gebirge-Spots nutzt die App denselben Schneeanteil der Szenenklassifikation und nennt pro Jahr den Monat
+der **Ausaperung**: den ersten Monat von März bis August, in dem weniger als die Hälfte Schnee liegt, in
+Jahren, deren Winter (Januar, Februar) weiss war. Mit mindestens vier Jahren vergleicht sie die ersten drei
+mit den letzten drei: *Der Schnee schmilzt 2024–2026 im Mittel rund 6 Wochen früher als 2017–2019*. Eine
+frühere Ausaperung verlängert die Vegetationszeit; zusammen mit dem NDVI und der Beobachtung *Verbuschung der
+Alpweide* zeigt das, wie Sträucher eine nicht mehr bestossene Weide erobern. Liegt ein Gletscher näher als
+3 km, nennt der Teil seinen Abstand.
+
+**Grenzen**: Monatswerte, also auf etwa zwei Wochen genau; Wolken im Frühling können einen Monat fehlen
+lassen, dann zählt der nächste.
+
+### Archivfotos
+
+Alte Aufnahmen vom gleichen Standort zeigen, wie weit das Eis früher reichte. Im Gletscher- bzw. Schnee-Teil eines Spots
+nimmt *Archivfoto hinzufügen* einen Scan, eine Postkarte oder ein altes Dia mit einem **Aufnahmedatum von
+Hand** entgegen. Das Datum gilt auch dann, wenn die Datei ein EXIF-Datum (das des Scans) hat, und das Bild
+liegt am Spot, auch wenn die Datei GPS-Daten hat. Es wird wie jedes Foto auf die neuen ausgerichtet und
+erscheint im Zeitverlauf (*Archivfoto*) und im Vorher/Nachher-Vergleich. Über die API geht das mit
+`archive=1`, `spotId` und `takenAt` (siehe [API](api.md)).
+
+Für Archivbilder gilt die Lizenz wie für alle Fotos: Hochladen darf man nur, was man selbst aufgenommen hat
+oder unter einer passenden Lizenz verwenden darf.
+
+**Sicherheit**: Der Gletscher-Teil erinnert daran, Gletscher nur mit Erfahrung, Ausrüstung oder Bergführer zu
+betreten. Der Wege-Magnet führt nicht über Gletscher; das gewählte BRouter-Profil (`hiking-mountain`) meidet sie.
 
 ## Kartenmodi
 

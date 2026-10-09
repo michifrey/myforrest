@@ -109,10 +109,17 @@
         <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="4.5" cy="15.5" r="2"/><circle cx="15.5" cy="4.5" r="2"/><path d="M6.5 15.5h5a3 3 0 0 0 0-6h-3a3 3 0 0 1 0-6h5"/></svg>
         Touren &amp; Aufträge
       </button>
+      <button type="button" id="glacier-toggle" class="pill-btn glacier-btn" aria-pressed="false" hidden>
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M1.5 16.5 7 6l3 4 2-3 6.5 9.5z"/><path d="M5.2 9.6 7 11l1.4-1.6L10 10"/></svg>
+        Gletscher
+      </button>
       <div class="legend">
         <span><i class="dot ok"></i>Spot</span>
         <span><i class="dot damage"></i>Schäden</span>
         <span><i class="dot neo"></i>Neophyten</span>
+        <span id="legend-ice" hidden><i class="dot ice"></i>Gletscher</span>
+        <span id="legend-rock" hidden><i class="dot rock"></i>Gebirge</span>
+        <span id="legend-sand" hidden><i class="dot sand"></i>Trockengebiet</span>
       </div>
     </div>
     <section id="sunpanel" class="sunpanel" hidden aria-labelledby="sun-title">
@@ -165,6 +172,7 @@
           <p class="eyebrow">Spot</p>
           <h2 id="spot-title"></h2>
           <p id="spot-meta" class="muted"></p>
+          <p id="spot-landscape" class="spot-landscape small" hidden></p>
           <p id="spot-siblings" class="siblings small" hidden></p>
           <p id="spot-split" class="spot-split small" hidden></p>
           <div class="elev" id="spot-elev">
@@ -298,6 +306,10 @@
           <ol id="chronicle" class="chronicle"></ol>
         </section>
 
+        <section id="glacier-wrap" class="glacier" aria-labelledby="glacier-title" hidden>
+          <h3 class="label" id="glacier-title">Gletscher</h3>
+          <div id="glacier-body" aria-live="polite"></div>
+        </section>
         <section id="vegetation-wrap" class="vegetation" aria-labelledby="vegetation-title" hidden>
           <h3 class="label" id="vegetation-title">Vegetation im Zeitverlauf</h3>
           <div id="vegetation-body" aria-live="polite"></div>
@@ -396,6 +408,12 @@
         </label>
       </div>
 
+      <label class="field">
+        <span>Landschaft</span>
+        <select name="landscape" id="upload-landscape">
+          <option value="">Automatisch erkennen</option>
+        </select>
+      </label>
       <fieldset class="field">
         <legend>Beobachtungen</legend>
         <div id="upload-tags" class="checks"></div>
@@ -447,6 +465,7 @@
   <script src="hotspots.js"></script>
   <script src="video.js"></script>
   <script src="vegetation.js"></script>
+  <script src="glacier.js"></script>
   <script src="account.js"></script>
   <script src="push.js"></script>
   <script src="analysis.js"></script>

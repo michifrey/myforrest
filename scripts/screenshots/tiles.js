@@ -4,6 +4,7 @@
 const sharp = require('sharp');
 const { lv95ToWgs84 } = require('../../src/lv95');
 const { RESOLUTIONS, ORIGIN } = require('../../src/tiles-lv95');
+const glacier = require('./glacier-demo');
 
 const M_LAT = 111320;
 const M_LON = 111320 * Math.cos((47.37 * Math.PI) / 180);
@@ -60,14 +61,53 @@ const STYLES = {
   osm: {
     land: '#f2efe9', meadow: '#cdebb0', forest: '#add19e', forestDot: '#9cc38c', water: '#aad3df', stream: '#8fc3d6',
     residential: '#e0dfdf', building: '#d9d0c9', buildingEdge: '#c4b6ab', main: '#fcd6a4', mainCase: '#c79a62', track: '#ffffff', trackCase: '#b8b0a2', path: '#fa8072', contour: null,
+    rock: '#e4ddd2', scree: '#d3cabd', alpine: '#d8e8c2', ice: '#ddedf5', iceEdge: '#8fbfd9',
   },
   grau: {
     land: '#f4f4f2', meadow: '#f0f0ee', forest: '#d9dcd6', forestDot: '#c4c8c0', water: '#c9d3d8', stream: '#8899a3',
     residential: '#e6e6e4', building: '#8d8d8d', buildingEdge: '#6c6c6c', main: '#ffffff', mainCase: '#555555', track: '#ffffff', trackCase: '#777777', path: '#555555', contour: '#b0a69a',
+    rock: '#eeeeec', scree: '#dededc', alpine: '#f0f0ee', ice: '#f6f9fb', iceEdge: '#8aa6b8',
   },
 };
 
+/** The Alps around the demo glacier: rock, scree, alpine meadows, today's ice and the lake in front of it. */
+function alpineColorAt(lat, lon, mpp, st) {
+  const x = lon * M_LON;
+  const y = lat * M_LAT;
+  const e = glacier.elevation(lat, lon);
+  let c;
+  if (glacier.iceToday(lat, lon)) {
+    c = hex(st.ice);
+    // Crevasses as faint stripes across the flow.
+    if (Math.abs(Math.sin(y / 9 + fbm(x / 60, y / 60) * 6)) < 0.08) c = mix(c, hex(st.iceEdge), 0.5);
+  } else if (glacier.inLake(lat + (fbm(x / 90, y / 90) - 0.5) * 0.0005, lon + (fbm(x / 90 + 7, y / 90) - 0.5) * 0.0012)) {
+    c = hex(st.water);
+  } else if (e < 2180 + fbm(x / 120 + 3, y / 120) * 260 && fbm(x / 180, y / 180) > 0.42) {
+    c = hex(st.alpine);
+  } else {
+    c = hex(st.rock);
+    if (hash2(Math.floor(x / 7), Math.floor(y / 7)) < 0.12) c = hex(st.scree);
+  }
+  // Edge of the ice.
+  const dLat = (1.1 * mpp) / M_LAT;
+  const dLon = (1.1 * mpp) / M_LON;
+  const near = [[dLat, 0], [-dLat, 0], [0, dLon], [0, -dLon]].some(([dy, dx]) => glacier.iceToday(lat + dy, lon + dx) !== glacier.iceToday(lat, lon));
+  if (near) c = hex(st.iceEdge);
+  const e0 = e;
+  const sx = glacier.elevation(lat, lon + 0.0004) - e0;
+  const sy = glacier.elevation(lat + 0.0004, lon) - e0;
+  const shade = Math.max(-1, Math.min(1, (sx - sy) * 0.012));
+  c = mix(c, shade > 0 ? [255, 255, 255] : [60, 70, 80], Math.abs(shade) * 0.35);
+  // The hiking path up the valley floor to the lake.
+  const pathLon = 8.4003 + 0.0012 * Math.sin((lat - 46.6) * 900);
+  if (lat > 46.5998 && Math.abs(lon - pathLon) * M_LON < Math.max(1, 0.8 * mpp)) {
+    if (Math.floor(y / (mpp * 6)) % 2 === 0) c = hex(st.path);
+  }
+  return c;
+}
+
 function colorAt(lat, lon, mpp, st) {
+  if (lat < 46.9) return alpineColorAt(lat, lon, mpp, st);
   const x = lon * M_LON;
   const y = lat * M_LAT;
   // Forest: a large wood around the hill with ragged edges and a few meadows.

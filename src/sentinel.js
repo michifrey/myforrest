@@ -16,6 +16,10 @@
  * each (B08 is read anyway, so NDMI costs one band more, not two). Scenes are grouped per month; the
  * monthly value is the median of the clear scenes of that month.
  *
+ * For glacier spots the share of snow and ice (SCL class 11) among the
+ * observed pixels is kept per scene as well: its minimum in late summer, when
+ * the winter snow has melted, is the ice that is left (`iceSeries`).
+ *
  * Besides drops between two photo dates (supporting evidence for what the
  * photos show), `currentAnomalies` compares the last months with the same
  * season of the years before: an early warning that does not need new photos.
@@ -26,6 +30,7 @@
 
 const { utmFromLatLon, latLonFromUtm } = require('./utm');
 const { sensorMonths, adjust, fitHarmonization } = require('./harmonize');
+const { ICE_LANDSCAPES } = require('./landscapes');
 
 const STAC_URL = 'https://earth-search.aws.element84.com/v1';
 const COLLECTION = 'sentinel-2-l2a';
@@ -38,6 +43,7 @@ const ATTEMPTS_PER_MONTH = 4; // scenes tried per month (lowest cloud cover firs
 // Masked: 0 no data, 1 saturated, 2 dark/topographic shadow, 3 cloud shadow,
 // 8/9 cloud medium/high probability, 10 thin cirrus, 11 snow/ice.
 const SCL_CLEAR = new Set([4, 5, 6, 7]);
+const SCL_SNOW = 11;
 const NDVI_DROP = 0.1; // drop between photo dates flagged as supporting evidence
 const NDVI_DROP_STRONG = 0.2;
 // NDMI varies less than NDVI over the seasons; drops of this size mark water stress in canopies.
@@ -46,7 +52,9 @@ const NDMI_DROP_STRONG = 0.15;
 const NDMI_RADIUS_M = 20; // 20 m pixels whose centre lies within 20 m: about 2 × 2 pixels
 const THRESHOLDS = { ndvi: [NDVI_DROP, NDVI_DROP_STRONG], ndmi: [NDMI_DROP, NDMI_DROP_STRONG] };
 // Bump when a scene's stored values gain a new index: older rows are evaluated again.
-const INDEX_VERSION = 2;
+// Version 3 added the snow and ice share; forest spots keep their version 2 rows (they do not need it).
+const INDEX_VERSION = 3;
+const FOREST_INDEX_VERSION = 2;
 const SENTINEL_START = '2017-01-01'; // Earth Search's Sentinel-2 L2A archive; earlier years come from Landsat
 // Landsat is read on into these overlap years so it can be harmonised with Sentinel-2 (src/harmonize.js).
 const OVERLAP_END = '2018-12-31';
@@ -269,7 +277,13 @@ async function sceneIndices(scene, lat, lon, fetchImpl, { radiusM = WINDOW_RADIU
   };
   const m = swir16 ? windowMean(swir16, x, y, NDMI_RADIUS_M, (px, py) => (clearAt(px, py)
     ? normalisedDifference(nirMean(px, py), reflectance(swir16.at(px, py), scene.swir16)) : null)) : null;
-  return { ndvi: v.value, ndmi: m ? m.value : null, clearFraction: v.clearFraction };
+  // Snow and ice share over the 20 m classification pixels within ~20 m: of the pixels seen (not cloud,
+  // shadow or no data), the share classified as snow or ice.
+  const s = windowMean(scl, x, y, NDMI_RADIUS_M, (px, py) => {
+    const c = scl.at(px, py);
+    return c === SCL_SNOW ? 1 : SCL_CLEAR.has(c) ? 0 : null;
+  });
+  return { ndvi: v.value, ndmi: m ? m.value : null, snow: s.value, clearFraction: v.clearFraction };
 }
 
 const median = (values) => {
@@ -472,6 +486,7 @@ const MIGRATIONS = [
   ['spot_ndvi_scenes', 'sensor', "TEXT NOT NULL DEFAULT 'S2'"],
   ['spot_ndvi_scenes', 'v', 'INTEGER NOT NULL DEFAULT 1'],
   ['spot_ndvi', 'landsat_error', 'TEXT'],
+  ['spot_ndvi_scenes', 'snow', 'REAL'], // share of snow and ice (0–1), Sentinel-2 only
 ];
 
 const DAY = 86400000;
@@ -493,7 +508,9 @@ function createSentinel({ db, fetchImpl = fetch, stacUrl = STAC_URL, landsat = n
     if (!db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
   }
   const getStatus = db.prepare('SELECT * FROM spot_ndvi WHERE spot_id = ?');
-  const sceneRows = db.prepare('SELECT scene_id, date, cloud, ndvi, ndmi, sensor, v, clear_fraction FROM spot_ndvi_scenes WHERE spot_id = ? ORDER BY date');
+  const sceneRows = db.prepare('SELECT scene_id, date, cloud, ndvi, ndmi, snow, sensor, v, clear_fraction FROM spot_ndvi_scenes WHERE spot_id = ? ORDER BY date');
+  // Spots that need the snow and ice share (glaciers): their older rows are read again.
+  const iceSpot = (spotId) => ICE_LANDSCAPES.has(db.prepare('SELECT landscape FROM spots WHERE id = ?').get(spotId)?.landscape);
 
   function period(spotId) {
     const r = db.prepare('SELECT MIN(taken_at) AS first, MAX(taken_at) AS last FROM photos WHERE spot_id = ?').get(spotId);
@@ -555,10 +572,14 @@ function createSentinel({ db, fetchImpl = fetch, stacUrl = STAC_URL, landsat = n
       }
     }
     const read = (s) => (s.sensor === 'S2' ? sceneIndices(s, spot.lat, spot.lon, fetchImpl, { timeoutMs }) : landsat.indices(s, spot.lat, spot.lon));
+    const ice = iceSpot(spotId);
+    const current = ice ? INDEX_VERSION : FOREST_INDEX_VERSION;
+    // A scene counts as clear with an NDVI, on glaciers also with a snow and ice share (snow hides the NDVI).
+    const usable = (r) => r.ndvi !== null || (ice && r.snow !== null && r.snow !== undefined);
     const done = new Map(sceneRows.all(spotId).map((r) => [r.scene_id, r]));
     const insert = db.prepare(`
-      INSERT OR REPLACE INTO spot_ndvi_scenes (spot_id, scene_id, date, cloud, ndvi, ndmi, sensor, v, clear_fraction)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      INSERT OR REPLACE INTO spot_ndvi_scenes (spot_id, scene_id, date, cloud, ndvi, ndmi, snow, sensor, v, clear_fraction)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     // Per month and sensor: lowest cloud cover first, until enough clear scenes or attempts. Each Landsat
     // sensor gets its own scene in a month, so months seen by two sensors pair up for the harmonisation.
     const byMonth = new Map();
@@ -584,21 +605,21 @@ function createSentinel({ db, fetchImpl = fetch, stacUrl = STAC_URL, landsat = n
         tried++;
         const cached = done.get(s.id);
         // Rows of the current version (or scenes without the bands for more) need no new read.
-        if (cached && (cached.v >= INDEX_VERSION || (s.sensor === 'S2' && !s.swir16))) {
-          if (cached.ndvi !== null) clear++;
+        if (cached && (cached.v >= current || (s.sensor !== 'S2' && cached.v >= FOREST_INDEX_VERSION) || (s.sensor === 'S2' && !s.swir16 && !ice))) {
+          if (usable(cached)) clear++;
           continue;
         }
         if (budget <= 0) { complete = false; break; }
         budget--;
         try {
           const r = await read(s);
-          insert.run(spotId, s.id, s.date, s.cloud, r.ndvi, r.ndmi, s.sensor, INDEX_VERSION, r.clearFraction);
-          if (r.ndvi !== null) clear++;
+          insert.run(spotId, s.id, s.date, s.cloud, r.ndvi, r.ndmi, r.snow ?? null, s.sensor, INDEX_VERSION, r.clearFraction);
+          if (usable(r)) clear++;
         } catch (err) {
           // A scene that cannot cover the spot is recorded as without value.
-          if (err.permanent) { insert.run(spotId, s.id, s.date, s.cloud, null, null, s.sensor, INDEX_VERSION, 0); continue; }
+          if (err.permanent) { insert.run(spotId, s.id, s.date, s.cloud, null, null, null, s.sensor, INDEX_VERSION, 0); continue; }
           // Network trouble: an old row keeps its NDVI; the scene is tried again on the next refresh.
-          if (cached && cached.ndvi !== null) clear++;
+          if (cached && usable(cached)) clear++;
           lastError = err.message;
           complete = false;
           if (++failures >= 3) { save(false, `Szenen nicht lesbar: ${lastError}`, landsatError); return; }
@@ -612,7 +633,7 @@ function createSentinel({ db, fetchImpl = fetch, stacUrl = STAC_URL, landsat = n
   function series(spotId) {
     const st = getStatus.get(spotId);
     const scenes = sceneRows.all(spotId).map((r) => ({
-      id: r.scene_id, date: r.date, cloud: r.cloud, ndvi: r.ndvi, ndmi: r.ndmi, sensor: r.sensor, clearFraction: r.clear_fraction,
+      id: r.scene_id, date: r.date, cloud: r.cloud, ndvi: r.ndvi, ndmi: r.ndmi, snow: r.snow, sensor: r.sensor, clearFraction: r.clear_fraction,
     }));
     return {
       fetchedAt: st?.fetched_at ? new Date(st.fetched_at).toISOString() : null,
@@ -649,11 +670,66 @@ function createSentinel({ db, fetchImpl = fetch, stacUrl = STAC_URL, landsat = n
     return row ? { ...JSON.parse(row.json), computedAt: new Date(row.computed_at).toISOString() } : harmonize();
   }
 
-  return { refresh, needsRefresh, series, harmonize, harmonization };
+  /** Snow and ice share of a spot per month and late summer (see iceSeries). */
+  const ice = (spotId) => iceSeries(sceneRows.all(spotId).map((r) => ({ date: r.date, snow: r.snow, sensor: r.sensor })));
+
+  return { refresh, needsRefresh, series, harmonize, harmonization, ice };
+}
+
+/* ---------- Snow and ice (glacier spots) ---------- */
+
+const ICE_MONTHS = [7, 8, 9, 10]; // the end of the melt season: the lowest monthly share of these months counts
+const ICE_PRESENT = 0.5;
+
+/**
+ * Snow and ice share from scene values ({ date, snow }, Sentinel-2):
+ *   monthly: [{ month, snow, scenes }] the median per month;
+ *   summers: [{ year, ice, month }] the lowest monthly share of July–October,
+ *            when the winter snow is gone and what stays white is ice (or
+ *            old snow, firn: a glacier's accumulation area stays white too);
+ *   iceFreeSince: the first summer of a run of ice-free summers (share below
+ *            0.5) to the last one, after at least one summer with ice; null
+ *            while there is ice or without such a change;
+ *   meltOut: [{ year, month }] when the snow melts (mountain spots): the first
+ *            month of March–August below half snow, in years whose winter
+ *            (January, February) was white; years with ice all summer have none.
+ */
+function iceSeries(scenes) {
+  const byMonth = new Map();
+  for (const s of scenes) {
+    if (s.snow === null || s.snow === undefined || (s.sensor && s.sensor !== 'S2')) continue;
+    const m = s.date.slice(0, 7);
+    if (!byMonth.has(m)) byMonth.set(m, []);
+    byMonth.get(m).push(s.snow);
+  }
+  const round = (v) => Math.round(v * 100) / 100;
+  const monthly = [...byMonth.keys()].sort().map((month) => ({ month, snow: round(median(byMonth.get(month))), scenes: byMonth.get(month).length }));
+  const byYear = new Map();
+  for (const m of monthly) {
+    if (!ICE_MONTHS.includes(Number(m.month.slice(5, 7)))) continue;
+    const y = Number(m.month.slice(0, 4));
+    const best = byYear.get(y);
+    if (!best || m.snow < best.ice) byYear.set(y, { year: y, ice: m.snow, month: m.month });
+  }
+  const summers = [...byYear.values()].sort((a, b) => a.year - b.year);
+  let iceFreeSince = null;
+  for (let i = summers.length - 1; i >= 0 && summers[i].ice < ICE_PRESENT; i--) iceFreeSince = summers[i].year;
+  if (iceFreeSince !== null && !summers.some((s) => s.year < iceFreeSince && s.ice >= ICE_PRESENT)) iceFreeSince = null;
+  const snowAt = new Map(monthly.map((m) => [m.month, m.snow]));
+  const meltOut = [];
+  for (const y of [...new Set(monthly.map((m) => Number(m.month.slice(0, 4))))].sort((a, b) => a - b)) {
+    const winter = [`${y}-01`, `${y}-02`].map((m) => snowAt.get(m)).filter((v) => v !== undefined);
+    if (!winter.length || Math.max(...winter) < ICE_PRESENT) continue;
+    for (let m = 3; m <= 8; m++) {
+      const v = snowAt.get(`${y}-${String(m).padStart(2, '0')}`);
+      if (v !== undefined && v < ICE_PRESENT) { meltOut.push({ year: y, month: m }); break; }
+    }
+  }
+  return { monthly, summers, iceFreeSince, meltOut };
 }
 
 module.exports = {
   createSentinel, searchScenes, stacSearch, sceneIndices, readWindow, projectToScene, windowMean, reflectance, normalisedDifference,
-  monthlySeries, pairDrop, indexDrops, ndviDrops, anomalyScores, currentAnomalies, sceneOf, reflectanceScale,
+  monthlySeries, iceSeries, pairDrop, indexDrops, ndviDrops, anomalyScores, currentAnomalies, sceneOf, reflectanceScale,
   latLonFromUtm, STAC_URL, NDVI_DROP, NDMI_DROP, THRESHOLDS, SENTINEL_START, OVERLAP_END,
 };

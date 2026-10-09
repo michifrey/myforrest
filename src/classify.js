@@ -263,4 +263,15 @@ function reclassify(regionsIn, model = null) {
   return { regions: found, summary: summarize(found) };
 }
 
-module.exports = { classifyChange, reclassify, summarize, CLASSES };
+/**
+ * Outside the forest (glaciers, src/landscapes.js) the forest classes do not
+ * apply: windthrow or a clearing on a glacier forefield would be misleading.
+ * Every region stays a plain change, without a suggested tag.
+ */
+function unclassified(c) {
+  const regions = c.regions.map((g) => ({ ...g, class: 'sonstiges', label: 'Veränderung', ruleClass: null, decidedBy: 'landschaft', learned: null }));
+  const area = regions.reduce((sum, g) => sum + g.area, 0);
+  return { ...c, regions, summary: regions.length ? [{ class: 'sonstiges', label: 'Veränderung', area: round(area), tag: null }] : [] };
+}
+
+module.exports = { classifyChange, reclassify, summarize, unclassified, CLASSES };

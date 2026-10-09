@@ -12,6 +12,26 @@ const TAGS = {
   frostschaden: 'Frostschaden',
   neophyt: 'Neophyt',
   wegschaden: 'Weg / Erosion',
+  // Glaciers (src/landscapes.js)
+  gletscherzunge: 'Gletscherzunge / Rückzug',
+  gletschersee: 'Gletschersee',
+  spalten: 'Spalten / Séracs',
+  schuttbedeckung: 'Schuttbedeckung',
+  toteis: 'Toteis / Einbruch',
+  felssturz: 'Felssturz / Steinschlag',
+  murgang: 'Murgang',
+  pioniervegetation: 'Pioniervegetation im Vorfeld',
+  // Mountains
+  lawine: 'Lawine / Lawinenzug',
+  rutschung: 'Rutschung / Hangmure',
+  permafrost: 'Permafrost / Blockgletscher',
+  verbuschung: 'Verbuschung der Alpweide',
+  // Drylands
+  wanderduene: 'Wanderdüne / Sandverwehung',
+  bodenerosion: 'Bodenerosion / Rinnen',
+  vegetationsverlust: 'Vegetationsverlust',
+  ueberweidung: 'Überweidung',
+  versalzung: 'Versalzung / Salzkruste',
 };
 
 const isTag = (t) => Object.prototype.hasOwnProperty.call(TAGS, t);

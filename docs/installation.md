@@ -62,6 +62,8 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 | `ROUTER_PROFILE`   | `hiking-mountain` | BRouter-Profil für das Routing; mit dem eigenen BRouter `myforrest-wald` (Waldprofil, siehe [deploy/brouter](../deploy/brouter/README.md)) |
 | `WILDRUHE_GEOJSON` | – | GeoJSON-Datei mit Wildruhezonen (WGS84 oder LV95, z. B. BAFU-Datensatz von geo.admin.ch); der Wege-Magnet führt während der Schutzzeit um sie herum |
 | `WILDRUHE_SEASON`  | `12-20/04-30` | Schutzzeit (Monat-Tag/Monat-Tag) für Zonen ohne eigene Angabe; `immer` = ganzjährig |
+| `GEBIRGE_AB_M` | `2100` | Ab dieser Höhe (m ü. M.) wird ein Spot ohne Profil, Baumarten und Wald-Beobachtungen ein Gebirge-Spot; `0` = aus |
+| `GLETSCHER_GEOJSON` | – | Gletscherinventare als GeoJSON (WGS84 oder LV95, mehrere durch Kommas getrennt, z. B. GLAMOS SGI 1850, 1973, 2016); erkennt Gletscher-Spots, zeigt die Umrisse pro Jahr und wo früher Eis lag ([Details](funktionen.md#gletscherumrisse)) |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | erzeugt | Schlüssel für Web Push (base64url); ohne sie erzeugt der Server beim ersten Start ein Paar und speichert es in der Datenbank |
 | `VAPID_SUBJECT`    | `mailto:ADMIN_EMAIL` | Kontakt für die Push-Dienste (`mailto:` oder `https:`) |
 | `PUSH_HOSTS`       | –        | Weitere erlaubte Push-Dienste (Hostnamen, kommagetrennt), zusätzlich zu Google, Mozilla, Apple und Microsoft |
