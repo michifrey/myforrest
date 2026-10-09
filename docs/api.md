@@ -55,7 +55,7 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `PATCH`  | `/api/photos/:id`            | Tags und Notiz ändern; `license` nur durch den Urheber; `protected` (true/false) durch den Urheber, PRO-Mitglieder oder Moderation |
 | `DELETE` | `/api/photos/:id`            | Foto löschen (Urheber oder Moderation; anonyme Fotos ohne `REQUIRE_LOGIN` frei) |
 | `GET`    | `/api/auth/me`               | Angemeldetes Konto (mit `identities`, `emailVerified`, `hasPassword`, `pendingEmail`), CSRF-Token, Lizenzen, Meldegründe, `requireLogin`, `requireVerifiedEmail`, `providers` |
-| `POST`   | `/api/auth/register`         | Konto anlegen (JSON: `email`, `name`, `password`) und anmelden; schickt den Bestätigungslink (`verification`: `sent`, `logged` oder `failed`) |
+| `POST`   | `/api/auth/register`         | Konto anlegen (JSON: `email`, `name`, `password`, optional `invite` = Token einer Einladung) und anmelden; schickt den Bestätigungslink (`verification`: `sent`, `logged` oder `failed`), ausser die Einladung gilt für diese Adresse (`invite`: Adresse gleich bestätigt) |
 | `POST`   | `/api/auth/login`            | Anmelden (JSON: `login` = E-Mail oder Name, `password`)  |
 | `POST`   | `/api/auth/logout`           | Abmelden                                                 |
 | `GET`    | `/api/auth/verify?token=`    | Link aus der Bestätigungs-E-Mail: bestätigt die Adresse, leitet nach `/?auth=verified` bzw. `/?auth_error=…` |

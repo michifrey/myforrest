@@ -24,7 +24,9 @@
  * with a session in this browser, links the provider to it; then it
  * redirects to the start page (`/?auth=ok|created|linked` or `/?auth_error=…`).
  *
- * E-mail confirmation: registering sends a link to GET /api/auth/verify,
+ * E-mail confirmation: registering sends a link to GET /api/auth/verify
+ * (not when registering from an invitation link with the invited address,
+ * which the link already proves),
  * which confirms the address and redirects to `/?auth=verified`. With
  * `requireVerifiedEmail`, writes need an account with a confirmed address
  * (it implies `requireLogin`).
@@ -269,12 +271,16 @@ module.exports = function registerAccounts(app, ctx) {
     const wait = registerPerIp.blocked(req.ip);
     if (wait) return res.set('Retry-After', String(wait)).status(429).json({ error: 'Zu viele Registrierungen – bitte später erneut versuchen' });
     try {
-      const { email, name, password } = req.body || {};
-      const r = await auth.register({ email, name, password });
+      const { email, name, password, invite } = req.body || {};
+      // Registering from an invitation link with the invited address: the link proves the address,
+      // so it counts as confirmed and no confirmation link is sent. Another address goes the usual way.
+      const inv = invite ? auth.orgs.inviteByToken(invite) : null;
+      const invited = Boolean(inv && typeof email === 'string' && inv.email.toLowerCase() === email.trim().toLowerCase());
+      const r = await auth.register({ email, name, password, verified: invited });
       if (r.error) return fail(res, r.status || 400, r.error);
       registerPerIp.hit(req.ip);
       if (r.user.role === 'admin') mod.log(r.user, 'role', { targetUserId: r.user.id, detail: 'admin (erstes Konto)' });
-      const verification = await sendVerification(req, r.user);
+      const verification = invited ? 'invite' : await sendVerification(req, r.user);
       res.status(201).json({ ...startSession(req, res, r.user), verification });
     } catch (err) {
       next(err);

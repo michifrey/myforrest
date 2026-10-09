@@ -277,7 +277,8 @@ authForm.addEventListener('submit', async (e) => {
   try {
     const [url, body] = {
       login: ['login', { login: f.login.value, password: f.password.value }],
-      register: ['register', { email: f.login.value, name: f.name.value, password: f.password.value }],
+      // From an invitation link: the token lets the server count the invited address as confirmed.
+      register: ['register', { email: f.login.value, name: f.name.value, password: f.password.value, invite: pendingInvite.get() || undefined }],
       forgot: ['password/forgot', { email: f.login.value }],
       reset: ['password/reset', { token: resetToken, password: f.password.value }],
       change: ['password/change', { current: f.current.value, password: f.password.value }],
@@ -311,7 +312,8 @@ authForm.addEventListener('submit', async (e) => {
     fillLicenseSelect();
     await refreshViews();
     // Accepting an invitation confirms the address: no extra notice then.
-    if (data.verification && !pendingInvite.get()) alert(VERIFY_MESSAGE[data.verification](data.user.email));
+    // 'invite': the invitation link confirmed the address, nothing to wait for.
+    if (VERIFY_MESSAGE[data.verification]) alert(VERIFY_MESSAGE[data.verification](data.user.email));
     if (wasReset) alert('Dein neues Passwort ist gespeichert. Du bist angemeldet; auf anderen Geräten bist du abgemeldet.');
     const next = afterAuth;
     afterAuth = null;

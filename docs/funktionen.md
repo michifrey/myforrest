@@ -880,7 +880,9 @@ prüfen lassen muss, gibt es **Organisationen**:
   geht eine **Einladung** mit einem Link (`/#einladung=…`, 14 Tage gültig) an diese Adresse; in der Datenbank
   steht nur der SHA-256 des Tokens. Der Link zeigt, wer einlädt, und öffnet *Konto erstellen* mit der
   vorausgefüllten Adresse (oder *Anmelden*, wenn es schon ein Konto gibt; Google und GitHub gehen auch).
-  Danach ist die Person Mitglied, und ihre Adresse gilt als bestätigt, weil der Link an sie ging. Annehmen
+  Danach ist die Person Mitglied, und ihre Adresse gilt als bestätigt, weil der Link an sie ging. Wer sich so
+  mit der eingeladenen Adresse neu registriert, bekommt deshalb keinen separaten Bestätigungslink; wer im
+  Formular eine andere Adresse eintippt, bestätigt diese wie gewohnt per E-Mail. Annehmen
   kann nur ein Konto mit genau der eingeladenen Adresse; ein weitergeleiteter Link nützt niemand anderem.
   Die Leitung sieht offene Einladungen mit Ablaufdatum und kann sie zurückziehen; eine neue Einladung an
   dieselbe Adresse ersetzt die alte.
@@ -920,8 +922,9 @@ prüfen lassen muss, gibt es **Organisationen**:
   Sperre übersteht so einen Neustart oder ein Deployment und gilt für alle Prozesse auf derselben Datenbank.
   IP- und E-Mail-Adressen stehen dort nur als SHA-256-Hash; Einträge nach Ablauf ihres Zeitfensters (höchstens
   24 Stunden) werden gelöscht.
-- *E-Mail bestätigen*: Nach der Registrierung mit Passwort kommt ein Link per E-Mail (24 Stunden gültig,
-  nur der SHA-256 des Tokens steht in der Datenbank; ein neu angeforderter Link ersetzt den alten, höchstens
+- *E-Mail bestätigen*: Nach der Registrierung mit Passwort kommt ein Link per E-Mail; über eine Einladung an
+  dieselbe Adresse entfällt er, weil die Adresse damit schon bestätigt ist. Der Link ist 24 Stunden gültig;
+  in der Datenbank steht nur der SHA-256 des Tokens, ein neu angeforderter Link ersetzt den alten (höchstens
   3 pro Stunde). Bis zur Bestätigung zeigt das Konto-Menü „E-Mail-Adresse noch nicht bestätigt“ und
   *Bestätigungslink senden*. Mit `REQUIRE_VERIFIED_EMAIL=1` braucht es eine bestätigte Adresse für Uploads
   und Änderungen. Fällt der Mailserver aus, gelingt die Registrierung trotzdem; der Link lässt sich später
