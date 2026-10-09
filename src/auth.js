@@ -15,7 +15,8 @@
  * - E-mail addresses of password accounts are confirmed with a link: a random
  *   token, valid for 24 hours, of which the database again only keeps the SHA-256.
  *   A forgotten password is reset the same way, with a link valid for 1 hour;
- *   resetting ends every session of the account.
+ *   resetting ends every session of the account. A new address takes effect
+ *   only once the link sent to it is opened (purpose 'email', 24 hours).
  */
 
 const crypto = require('node:crypto');
@@ -29,7 +30,7 @@ const SESSION_COOKIE = 'mf_session';
 const SESSION_TTL_MS = 30 * 24 * 3600 * 1000;
 const VERIFY_TTL_MS = 24 * 3600 * 1000;
 const RESET_TTL_MS = 3600 * 1000;
-const TOKEN_TTL_MS = { verify: VERIFY_TTL_MS, reset: RESET_TTL_MS };
+const TOKEN_TTL_MS = { verify: VERIFY_TTL_MS, reset: RESET_TTL_MS, email: VERIFY_TTL_MS };
 const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 64 };
 
 const SCHEMA = `
@@ -65,7 +66,7 @@ const SCHEMA = `
   CREATE TABLE IF NOT EXISTS email_tokens (
     token_hash TEXT PRIMARY KEY,
     user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    purpose    TEXT NOT NULL CHECK (purpose IN ('verify', 'reset')),
+    purpose    TEXT NOT NULL CHECK (purpose IN ('verify', 'reset', 'email')),
     email      TEXT NOT NULL,
     created_at INTEGER NOT NULL,
     expires_at INTEGER NOT NULL
@@ -148,6 +149,15 @@ function createLimiter({ max, windowMs, now = Date.now }) {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NAME_RE = /^[\p{L}\p{N}][\p{L}\p{N} ._-]{1,38}[\p{L}\p{N}]$/u;
+// Words the app shows itself: "Anonym" for photos without account, "System" in the moderation log.
+const RESERVED_NAMES = new Set(['anonym', 'system']);
+const cleanName = (name) => (typeof name === 'string' ? name.trim().replace(/\s+/g, ' ') : '');
+/** Why a display name is not allowed, or null. */
+function nameError(name) {
+  if (!NAME_RE.test(name)) return 'Der Name braucht 3–40 Zeichen (Buchstaben, Ziffern, Leerzeichen, . _ -)';
+  if (RESERVED_NAMES.has(name.toLowerCase())) return `«${name}» ist für die App reserviert`;
+  return null;
+}
 
 /** Account store bound to a database. */
 // PRO membership (verified organisations such as forest services or nature NGOs), added in place.
@@ -174,6 +184,17 @@ const PRO_REMIND_DAYS = 30;
 
 function createAuth(db, { adminEmail = null } = {}) {
   db.exec(SCHEMA);
+  // Older databases allow only 'verify' and 'reset': rebuild the table (SQLite cannot change a CHECK), keeping open links.
+  const tokensSql = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'email_tokens'").get()?.sql || '';
+  if (!tokensSql.includes("'email'")) {
+    db.exec(`BEGIN;
+      ALTER TABLE email_tokens RENAME TO email_tokens_old;
+      DROP INDEX IF EXISTS email_tokens_user;
+      ${SCHEMA.slice(SCHEMA.indexOf('CREATE TABLE IF NOT EXISTS email_tokens'))}
+      INSERT INTO email_tokens SELECT token_hash, user_id, purpose, email, created_at, expires_at FROM email_tokens_old;
+      DROP TABLE email_tokens_old;
+      COMMIT;`);
+  }
   const cols = new Set(db.prepare('PRAGMA table_info(users)').all().map((c) => c.name));
   for (const [col, type] of USER_MIGRATIONS) if (!cols.has(col)) db.exec(`ALTER TABLE users ADD COLUMN ${col} ${type}`);
   // Verifications from before PRO was limited: a year from the decision, at least another 30 days from now.
@@ -191,11 +212,9 @@ function createAuth(db, { adminEmail = null } = {}) {
 
   async function register({ email, name, password }) {
     email = typeof email === 'string' ? email.trim() : '';
-    name = typeof name === 'string' ? name.trim().replace(/\s+/g, ' ') : '';
+    name = cleanName(name);
     if (!EMAIL_RE.test(email) || email.length > 200) return { error: 'Bitte eine gültige E-Mail-Adresse angeben' };
-    if (!NAME_RE.test(name)) {
-      return { error: 'Der Name braucht 3–40 Zeichen (Buchstaben, Ziffern, Leerzeichen, . _ -)' };
-    }
+    if (nameError(name)) return { error: nameError(name) };
     if (typeof password !== 'string' || password.length < 8 || password.length > 200) {
       return { error: 'Das Passwort braucht mindestens 8 Zeichen' };
     }
@@ -231,7 +250,7 @@ function createAuth(db, { adminEmail = null } = {}) {
     if (!NAME_RE.test(base)) base = `Waldfreund${base ? ` ${base}` : ''}`.slice(0, 34).trim();
     for (let i = 1; i < 1000; i += 1) {
       const name = i === 1 ? base : `${base} ${i}`;
-      if (NAME_RE.test(name) && !db.prepare('SELECT 1 FROM users WHERE name = ?').get(name)) return name;
+      if (!nameError(name) && !db.prepare('SELECT 1 FROM users WHERE name = ?').get(name)) return name;
     }
     return `Waldfreund ${crypto.randomBytes(3).toString('hex')}`;
   }
@@ -292,18 +311,19 @@ function createAuth(db, { adminEmail = null } = {}) {
    * A new token for a link to the account's current address, `purpose`
    * 'verify' or 'reset'; earlier ones of the same purpose stop working.
    */
-  function createEmailToken(user, purpose = 'verify') {
+  function createEmailToken(user, purpose = 'verify', email = user.email) {
     const token = randomToken();
     const t = Date.now();
     db.prepare('DELETE FROM email_tokens WHERE (user_id = ? AND purpose = ?) OR expires_at < ?').run(user.id, purpose, t);
     db.prepare('INSERT INTO email_tokens (token_hash, user_id, purpose, email, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(sha256(token), user.id, purpose, user.email, t, t + TOKEN_TTL_MS[purpose]);
+      .run(sha256(token), user.id, purpose, email, t, t + TOKEN_TTL_MS[purpose]);
     return token;
   }
 
   const LINK_ERRORS = {
     verify: { invalid: 'Der Bestätigungslink ist ungültig oder wurde schon ersetzt', expired: 'Der Bestätigungslink ist abgelaufen – im Konto-Menü einen neuen anfordern' },
     reset: { invalid: 'Der Link zum Zurücksetzen ist ungültig oder wurde schon benutzt', expired: 'Der Link zum Zurücksetzen ist abgelaufen – bitte einen neuen anfordern' },
+    email: { invalid: 'Der Link für die neue E-Mail-Adresse ist ungültig oder wurde schon benutzt', expired: 'Der Link für die neue E-Mail-Adresse ist abgelaufen – bitte die Änderung neu anfordern' },
   };
 
   /** The account for a token from a link, or `{ error }`. */
@@ -317,9 +337,9 @@ function createAuth(db, { adminEmail = null } = {}) {
       db.prepare('DELETE FROM email_tokens WHERE token_hash = ?').run(row.token_hash);
       return { error: errors.expired, expired: true };
     }
-    // The link went to an address the account no longer has.
-    if (row.email.toLowerCase() !== user.email.toLowerCase()) return { error: errors.invalid };
-    return { user };
+    // The link went to an address the account no longer has (for a change: the new address it asks for).
+    if (purpose !== 'email' && row.email.toLowerCase() !== user.email.toLowerCase()) return { error: errors.invalid };
+    return { user, email: row.email, tokenHash: row.token_hash };
   }
 
   const markVerified = (user) => {
@@ -421,6 +441,59 @@ function createAuth(db, { adminEmail = null } = {}) {
     }
   }
 
+  /** Changes the display name; only the case of the own name may stay the same. */
+  function rename(user, wanted) {
+    const name = cleanName(wanted);
+    const error = nameError(name);
+    if (error) return { error, status: 400 };
+    if (name === user.name) return { error: 'Das ist bereits dein Name', status: 400 };
+    // Names are unique regardless of case (COLLATE NOCASE).
+    if (db.prepare('SELECT 1 FROM users WHERE name = ? AND id != ?').get(name, user.id)) {
+      return { error: 'Dieser Name ist bereits vergeben', status: 409 };
+    }
+    try {
+      db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name, user.id);
+    } catch {
+      return { error: 'Dieser Name ist bereits vergeben', status: 409 }; // lost a race
+    }
+    return { user: userById.get(user.id), previous: user.name };
+  }
+
+  /** Checks a new address and stores the request; the caller mails the returned token to the new address. */
+  function requestEmailChange(user, wanted) {
+    const email = typeof wanted === 'string' ? wanted.trim() : '';
+    if (!EMAIL_RE.test(email) || email.length > 200) return { error: 'Bitte eine gültige E-Mail-Adresse angeben', status: 400 };
+    if (email.toLowerCase() === user.email.toLowerCase()) return { error: 'Das ist bereits deine E-Mail-Adresse', status: 400 };
+    if (db.prepare('SELECT 1 FROM users WHERE email = ? AND id != ?').get(email, user.id)) {
+      return { error: 'Zu dieser E-Mail-Adresse gibt es schon ein Konto', status: 409 };
+    }
+    return { email, token: createEmailToken(user, 'email', email) };
+  }
+
+  /** The address an open change request waits for, or null. */
+  const pendingEmail = (userId) => db.prepare("SELECT email FROM email_tokens WHERE user_id = ? AND purpose = 'email' AND expires_at > ?")
+    .get(userId, Date.now())?.email ?? null;
+  const cancelEmailChange = (userId) => db.prepare("DELETE FROM email_tokens WHERE user_id = ? AND purpose = 'email'").run(userId);
+
+  /**
+   * Applies a change for a token from the link sent to the new address. The new
+   * address counts as confirmed; links sent to the old one stop working.
+   */
+  function confirmEmailChange(token) {
+    const r = tokenUser(token, 'email');
+    if (r.error) return r;
+    if (db.prepare('SELECT 1 FROM users WHERE email = ? AND id != ?').get(r.email, r.user.id)) {
+      return { error: 'Zu dieser E-Mail-Adresse gibt es inzwischen ein anderes Konto' };
+    }
+    try {
+      db.prepare('UPDATE users SET email = ?, email_verified_at = ? WHERE id = ?').run(r.email, Date.now(), r.user.id);
+    } catch {
+      return { error: 'Zu dieser E-Mail-Adresse gibt es inzwischen ein anderes Konto' };
+    }
+    db.prepare('DELETE FROM email_tokens WHERE user_id = ?').run(r.user.id);
+    return { user: userById.get(r.user.id), previous: r.user.email };
+  }
+
   const userByEmail = (email) => (typeof email === 'string' && EMAIL_RE.test(email.trim()) ? db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim()) : null);
 
   const identitiesOf = (userId) => db.prepare('SELECT provider FROM identities WHERE user_id = ? ORDER BY provider').all(userId).map((r) => r.provider);
@@ -480,7 +553,8 @@ function createAuth(db, { adminEmail = null } = {}) {
   return {
     register, authenticate, createSession, session, destroySession, identityLogin, identitiesOf, unlinkIdentity,
     createEmailToken, confirmEmail, checkResetToken, resetPassword, changePassword, userByEmail,
-    confirmOwner, deleteBlocker, deleteUser, orgs,
+    confirmOwner, deleteBlocker, deleteUser, rename, orgs,
+    requestEmailChange, pendingEmail, cancelEmailChange, confirmEmailChange,
     userById: (id) => userById.get(id),
   };
 }

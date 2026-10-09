@@ -255,7 +255,7 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     const years = Object.entries(photos.reduce((acc, ph) => ({ ...acc, [ph.takenAt.slice(0, 4)]: (acc[ph.takenAt.slice(0, 4)] || 0) + 1 }), {}))
       .map(([year, n]) => ({ year: Number(year), photos: n })).sort((a, b) => a.year - b.year);
     const profile = {
-      name: 'Revierförsterin', memberSince: '2019-04-02T08:00:00.000Z', photos: photos.length,
+      name: 'Revierförsterin', memberSince: '2019-04-02T08:00:00.000Z', photos: photos.length, photoBytes: photos.length * 3.4e6,
       spots: new Set(photos.map((ph) => ph.spotId)).size, repeatSpots: 9, hidden: 0, protected: 0,
       firstAt: photos.at(-1).takenAt, lastAt: photos[0].takenAt, years,
       activities: Object.entries(photos.reduce((acc, ph) => ({ ...acc, [ph.activity || 'sonstiges']: (acc[ph.activity || 'sonstiges'] || 0) + 1 }), {}))

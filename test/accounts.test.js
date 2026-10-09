@@ -706,3 +706,188 @@ test('profile: own figures and photos, hidden ones without files, nothing of oth
     assert.deepEqual((await (await admin.req('/api/profile/photos')).json()).photos.map((x) => x.id), [first.id]);
   });
 });
+
+test('changing the display name: rules, credits, login by the new name, log, limit', async () => {
+  await withServer({ rateLimits: { renamePerAccount: 2 } }, async (base, db) => {
+    const admin = client(base);
+    await admin.register('admin@example.org', 'Admin');
+    const anna = client(base);
+    await anna.register('anna@example.org', 'Anna Wald');
+    const p = (await (await anna.upload('nogps.jpg', { lat: '47.1', lon: '8.1' })).json()).created[0];
+    const rename = (c, name, opts = {}) => c.req('/api/auth/me', { method: 'PATCH', json: { name }, ...opts });
+
+    assert.equal((await rename(client(base), 'Niemand')).status, 401);
+    assert.equal((await rename(anna, 'A')).status, 400);
+    assert.equal((await rename(anna, 'anonym')).status, 400, 'reserved');
+    assert.equal((await rename(anna, 'ADMIN')).status, 409, 'taken, regardless of case');
+    assert.equal((await rename(anna, 'Anna Wald')).status, 400, 'unchanged');
+    assert.equal((await rename(anna, 'Anna Neu', { csrf: false })).status, 403, 'needs the CSRF token');
+
+    const ok = await rename(anna, '  Anna   Moos ');
+    assert.equal(ok.status, 200);
+    assert.equal((await ok.json()).user.name, 'Anna Moos');
+    const spot = await (await fetch(`${base}/api/spots/${p.spotId}`)).json();
+    assert.equal(spot.photos[0].uploader.name, 'Anna Moos', 'credits show the new name');
+    assert.equal((await client(base).login('Anna Moos')).res.status, 200);
+    assert.equal((await client(base).login('Anna Wald')).res.status, 401);
+    const log = db.prepare("SELECT * FROM moderation_log WHERE action = 'rename'").get();
+    assert.equal(log.detail, 'Anna Wald → Anna Moos');
+
+    // Only the case of the own name: allowed. Then the daily limit.
+    assert.equal((await rename(anna, 'anna moos')).status, 200);
+    assert.equal((await rename(anna, 'Anna Dritte')).status, 429);
+    // Registering with a reserved name is refused as well.
+    assert.equal((await client(base).register('x@example.org', 'System')).res.status, 400);
+  });
+});
+
+/** Reads a stored (uncompressed) ZIP: { name: Buffer }, checking each CRC. */
+function readZip(buf) {
+  const zlib = require('node:zlib');
+  const eocd = buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  const count = buf.readUInt16LE(eocd + 10);
+  let p = buf.readUInt32LE(eocd + 16);
+  const files = {};
+  for (let i = 0; i < count; i += 1) {
+    assert.equal(buf.readUInt32LE(p), 0x02014b50);
+    const crc = buf.readUInt32LE(p + 16);
+    const size = buf.readUInt32LE(p + 20);
+    const nameLen = buf.readUInt16LE(p + 28);
+    const extraLen = buf.readUInt16LE(p + 30);
+    const local = buf.readUInt32LE(p + 42);
+    const name = buf.subarray(p + 46, p + 46 + nameLen).toString('utf8');
+    const start = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
+    files[name] = buf.subarray(start, start + size);
+    assert.equal(zlib.crc32(files[name]), crc, `CRC of ${name}`);
+    p += 46 + nameLen + extraLen;
+  }
+  return files;
+}
+
+test('export of the own data as ZIP: account, photos with originals, tours, nothing of others', async () => {
+  await withServer({ rateLimits: { exportPerAccount: 3 } }, async (base, db) => {
+    const admin = client(base);
+    await admin.register('admin@example.org', 'Admin');
+    const anna = client(base);
+    await anna.register('anna@example.org', 'Anna Wald');
+    const mine = (await (await anna.upload('nogps.jpg', { lat: '47.1', lon: '8.1', activity: 'wandern' })).json()).created[0];
+    const theirs = (await (await admin.upload('nogps.jpg', { lat: '47.1', lon: '8.1' })).json()).created[0];
+    const track = await anna.req('/api/tracks', { method: 'POST', json: {
+      name: 'Runde Adlisberg', kind: 'gezeichnet', visibility: 'privat', points: [[47.37, 8.57, null, null], [47.38, 8.58, null, null]],
+    } });
+    assert.equal(track.status, 201);
+    await anna.req(`/api/photos/${theirs.id}/report`, { method: 'POST', json: { reason: 'spam' } });
+
+    assert.equal((await client(base).req('/api/profile/export')).status, 401);
+    const profile = await (await anna.req('/api/profile')).json();
+    assert.equal(profile.photoBytes, fs.statSync(path.join(__dirname, 'fixtures', 'nogps.jpg')).size);
+
+    const res = await anna.req('/api/profile/export');
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('content-type'), 'application/zip');
+    assert.match(res.headers.get('content-disposition'), /attachment; filename="myforrest-export-\d{4}-\d{2}-\d{2}\.zip"/);
+    const files = readZip(Buffer.from(await res.arrayBuffer()));
+    const names = Object.keys(files);
+    for (const n of ['LIESMICH.txt', 'konto.json', 'fotos.geojson', 'fotoauftraege.json', 'meldungen.json', 'gefolgte-spots.json']) assert.ok(names.includes(n), n);
+
+    const konto = JSON.parse(files['konto.json']);
+    assert.equal(konto.email, 'anna@example.org');
+    assert.equal(konto.passwort, 'gesetzt (nicht exportiert)');
+    assert.deepEqual(konto.organisationen, []);
+    assert.ok(!files['konto.json'].toString().includes('scrypt$'), 'no password hash');
+
+    const geo = JSON.parse(files['fotos.geojson']);
+    assert.equal(geo.features.length, 1, 'only own photos');
+    assert.equal(geo.features[0].properties.id, mine.id);
+    assert.equal(geo.features[0].properties.aktivitaet, 'wandern');
+    const original = files[geo.features[0].properties.datei];
+    assert.ok(original, 'the original is in the archive');
+    assert.deepEqual(original, fs.readFileSync(path.join(__dirname, 'fixtures', 'nogps.jpg')));
+
+    const gpx = names.find((n) => n.startsWith('touren/'));
+    assert.match(gpx, /^touren\/\d+_Runde-Adlisberg\.gpx$/);
+    assert.match(files[gpx].toString(), /<trkpt lat="47\.3700000" lon="8\.5700000">/);
+    assert.equal(JSON.parse(files['meldungen.json'])[0].foto, theirs.id);
+
+    // Without the originals; then the hourly limit.
+    const light = readZip(Buffer.from(await (await anna.req('/api/profile/export?fotos=0')).arrayBuffer()));
+    assert.ok(!Object.keys(light).some((n) => n.startsWith('fotos/')));
+    assert.equal(JSON.parse(light['fotos.geojson']).features[0].properties.datei, null);
+    await anna.req('/api/profile/export?fotos=0');
+    assert.equal((await anna.req('/api/profile/export?fotos=0')).status, 429);
+  });
+});
+
+test('changing the e-mail address takes effect only through the link to the new address', async () => {
+  await withServer({ rateLimits: { emailChangePerAccount: 2 } }, async (base, db, mails) => {
+    const admin = client(base);
+    await admin.register('admin@example.org', 'Admin');
+    const anna = client(base);
+    await anna.register('anna@example.org', 'Anna Wald');
+    const phone = client(base);
+    await phone.login('anna@example.org');
+    const change = (c, json) => c.req('/api/auth/email', { method: 'POST', json });
+
+    assert.equal((await change(client(base), { email: 'neu@example.org', password: 'geheim-1234' })).status, 401);
+    assert.equal((await change(anna, { email: 'neu@example.org', password: 'falsch-falsch' })).status, 403);
+    assert.equal((await change(anna, { email: 'kaputt', password: 'geheim-1234' })).status, 400);
+    assert.equal((await change(anna, { email: 'ADMIN@example.org', password: 'geheim-1234' })).status, 409);
+    assert.equal((await change(anna, { email: 'anna@example.org', password: 'geheim-1234' })).status, 400);
+
+    const before = mails.length;
+    const res = await change(anna, { email: 'anna.moos@example.org', password: 'geheim-1234' });
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).pendingEmail, 'anna.moos@example.org');
+    const [toNew, toOld] = mails.slice(before);
+    assert.equal(toNew.to, 'anna.moos@example.org');
+    assert.equal(toOld.to, 'anna@example.org', 'the current address gets a heads-up');
+    assert.ok(!toOld.text.includes('anna.moos@example.org'), 'the heads-up masks the new address');
+    let me = await (await anna.req('/api/auth/me')).json();
+    assert.equal(me.user.email, 'anna@example.org', 'nothing changes before the link');
+    assert.equal(me.user.pendingEmail, 'anna.moos@example.org');
+
+    // A reset link for the old address dies with the change.
+    await client(base).req('/api/auth/password/forgot', { method: 'POST', json: { email: 'anna@example.org' } });
+    const resetToken = mails.at(-1).text.match(/#reset=([\w-]+)/)[1];
+
+    const link = new URL(toNew.text.match(/https?:\/\/\S+/)[0]);
+    const done = await fetch(link, { redirect: 'manual' });
+    assert.equal(done.headers.get('location'), '/?auth=email-changed');
+    me = await (await anna.req('/api/auth/me')).json();
+    assert.equal(me.user.email, 'anna.moos@example.org');
+    assert.equal(me.user.emailVerified, true);
+    assert.equal(me.user.pendingEmail, null);
+    assert.equal(mails.at(-1).to, 'anna@example.org');
+    assert.match(mails.at(-1).subject, /E-Mail-Adresse geändert/);
+    assert.equal((await (await phone.req('/api/auth/me')).json()).user.email, 'anna.moos@example.org', 'sessions stay');
+    assert.equal((await client(base).login('anna.moos@example.org')).res.status, 200);
+    assert.equal((await client(base).login('anna@example.org')).res.status, 401);
+    assert.equal((await fetch(link, { redirect: 'manual' })).headers.get('location').includes('auth_error'), true, 'one-time');
+    const reset = await client(base).req('/api/auth/password/reset', { method: 'POST', json: { token: resetToken, password: 'neues-passwort-1' } });
+    assert.equal(reset.status, 400, 'the old reset link no longer works');
+
+    // A pending change can be cancelled; its link then fails.
+    await change(anna, { email: 'dritte@example.org', password: 'geheim-1234' });
+    const third = new URL(mails.find((m) => m.to === 'dritte@example.org').text.match(/https?:\/\/\S+/)[0]);
+    assert.equal((await (await anna.req('/api/auth/email', { method: 'DELETE' })).json()).user.pendingEmail, null);
+    assert.match((await fetch(third, { redirect: 'manual' })).headers.get('location'), /auth_error/);
+    assert.equal((await change(anna, { email: 'vierte@example.org', password: 'geheim-1234' })).status, 429);
+  });
+});
+
+test('an older token table is rebuilt to allow address changes, keeping open links', async () => {
+  const { DatabaseSync } = require('node:sqlite');
+  const { createAuth } = require('../src/auth');
+  const db = new DatabaseSync(':memory:');
+  db.exec(`CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL UNIQUE COLLATE NOCASE, name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'user', default_license TEXT, created_at INTEGER NOT NULL);
+    CREATE TABLE email_tokens (token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+      purpose TEXT NOT NULL CHECK (purpose IN ('verify', 'reset')), email TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL);
+    INSERT INTO users (id, email, name, password_hash, created_at) VALUES (1, 'a@example.org', 'Anna', '', 0);
+    INSERT INTO email_tokens VALUES ('h', 1, 'reset', 'a@example.org', 0, 9999999999999);`);
+  const auth = createAuth(db);
+  assert.match(db.prepare("SELECT sql FROM sqlite_master WHERE name = 'email_tokens'").get().sql, /'email'/);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM email_tokens').get().n, 1, 'open links kept');
+  assert.ok(auth.requestEmailChange(auth.userById(1), 'b@example.org').token);
+  db.close();
+});
