@@ -194,7 +194,8 @@ wald.example.ch {
 
 Caddy setzt `X-Forwarded-Proto` und `X-Forwarded-For` von sich aus; bei eigenem nginx
 `proxy_set_header X-Forwarded-Proto $scheme;` und `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`
-setzen. Dazu `TRUST_PROXY` (hier `loopback`, bei Containern im privaten Netz `uniquelocal`), damit die Rate-Limits
+setzen (die nginx-Vorlage in `deploy/qgis-server` übernimmt `X-Forwarded-Proto` eines TLS-Proxys davor, statt
+es mit `http` zu überschreiben). Dazu `TRUST_PROXY` (hier `loopback`, bei Containern im privaten Netz `uniquelocal`), damit die Rate-Limits
 die Adresse der Person sehen und nicht die des Proxys. `PUBLIC_URL` muss die öffentliche HTTPS-Adresse sein (Links in Mails, OAuth-Rücksprung, Kacheln).
 
 Weitere Schlüssel, die keine TLS-Zertifikate sind, aber wie Secrets behandelt werden:

@@ -59,6 +59,9 @@ PUBLIC_URL=https://karten.example.ch docker compose up -d
 
 Für den Betrieb gehört ein TLS-Zertifikat davor (z. B. Caddy oder Traefik als Reverse Proxy);
 Geoportale laden Dienste nur über HTTPS.
+Das nginx der Vorlage übernimmt `X-Forwarded-Proto` und `X-Forwarded-For` von diesem Proxy und reicht sie an
+MyForrest weiter: So erhält das Sitzungs-Cookie `Secure`, und die Rate-Limits sehen die Adresse der Person
+(`TRUST_PROXY`, Standard `uniquelocal`).
 
 BRouter läuft mit (siehe [`deploy/brouter`](../brouter/README.md)): MyForrest nutzt ihn für den Wege-Magnet
 statt `brouter.de`. Beim ersten Start lädt er die Routing-Daten für die Schweiz; ein anderes Gebiet mit
