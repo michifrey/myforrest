@@ -131,6 +131,15 @@ lehnt der Server einen davon ab, während die App zu ist, meldet das eine Benach
 
 <p align="center"><img src="docs/screenshots/offline-route.jpg" width="400" alt="Karte entlang einer Route offline gespeichert"></p>
 
+<p align="center"><img src="docs/screenshots/fahrtmodus.jpg" width="300" alt="Fahrtmodus: Bilder gemacht, behalten, Strecke und gesparter Speicher"></p>
+
+Im Auto wird das Handy zur **Dashcam**: Der *Fahrtmodus* (unter *Touren & Aufträge* oder als Verknüpfung der
+installierten App) macht alle paar Sekunden ein Bild und zeichnet die Strecke als Tour auf. Behalten werden
+nur Bilder an bekannten Spots (das nächstgelegene, in Blickrichtung des Spots) und eines alle 150 m; Bilder
+im Stillstand, unscharfe und solche, die gleich aussehen wie das letzte, verwirft schon das Handy. Aus
+einem Tag mit Tausenden Bildern werden so einige Dutzend, die im Hintergrund hochgeladen werden. (Im
+Screenshot liefert die Testkamera des Browsers das Bild.)
+
 Vor einer Tour ohne Empfang speichert *Touren & Aufträge → Karte entlang der Route offline speichern* die
 Kartenkacheln eines Korridors um die Route und die Spots daran (mit Vorschaubildern und den Referenzfotos
 für das Kamera-Overlay) auf dem Gerät. Unterwegs zeigt die App Karte und Spots dann auch ohne Netz.
@@ -240,11 +249,15 @@ Naturschutzverordnungen, Rote Liste) als CSV. Eine Art gilt dann dort als gesch�
 den Kanton fragt der Server einmal pro Spot bei geo.admin.ch ab. Funde, die schon vorher bestimmt wurden,
 werden beim Laden einer Liste nachträglich geschützt.
 
-<p align="center"><img src="docs/screenshots/organisation.jpg" width="420" alt="Organisation mit Leitung und Mitgliedern, Formular zum Aufnehmen"></p>
+<p align="center">
+  <img src="docs/screenshots/organisation.jpg" width="420" alt="Organisation mit Leitung, offenen Einladungen und Formular zum Aufnehmen">
+  <img src="docs/screenshots/einladung.jpg" width="300" alt="Konto erstellen über eine Einladung, E-Mail-Adresse vorausgefüllt">
+</p>
 
 Ein Forstrevier oder eine Fachstelle muss nicht jede Person einzeln verifizieren lassen: Wer verifiziert ist,
-leitet die **Organisation** und nimmt Kolleginnen und Kollegen mit Konto auf. Sie sehen geschützte Funde,
-solange eine Person der Leitung verifiziert ist, und die Leitung lässt sich weitergeben.
+leitet die **Organisation** und nimmt Kolleginnen und Kollegen auf; wer noch kein Konto hat, bekommt eine
+**Einladung per E-Mail** und registriert sich über den Link. Mitglieder sehen geschützte Funde, solange eine
+Person der Leitung verifiziert ist, und die Leitung lässt sich weitergeben.
 
 ### 12. Konto: E-Mail, Google, GitHub oder SWITCH edu-ID
 
@@ -306,6 +319,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
 - **[Geschützte Funde](docs/funktionen.md#geschützte-funde-und-pro-mitglieder)**: seltene Arten und Pilzstellen
   nur für verifizierte PRO-Mitglieder (Forstdienst, Naturschutz), öffentlich nur als 5-km-Raster;
   Organisationen nehmen ihre Mitglieder selbst auf.
+- **[Fahrtmodus](docs/funktionen.md#fahrtmodus-dashcam-im-auto)**: das Handy als Dashcam im Auto, Route
+  automatisch, Bilder an Spots und alle 150 m, Stillstand und Doppelte werden schon auf dem Gerät verworfen.
 - **[Konten und Moderation](docs/funktionen.md#konten-moderation-und-lizenzen)**: Konten mit Rollen, Anmeldung mit E-Mail (Bestätigungslink, Passwort ändern und zurücksetzen, Konto löschen, Profil mit den eigenen Fotos, Export der eigenen Daten) oder über Google, GitHub, SWITCH edu-ID und weitere OpenID-Connect-Dienste,
   Lizenz pro Foto, Melden und Moderieren.
 

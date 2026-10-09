@@ -73,7 +73,7 @@ src/oauth.js         Anmelden mit Google, GitHub, SWITCH edu-ID und weiteren Ope
 src/mail.js          E-Mail-Versand über SMTP (TLS/STARTTLS, AUTH PLAIN) für Bestätigungs- und Reset-Links
 src/moderation.js    Lizenzen, Meldungen, Ausblenden und Protokoll
 src/routes/accounts.js  Routen für Konten und Moderation, CSRF-Schutz, Rechte auf Fotos
-src/routes/organizations.js  Mitglieder einer Organisation aufnehmen, Rollen, austreten
+src/routes/organizations.js  Mitglieder einer Organisation aufnehmen, Einladungen per E-Mail, Rollen, austreten
 src/routes/profile.js   Eigene Profilseite: Zahlen, eigene Fotos und Export als ZIP (nur für das eigene Konto)
 src/zip.js           ZIP-Archive als Stream schreiben (ohne Kompression, ZIP64 ab 4 GB), ohne Abhängigkeiten
 src/trackfile.js     Touren lesen (GPX, TCX, KML, GeoJSON) und als GPX schreiben
@@ -98,6 +98,8 @@ public/sw.js         Service Worker: App-Shell vorhalten, Laufzeit-Caches, Backg
 public/offline-queue.js  Warteschlange für Uploads ohne Verbindung (IndexedDB, von Seite und Service Worker genutzt)
 public/pwa.js        Registrierung, Warteschlangen-Anzeige, Installieren-Knopf, Kamera-Aufnahme im Upload, Erlaubnis für Benachrichtigungen
 public/offline-map.js  Karte und Spots entlang einer Route offline speichern (eigener Cache pro Route)
+public/drive-select.js  Fahrtmodus: welche der Bilder einer Fahrt behalten werden (Spots, Abstand, Stillstand, Schärfe, Differenz-Hash)
+public/drive.js      Fahrtmodus (Handy als Dashcam): Kamera, GPS-Route, Upload über die Warteschlange
 public/manifest.webmanifest, public/icons/  Web-App-Manifest und App-Icons
 test/                Tests (`npm test`, Node-Testrunner)
 scripts/generate-icons.js  Erzeugt die App-Icons aus dem Logo (`node scripts/generate-icons.js`)

@@ -1336,6 +1336,7 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 .org-add label { font-weight: 600; font-size: 0.85rem; }
 .org-add-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .org-add-row input { flex: 1 1 14rem; min-width: 0; }
+.org-invites-title { font-weight: 600; margin: 0.6rem 0 0; }
 
 /* Own profile */
 .profile-dialog { width: min(960px, calc(100vw - 32px)); }
@@ -1372,3 +1373,27 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 .btn.secondary { background: var(--surface-2); }
 .profile-email { margin: 0.2rem 0 0; display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: baseline; }
 .profile-pending { margin: 0.4rem 0 0; padding: 0.4rem 0.7rem; border-radius: 10px; background: var(--accent-soft); color: var(--text); }
+
+/* ---------- Drive mode (dashcam, drive.js) ---------- */
+.drive {
+  position: fixed; inset: 0; z-index: 2000; overflow-y: auto;
+  background: #0d130e; color: #eef2ea; display: flex; flex-direction: column; gap: 0.8rem;
+  padding: max(0.6rem, env(safe-area-inset-top)) 16px max(1rem, env(safe-area-inset-bottom));
+}
+.drive[hidden] { display: none; }
+.drive-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.drive-top .icon { color: #fff; }
+.drive-preview { position: relative; aspect-ratio: 16 / 9; max-height: 38vh; border-radius: 12px; overflow: hidden; background: #000; }
+.drive-preview video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.drive-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.6rem; }
+.drive-stat { background: #18221a; border-radius: 12px; padding: 0.6rem 0.8rem; display: grid; }
+.drive-stat output { font-family: var(--font-display); font-size: 2rem; line-height: 1.1; }
+.drive-stat span { font-size: 0.8rem; color: #b9c6b6; }
+.drive-why { font-size: 0.85rem; color: #b9c6b6; margin: 0; min-height: 1.2em; }
+.drive-settings { display: flex; flex-wrap: wrap; gap: 0.8rem; }
+.drive-settings[hidden] { display: none; }
+.drive-setting { display: grid; gap: 0.25rem; font-size: 0.85rem; color: #b9c6b6; }
+.drive-setting select { background: #18221a; color: #eef2ea; border: 1px solid #3a4a3c; border-radius: 8px; padding: 0.4rem 0.5rem; }
+.drive-controls { display: flex; justify-content: center; margin-top: auto; }
+.drive-go { min-width: min(320px, 100%); padding: 1rem 1.4rem; font-size: 1.1rem; }
+#drive-toggle.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
