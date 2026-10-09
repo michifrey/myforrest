@@ -16,12 +16,17 @@ services:
       METADATA_OWS_URL: ${PUBLIC_URL:-http://localhost:8080}/ows/
       # Path magnet for tours through the own BRouter below instead of brouter.de.
       ROUTER_URL: http://brouter:17777/brouter
+      # Forest profile of the own BRouter (deploy/brouter/profiles); brouter.de does not have it.
+      ROUTER_PROFILE: myforrest-wald
+      # Wildlife rest areas as GeoJSON (BAFU, geo.admin.ch) in the data volume: routed around in their protection period.
+      WILDRUHE_GEOJSON: ${WILDRUHE_GEOJSON:-}
     volumes:
       - myforrest-data:/app/data
     restart: unless-stopped
 
   # Routing along paths (deploy/brouter); loads the segments for BBOX on first start.
   brouter:
+    # Built from deploy/brouter; or the prebuilt image: ghcr.io/michifrey/myforrest-brouter
     build: ../brouter
     environment:
       BBOX: ${BROUTER_BBOX:-5.9,45.8,10.5,47.9}

@@ -1,0 +1,70 @@
+# Builds the BRouter image (deploy/brouter, with MyForrest's forest profile)
+# and publishes it to the GitHub Container Registry:
+#   ghcr.io/<owner>/myforrest-brouter:latest and :<BROUTER_VERSION>
+# Runs when deploy/brouter changes on main, and by hand (Actions → Run workflow).
+# Pull requests only build, to catch a broken Dockerfile early.
+name: BRouter-Image
+
+on:
+  push:
+    branches: [main]
+    paths: ['deploy/brouter/**', '.github/workflows/brouter-image.yml']
+  pull_request:
+    paths: ['deploy/brouter/**', '.github/workflows/brouter-image.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version und Name
+        id: meta
+        run: |
+          version=$(sed -n 's/^ARG BROUTER_VERSION=//p' deploy/brouter/Dockerfile)
+          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/$owner/myforrest-brouter" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Anmelden bei ghcr.io
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bauen (und veröffentlichen)
+        uses: docker/build-push-action@v6
+        with:
+          context: deploy/brouter
+          push: ${{ github.event_name != 'pull_request' }}
+          load: ${{ github.event_name == 'pull_request' }}
+          tags: |
+            ${{ steps.meta.outputs.image }}:latest
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.description=BRouter für den Wege-Magnet von MyForrest, mit Waldprofil
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Profil prüfen
+        # The image starts, and BRouter parses the forest profile (a request without routing data
+        # fails at the segments, not at the profile).
+        run: |
+          image=${{ steps.meta.outputs.image }}:latest
+          if [ "${{ github.event_name }}" != "pull_request" ]; then docker pull "$image"; fi
+          docker run -d --name brouter -p 17777:17777 --entrypoint java "$image" \
+            -cp /opt/brouter/brouter.jar btools.server.RouteServer /tmp /opt/brouter/profiles2 /tmp 17777 1 0.0.0.0
+          sleep 5
+          curl -s "http://127.0.0.1:17777/brouter?lonlats=8.58,47.36|8.60,47.36&profile=myforrest-wald&format=geojson" || true
+          docker logs brouter 2>&1 | tee brouter.log
+          if grep -q "ParseException" brouter.log; then echo "Profil fehlerhaft"; exit 1; fi

@@ -10,7 +10,9 @@
  *   PATCH  /api/tracks/:id              name, activity, visibility
  *   DELETE /api/tracks/:id
  *   GET    /api/tracks/:id.gpx          download as GPX
- *   GET    /api/route                   path between waypoints from a routing service (ROUTER_URL, BRouter)
+ *   GET    /api/route                   path between waypoints from a routing service (ROUTER_URL, BRouter),
+ *                                        around wildlife rest areas in their protection period (WILDRUHE_GEOJSON)
+ *   GET    /api/wildlife-zones?bbox=    those areas as GeoJSON, for the map
  *   POST   /api/route-suggestions       photo requests and spots worth a visit near a route (satellite early warning,
  *                                       series not continued for a year); the route is not stored
  *   GET    /api/photo-requests          open (and recently done) requests
@@ -32,6 +34,7 @@
 const { createLimiter, isModerator, canSeeProtected } = require('../auth');
 const { distanceM, isValidCoord } = require('../geo');
 const { parseTrackFile, toGpx, MAX_POINTS } = require('../trackfile');
+const { createWildlife } = require('../wildlife');
 const { lengthM, bbox, nearRoute, trimEnds } = require('../routegeo');
 
 const KINDS = ['gezeichnet', 'aufgezeichnet', 'importiert'];
@@ -114,6 +117,7 @@ const unpackPoints = (json) => JSON.parse(json).map(([lat, lon, ele, time]) => {
 
 module.exports = function registerTracks(app, ctx) {
   const { db, spotRadiusM, satelliteAlerts = () => [], routerUrl = null, routerFetch = fetch, routerProfile = 'hiking-mountain', accounts = null } = ctx;
+  const wildlife = ctx.wildlife || createWildlife();
   db.exec(SCHEMA);
   const reqCols = new Set(db.prepare('PRAGMA table_info(photo_requests)').all().map((c) => c.name));
   for (const [col, type] of REQUEST_MIGRATIONS) if (!reqCols.has(col)) db.exec(`ALTER TABLE photo_requests ADD COLUMN ${col} ${type}`);
@@ -267,7 +271,10 @@ module.exports = function registerTracks(app, ctx) {
       return fail(res, 400, 'points: 2 bis 50 Punkte als lat,lon;lat,lon');
     }
     const lonlats = pts.map(([la, lo]) => `${lo.toFixed(6)},${la.toFixed(6)}`).join('|');
-    const url = `${routerUrl}?lonlats=${encodeURIComponent(lonlats)}&profile=${encodeURIComponent(routerProfile)}&alternativeidx=0&format=geojson`;
+    // Wildlife rest areas in their protection period: no-go areas for the router.
+    const wild = wildlife.near(pts.map(([lat, lon]) => ({ lat, lon })));
+    const nogo = wild.zones.length ? `&polygons=${encodeURIComponent(wildlife.polygonsParam(wild.zones))}` : '';
+    const url = `${routerUrl}?lonlats=${encodeURIComponent(lonlats)}&profile=${encodeURIComponent(routerProfile)}&alternativeidx=0&format=geojson${nogo}`;
     try {
       const r = await routerFetch(url, { signal: AbortSignal.timeout(20000) });
       if (!r.ok) return fail(res, 502, `Routing-Dienst antwortete mit HTTP ${r.status}`);
@@ -275,10 +282,29 @@ module.exports = function registerTracks(app, ctx) {
       const coords = geo.features?.[0]?.geometry?.coordinates;
       if (!Array.isArray(coords) || coords.length < 2) return fail(res, 502, 'Routing-Dienst lieferte keine Strecke');
       const points = coords.map(([lon, lat, ele]) => (Number.isFinite(ele) ? { lat, lon, ele } : { lat, lon }));
-      res.json({ points, distanceM: Math.round(lengthM(points)) });
+      res.json({
+        points, distanceM: Math.round(lengthM(points)),
+        // Zones considered, and zones a waypoint lies in (no way around those).
+        wildlifeZones: wild.zones.map((z) => z.name), insideWildlifeZones: wild.inside,
+      });
     } catch (err) {
       fail(res, 502, `Routing-Dienst nicht erreichbar (${err.message})`);
     }
+  });
+
+  /** Wildlife rest areas in their protection period within a bbox (GeoJSON, for the map). */
+  app.get('/api/wildlife-zones', (req, res) => {
+    const b = String(req.query.bbox || '').split(',').map(Number);
+    if (b.length !== 4 || !b.every(Number.isFinite)) return fail(res, 400, 'bbox=west,süd,ost,nord');
+    const zones = wildlife.within(b).slice(0, 200);
+    res.json({
+      type: 'FeatureCollection',
+      features: zones.map((z) => ({
+        type: 'Feature',
+        properties: { name: z.name, season: z.season ? `${z.season.from[1]}.${z.season.from[0]}.–${z.season.to[1]}.${z.season.to[0]}.` : 'ganzjährig' },
+        geometry: { type: 'MultiPolygon', coordinates: z.rings.map((r) => [r]) },
+      })),
+    });
   });
 
   /* ---------- Photo requests ---------- */

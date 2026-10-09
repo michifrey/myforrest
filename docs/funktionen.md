@@ -712,6 +712,15 @@ wird.
   RunnerMaps. Dafür fragt der Server einen BRouter-Dienst an (Standard `brouter.de`, Profil `hiking-mountain`,
   anpassbar mit `ROUTER_URL` und `ROUTER_PROFILE`, siehe [Installation](installation.md#umgebungsvariablen));
   der Browser spricht ihn nie direkt an. Ohne Magnet oder ohne Dienst entstehen gerade Linien.
+- **Eigener Routing-Server mit Waldprofil**: Mit dem eigenen BRouter ([`deploy/brouter`](../deploy/brouter/README.md))
+  gilt das Profil `myforrest-wald`: Forststrassen zuerst, Rückegassen fast gleich gut, dann Pfade; Strassen
+  mit Verkehr werden umgangen, Autobahnen und schwierige Bergwege (ab SAC T5) nie genommen.
+- **Wildruhezonen**: Ist eine Datei mit den Zonen hinterlegt (`WILDRUHE_GEOJSON`, z. B. der BAFU-Datensatz von
+  geo.admin.ch), führt der Magnet während der Schutzzeit (aus dem Text der Zone, sonst 20.12.–30.4.) um sie
+  herum, und die Karte zeigt sie beim Planen gestrichelt (ab Zoom 11, mit Name und Schutzzeit). Das Panel
+  sagt, um welche Zonen die Route geführt wurde; liegt ein Wegpunkt in einer Zone, weist es darauf hin.
+
+![Wildruhezone beim Planen einer Route](screenshots/wildruhezonen.jpg)
 - **Aufzeichnen**: Das Handy zeichnet die Strecke per GPS auf (Punkte ab ±40 m Genauigkeit, mindestens 4 m
   auseinander, mit Zeit und Höhe). Der Bildschirm bleibt dabei an (Wake Lock), denn Browser stoppen GPS
   für Seiten im Hintergrund. Die Punkte liegen laufend im Browser; nach einem Neuladen lässt sich die

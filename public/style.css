@@ -1403,3 +1403,6 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 .drive-controls { display: flex; justify-content: center; margin-top: auto; }
 .drive-go { min-width: min(320px, 100%); padding: 1rem 1.4rem; font-size: 1.1rem; }
 #drive-toggle.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* Wildlife rest areas on the map while planning a tour (tours.js) */
+.wildlife-zone { stroke: #b0452a; stroke-width: 1.5; stroke-dasharray: 5 4; fill: #b0452a; fill-opacity: 0.12; }
