@@ -97,6 +97,7 @@ function renderNav() {
       ...(via.length ? [el('span', { class: 'muted small', text: `Anmeldung über ${via.join(', ')}${u.hasPassword ? ' oder Passwort' : ''}` })] : []),
       ...(u.emailVerified ? [] : [el('span', { class: 'menu-unverified small', text: 'E-Mail-Adresse noch nicht bestätigt' })]),
     ]),
+    item('Mein Profil', () => openProfile()),
     ...(u.emailVerified ? [] : [item('Bestätigungslink senden', resendVerification)]),
     item(u.proExpired ? 'PRO abgelaufen – verlängern' : u.proRenewable && !u.proRenewalRequestedAt ? `PRO läuft am ${fmtDate(u.proValidUntil)} ab – verlängern`
       : u.pro ? 'PRO-Mitgliedschaft' : u.proStatus === 'angefragt' ? 'PRO: Antrag in Prüfung' : 'PRO-Mitgliedschaft beantragen', openPro),
@@ -712,6 +713,128 @@ async function deletePhoto(p) {
   }
 }
 
+/* ---------- Own profile: figures and photos (also /#profil) ---------- */
+
+const ACTIVITY_LABEL = { joggen: 'Joggen', wandern: 'Wandern', biken: 'Biken', sonstiges: 'Sonstiges' };
+const PROFILE_PAGE = 48;
+const profileDialog = el('dialog', { id: 'profile-dialog', class: 'mod-dialog profile-dialog', 'aria-labelledby': 'profile-title' });
+profileDialog.innerHTML = `
+  <div class="dialog-head mod-head">
+    <div>
+      <p class="eyebrow">Mein Profil</p>
+      <h2 id="profile-title"></h2>
+      <p id="profile-since" class="muted small"></p>
+    </div>
+    <button type="button" class="icon" id="profile-close" aria-label="Schliessen">×</button>
+  </div>
+  <div id="profile-stats" class="stats profile-stats"></div>
+  <p id="profile-more" class="muted small"></p>
+  <div class="tabs profile-tabs" role="tablist" id="profile-tabs"></div>
+  <div id="profile-grid" class="profile-grid" aria-live="polite"></div>
+  <div class="row center"><button type="button" class="secondary" id="profile-next" hidden>Weitere Fotos laden</button></div>`;
+document.body.append(profileDialog);
+$('profile-close').addEventListener('click', () => profileDialog.close());
+let profileFilter = 'alle';
+let profileOffset = 0;
+
+const stat = (n, label) => el('div', { class: 'stat' }, [el('b', { text: String(n) }), el('span', { text: label })]);
+
+async function openProfile() {
+  if (!Account.user) return openAuth('login', { intro: 'Melde dich an, um dein Profil zu sehen.', then: openProfile });
+  let p;
+  try {
+    p = await api('/api/profile');
+  } catch (err) {
+    alert(err.message);
+    return;
+  }
+  $('profile-title').textContent = p.name;
+  const span = p.firstAt ? ` · Fotos von ${new Date(p.firstAt).getFullYear()} bis ${new Date(p.lastAt).getFullYear()}` : '';
+  $('profile-since').textContent = `Dabei seit ${fmtDate(p.memberSince)}${span}`;
+  $('profile-stats').replaceChildren(
+    stat(p.photos, p.photos === 1 ? 'Foto' : 'Fotos'),
+    stat(p.spots, p.spots === 1 ? 'Spot' : 'Spots'),
+    stat(p.repeatSpots, 'Zeitreihen ergänzt'),
+    stat(p.tracks, p.tracks === 1 ? 'Tour' : 'Touren'),
+    stat(p.requests.fulfilled, 'Aufträge erledigt'),
+    stat(p.followedSpots, 'Spots gefolgt'),
+  );
+  const parts = [
+    p.activities.length ? `Unterwegs: ${p.activities.map((a) => `${ACTIVITY_LABEL[a.activity] || a.activity} ${a.photos}`).join(', ')}` : '',
+    p.years.length > 1 ? `Pro Jahr: ${p.years.map((y) => `${y.year}: ${y.photos}`).join(' · ')}` : '',
+    p.requests.open ? `${p.requests.open === 1 ? '1 eigener Fotoauftrag' : `${p.requests.open} eigene Fotoaufträge`} offen` : '',
+  ].filter(Boolean);
+  $('profile-more').textContent = parts.join('. ');
+  $('profile-more').hidden = !parts.length;
+  const tabs = [['alle', `Alle (${p.photos})`], ...(p.protected ? [['geschuetzt', `Geschützt (${p.protected})`]] : []),
+    ...(p.hidden ? [['ausgeblendet', `Ausgeblendet (${p.hidden})`]] : [])];
+  $('profile-tabs').replaceChildren(...tabs.map(([id, label]) => el('button', {
+    type: 'button', role: 'tab', 'aria-selected': 'false', 'data-filter': id, text: label, onclick: () => loadProfilePhotos(id),
+  })));
+  $('profile-tabs').hidden = tabs.length < 2;
+  if (!profileDialog.open) profileDialog.showModal();
+  await loadProfilePhotos('alle');
+}
+Account.openProfile = openProfile;
+
+async function loadProfilePhotos(filter, { more = false } = {}) {
+  profileFilter = filter;
+  profileOffset = more ? profileOffset : 0;
+  $('profile-tabs').querySelectorAll('[role="tab"]').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.filter === filter)));
+  const grid = $('profile-grid');
+  if (!more) grid.replaceChildren(el('p', { class: 'muted', text: 'Lade …' }));
+  let page;
+  try {
+    page = await api(`/api/profile/photos?filter=${filter}&offset=${profileOffset}&limit=${PROFILE_PAGE}`);
+  } catch (err) {
+    grid.replaceChildren(el('p', { class: 'auth-error', text: err.message }));
+    return;
+  }
+  if (!more) grid.replaceChildren();
+  if (!page.total) {
+    grid.append(el('div', { class: 'profile-empty' }, [
+      el('p', { class: 'muted', text: 'Noch keine Fotos mit diesem Konto. Ein Foto vom nächsten Lauf, der nächsten Wanderung oder Tour macht den Anfang.' }),
+      el('button', { type: 'button', class: 'btn primary', text: 'Foto beitragen', onclick: () => { profileDialog.close(); $('open-upload').click(); } }),
+    ]));
+  }
+  grid.append(...page.photos.map(profileTile));
+  profileOffset += page.photos.length;
+  $('profile-next').hidden = profileOffset >= page.total;
+}
+$('profile-next').addEventListener('click', () => loadProfilePhotos(profileFilter, { more: true }));
+
+function profileTile(p) {
+  const badges = [
+    ...(p.protected ? [el('span', { class: 'tile-badge', text: 'Geschützt' })] : []),
+    ...(p.panorama ? [el('span', { class: 'tile-badge', text: '360°' })] : []),
+    ...(p.spotPhotos > 1 ? [el('span', { class: 'tile-badge', text: `${p.spotPhotos} Fotos am Spot` })] : []),
+  ];
+  const caption = el('span', { class: 'tile-caption' }, [
+    el('b', { text: fmtDate(p.takenAt) }),
+    ` · ${ACTIVITY_LABEL[p.activity] || 'Spot'} · Spot ${p.spotId}`,
+  ]);
+  if (p.hidden) {
+    return el('div', { class: 'profile-tile is-hidden', title: 'Von der Moderation ausgeblendet' }, [
+      el('div', { class: 'tile-placeholder', text: p.hiddenReason ? `Ausgeblendet: ${p.hiddenReason}` : 'Von der Moderation ausgeblendet' }),
+      caption,
+    ]);
+  }
+  return el('button', {
+    type: 'button',
+    class: 'profile-tile',
+    'aria-label': `Foto vom ${fmtDate(p.takenAt)} an Spot ${p.spotId} öffnen`,
+    onclick: async () => {
+      profileDialog.close();
+      await openSpot(p.spotId, p.id);
+      $('explore').scrollIntoView({ behavior: 'smooth' });
+    },
+  }, [
+    el('img', { src: p.thumbUrl, alt: '', loading: 'lazy' }),
+    badges.length ? el('span', { class: 'tile-badges' }, badges) : '',
+    caption,
+  ]);
+}
+
 /* ---------- Deleting the account ---------- */
 
 const deleteDialog = el('dialog', { id: 'delete-dialog', class: 'auth-dialog', 'aria-labelledby': 'delete-title' });
@@ -996,6 +1119,10 @@ async function resetFromLink() {
 
 function authReturn() {
   if (location.hash.startsWith('#reset=')) return resetFromLink();
+  if (location.hash === '#profil') {
+    history.replaceState(null, '', `${location.pathname}${location.search}`);
+    return openProfile();
+  }
   const q = new URLSearchParams(location.search);
   const error = q.get('auth_error');
   const result = q.get('auth');

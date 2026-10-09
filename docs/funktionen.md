@@ -872,6 +872,13 @@ prüfen lassen muss, gibt es **Organisationen**:
   Teil nach `#` geht an keinen Server und in keinen Referer. Mit dem neuen Passwort ist man angemeldet,
   alle anderen Sitzungen des Kontos enden, und die Adresse gilt als bestätigt. So können auch Konten aus
   Google oder GitHub ein Passwort festlegen.
+- *Mein Profil*: Im Konto-Menü (oder über den Link `/#profil`) stehen die eigenen Zahlen – Fotos, Spots,
+  fortgesetzte Zeitreihen (Spots, an denen schon jemand vorher fotografiert hat), Touren, erledigte Fotoaufträge
+  anderer, gefolgte Spots, Aktivitäten und Fotos pro Jahr – und alle eigenen Fotos, das neueste zuerst, in Seiten
+  zu 48. Ein Klick öffnet das Foto an seinem Spot. Geschützte und von der Moderation ausgeblendete Fotos lassen
+  sich getrennt anzeigen; ausgeblendete erscheinen mit dem Grund, aber ohne Bild, weil ihre Dateien auch der
+  Urheberin nicht mehr ausgeliefert werden. Das Profil ist nur für das eigene Konto sichtbar: Eine öffentliche
+  Liste aller Fotos einer Person würde ihre regelmässigen Wege und Zeiten verraten.
 - *Konto löschen*: Im Konto-Menü unter *Konto löschen …*, bestätigt mit dem Passwort (Konten ohne Passwort
   tippen ihren Kontonamen ein). Für die eigenen Fotos ist eine ausdrückliche Wahl nötig: **anonym behalten**
   (sie bleiben für die Zeitreihen der Spots erhalten und heissen danach „Anonym“, die Lizenz bleibt) oder
