@@ -337,8 +337,19 @@ function renderStats(updateHero = true) {
 
 /* ---------- Spot panel ---------- */
 
+/* Pictures from the car (drive mode, dashcam videos): marked, and hidden on request. */
+const HIDE_DRIVE_KEY = 'myforrest-hide-drive';
+const isDrive = (p) => p.activity === 'fahren';
+const hideDrive = () => { try { return localStorage.getItem(HIDE_DRIVE_KEY) === '1'; } catch { return false; } };
+
 async function openSpot(id, photoId) {
   state.spot = await api(`/api/spots/${id}`);
+  // Only when other photos remain: a spot of drive pictures alone shows them.
+  const drive = state.spot.photos.filter(isDrive).length;
+  const hiding = hideDrive() && drive > 0 && drive < state.spot.photos.length;
+  $('drive-filter-wrap').hidden = !drive || drive === state.spot.photos.length;
+  $('drive-filter').checked = hideDrive();
+  if (hiding) state.spot.photos = state.spot.photos.filter((p) => !isDrive(p));
   const photos = state.spot.photos;
   const wanted = photos.findIndex((p) => p.id === photoId);
   state.index = wanted >= 0 ? wanted : photos.length - 1;
@@ -357,7 +368,8 @@ async function openSpot(id, photoId) {
   $('spot-meta').textContent =
     `${state.spot.lat.toFixed(5)}, ${state.spot.lon.toFixed(5)} · ${photos.length} Foto${photos.length === 1 ? '' : 's'} · ` +
     `${fmtDate(photos[0].takenAt)} – ${fmtDate(photos[photos.length - 1].takenAt)} (${years.size} Jahr${years.size === 1 ? '' : 'e'})` +
-    (hasHeading(state.spot) ? ` · ${headingText(state.spot.heading)}` : '');
+    (hasHeading(state.spot) ? ` · ${headingText(state.spot.heading)}` : '') +
+    (hiding ? ` · ${drive} Fahrtbild${drive === 1 ? '' : 'er'} ausgeblendet` : '');
   renderSiblings(state.spot);
   renderSplit(state.spot);
   const allTags = [...new Set(photos.flatMap((p) => p.tags))].sort();
@@ -369,7 +381,7 @@ async function openSpot(id, photoId) {
   $('t-first').textContent = fmtDate(photos[0].takenAt);
   $('t-last').textContent = fmtDate(photos[photos.length - 1].takenAt);
   $('thumbs').replaceChildren(...photos.map((p, i) =>
-    el('button', { type: 'button', title: fmtDateTime(p.takenAt), onclick: () => showPhoto(i) },
+    el('button', { type: 'button', class: isDrive(p) ? 'is-drive' : '', title: `${fmtDateTime(p.takenAt)}${isDrive(p) ? ' · Fahrt (Dashcam)' : ''}`, onclick: () => showPhoto(i) },
       el('img', { src: thumbUrl(p), alt: `Foto vom ${fmtDate(p.takenAt)}`, loading: 'lazy' }))));
 
   fillCompareSelects();
@@ -457,7 +469,7 @@ function showPhoto(i) {
   showFramed($('viewer-stage'), $('viewer-img'), p, frame);
   $('viewer-img').alt = `Spot ${state.spot.id} am ${fmtDate(p.takenAt)}`;
   const parts = [fmtDateTime(p.takenAt), SOURCE_LABEL[p.locationSource]];
-  if (p.activity) parts.push(p.activity[0].toUpperCase() + p.activity.slice(1));
+  if (p.activity) parts.push(isDrive(p) ? 'Fahrt (Dashcam)' : p.activity[0].toUpperCase() + p.activity.slice(1));
   if (p.heading !== null) parts.push(`Blickrichtung ${Math.round(p.heading)}°`);
   if (stabilize) parts.push(frame && relativeAlignment(p, frame) ? 'ausgerichtet' : 'nicht ausgerichtet');
   $('viewer-caption').textContent = parts.join(' · ');
@@ -984,6 +996,10 @@ $('cmp-b').addEventListener('change', updateCompare);
 $('cmp-align').addEventListener('change', updateCompare);
 $('cmp-heat').addEventListener('change', updateCompare);
 $('stabilize').addEventListener('change', () => showPhoto(state.index));
+$('drive-filter').addEventListener('change', (e) => {
+  try { localStorage.setItem(HIDE_DRIVE_KEY, e.target.checked ? '1' : '0'); } catch { /* private mode */ }
+  if (state.spot) openSpot(state.spot.id, state.spot.photos[state.index]?.id);
+});
 $('realign').addEventListener('click', async (e) => {
   const { id } = state.spot;
   const current = state.spot.photos[state.index].id;

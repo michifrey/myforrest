@@ -45,6 +45,14 @@ nächstgelegenen Stelle gezogen. So füllt jede Runde dieselben Spots weiter.
 - **GoPro-Telemetrie (GPMF)**: Die GPS-Spur (GPS5 bzw. GPS9 ab HERO11, mit GPSU-Zeit, SCAL-Skalierung
   sowie Fix und Genauigkeit) wird direkt aus der MP4-Datei gelesen, ohne Zusatzprogramm. Daraus ergeben
   sich Position, UTC-Aufnahmezeit, Höhe und Blickrichtung (Fahrtrichtung) jedes Bildes.
+- **Dashcams**: Ohne GoPro-Telemetrie sucht die App das GPS der Dashcam in der Datei, ohne Zusatzprogramm:
+  NMEA-Sätze (`$GPRMC`/`$GNRMC` mit Zeit, Ort, Geschwindigkeit und Kurs, Höhe aus `$GPGGA`, mit Prüfsumme),
+  wie sie z. B. BlackVue im MP4 speichert, und die `freeGPS`-Blöcke von Novatek-Kameras (Viofo, Kenwood und
+  viele ohne Marke). Die Datei wird stückweise gelesen, auch grosse Videos brauchen wenig Speicher. Die
+  Dashcams schreiben ab dem Start jeder Datei eine Position pro Sekunde; die erste ist der Videoanfang.
+  Solche Videos bekommen die Aktivität *Fahrt*, wenn keine gewählt ist. Verschlüsselte Varianten (manche
+  neuere Viofo-Firmware) werden nicht gelesen. Eine `.nmea`-Datei neben dem Video geht im Feld für den
+  GPX-Track, auch für Fotos und beim Import einer Tour.
 - **Ohne Telemetrie** wird das Video über einen mitgeschickten GPX-Track verortet; die Startzeit kommt
   aus dem Video-Header (UTC) oder dem Datumsfeld und lässt sich mit *Kamera-Uhr korrigieren* verschieben.
   Mit einem auf der Karte gewählten Standort wird stattdessen alle N Sekunden ein Bild gezogen.
@@ -91,8 +99,14 @@ der installierten App, `/?action=fahrt`) zeigt eine dunkle Vollbildansicht für 
   zählt gemachte und behaltene Bilder, die Strecke, den gesparten Speicher und warum Bilder verworfen wurden.
 - **Auf dem Server** gilt zusätzlich: Pro Konto und Ort (Spot-Radius) wird innerhalb von 12 Stunden nur ein
   Fahrtbild gespeichert, falls doch einmal zwei kommen (zweites Gerät, erneut gesendete Warteschlange).
-- **Echte Dashcams**: Deren Videos lassen sich schon heute über *Foto beitragen* hochladen (mit GPX-Track
-  oder GoPro-Telemetrie); daraus wird etwa alle 25 m ein Bild gezogen, siehe *Videos statt Einzelbilder*.
+- **Echte Dashcams**: Deren Videos gehen über *Foto beitragen*; das GPS liest die App direkt aus der Datei
+  (siehe *Videos statt Einzelbilder*), daraus wird etwa alle 25 m ein Bild gezogen.
+- **In der Zeitreise** tragen Bilder aus dem Auto (Fahrtmodus und Dashcam-Videos, Aktivität *Fahrt*) die
+  Marke *Fahrt*; die Bildunterschrift nennt *Fahrt (Dashcam)*. Hat ein Spot auch andere Fotos, blendet
+  *Fahrtbilder (Dashcam) ausblenden* sie aus (gilt für alle Spots, merkt sich das Gerät); die Spot-Zeile sagt,
+  wie viele ausgeblendet sind.
+
+![Fahrtbilder in der Zeitreise](screenshots/fahrtbilder.jpg)
 
 ### HEIC-Fotos vom iPhone
 
@@ -703,7 +717,8 @@ wird.
   für Seiten im Hintergrund. Die Punkte liegen laufend im Browser; nach einem Neuladen lässt sich die
   Aufzeichnung fortsetzen.
 - **Importieren**: GPX (Tracks, Routen oder Wegpunkte), Garmin TCX, KML (LineString und `gx:Track`) und
-  GeoJSON (LineString, MultiLineString, mit `coordTimes`), bis 14 MB und 20 000 Punkte. FIT-Dateien bitte in
+  GeoJSON (LineString, MultiLineString, mit `coordTimes`) sowie NMEA von Dashcams (`.nmea`), bis 14 MB und
+  20 000 Punkte. FIT-Dateien bitte in
   Garmin Connect oder Strava als GPX exportieren.
 - **Exportieren**: jede Route als GPX, mit Höhe und Zeit, wo vorhanden.
 
