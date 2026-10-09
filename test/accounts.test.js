@@ -891,3 +891,69 @@ test('an older token table is rebuilt to allow address changes, keeping open lin
   assert.ok(auth.requestEmailChange(auth.userById(1), 'b@example.org').token);
   db.close();
 });
+
+test('stored rate limits survive a restart, keep keys hashed and clean up', () => {
+  const { DatabaseSync } = require('node:sqlite');
+  const db = new DatabaseSync(':memory:');
+  let t = 1_000_000;
+  const now = () => t;
+  const make = () => createLimiter({ max: 2, windowMs: 60_000, now, db, name: 'loginPerIp' });
+  const a = make();
+  a.hit('203.0.113.7|anna@example.org');
+  a.hit('203.0.113.7|anna@example.org');
+  assert.equal(a.blocked('203.0.113.7|anna@example.org'), 60);
+  assert.equal(a.blocked('198.51.100.1'), 0);
+
+  // A second limiter on the same database (a restart) sees the same counts.
+  const b = make();
+  assert.equal(b.blocked('203.0.113.7|anna@example.org'), 60);
+  const stored = db.prepare('SELECT * FROM rate_limits').all();
+  assert.equal(stored.length, 1);
+  assert.ok(!JSON.stringify(stored).includes('anna') && !JSON.stringify(stored).includes('203.0.113'), 'keys are hashed');
+
+  // Other buckets are separate; reset clears one key.
+  const other = createLimiter({ max: 1, windowMs: 60_000, now, db, name: 'registerPerIp' });
+  assert.equal(other.blocked('203.0.113.7|anna@example.org'), 0);
+  b.reset('203.0.113.7|anna@example.org');
+  assert.equal(a.blocked('203.0.113.7|anna@example.org'), 0);
+
+  // After the window a hit starts over, and expired rows are removed on start.
+  a.hit('x'); a.hit('x');
+  t += 60_000;
+  assert.equal(a.blocked('x'), 0);
+  a.hit('x');
+  assert.equal(db.prepare("SELECT count FROM rate_limits WHERE bucket = 'loginPerIp'").get().count, 1);
+  t += 60_000;
+  make();
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM rate_limits').get().n, 0);
+  db.close();
+});
+
+test('a login lockout outlasts a restart of the app', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'myforrest-acc-'));
+  const start = async () => {
+    const app = createApp({ dataDir, weatherFetch: noWeather, mailer: { send: async () => ({ sent: true }) }, rateLimits: { loginPerAccount: 2 } });
+    const server = app.listen(0);
+    await new Promise((r) => server.once('listening', r));
+    return { app, server, base: `http://127.0.0.1:${server.address().port}` };
+  };
+  const stop = async ({ app, server }) => {
+    await app.locals.idle();
+    server.close();
+    app.locals.db.close();
+  };
+  try {
+    let s = await start();
+    await client(s.base).register('anna@example.org', 'Anna Wald');
+    const c = client(s.base);
+    assert.equal((await c.login('anna@example.org', 'falsch-1')).res.status, 401);
+    assert.equal((await c.login('anna@example.org', 'falsch-2')).res.status, 401);
+    assert.equal((await c.login('anna@example.org')).res.status, 429);
+    await stop(s);
+    s = await start();
+    assert.equal((await client(s.base).login('anna@example.org')).res.status, 429, 'still locked after the restart');
+    await stop(s);
+  } finally {
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  }
+});

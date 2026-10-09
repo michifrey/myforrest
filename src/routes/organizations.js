@@ -16,7 +16,7 @@ const { ORG_ROLES } = require('../orgs');
 
 module.exports = function registerOrganizations(app, { db, auth, mod, mailer, publicUrl, limits = {}, fail, adminOnly }) {
   const orgs = auth.orgs;
-  const addPerUser = createLimiter({ max: limits.orgAddPerUser ?? 50, windowMs: 24 * 3600 * 1000 });
+  const addPerUser = createLimiter({ db, name: 'addPerUser', max: limits.orgAddPerUser ?? 50, windowMs: 24 * 3600 * 1000 });
   const isAdmin = (u) => u?.role === 'admin';
 
   /** The organisation of the request and what the current account may do in it, or an error sent. */

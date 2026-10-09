@@ -13,6 +13,9 @@
   Kameramodell). Ausnahmen sind die Vorschaubilder und die aus HEIC umgewandelten JPEGs, die keine
   EXIF-Daten enthalten. Vor einem öffentlichen Betrieb sollten Metadaten entfernt und Personen sowie
   Kennzeichen automatisch verpixelt werden.
+- Die Rate-Limits (Tabelle `rate_limits`) speichern IP- und E-Mail-Adressen nur als SHA-256-Hash und
+  höchstens 24 Stunden. Das ist eine Pseudonymisierung, keine Anonymisierung: Ein Hash einer IP-Adresse
+  lässt sich durch Durchprobieren zurückrechnen, deshalb die kurze Aufbewahrung. Wer eine Sperre von Hand aufheben will: `DELETE FROM rate_limits;` in der Datenbank.
 - *Konto löschen* entfernt das Konto sofort aus der Datenbank. Behaltene Fotos sind danach nur noch über
   den Namen „Anonym“ vom Konto getrennt: Ihre EXIF-Daten (siehe oben) können weiterhin etwa Kameramodell
   oder einen in der Kamera eingetragenen Namen enthalten. Backups der Datenbank und von `data/uploads`

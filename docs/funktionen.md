@@ -859,6 +859,11 @@ prüfen lassen muss, gibt es **Organisationen**:
   Passwörter werden mit scrypt und eigenem Salt pro Konto gespeichert. Die Sitzung liegt in einem
   httpOnly-Cookie (SameSite=Lax, 30 Tage); in der Datenbank steht nur ihr SHA-256-Hash. Fehlversuche beim
   Anmelden werden begrenzt (5 pro Konto und IP, 30 pro IP in 15 Minuten).
+- *Begrenzungen dauerhaft*: Alle Begrenzungen (Anmelden, Registrieren, Links per E-Mail, Meldungen, Exporte,
+  Namensänderungen, Fotoaufträge, Organisationen) zählen in der Tabelle `rate_limits` der Datenbank. Eine
+  Sperre übersteht so einen Neustart oder ein Deployment und gilt für alle Prozesse auf derselben Datenbank.
+  IP- und E-Mail-Adressen stehen dort nur als SHA-256-Hash; Einträge nach Ablauf ihres Zeitfensters (höchstens
+  24 Stunden) werden gelöscht.
 - *E-Mail bestätigen*: Nach der Registrierung mit Passwort kommt ein Link per E-Mail (24 Stunden gültig,
   nur der SHA-256 des Tokens steht in der Datenbank; ein neu angeforderter Link ersetzt den alten, höchstens
   3 pro Stunde). Bis zur Bestätigung zeigt das Konto-Menü „E-Mail-Adresse noch nicht bestätigt“ und

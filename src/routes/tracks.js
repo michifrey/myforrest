@@ -123,7 +123,7 @@ module.exports = function registerTracks(app, ctx) {
     || Boolean(db.prepare(`SELECT 1 FROM photos p WHERE p.spot_id = ? AND ${photoVisible(req)} LIMIT 1`).get(spotId));
   const requestVisible = (req, r) => (r.protected ? canSeeProtected(req.user) || Boolean(req.user && r.requester_id === req.user.id) : true)
     && spotVisible(req, r.spot_id);
-  const requestLimit = createLimiter({ max: 20, windowMs: 3600 * 1000 });
+  const requestLimit = createLimiter({ db, name: 'requestLimit', max: 20, windowMs: 3600 * 1000 });
   const fail = (res, status, error) => res.status(status).json({ error });
   const idOf = (req) => {
     const id = Number(req.params.id);

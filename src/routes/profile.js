@@ -52,7 +52,7 @@ module.exports = function profileRoutes(app, { db, thumbs, accounts, uploadDir, 
   const fail = (res, status, error) => res.status(status).json({ error });
   const loggedIn = (req, res, next) => (req.user ? next() : fail(res, 401, 'Bitte zuerst anmelden'));
   const count = (sql, ...args) => db.prepare(sql).get(...args).n;
-  const exportPerAccount = createLimiter({ max: rateLimits.exportPerAccount ?? 5, windowMs: 3600 * 1000 });
+  const exportPerAccount = createLimiter({ db, name: 'exportPerAccount', max: rateLimits.exportPerAccount ?? 5, windowMs: 3600 * 1000 });
 
   app.get('/api/profile', loggedIn, async (req, res) => {
     const id = req.user.id;
