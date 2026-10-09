@@ -11,6 +11,8 @@ const { openDb, transaction } = require('./db');
 const { distanceM, isValidCoord, positionAt } = require('./geo');
 const { lenientFetch } = require('./lenient-fetch');
 const { createWildlife } = require('./wildlife');
+const { createGlaciers } = require('./glaciers');
+const { LANDSCAPES, ICE_LANDSCAPES, isLandscape, landscapeOf } = require('./landscapes');
 const { parseGpx } = require('./gpx');
 const { readPhotoMeta, imageExtension } = require('./exif');
 const { assignSpot, refreshSpot, backfillSpotHeadings, planSplit, splitSpot, HEADING_TOLERANCE_DEG } = require('./spots');
@@ -23,7 +25,7 @@ const { alignImages, alignPanoramas, extractFeatures } = require('./align');
 const sphere = require('./sphere');
 const { IDENTITY, multiply, invert } = require('./homography');
 const { computeChange, renderHeatmap } = require('./change');
-const { classifyChange } = require('./classify');
+const { classifyChange, unclassified } = require('./classify');
 const { createWeather } = require('./weather');
 const { assess } = require('./irregularities');
 const { TREES, treeInfo, treeJson } = require('./trees');
@@ -38,6 +40,8 @@ const {
 } = require('./phenology');
 
 const ACTIVITIES = ['joggen', 'wandern', 'biken', 'fahren', 'sonstiges'];
+// Irregularities that concern any landscape (src/irregularities.js, src/storms.js); the others are about trees.
+const WEATHER_IRREGULARITIES = new Set(['trockenheit', 'naesse', 'waerme', 'sturm']);
 // Drive mode (dashcam): at most one picture per account and place within this time.
 const DRIVE_REPEAT_MS = 12 * 3600 * 1000;
 /** Without GPano metadata: exactly 2:1 and at least this wide (360° cameras: 5376 px and more). */
@@ -70,6 +74,8 @@ function createApp({
   tileOptions = { precompute: process.env.TILES_PRECOMPUTE !== '0' },
   // Push messages (routes/push.js): { fetchImpl, allowedHosts, allowHttp } for tests.
   pushOptions = {},
+  // Glacier outlines (src/glaciers.js): GeoJSON files of glacier inventories, comma-separated.
+  glacierFiles = process.env.GLETSCHER_GEOJSON || '',
 } = {}) {
   const uploadDir = path.join(dataDir, 'uploads');
   const tmpDir = path.join(dataDir, 'tmp');
@@ -100,6 +106,8 @@ function createApp({
   const accounts = registerAccounts(app, accountsCtx);
   // Wildlife rest areas (WILDRUHE_GEOJSON): the path magnet routes around them in their protection period.
   const wildlife = createWildlife();
+  // Glacier inventories (GLETSCHER_GEOJSON): glacier spots, the outlines on the map, where the ice was.
+  const glaciers = createGlaciers({ files: glacierFiles });
   app.locals.remindPro = accounts.remindPro;
   // Protection lists per canton (src/sensitive.js) and the canton of each spot (src/canton.js).
   const sensitiveLists = createSensitiveLists(db);
@@ -158,6 +166,7 @@ function createApp({
     panorama: Boolean(p.panorama),
     videoTime: p.video_time ?? null,
     sequenceId: p.sequence_id ?? null,
+    archive: Boolean(p.archive),
     activity: p.activity,
     note: p.note,
     tags: tagsOf.all(p.id).map((r) => r.tag),
@@ -376,7 +385,7 @@ function createApp({
     const terrain = terrainOf(photo.spot_id);
     // Storm link, frost nights in hollows and phenology references (routes/climate.js).
     const extra = climate.decorate(photo, ctx, terrain, species);
-    return [...assess({
+    const found = [...assess({
       takenAt: photo.taken_at,
       tags: tagsOf.all(photo.id).map((t) => t.tag),
       change: photo.change_json ? JSON.parse(photo.change_json) : null,
@@ -386,6 +395,9 @@ function createApp({
       nightFrost: extra.nightFrost,
       phenoRef: extra.phenoRef,
     }), ...extra.irregularities];
+    // Outside the forest only the weather counts (drought, heat, wet, storms), not leaves, frost on shoots or beetles.
+    const landscape = landscapeOf(db.prepare('SELECT landscape FROM spots WHERE id = ?').get(photo.spot_id)?.landscape);
+    return landscape === 'wald' ? found : found.filter((i) => WEATHER_IRREGULARITIES.has(i.type));
   };
 
   /** Species changed: re-evaluate every photo of the spot. */
@@ -458,14 +470,17 @@ function createApp({
   const climate = require('./routes/climate')(app, { db, weatherFetch, getPhoto, terrainOf, background, reassessSpot, visibleSpotIds: accounts.visibleSpotIds });
 
   app.get('/api/config', (req, res) => {
-    res.json({ tags: TAGS, activities: ACTIVITIES, plantnet: Boolean(plantnetKey), spotRadiusM, routing: Boolean(routerUrl), wildlifeZones: wildlife.enabled() });
+    res.json({
+      tags: TAGS, activities: ACTIVITIES, plantnet: Boolean(plantnetKey), spotRadiusM, routing: Boolean(routerUrl), wildlifeZones: wildlife.enabled(),
+      landscapes: LANDSCAPES, glaciers: glaciers.enabled() ? { years: glaciers.years() } : null,
+    });
   });
 
   app.get('/api/spots', (req, res) => {
     const tag = req.query.tag ? String(req.query.tag) : null;
     const vis = (alias) => accounts.visibleSql(req, alias); // hidden photos: moderators only
     const rows = db.prepare(`
-      SELECT s.id, s.lat, s.lon, s.elevation, s.heading,
+      SELECT s.id, s.lat, s.lon, s.elevation, s.heading, s.landscape,
              COUNT(DISTINCT p.id) AS photo_count,
              MIN(p.taken_at) AS first_taken,
              MAX(p.taken_at) AS last_taken,
@@ -488,6 +503,7 @@ function createApp({
       lon: r.lon,
       elevation: r.elevation,
       heading: r.heading,
+      landscape: landscapeOf(r.landscape),
       photoCount: r.photo_count,
       firstTaken: new Date(r.first_taken).toISOString(),
       lastTaken: new Date(r.last_taken).toISOString(),
@@ -507,7 +523,7 @@ function createApp({
   const spotJson = (id, req = null) => {
     const spot = db.prepare(`
       SELECT id, lat, lon, heading, elevation, elevation_source, slope, aspect, terrain_source,
-             tpi300, tpi600, landform, landform_source
+             tpi300, tpi600, landform, landform_source, landscape, landscape_source
       FROM spots WHERE id = ?`).get(id);
     if (!spot) return null;
     const photos = db.prepare(`SELECT * FROM photos p WHERE spot_id = ? AND ${req ? accounts.visibleSql(req, 'p') : accounts.publicSql('p')} ORDER BY taken_at, id`).all(id);
@@ -516,6 +532,8 @@ function createApp({
       lat: spot.lat,
       lon: spot.lon,
       heading: spot.heading,
+      landscape: landscapeOf(spot.landscape),
+      landscapeSource: spot.landscape_source,
       elevation: spot.elevation,
       elevationSource: spot.elevation_source,
       slope: spot.slope,
@@ -630,6 +648,36 @@ function createApp({
     res.status(status).json(body);
   }
 
+  /**
+   * Sets the landscape profile of a spot: `chosen` (from an upload, or by hand
+   * with source 'manual') when the spot has none yet or only a guessed one;
+   * without a choice a spot on or near a glacier becomes a glacier spot.
+   * A profile set by hand is only changed by hand. Runs inside a transaction.
+   */
+  function classifySpot(spotId, chosen = null, source = 'upload') {
+    const spot = db.prepare('SELECT lat, lon, landscape, landscape_source FROM spots WHERE id = ?').get(spotId);
+    if (!spot) return;
+    let next = null;
+    if (chosen && (source === 'manual' || spot.landscape === null || spot.landscape_source === 'auto')) next = [chosen, source];
+    else if (!chosen && spot.landscape === null && glaciers.isGlacierPlace(spot.lat, spot.lon)) next = ['gletscher', 'auto'];
+    if (!next || (next[0] === spot.landscape && next[1] === spot.landscape_source)) return;
+    db.prepare('UPDATE spots SET landscape = ?, landscape_source = ? WHERE id = ?').run(next[0], next[1], spotId);
+    // A glacier spot needs the snow and ice share of its satellite scenes.
+    if (ICE_LANDSCAPES.has(next[0]) && !ICE_LANDSCAPES.has(spot.landscape)) vegetation.satelliteDue(spotId);
+    // Changes are classified per landscape (forest classes only in the forest): evaluate the photos again.
+    if (landscapeOf(next[0]) !== landscapeOf(spot.landscape)) {
+      const photos = db.prepare('SELECT id FROM photos WHERE spot_id = ?').all(spotId);
+      if (photos.length) {
+        background((async () => {
+          for (const { id } of photos) {
+            await analyzeChange(id);
+            refreshIrregularities(id);
+          }
+        })());
+      }
+    }
+  }
+
   /** A drive picture by the same account near this place within DRIVE_REPEAT_MS? */
   function driveRepeat(userId, pos, takenAt) {
     const dLat = spotRadiusM / 111320;
@@ -656,6 +704,12 @@ function createApp({
     // Photos of one recording (drive, upload batch) form a sequence for the walk-through.
     const sequenceId = /^[A-Za-z0-9-]{8,64}$/.test(String(b.sequenceId || '')) ? String(b.sequenceId) : null;
     const tags = parseTags(b.tags);
+    const landscape = isLandscape(b.landscape) ? b.landscape : null;
+    // Archive pictures (old photos, scanned) for a spot: dated by hand, placed at the spot.
+    const archive = ['1', 'true', 'on'].includes(String(b.archive));
+    if (archive && (!Number.isFinite(fallbackTime) || b.spotId === undefined || b.spotId === '')) {
+      return [400, { error: 'Archivfoto: spotId und takenAt angeben' }];
+    }
     const protect = ['1', 'true', 'on'].includes(String(b.protected));
     // Repeat photos taken at a known spot (rephotography) are pinned to that spot.
     let targetSpot = null;
@@ -690,6 +744,8 @@ function createApp({
       }
       const meta = await readPhotoMeta(heic ? heicExif(buf) || buf : buf, offsetMin);
       let takenAt = meta.takenAt !== null ? meta.takenAt + clockShiftMs : null;
+      // An archive picture (a scan of an old photo): its EXIF date is the scan's, the given date counts.
+      if (archive) takenAt = fallbackTime;
       if (takenAt === null) takenAt = Number.isFinite(fallbackTime) ? fallbackTime : Date.now();
 
       let pos = null;
@@ -697,7 +753,8 @@ function createApp({
       const exifPos = isValidCoord(meta.lat, meta.lon) ? { lat: meta.lat, lon: meta.lon } : null;
       if (targetSpot) {
         // Keep the device position when it is plausible, otherwise use the spot centre.
-        if (exifPos && nearSpot(exifPos)) [pos, source] = [exifPos, 'exif'];
+        if (archive) [pos, source] = [{ lat: targetSpot.lat, lon: targetSpot.lon }, 'spot'];
+        else if (exifPos && nearSpot(exifPos)) [pos, source] = [exifPos, 'exif'];
         else if (manual && nearSpot(manual)) [pos, source] = [manual, 'spot'];
         else [pos, source] = [{ lat: targetSpot.lat, lon: targetSpot.lon }, 'spot'];
       } else if (exifPos) {
@@ -754,7 +811,9 @@ function createApp({
         setTags(id, tags);
         accounts.stampPhoto(id, owner);
         if (protect) db.prepare("UPDATE photos SET protected = 1, protected_reason = 'upload' WHERE id = ?").run(id);
+        if (archive) db.prepare('UPDATE photos SET archive = 1 WHERE id = ?').run(id);
         refreshSpot(db, spotId);
+        classifySpot(spotId, landscape, 'upload');
         touchedSpots.add(spotId);
         return id;
       });
@@ -983,7 +1042,9 @@ function createApp({
     if (a.spot_id !== b.spot_id) return { status: 422, error: 'Fotos gehören zu verschiedenen Spots' };
     if (kindOf(a) !== kindOf(b)) return { status: 422, error: 'Ein 360°-Panorama lässt sich nicht mit einem normalen Foto vergleichen' };
     if (!a.align_h || !b.align_h) return { status: 422, error: 'Mindestens eines der Fotos ist nicht ausgerichtet' };
-    const key = `${a.id}:${b.id}:${a.align_h}:${b.align_h}:${app.locals.learner?.version() ?? ''}`;
+    // The forest classes only apply in the forest (src/landscapes.js).
+    const forest = landscapeOf(db.prepare('SELECT landscape FROM spots WHERE id = ?').get(a.spot_id)?.landscape) === 'wald';
+    const key = `${a.id}:${b.id}:${a.align_h}:${b.align_h}:${app.locals.learner?.version() ?? ''}:${forest}`;
     if (!changeCache.has(key)) {
       const panorama = Boolean(a.panorama);
       // B onto A: through the spot's frame (rotations invert by transposing).
@@ -997,7 +1058,7 @@ function createApp({
         return {
           changedFraction: result.changedFraction,
           coverage: result.coverage,
-          ...classifyChange(result, { model: app.locals.learner?.current() }),
+          ...(forest ? (c) => c : unclassified)(classifyChange(result, { model: app.locals.learner?.current() })),
           png: await renderHeatmap(result),
         };
       })();
@@ -1124,10 +1185,15 @@ function createApp({
   require('./routes/protection')(app, { db, accounts, sensitiveLists, cantons, reprotect });
   require('./routes/walk')(app, { db, accounts, thumbs });
   require('./routes/ogc')(app, { db, spotRadiusM, dataDir, background, tiles: tileOptions });
-  require('./routes/video')(app, { db, uploadDir, tmpDir, spotRadiusM, activities: ACTIVITIES, photoJson, getPhoto, setTags, alignPhoto, analyzeChange, analyzeContext, background, safeAlign });
+  require('./routes/video')(app, { db, uploadDir, tmpDir, spotRadiusM, activities: ACTIVITIES, photoJson, getPhoto, setTags, alignPhoto, analyzeChange, analyzeContext, background, safeAlign, classifySpot });
   const push = require('./routes/push')(app, { db, idParam, adminEmail, ...pushOptions });
   app.locals.push = push;
   const vegetation = require('./routes/vegetation')(app, { db, uploadDir, background, fetchImpl: weatherFetch, push, accounts });
+  // Spots from before the glacier outlines were loaded.
+  if (glaciers.enabled()) {
+    for (const { id } of db.prepare('SELECT id FROM spots WHERE landscape IS NULL').all()) classifySpot(id);
+  }
+  require('./routes/landscapes')(app, { db, glaciers, vegetation, accounts, classifySpot, spotJson, idParam });
   Object.assign(tours, require('./routes/tracks')(app, {
     db, spotRadiusM, satelliteAlerts: vegetation.alerts, routerUrl, routerFetch, routerProfile, accounts, wildlife,
   }));

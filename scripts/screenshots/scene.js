@@ -270,4 +270,111 @@ async function renderPano(seed, state, file) {
     .jpeg({ quality: 82 }).toFile(file);
 }
 
-module.exports = { layout, svg, render, renderCloseup, renderPano };
+/**
+ * The demo glacier seen from its forefield, looking up the valley (seed-gletscher.js).
+ * state: { tongue (0–1: how far the ice reaches towards the camera), lake (0–1), green (0–1: pioneer
+ * vegetation), archive (true: an old black-and-white photo, sepia) }.
+ */
+function glacierSvg(seed, state) {
+  const r = rng(seed);
+  const tongue = state.tongue ?? 0.5;
+  const vx = 800 + (r() - 0.5) * 20; // vanishing point of the valley
+  const vy = 430;
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
+    <defs>
+      <linearGradient id="gsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fb8d8"/><stop offset="1" stop-color="#dfeaf1"/></linearGradient>
+      <linearGradient id="gice" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f8fb"/><stop offset="0.6" stop-color="#d4e3ec"/><stop offset="1" stop-color="#a9c3d2"/></linearGradient>
+      <linearGradient id="glake" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6fa7b9"/><stop offset="1" stop-color="#4f8597"/></linearGradient>
+    </defs>
+    <rect width="${W}" height="${H}" fill="url(#gsky)"/>`;
+  // Far peaks with snow.
+  let peaks = `M0 ${vy + 10}`;
+  const tops = [];
+  for (let x = 0; x <= W; x += 80) {
+    const y = 200 + Math.abs(Math.sin(x / 260 + 1.3)) * 140 + r() * 40 - (Math.abs(x - vx) < 260 ? 60 : 0);
+    peaks += ` L${x} ${y.toFixed(0)}`;
+    tops.push([x, y]);
+  }
+  s += `<path d="${peaks} L${W} ${vy + 10} Z" fill="#8d8f93"/>`;
+  for (const [x, y] of tops) s += `<path d="M${x - 46} ${y + 50} L${x} ${y} L${x + 46} ${y + 54} L${x + 18} ${y + 34} L${x - 14} ${y + 40} Z" fill="#f2f5f7"/>`;
+  // The firn basin behind the tongue.
+  s += `<path d="M${vx - 520} ${vy + 20} Q${vx} ${vy - 70} ${vx + 520} ${vy + 20} L${vx + 300} ${vy + 40} L${vx - 300} ${vy + 40} Z" fill="#f5f8fa"/>`;
+  // Valley walls, with the light band of rock the ice has left (trimline) above today's surface.
+  const wall = (side) => {
+    const x0 = side < 0 ? 0 : W;
+    const inner = vx + side * 120;
+    return `M${x0} 260 L${inner} ${vy} L${vx + side * 330} ${H} L${x0} ${H} Z`;
+  };
+  s += `<path d="${wall(-1)}" fill="#6f6a66"/><path d="${wall(1)}" fill="#76716b"/>`;
+  const trim = 1 - tongue;
+  for (const side of [-1, 1]) {
+    const x0 = side < 0 ? 0 : W;
+    s += `<path d="M${vx + side * 120} ${vy} L${vx + side * 330} ${H} L${vx + side * (330 + 260 * trim)} ${H} L${x0 + side * -1} ${H - 40} L${vx + side * (140 + 60 * trim)} ${vy - 4} Z" fill="#a39a8f" opacity="${(0.25 + 0.6 * trim).toFixed(2)}"/>`;
+    for (let k = 0; k < 14; k++) {
+      const y = vy + 40 + r() * (H - vy - 60);
+      const t = (y - vy) / (H - vy);
+      const xi = vx + side * (120 + 210 * t);
+      s += `<path d="M${xi + side * 10} ${y} L${xi + side * (60 + r() * 200)} ${y - 20 - r() * 40}" stroke="#57524e" stroke-width="2" opacity=".5"/>`;
+    }
+  }
+  // Forefield: gravel between the walls.
+  s += `<path d="M${vx - 120} ${vy + 10} L${vx + 120} ${vy + 10} L${vx + 330} ${H} L${vx - 330} ${H} Z" fill="#9b958c"/>`;
+  for (let k = 0; k < 260; k++) {
+    const y = vy + 20 + Math.pow(r(), 0.7) * (H - vy - 20);
+    const t = (y - vy) / (H - vy);
+    const x = vx + (r() - 0.5) * 2 * (120 + 210 * t);
+    const sz = 1 + t * 9 * r();
+    s += `<ellipse cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" rx="${(sz * 1.4).toFixed(1)}" ry="${sz.toFixed(1)}" fill="${['#7d776f', '#b2aca2', '#8b857c'][Math.floor(r() * 3)]}"/>`;
+  }
+  // Pioneer vegetation on the ground the ice left long ago (foreground first).
+  const green = state.green || 0;
+  for (let k = 0; k < 140 * green; k++) {
+    const y = H - Math.pow(r(), 1.6) * (H - vy - 140) * (0.4 + 0.6 * green);
+    const t = (y - vy) / (H - vy);
+    const x = vx + (r() - 0.5) * 2 * (100 + 200 * t);
+    s += `<ellipse cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" rx="${(4 + t * 22 * r()).toFixed(1)}" ry="${(2 + t * 8 * r()).toFixed(1)}" fill="${['#7f9a4a', '#98ad5c', '#6a8a3e'][Math.floor(r() * 3)]}" opacity=".9"/>`;
+  }
+  // The tongue: from the basin down towards the camera, as far as `tongue` reaches.
+  const end = vy + 30 + tongue * (H - vy - 140);
+  const halfAt = (y) => 110 + ((y - vy) / (H - vy)) * 200;
+  const he = halfAt(end) * (0.75 + 0.25 * tongue);
+  // Lake in front of the tongue.
+  const lake = state.lake || 0;
+  if (lake > 0) {
+    const ly = end + 18 + 30 * lake;
+    s += `<ellipse cx="${vx}" cy="${ly.toFixed(0)}" rx="${(he * (0.7 + 0.5 * lake)).toFixed(0)}" ry="${(14 + 36 * lake).toFixed(0)}" fill="url(#glake)"/>`;
+    s += `<ellipse cx="${vx - he * 0.2}" cy="${(ly - 4).toFixed(0)}" rx="${(he * 0.3).toFixed(0)}" ry="3" fill="#e9f2f6" opacity=".55"/>`;
+  }
+  s += `<path d="M${vx - 115} ${vy + 4} L${vx + 115} ${vy + 4} L${(vx + he).toFixed(0)} ${(end - 30).toFixed(0)} Q${vx} ${(end + 26).toFixed(0)} ${(vx - he).toFixed(0)} ${(end - 30).toFixed(0)} Z" fill="url(#gice)"/>`;
+  // Medial moraine and crevasses.
+  s += `<path d="M${vx + 10} ${vy + 6} Q${vx + 30} ${(vy + end) / 2} ${vx + he * 0.25} ${(end - 18).toFixed(0)}" stroke="#7b7670" stroke-width="${(4 + tongue * 10).toFixed(0)}" fill="none" opacity=".75"/>`;
+  for (let k = 0; k < 26; k++) {
+    const y = vy + 20 + r() * (end - vy - 50);
+    const hw = halfAt(y) * (0.75 + 0.25 * tongue) * (0.3 + r() * 0.5);
+    const x = vx + (r() - 0.5) * halfAt(y) * 0.6;
+    s += `<path d="M${(x - hw / 2).toFixed(0)} ${y.toFixed(0)} Q${x.toFixed(0)} ${(y + 6).toFixed(0)} ${(x + hw / 2).toFixed(0)} ${y.toFixed(0)}" stroke="#6f93a8" stroke-width="${(1 + (y - vy) / 200).toFixed(1)}" fill="none" opacity=".7"/>`;
+  }
+  // Foreground boulders.
+  for (let k = 0; k < 9; k++) {
+    const x = r() * W;
+    const y = H - 30 - r() * 120;
+    s += `<ellipse cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" rx="${(30 + r() * 60).toFixed(0)}" ry="${(18 + r() * 30).toFixed(0)}" fill="${['#6e6964', '#85807a', '#5d5955'][Math.floor(r() * 3)]}"/>`;
+  }
+  return `${s}</svg>`;
+}
+
+async function renderGlacier(seed, state, file) {
+  let img = sharp(Buffer.from(glacierSvg(seed, state)));
+  if (state.archive) {
+    // An old print: black and white, sepia, grain and a dark edge.
+    const r = rng(seed + 5);
+    let grain = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><defs><radialGradient id="v" cx=".5" cy=".5" r=".75"><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".55"/></radialGradient></defs>`;
+    for (let k = 0; k < 2500; k++) grain += `<rect x="${(r() * W).toFixed(0)}" y="${(r() * H).toFixed(0)}" width="2" height="2" fill="${r() < 0.5 ? '#000' : '#fff'}" opacity=".18"/>`;
+    grain += `<rect width="${W}" height="${H}" fill="url(#v)"/></svg>`;
+    const base = await img.grayscale().toBuffer();
+    img = sharp(base).composite([{ input: Buffer.from(grain) }]).tint({ r: 150, g: 115, b: 75 }).modulate({ brightness: 0.95 });
+  }
+  await img.jpeg({ quality: 84 }).toFile(file);
+}
+
+module.exports = { layout, svg, render, renderCloseup, renderPano, renderGlacier };

@@ -12,6 +12,15 @@ const TAGS = {
   frostschaden: 'Frostschaden',
   neophyt: 'Neophyt',
   wegschaden: 'Weg / Erosion',
+  // Glaciers (src/landscapes.js)
+  gletscherzunge: 'Gletscherzunge / Rückzug',
+  gletschersee: 'Gletschersee',
+  spalten: 'Spalten / Séracs',
+  schuttbedeckung: 'Schuttbedeckung',
+  toteis: 'Toteis / Einbruch',
+  felssturz: 'Felssturz / Steinschlag',
+  murgang: 'Murgang',
+  pioniervegetation: 'Pioniervegetation im Vorfeld',
 };
 
 const isTag = (t) => Object.prototype.hasOwnProperty.call(TAGS, t);

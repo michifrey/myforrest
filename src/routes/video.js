@@ -10,6 +10,7 @@ const { transaction } = require('../db');
 const { isValidCoord, positionAt } = require('../geo');
 const { parseGpx } = require('../gpx');
 const { parseTags } = require('../tags');
+const { isLandscape } = require('../landscapes');
 const { assignSpot, refreshSpot } = require('../spots');
 const { readMp4 } = require('../mp4');
 const { gpsTrack } = require('../gpmf');
@@ -163,6 +164,7 @@ module.exports = function videoRoutes(app, ctx) {
     const note = b.note ? String(b.note).slice(0, 2000) : null;
     const tags = parseTags(b.tags);
     const protect = ['1', 'true', 'on'].includes(String(b.protected)); // protected finds: PRO members only
+    const landscape = isLandscape(b.landscape) ? b.landscape : null;
     const panoramaChoice = ['0', '1'].includes(String(b.panorama)) ? String(b.panorama) : 'auto';
 
     // Positions: GPMF telemetry of the camera, else a GPX track, else a fixed place.
@@ -291,6 +293,7 @@ module.exports = function videoRoutes(app, ctx) {
         setTags(id, tags);
         if (protect) db.prepare("UPDATE photos SET protected = 1, protected_reason = 'upload' WHERE id = ?").run(id);
         refreshSpot(db, spotId);
+        ctx.classifySpot?.(spotId, landscape, 'upload');
         touchedSpots.add(spotId);
         return id;
       });

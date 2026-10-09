@@ -70,6 +70,7 @@ Push-Dienst sieht nur, dass eine Nachricht an ein Gerät geht.
 | OpenStreetMap | Kartenkacheln (im Browser) | – |
 | swisstopo (geo.admin.ch) | Landeskarte und Luftbild der Vektorkarte LV95 (im Browser) | – |
 | swisstopo (geo.admin.ch), swissBOUNDARIES3D | Kanton eines Spots für die kantonalen Schutzlisten (einmal pro Spot) | `api3.geo.admin.ch` |
+| Gletscherinventare, z. B. [GLAMOS](https://www.glamos.ch) (Swiss Glacier Inventory) | Gletscher-Spots, Umrisse pro Jahr (`GLETSCHER_GEOJSON`, lokale Dateien; Quellenangabe und Nutzungsbedingungen des Inventars beachten) | – |
 
 Im Browser laufen [Leaflet](https://leafletjs.com) (BSD-2-Clause) für die App-Karte und
 [MapLibre GL JS](https://maplibre.org) (BSD-3-Clause) für die Vektorkarte sowie

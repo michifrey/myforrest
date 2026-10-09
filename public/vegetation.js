@@ -51,8 +51,9 @@
     const years = y1 - y0;
     const ticks = [];
     if (years >= 2) {
-      const step = years > 6 ? 2 : 1;
-      for (let y = y0 + 1; y <= y1; y += step) ticks.push({ t: Date.UTC(y, 0, 1), label: String(y) });
+      // About eight labels at most, on round years for long series (archive photos reach back a century).
+      const step = [1, 2, 5, 10, 20, 25, 50].find((k) => years / k <= 8) || 100;
+      for (let y = Math.ceil((y0 + 1) / step) * step; y <= y1; y += step) ticks.push({ t: Date.UTC(y, 0, 1), label: String(y) });
     } else {
       for (let y = y0; y <= y1; y++) {
         for (const m of [0, 3, 6, 9]) {
@@ -185,9 +186,11 @@
       });
     };
     const frameNote = (p) => (p.frame === 'spot' ? '' : 'nicht ausgerichtet: eigener Ausschnitt');
+    // Outside the forest there is no canopy; the green share shows plants spreading (e.g. on a glacier forefield).
+    const forest = (spot.landscape || 'wald') === 'wald';
     return [
       make('greenFraction', 'Grünanteil (%)', (p) => [`Lücken/Himmel ${pctText(p.gapFraction)}`, frameNote(p)].filter(Boolean).join(' · ')),
-      make('canopyCover', 'Kronendach-Deckung, obere Bildhälfte (%)', (p) => [`Grünwert GCC ${p.gcc.toFixed(2)}`, frameNote(p)].filter(Boolean).join(' · ')),
+      ...(forest ? [make('canopyCover', 'Kronendach-Deckung, obere Bildhälfte (%)', (p) => [`Grünwert GCC ${p.gcc.toFixed(2)}`, frameNote(p)].filter(Boolean).join(' · '))] : []),
     ];
   }
 
@@ -366,10 +369,17 @@
       if (vegData.pending) parts.push(el('p', { class: 'context-loading', text: `Vegetationsdichte wird berechnet (${vegData.pending} Foto${vegData.pending === 1 ? '' : 's'}) …` }));
       if (domain) parts.push(...photoCharts(domain));
       if (vegData.photos.some((p) => p.frame === 'spot')) {
-        parts.push(el('p', { class: 'hint', text: 'Aus den Bildfarben geschätzt, bei ausgerichteten Fotos im gemeinsamen Bildausschnitt des Spots. Grün = Laub und Nadeln; Kronendach-Deckung = Anteil der oberen Bildhälfte ohne sichtbaren Himmel.' }));
+        parts.push(el('p', {
+          class: 'hint',
+          text: (state.spot.landscape || 'wald') === 'wald'
+            ? 'Aus den Bildfarben geschätzt, bei ausgerichteten Fotos im gemeinsamen Bildausschnitt des Spots. Grün = Laub und Nadeln; Kronendach-Deckung = Anteil der oberen Bildhälfte ohne sichtbaren Himmel.'
+            : 'Aus den Bildfarben geschätzt, bei ausgerichteten Fotos im gemeinsamen Bildausschnitt des Spots. Grün = Pflanzen, die sich ansiedeln.',
+        }));
       }
     }
-    if (ndviData && ndviData.status !== 'disabled') {
+    // Glacier spots tell their satellite story as snow and ice (glacier.js); NDVI only where there is one.
+    const iceOnly = state.spot.landscape === 'gletscher' && !ndviData?.monthly?.length;
+    if (ndviData && ndviData.status !== 'disabled' && !iceOnly) {
       parts.push(...alertCards());
       if (domain && ndviData.monthly.length) {
         parts.push(...['ndvi', 'ndmi'].map((k) => indexChart(domain, k)).filter(Boolean));

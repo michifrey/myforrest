@@ -72,7 +72,7 @@
       fd.append('lon', String(state.picked.lng));
     }
     if (form.takenAtLocal.value) fd.append('takenAt', new Date(form.takenAtLocal.value).toISOString());
-    for (const name of ['activity', 'note', 'utcOffsetMinutes', 'clockShiftSeconds']) fd.append(name, form[name].value);
+    for (const name of ['activity', 'note', 'utcOffsetMinutes', 'clockShiftSeconds', 'landscape']) fd.append(name, form[name].value);
     fd.append('tags', [...$('upload-tags').querySelectorAll('input:checked')].map((c) => c.value).join(','));
     return fd;
   }

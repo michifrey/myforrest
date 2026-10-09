@@ -25,6 +25,13 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
   Aufzeichnung im Hintergrund (braucht eine native Hülle, Browser stoppen GPS im Hintergrund),
   Benachrichtigung, wenn ein eigener Fotoauftrag erledigt wurde, Ablaufdatum für Aufträge.
 
+- **Weitere Landschaften**: Profil *Gebirge* (Felssturz, Murgang, Permafrost, Verbuschung von Alpweiden;
+  Routing mit SAC-Skala) und *Trockengebiet* (Wanderdünen, Bodenerosion; Ausrichtung auf Fels und Horizont
+  statt auf Bäume, längere Offline-Zeiten); Name der App für mehr als den Wald.
+- **Gletscher ausbauen**: Längenänderung der Zunge aus den GLAMOS-Messreihen am Spot zeigen; schuttbedecktes
+  Eis mit einem eigenen Index (z. B. NDSI und Temperatur) erkennen; Archivbilder aus Sammlungen mit offener
+  Lizenz (z. B. ETH-Bibliothek) als Vorschlag am passenden Standort anbieten.
+
 ## Phase 3: Automatische Auswertung
 
 - **Objekterkennung**: ein feinjustiertes YOLO- oder Segmentierungsmodell für umgestürzte Bäume,
@@ -70,6 +77,8 @@ Aus früheren Versionen dieser Roadmap:
 - Video statt Einzelbilder (GoPro mit GPMF, 360°-MP4, GPX), unscharfe Bilder werden ersetzt oder verworfen
 - 360°-Fotos beim Upload erkennen, Panoramen über eine Drehung der Kugel ausrichten und vergleichen
 - Durchgehen wie Street View: Pfeile entlang der Aufnahme und zu Spots in der Nähe, Blickrichtung bleibt beim Schritt
+- Landschaftsprofile, als erstes der Gletscher: Umrisse aus Gletscherinventaren pro Jahr, Eis im Spätsommer aus
+  Sentinel-2, Archivfotos mit Datum von Hand, Beobachtungen und Auswertung je Landschaft
 - Spots mit gemischten Blickrichtungen auf Wunsch aufteilen
 - Karte und Spots entlang einer Route offline speichern; Benachrichtigung, wenn ein Upload im Hintergrund
   abgelehnt wurde
