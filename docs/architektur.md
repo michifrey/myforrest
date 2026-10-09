@@ -89,6 +89,7 @@ src/routes/organizations.js  Mitglieder einer Organisation aufnehmen, Einladunge
 src/routes/profile.js   Eigene Profilseite: Zahlen, eigene Fotos und Export als ZIP (nur für das eigene Konto)
 src/zip.js           ZIP-Archive als Stream schreiben (ohne Kompression, ZIP64 ab 4 GB), ohne Abhängigkeiten
 src/trackfile.js     Touren lesen (GPX, TCX, KML, GeoJSON, NMEA) und als GPX schreiben
+src/gpkg-tiles.js    Vektorkacheln im LV95-Gitter als GeoPackage (OGC-Erweiterung Vektorkacheln, Gitter mit exakt gleicher Fläche je Stufe)
 src/coolmap.js       Karte kühler Abschnitte: Tour-Temperaturen ohne Wetter, Tageszeit und Trägheit, in 100-m-Zellen über Touren gemittelt
 src/routegeo.js      Länge, Abstand zur Route und Position entlang der Route, Privatzone an den Enden
 src/sensitive.js     Sensible Arten (Orchideen, geschützte Pflanzen), deren Funde automatisch geschützt werden; kantonale Schutzlisten (CSV-Import)

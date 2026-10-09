@@ -61,8 +61,9 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
   HTTPS und ein Helm-Chart für den Betrieb ausserhalb des eigenen Rechners.
 - **Metadaten**: Einträge pro Collection und einen Objektkatalog (Feature Catalogue) für geocat.ch; den Weg
   zu opendata.swiss einmal mit einem echten Konto durchspielen.
-- **Kacheln**: PMTiles/MBTiles mit streamendem Schreiber für sehr grosse Datenmengen; LV95-Kacheln auch als
-  Datei (z. B. GeoPackage-Kacheln mit eigenem Kachelgitter).
+- **Kacheln**: die LV95-Kacheln in einer Form, die QGIS direkt öffnet (GDAL liest Vektorkacheln in GeoPackage noch
+  nicht), etwa als gerenderte Rasterkacheln im selben Gitter; den Kachel-Speicher für ganz grosse Datenmengen auf
+  mehrere Dateien verteilen.
 
 ## Bereits umgesetzt
 
@@ -112,6 +113,8 @@ Aus früheren Versionen dieser Roadmap:
   Kreuzvalidierung nach Spots, getrennt für Laub- und Nadelwald
 - Frühwarnung als Push-Nachricht an Leute, die den Spot regelmässig besuchen oder ihm folgen
 - Angleichung von Landsat an Sentinel-2 aus den Überlappungsjahren
+- PMTiles/MBTiles Kachel für Kachel geschrieben (auch sehr grosse Datenmengen), LV95-Kacheln als GeoPackage mit eigenem
+  Kachelgitter
 - Geodienste: OGC API – Features und Tiles (auch im LV95-Kachelgitter, vorberechnet, PMTiles/MBTiles),
   Vektorkarten, QGIS Server, Metadaten für geocat.ch (GM03)
 - Betrieb mit Docker Compose und Kubernetes (podman-Startskript)

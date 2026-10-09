@@ -958,6 +958,19 @@ einbinden.
     wie tileserver-gl oder martin.
   - Solange die Dateien zur aktuellen Datenversion noch berechnet werden, antworten beide mit 503 und
     `Retry-After`.
+  - **Auch für sehr grosse Datenmengen**: Die Dateien entstehen Kachel für Kachel aus dem Kachel-Speicher. Für
+    PMTiles hält der Server nur das Verzeichnis im Speicher (wenige Bytes pro Kachel) und schreibt die Kacheln
+    nacheinander in eine Zwischendatei, gleiche Kacheln nur einmal; MBTiles und GeoPackage werden seitenweise
+    gelesen. Das Ergebnis ist byte-gleich wie zuvor.
+- **LV95-Kacheln als GeoPackage**: `/api/export/myforrest-kacheln-lv95.gpkg` enthält die Vektorkacheln des
+  Datensatzes im Kachelgitter von swisstopo (EPSG:2056), nach der OGC-Erweiterung für Vektorkacheln in
+  GeoPackage (`data_type` *vector-tiles*, Ebenen und Felder in `gpkgext_vt_layers`/`gpkgext_vt_fields`, Mapbox
+  Vector Tiles). Weil ein GeoPackage verlangt, dass jede Zoomstufe dieselbe Fläche exakt abdeckt, und die
+  swisstopo-Auflösungen keine Zweierpotenzen sind (Erweiterung *gpkg_zoom_other*), enthält die Datei die feinen
+  Stufen, für die das aufgeht: 500 m bis 0,5 m pro Pixel (Stufen 15–26), auf einer Fläche, deren Seiten ein
+  Vielfaches aller dieser Kachelbreiten sind, oben links am Ursprung von swisstopo. Spalten und Zeilen sind
+  deshalb dieselben wie bei swisstopo und in der OGC API. GDAL (geprüft mit 3.12) und damit QGIS lesen
+  Vektorkacheln in GeoPackage noch nicht; in QGIS gehen die LV95-Kacheln über die OGC API Tiles.
 - **Metadaten für geocat.ch**: `/api/metadata/geocat.xml` beschreibt den Datensatz nach dem Schweizer
   Metadatenmodell GM03 (ISO19139.che), dem Format von geocat.ch. `/api/metadata/iso19139.xml` liefert
   dasselbe als reines ISO 19139 für andere Kataloge.

@@ -40,6 +40,22 @@ function createTileCache(file) {
   const putBuild = db.prepare(`INSERT OR REPLACE INTO builds (tileset, version, max_zoom, tiles, bytes, built_at, millis)
     VALUES (?, ?, ?, ?, ?, ?, ?)`);
   const allTiles = db.prepare('SELECT z, x, y, data FROM tiles WHERE tileset = ? AND version = ? ORDER BY z, x, y');
+  const keyPage = db.prepare(`SELECT z, x, y FROM tiles WHERE tileset = ? AND version = ? AND (z, x, y) > (?, ?, ?)
+    ORDER BY z, x, y LIMIT ?`);
+  const tilePage = db.prepare(`SELECT z, x, y, data FROM tiles WHERE tileset = ? AND version = ? AND (z, x, y) > (?, ?, ?)
+    ORDER BY z, x, y LIMIT ?`);
+  const PAGE = 512;
+  /** Rows page by page (keyset pagination): only one page is in memory at a time. */
+  function* pages(stmt, tileset, version) {
+    let last = [-1, -1, -1];
+    for (;;) {
+      const rows = stmt.all(tileset, version, ...last, PAGE);
+      yield* rows;
+      if (rows.length < PAGE) return;
+      const r = rows[rows.length - 1];
+      last = [r.z, r.x, r.y];
+    }
+  }
   let closed = false;
 
   /** The build of a tileset when it is current (matches `version`), else null. */
@@ -107,6 +123,22 @@ function createTileCache(file) {
     /** All stored tiles of a current build ([{ z, x, y, data }], gzip-compressed). */
     tiles(tileset, version) {
       return allTiles.all(tileset, version).map((r) => ({ ...r, data: Buffer.from(r.data) }));
+    },
+
+    /** The same one by one (z, x, y order), for writing large exports without holding them in memory. */
+    *each(tileset, version) {
+      for (const r of pages(tilePage, tileset, version)) yield { z: r.z, x: r.x, y: r.y, data: Buffer.from(r.data) };
+    },
+
+    /** Only the addresses of the stored tiles: [{ z, x, y }]. */
+    keys(tileset, version) {
+      return [...pages(keyPage, tileset, version)].map((r) => ({ z: r.z, x: r.x, y: r.y }));
+    },
+
+    /** One stored tile (gzip-compressed Buffer) or null. */
+    tile(tileset, version, z, x, y) {
+      const row = getTile.get(tileset, version, z, x, y);
+      return row ? Buffer.from(row.data) : null;
     },
 
     /** Removes every tileset whose key does not start with one of these prefixes. */
