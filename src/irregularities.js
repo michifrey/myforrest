@@ -48,7 +48,7 @@ const names = (list) => list.map((t) => t.de).join(', ');
 function assess({
   takenAt, tags = [], change = null, weather = null, species = [],
   elevation = null, aspect = null, slope = null, landform = null, tpi600 = null,
-  nightFrost = null, phenoRef = null,
+  nightFrost = null, phenoRef = null, leafOut = null,
 }) {
   const terrain = { elevation, aspect, slope, landform, tpi600 };
   const out = [];
@@ -135,9 +135,16 @@ function assess({
   // Cold-air pools: frost after leaf-out even when the weather model stays just above zero.
   // This year's leaf-out lies in the year-to-date window, not necessarily in the last 90 days.
   const season = weather?.yearToDate;
+  // Leaf-out of the region (phenoref.js: this year's observations or the ten-year mean, at the spot's altitude);
+  // without data the fixed mid-April date. Frost before leaf-out does not hurt the leaves.
+  const leafOutDoy = leafOut?.doy ?? LEAF_OUT_DOY;
+  const doyOf = (iso) => Math.floor((Date.parse(`${iso}T12:00:00Z`) - Date.UTC(+iso.slice(0, 4), 0, 1)) / 86400000) + 1;
+  const frostAfter = nightFrost && leafOut
+    ? { ...nightFrost, frostNights: nightFrost.frostNights.filter((n) => doyOf(n.date) >= leafOutDoy) }
+    : nightFrost;
   // With estimated hollow minima (nightcool.js) only nights estimated below 0 °C count; else the 3 °C model rule.
-  const cold = nightFrost ? nightFrost.frostNights.length : season?.coldNightsAfterLeafOut;
-  const frostRisk = landform === 'senke' && cold > 0 && day >= LEAF_OUT_DOY;
+  const cold = frostAfter ? frostAfter.frostNights.length : season?.coldNightsAfterLeafOut;
+  const frostRisk = landform === 'senke' && cold > 0 && day >= leafOutDoy;
   // Brown young leaves in early summer after cold nights in a hollow: frost damage, not autumn colouring.
   const frostDamage = frostRisk && (colouredRegion || taggedColouring) && day >= SEASON_START_DOY && day <= 200;
 
@@ -192,14 +199,17 @@ function assess({
   if (frostRisk) {
     const damaged = frostDamage;
     const tender = species.filter((t) => FROST_TENDER.includes(t.sci));
-    const c = season.coldestAfterLeafOut;
+    const c = season?.coldestAfterLeafOut;
     out.push({
       type: 'spaetfrost',
       severity: damaged ? 'auffällig' : 'hinweis',
       title: damaged ? 'Spätfrost wahrscheinlich' : 'Spätfrost-Gefahr in der Senke',
       text: 'Der Spot liegt in einer Senke, in der sich in klaren Nächten Kaltluft sammelt. ' +
-        (nightFrost
-          ? frostNightsText(nightFrost)
+        (leafOut
+          ? `Das Laub treibt hier um den ${fmtDoy(leafOut.doy)} aus (${leafOut.label}, auf die Höhe des Spots umgerechnet). `
+          : '') +
+        (frostAfter
+          ? frostNightsText(frostAfter)
           : `Nach dem Laubaustrieb zeigt das Wettermodell ${cold} ${cold === 1 ? 'Nacht' : 'Nächte'} unter 3 °C` +
             (c ? ` (kälteste: ${c.tmin.toFixed(1)} °C am ${fmtDay(Date.parse(`${c.date}T00:00:00Z`))})` : '') +
             '; in der Senke war es vermutlich mehrere Grad kälter, also Frost. ') +

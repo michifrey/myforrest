@@ -199,11 +199,15 @@ erreichbar, fallen die Heuristiken ein, und die Antwort enthält einen Hinweis.
 
 ## Phänologie-Referenzdaten laden
 
-Die Referenzreihen für den Beginn der Herbstfärbung (siehe
+Die Referenzreihen für den Beginn der Herbstfärbung und den Laubaustrieb (siehe
 [Phänologie-Referenzdaten](funktionen.md#phänologie-referenzdaten)) stammen vom Deutschen Wetterdienst
-(Open Data, `opendata.dwd.de`, Jahresmelder Wildwachsende Pflanzen). Sie werden nicht automatisch geladen:
+(Open Data, `opendata.dwd.de`, Jahres- und Sofortmelder Wildwachsende Pflanzen) und von MeteoSchweiz (OGD
+über `data.geo.admin.ch`). Sie werden nicht automatisch geladen:
 
-- `POST /api/phenoref/sync` lädt sie herunter (braucht Zugang zu `opendata.dwd.de`), oder
+- `POST /api/phenoref/sync` lädt die DWD-Daten herunter, samt Sofortmeldern für das laufende Jahr (braucht Zugang
+  zu `opendata.dwd.de`); `POST /api/phenoref/sync?source=meteoschweiz` die Daten von MeteoSchweiz über die
+  STAC-API (braucht Zugang zu `data.geo.admin.ch`). Für den Austrieb des laufenden Jahres lohnt es sich, im
+  Frühling wöchentlich zu synchronisieren, oder
 - einzelne Dateien werden importiert, zuerst die Stationen, danach jede Datei
   `PH_Jahresmelder_Wildwachsende_Pflanze_<Art>_….txt` mit `kind=observations&name=<Dateiname>`:
 
@@ -212,9 +216,19 @@ curl --data-binary @PH_Beschreibung_Phaenologie_Stationen_Jahresmelder.txt \
   'localhost:3000/api/phenoref/import?format=dwd&kind=stations'
 ```
 
-Andere Quellen wie MeteoSchweiz lassen sich als generisches CSV importieren (`format=generic`). Es hat die
-Spalten `source;station_id;station_name;lat;lon;elevation;species;year;doy` (lateinischer Artname, Tag im
-Jahr der beginnenden Blattverfärbung).
+Die Dateien von MeteoSchweiz lassen sich ebenso einzeln importieren, zuerst die Parameterbeschreibung, dann
+die Stationen, dann die Beobachtungen:
+
+```bash
+curl --data-binary @ogd-phenology_meta_parameters.csv 'localhost:3000/api/phenoref/import?format=meteoschweiz&kind=parameters'
+curl --data-binary @ogd-phenology_meta_stations.csv   'localhost:3000/api/phenoref/import?format=meteoschweiz&kind=stations'
+curl --data-binary @<Beobachtungen>.csv               'localhost:3000/api/phenoref/import?format=meteoschweiz&kind=observations'
+```
+
+Andere Quellen lassen sich als generisches CSV importieren (`format=generic`). Es hat die
+Spalten `source;station_id;station_name;lat;lon;elevation;species;year;doy`, optional `phase` (lateinischer
+Artname, Tag im Jahr; Phase `colour` für die beginnende Blattverfärbung, Standard, oder `leafout` für die
+Blattentfaltung).
 
 ## Mit Docker und QGIS Server
 

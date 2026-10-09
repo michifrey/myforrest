@@ -162,6 +162,9 @@ für das Kamera-Overlay) auf dem Gerät. Unterwegs zeigt die App Karte und Spots
   <img src="docs/screenshots/satellite.jpg" width="49%" alt="Satelliten-Frühwarnung und NDVI-Rückgang eines Nadelwald-Spots mit geeichter Schwelle">
 </p>
 
+Der Hinweis auf **Spätfrost** in Senken zählt erst Frostnächte nach dem tatsächlichen Laubaustrieb der Region,
+aus den Beobachtungen von DWD und MeteoSchweiz für das laufende Jahr.
+
 Eine **Sturmwarnung** aus der Prognose (ICON-D2) meldet Leuten, die einem Spot folgen oder ihn regelmässig
 fotografieren, Böen ab 75 km/h per Push; kam der Sturm, bittet eine zweite Nachricht danach um ein Foto, sobald es
 sicher ist.
@@ -462,7 +465,7 @@ entsteht aus `docs/*.md` (MkDocs Material) und wird bei jedem Merge neu veröffe
 Kartendaten © OpenStreetMap-Mitwirkende, Landeskarte und Luftbild © swisstopo. Wetterdaten von
 [Open-Meteo.com](https://open-meteo.com) (ERA5, CC BY 4.0). Enthält modifizierte Copernicus-Sentinel-Daten;
 Landsat-Daten mit freundlicher Genehmigung des U.S. Geological Survey. Phänologie-Daten: Deutscher
-Wetterdienst. Pflanzenbestimmung mit Pl@ntNet. Bilder von Mapillary (CC BY-SA 4.0) mit Urheber im Bild. Gletscherumrisse aus den geladenen Inventaren, z. B.
+Wetterdienst und MeteoSchweiz. Pflanzenbestimmung mit Pl@ntNet. Bilder von Mapillary (CC BY-SA 4.0) mit Urheber im Bild. Gletscherumrisse aus den geladenen Inventaren, z. B.
 GLAMOS. Details unter [Datenquellen](docs/betrieb.md#externe-datenquellen-und-netzzugang).
 
 Der Code steht unter der [Apache-Lizenz 2.0](LICENSE).

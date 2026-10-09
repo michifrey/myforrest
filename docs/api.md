@@ -47,10 +47,11 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/spots/:id/storms`      | Sturmereignisse am Spot (ab 12 Monate vor dem ersten Foto), mit verknüpften Windwurf-Fotos |
 | `GET`    | `/api/photos/:id/storm?to=`  | Wahrscheinlichster Sturm zwischen zwei Fotos             |
 | `GET`    | `/api/storms/spots`          | Spots mit Sturm seit dem ersten Foto (aus dem Cache; fehlende werden im Hintergrund geladen) |
-| `GET`    | `/api/phenoref`              | Geladene Phänologie-Reihen (Stationen, Beobachtungen, Arten) |
+| `GET`    | `/api/phenoref`              | Geladene Phänologie-Reihen (Stationen, Beobachtungen der Verfärbung, `leafout`: Beobachtungen des Austriebs, Arten) |
 | `GET`    | `/api/spots/:id/phenoref`    | Referenz für den Beginn der Herbstfärbung am Spot, pro Art mit Stationen |
-| `POST`   | `/api/phenoref/sync`         | DWD-Jahresmelder-Daten herunterladen (braucht Zugang zu `opendata.dwd.de`) |
-| `POST`   | `/api/phenoref/import?format=` | Datei als Text importieren: `generic` (CSV) oder `dwd&kind=stations\|plants\|phases\|observations&name=<Dateiname>` |
+| `GET`    | `/api/spots/:id/leafout?year=` | Laubaustrieb am Spot für ein Jahr (Standard: dieses): beobachtet (`year`) oder Mittel der letzten zehn Jahre (`year: null`), mit Stationen und `label` |
+| `POST`   | `/api/phenoref/sync`         | DWD-Jahres- und Sofortmelder herunterladen (braucht Zugang zu `opendata.dwd.de`); `?source=meteoschweiz`: Phänologie-OGD von MeteoSchweiz (`data.geo.admin.ch`) |
+| `POST`   | `/api/phenoref/import?format=` | Datei als Text importieren: `generic` (CSV), `dwd&kind=stations\|plants\|phases\|observations&name=<Dateiname>` oder `meteoschweiz&kind=parameters\|stations\|observations` |
 | `PATCH`  | `/api/spots/:id`             | Höhe (`{ elevation: 950 }`), Exposition (`{ exposition: 'S' }`, auch `'eben'`) und/oder Geländeform (`{ landform: 'senke' }`) von Hand setzen; `null` ermittelt den Wert neu |
 | `PUT`    | `/api/spots/:id/landscape`   | Landschaftsprofil von Hand setzen (`{ landscape: 'gletscher' }`); `null` bestimmt es neu (Gletscherumrisse) |
 | `GET`    | `/api/spots/:id/glacier`     | Gletscher am Spot: `glacier` (Name, `latestYear`, `distanceM` zum Eis des neusten Inventars, `history` mit `ice` pro Inventarjahr) und `satellite` (Schnee- und Eisanteil: `monthly`, `summers` mit dem Spätsommerwert pro Jahr, `iceFreeSince`, `meltOut` mit dem Monat der Ausaperung pro Jahr, `status`) |

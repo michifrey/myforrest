@@ -187,8 +187,10 @@ test('DWD phenology files parse by header names, Latin-1 and padded', () => {
   assert.equal(speciesFromFileName('PH_Jahresmelder_Wildwachsende_Pflanze_Stiel-Eiche_akt.txt'), 'Quercus robur');
   const obs = parseDwdObservations(dwd('PH_Jahresmelder_Wildwachsende_Pflanze_Rotbuche_akt.txt'), { plants });
   assert.ok(obs.every((o) => o.species === 'Fagus sylvatica'));
-  assert.ok(!obs.some((o) => o.doy === 110), 'leaf unfolding (phase 4) is skipped');
-  assert.deepEqual(obs.find((o) => o.station === '103' && o.year === 2019), { station: '103', species: 'Fagus sylvatica', year: 2019, doy: 268 },
+  assert.ok(!obs.some((o) => o.doy === 110 && o.phase === 'colour'), 'leaf unfolding (phase 4) is not colouring');
+  assert.deepEqual(obs.find((o) => o.station === '101' && o.year === 2010 && o.phase === 'leafout'),
+    { station: '101', species: 'Fagus sylvatica', year: 2010, doy: 110, phase: 'leafout' }, 'but kept as leaf-out');
+  assert.deepEqual(obs.find((o) => o.station === '103' && o.year === 2019), { station: '103', species: 'Fagus sylvatica', year: 2019, doy: 268, phase: 'colour' },
     'day of year from the date when Jultag is missing');
 });
 
@@ -236,7 +238,7 @@ test('generic CSV import (e.g. converted MeteoSchweiz data)', () => {
   const ref = createPhenoRef({ db: new DatabaseSync(':memory:'), now: () => Date.UTC(2026, 9, 7) });
   const rows = ['source,station_id,station_name,lat,lon,elevation,species,year,doy'];
   for (let y = 2016; y <= 2025; y++) rows.push(`meteoschweiz,SMA,Zürich-Fluntern,47.378,8.566,556,Fagus sylvatica,${y},${y % 2 ? 280 : 282}`);
-  assert.deepEqual(ref.importGeneric(rows.join('\n')), { stations: 1, observations: 10 });
+  assert.deepEqual(ref.importGeneric(rows.join('\n')), { stations: 1, observations: 10, leafout: 0 });
   const r = ref.reference('Fagus sylvatica', { lat: 47.36, lon: 8.58, elevation: 556 });
   assert.equal(r.doy, 281);
   assert.equal(r.label, 'Referenz: MeteoSchweiz-Station Zürich-Fluntern, 2 km, 556 m, Mittel 2016–2025');

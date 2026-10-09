@@ -44,9 +44,9 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
   Beispiele gewichten.
 - **Nadel-/Laubholzanteil**: mit Referenzfotos pro Art kalibrieren und Arten direkt im Bild erkennen, auch
   ohne Pl@ntNet.
-- **Phänologie**: MeteoSchweiz-Daten direkt lesen (heute über das generische CSV), Referenz auch für den
-  Laubaustrieb (Spätfrost erst nach dem tatsächlichen Austrieb der Region) und für das laufende Jahr
-  (Sofortmelder) statt nur des Zehnjahresmittels.
+- **Phänologie**: den MeteoSchweiz-Leser mit echten Downloads prüfen; die Stundenwerte der Nächte schon ab
+  März laden, damit ein früher Austrieb (warme Jahre, tiefe Lagen) auch frühe Frostnächte zählt; die Herbstfärbung
+  des laufenden Jahres aus den Sofortmeldern.
 - **Stürme genauer**: auch die vergangenen Stürme aus feiner aufgelösten Daten (Stationsmessungen von
   MeteoSchweiz statt ERA5), Gewitterböen (lokal, im Modell kaum sichtbar) aus Warnungen der Wetterdienste.
 - **Vegetationsdichte verfeinern**: Himmel und Vegetation mit einem Segmentierungsmodell statt Farbregeln
@@ -102,6 +102,8 @@ Aus früheren Versionen dieser Roadmap:
 - Sturmereignisse aus Böen mit Windwurf-Funden verknüpfen
 - Sturmwarnung aus der Böenprognose (ICON-D2) per Push, nach dem Sturm die Bitte um ein Foto, wenn er wirklich kam
 - DWD-Phänologie als Referenz für den Beginn der Herbstfärbung
+- Phänologie von MeteoSchweiz direkt (OGD), Laubaustrieb aus Jahres- und Sofortmeldern; Spätfrost zählt erst nach dem
+  Austrieb der Region
 - Nächtliche Abkühlung in Senken aus Wind und Bewölkung
 - Hotspot-Karten, Ausbreitungsfronten und Datei-Export zu Info Flora / iNaturalist
 - Satellitenkontext: NDMI, Frühwarnung ohne neue Fotos, Landsat vor 2017, Sturm als Kontext

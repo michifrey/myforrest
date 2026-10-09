@@ -421,6 +421,7 @@ function createApp({
       species,
       ...terrain,
       nightFrost: extra.nightFrost,
+      leafOut: extra.leafOut,
       phenoRef: extra.phenoRef,
     }), ...extra.irregularities];
     // Outside the forest only the weather counts (drought, heat, wet, storms), not leaves, frost on shoots or beetles.

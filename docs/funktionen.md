@@ -428,6 +428,15 @@ geschätzt unter 0 °C fallen, zählen als Spätfrost. Im Kontext des Fotos steh
 Modellminimum, geschätztem Minimum in der Senke, Wind und Bewölkung. Fehlen Stundenwerte, gilt die alte
 3-°C-Regel.
 
+**Ab dem echten Laubaustrieb**: Frost schadet erst den ausgetriebenen Blättern. Die App nimmt deshalb den
+Austrieb der Region (siehe [Phänologie-Referenzdaten](#phänologie-referenzdaten)): für das Jahr des Fotos die
+Beobachtungen nahe gelegener Stationen, sobald sie gemeldet sind (DWD-Sofortmelder, MeteoSchweiz), sonst das
+Mittel der letzten zehn Jahre, mit 3 Tagen pro 100 m später in der Höhe. Massgebend sind die Laubbäume am Spot,
+ohne bestimmte Bäume die Buche. Frostnächte davor zählen nicht. Der Hinweis nennt die Quelle, z. B. *Das Laub
+treibt hier um den 28.04. aus (Beobachtet 2026: MeteoSchweiz-Station Zürich-Fluntern, 2 km, 556 m, auf die Höhe
+des Spots umgerechnet)*. Ohne Daten gilt wie bisher der 15. April. Die Stundenwerte der Nächte deckt die App
+vom 15. April bis 15. Juni ab; ein Austrieb vor dem 15. April verschiebt den Beginn also nicht nach vorne.
+
 ### Sturmereignisse
 
 Für jeden Spot lädt die App die täglichen Spitzenböen und die vorherrschende
@@ -470,10 +479,20 @@ keine Spots: Die App ordnet ihre sichtbaren Spots selbst zu, geschützte Funde b
 
 ### Phänologie-Referenzdaten
 
-Statt pauschaler Gradienten kann die App den Beginn der Herbstfärbung aus
-regionalen Beobachtungsreihen nehmen. Unterstützt sind die Jahresmelder-Daten des DWD (Phase
-*Blattverfärbung* für Rotbuche, Stiel- und Traubeneiche, Hänge-Birke, Rosskastanie, Eberesche, Linden,
-Ahorne und weitere) und ein einfaches CSV-Format für andere Quellen wie MeteoSchweiz. Für einen Spot zählen
+Statt pauschaler Gradienten kann die App den Beginn der Herbstfärbung und den Laubaustrieb aus
+regionalen Beobachtungsreihen nehmen. Unterstützt sind
+
+- die Jahresmelder-Daten des DWD (Phasen *Blattverfärbung* und *Blattentfaltung* für Rotbuche, Stiel- und
+  Traubeneiche, Hänge-Birke, Rosskastanie, Eberesche, Linden, Ahorne und weitere) und die **Sofortmelder** des
+  DWD, die das laufende Jahr innert Tagen melden;
+- die **offenen Phänologiedaten von MeteoSchweiz** (OGD über data.geo.admin.ch): Art und Phase liest die App aus
+  der deutschen Parameterbeschreibung (*Buche: Blattentfaltung*, *Buche: Blattverfärbung* …). Der Leser folgt der
+  veröffentlichten Beschreibung der Dateien; mit echten Downloads ist er noch nicht geprüft;
+- ein einfaches CSV-Format für weitere Quellen.
+
+Für den Laubaustrieb verschiebt die Höhe in die andere Richtung (3 Tage später pro 100 m), und für das laufende
+Jahr ersetzen die eigenen Beobachtungen das Mittel, sobald eine Station in der Nähe gemeldet hat. Für die
+Herbstfärbung gilt: Für einen Spot zählen
 die Stationen im Umkreis von 60 km (100 m Höhenunterschied wiegen wie 10 km Distanz) mit mindestens fünf
 Jahren in den letzten zehn abgeschlossenen Jahren. Bis zu drei Stationen werden gewichtet gemittelt und mit
 2,5 Tagen pro 100 m auf die Höhe des Spots umgerechnet. Exposition und Kaltluft kommen wie bisher dazu.
