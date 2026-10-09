@@ -647,6 +647,11 @@ module.exports = function registerAccounts(app, ctx) {
   });
   const backTo = (res, params) => res.redirect(303, `/?${new URLSearchParams(params)}`);
 
+  // Public keys for providers that authenticate the app by a signed assertion (private_key_jwt).
+  app.get('/api/auth/jwks.json', (req, res) => {
+    res.set('Cache-Control', 'public, max-age=300').json(oauth.jwks());
+  });
+
   app.get('/api/auth/oauth/:provider', async (req, res) => {
     const provider = oauth.get(req.params.provider);
     if (!provider) return fail(res, 404, 'Diese Anmeldung ist nicht eingerichtet');

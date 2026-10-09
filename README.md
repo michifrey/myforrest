@@ -261,7 +261,7 @@ leitet die **Organisation** und nimmt Kolleginnen und Kollegen auf; wer noch kei
 **Einladung per E-Mail** und registriert sich über den Link. Mitglieder sehen geschützte Funde, solange eine
 Person der Leitung verifiziert ist, und die Leitung lässt sich weitergeben.
 
-### 12. Konto: E-Mail, Google, GitHub, Microsoft oder SWITCH edu-ID
+### 12. Konto: E-Mail, Google, GitHub, Microsoft, SWITCH edu-ID oder AGOV
 
 <p>
   <img src="docs/screenshots/anmelden.png" width="38%" alt="Anmeldedialog mit Google, GitHub und E-Mail">
@@ -269,7 +269,7 @@ Person der Leitung verifiziert ist, und die Leitung lässt sich weitergeben.
   <img src="docs/screenshots/konto-loeschen.png" width="38%" alt="Konto löschen mit der Wahl, die Fotos anonym zu behalten oder zu löschen">
 </p>
 
-Ein **Konto** legt man mit E-Mail und Passwort an oder mit einem Klick über **Google**, **GitHub**, **Microsoft** oder **SWITCH edu-ID**
+Ein **Konto** legt man mit E-Mail und Passwort an oder mit einem Klick über **Google**, **GitHub**, **Microsoft** oder **SWITCH edu-ID** (bei Behörden auch **AGOV**)
 (links). Nach der Registrierung kommt ein **Bestätigungslink** per E-Mail; bis dahin erinnert das Konto-Menü
 daran (Mitte). Ein vergessenes Passwort lässt sich per Link **zurücksetzen**, im Menü **ändern**, und
 Google, GitHub, Microsoft oder SWITCH edu-ID lassen sich mit einem bestehenden Konto **verknüpfen**. Wer geht, **löscht das Konto**
@@ -323,7 +323,7 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   Organisationen nehmen ihre Mitglieder selbst auf.
 - **[Fahrtmodus](docs/funktionen.md#fahrtmodus-dashcam-im-auto)**: das Handy als Dashcam im Auto, Route
   automatisch, Bilder an Spots und alle 150 m, Stillstand und Doppelte werden schon auf dem Gerät verworfen.
-- **[Konten und Moderation](docs/funktionen.md#konten-moderation-und-lizenzen)**: Konten mit Rollen, Anmeldung mit E-Mail (Bestätigungslink, Passwort ändern und zurücksetzen, Konto löschen, Profil mit den eigenen Fotos, Export der eigenen Daten) oder über Google, GitHub, Microsoft, SWITCH edu-ID und weitere OpenID-Connect-Dienste,
+- **[Konten und Moderation](docs/funktionen.md#konten-moderation-und-lizenzen)**: Konten mit Rollen, Anmeldung mit E-Mail (Bestätigungslink, Passwort ändern und zurücksetzen, Konto löschen, Profil mit den eigenen Fotos, Export der eigenen Daten) oder über Google, GitHub, Microsoft, SWITCH edu-ID, AGOV und weitere OpenID-Connect-Dienste,
   Lizenz pro Foto, Melden und Moderieren.
 
 ## Schnellstart

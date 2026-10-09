@@ -21,6 +21,15 @@
  *   ("nOAuth"): the address counts as verified only with the optional claim
  *   `xms_edov` (domain owner verified), which the app registration has to
  *   add to the ID token together with `email`.
+ * - AGOV (authentication service of Swiss authorities): an OpenID Connect
+ *   provider like the generic one, with its issuer from the configuration.
+ *
+ * Instead of a client secret, any OpenID Connect provider can take a private
+ * key (`privateKey`, PEM, RSA or EC P-256): the app then authenticates at the
+ * token endpoint with a signed assertion (`private_key_jwt`, RFC 7523) and
+ * publishes the public keys at /api/auth/jwks.json for the registration.
+ * `acrValues` asks for an authentication quality (`acr_values`); it is
+ * requested, not enforced, since nothing in the app depends on it.
  *
  * A provider is enabled when its client ID and secret are configured. The
  * `state` and the PKCE verifier travel in a short-lived httpOnly cookie bound
@@ -88,6 +97,8 @@ Object.assign(PROVIDERS, {
   eduid: { label: 'SWITCH edu-ID', issuer: 'https://login.eduid.ch/', scope: 'openid email profile', profile: oidcProfile },
   // Any further provider, e.g. the Microsoft account of an organisation or a Keycloak (issuer and label from the config).
   oidc: { label: 'OpenID Connect', scope: 'openid email profile', profile: oidcProfile },
+  // AGOV, the login of Swiss authorities: the issuer comes from the registration in AGOV connect.
+  agov: { label: 'AGOV', scope: 'openid profile email', profile: oidcProfile },
 });
 
 const truthy = (v) => v === true || v === 1 || v === '1' || v === 'true';
@@ -132,6 +143,32 @@ PROVIDERS.microsoft = {
 };
 
 const base64url = (buf) => Buffer.from(buf).toString('base64url');
+
+/** A signing key from PEM: algorithm, public JWK with its RFC 7638 thumbprint as `kid`. */
+function signingKey(pem) {
+  const key = crypto.createPrivateKey(pem);
+  const jwk = crypto.createPublicKey(key).export({ format: 'jwk' });
+  let alg;
+  if (jwk.kty === 'RSA') alg = 'RS256';
+  else if (jwk.kty === 'EC' && jwk.crv === 'P-256') alg = 'ES256';
+  else throw new Error('Privater Schlüssel: nur RSA oder EC P-256');
+  const members = jwk.kty === 'RSA' ? { e: jwk.e, kty: jwk.kty, n: jwk.n } : { crv: jwk.crv, kty: jwk.kty, x: jwk.x, y: jwk.y };
+  const kid = base64url(crypto.createHash('sha256').update(JSON.stringify(members)).digest());
+  return { key, alg, publicJwk: { ...members, kid, alg, use: 'sig' } };
+}
+
+/** A client assertion for the token endpoint (private_key_jwt). */
+function clientAssertion(provider, audience) {
+  const { key, alg, publicJwk } = provider.signing;
+  const t = Math.floor(Date.now() / 1000);
+  const header = base64url(JSON.stringify({ alg, kid: publicJwk.kid, typ: 'JWT' }));
+  const payload = base64url(JSON.stringify({
+    iss: provider.clientId, sub: provider.clientId, aud: audience, jti: base64url(crypto.randomBytes(16)), iat: t, exp: t + 60,
+  }));
+  const input = `${header}.${payload}`;
+  const signature = crypto.sign('sha256', Buffer.from(input), alg === 'ES256' ? { key, dsaEncoding: 'ieee-p1363' } : key);
+  return `${input}.${base64url(signature)}`;
+}
 const sameIssuer = (a, b) => String(a || '').replace(/\/+$/, '') === String(b || '').replace(/\/+$/, '');
 
 /**
@@ -142,9 +179,14 @@ const sameIssuer = (a, b) => String(a || '').replace(/\/+$/, '') === String(b ||
 function createOAuth({ providers = {}, publicUrl = null, fetchImpl = fetch } = {}) {
   const enabled = {};
   for (const [id, conf] of Object.entries(providers)) {
-    if (!PROVIDERS[id] || !conf?.clientId || !conf?.clientSecret) continue;
+    if (!PROVIDERS[id] || !conf?.clientId || !(conf.clientSecret || conf.privateKey)) continue;
     const p = { ...PROVIDERS[id], ...Object.fromEntries(Object.entries(conf).filter(([, v]) => v)), id };
     if (p.profile === oidcProfile && !p.issuer && !p.authorizeUrl) continue; // a generic provider needs its issuer
+    if (p.privateKey) {
+      if (p.profile !== oidcProfile) throw new Error(`${p.label}: Anmeldung mit Schlüssel nur bei OpenID-Connect-Anbietern`);
+      p.signing = signingKey(p.privateKey);
+    }
+    if (p.acrValues) p.extraParams = { ...p.extraParams, acr_values: p.acrValues };
     if (p.urls && !conf.authorizeUrl) Object.assign(p, p.urls(p));
     enabled[id] = p;
   }
@@ -165,6 +207,9 @@ function createOAuth({ providers = {}, publicUrl = null, fetchImpl = fetch } = {
           throw new Error(`${provider.label}: unvollständige Konfiguration des Anbieters`);
         }
         const methods = d.token_endpoint_auth_methods_supported;
+        if (provider.signing && Array.isArray(methods) && !methods.includes('private_key_jwt')) {
+          throw new Error(`${provider.label} unterstützt keine Anmeldung mit Schlüssel (private_key_jwt)`);
+        }
         return {
           ...provider,
           authorizeUrl: d.authorization_endpoint,
@@ -189,6 +234,9 @@ function createOAuth({ providers = {}, publicUrl = null, fetchImpl = fetch } = {
   }
 
   return {
+    /** Public keys for private_key_jwt, to register with the providers (JWKS). */
+    jwks: () => ({ keys: Object.values(enabled).filter((p) => p.signing).map((p) => p.signing.publicJwk) }),
+
     /** Public list for the login dialog. */
     list: () => Object.values(enabled).map((p) => ({ id: p.id, label: p.label })),
     get: (id) => (Object.hasOwn(enabled, id) ? enabled[id] : null),
@@ -237,7 +285,10 @@ function createOAuth({ providers = {}, publicUrl = null, fetchImpl = fetch } = {
         code_verifier: verifier,
       };
       const headers = { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json', 'User-Agent': 'MyForrest' };
-      if (ep.basicAuth) {
+      if (ep.signing) {
+        form.client_assertion_type = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
+        form.client_assertion = clientAssertion(ep, ep.tokenUrl);
+      } else if (ep.basicAuth) {
         const enc = (v) => encodeURIComponent(v);
         headers.Authorization = `Basic ${Buffer.from(`${enc(provider.clientId)}:${enc(provider.clientSecret)}`).toString('base64')}`;
       } else {
@@ -259,16 +310,22 @@ function createOAuth({ providers = {}, publicUrl = null, fetchImpl = fetch } = {
  * Provider configuration from the environment: GOOGLE_, GITHUB_, MICROSOFT_,
  * EDUID_ and OIDC_CLIENT_ID / _CLIENT_SECRET; the generic provider also takes
  * OIDC_ISSUER and OIDC_LABEL (EDUID_ISSUER may point to a test system), and
- * MICROSOFT_TENANT limits the accounts (default 'common').
+ * MICROSOFT_TENANT limits the accounts (default 'common'). AGOV_ (and the
+ * other OpenID Connect providers) may take _PRIVATE_KEY_FILE (PEM) instead of
+ * the secret, and _ACR_VALUES.
  */
 function providersFromEnv(env = process.env) {
   const out = {};
   for (const id of Object.keys(PROVIDERS)) {
     const key = id.toUpperCase();
-    if (env[`${key}_CLIENT_ID`] && env[`${key}_CLIENT_SECRET`]) {
+    const keyFile = env[`${key}_PRIVATE_KEY_FILE`];
+    const privateKey = keyFile ? require('node:fs').readFileSync(keyFile, 'utf8') : undefined;
+    if (env[`${key}_CLIENT_ID`] && (env[`${key}_CLIENT_SECRET`] || privateKey)) {
       out[id] = {
         clientId: env[`${key}_CLIENT_ID`],
-        clientSecret: env[`${key}_CLIENT_SECRET`],
+        clientSecret: env[`${key}_CLIENT_SECRET`] || undefined,
+        privateKey,
+        acrValues: env[`${key}_ACR_VALUES`] || undefined,
         issuer: env[`${key}_ISSUER`] || undefined,
         label: env[`${key}_LABEL`] || undefined,
         tenant: env[`${key}_TENANT`] || undefined,
