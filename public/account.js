@@ -38,7 +38,8 @@ const ROLE_LABEL = { user: 'Mitglied', moderator: 'Moderation', admin: 'Administ
 const ACTION_LABEL = {
   hide: 'ausgeblendet', unhide: 'wieder eingeblendet', dismiss: 'Meldungen verworfen', delete: 'gelöscht', role: 'Rolle geändert',
   protect: 'geschützt', unprotect: 'Schutz aufgehoben', 'pro-verifiziert': 'PRO verifiziert', 'pro-abgelehnt': 'PRO abgelehnt', 'pro-entzogen': 'PRO entzogen',
-  'account-delete': 'Konto gelöscht',
+  'account-delete': 'Konto gelöscht', 'org-aufgenommen': 'in Organisation aufgenommen', 'org-entfernt': 'aus Organisation entfernt',
+  'org-verlassen': 'Organisation verlassen', 'org-rolle': 'Rolle in Organisation geändert',
 };
 const PROTECT_REASON = { upload: 'beim Hochladen geschützt', art: 'automatisch: seltene oder geschützte Art', pro: 'von einem PRO-Mitglied geschützt', moderation: 'von der Moderation geschützt' };
 /** Verified PRO members and moderation see protected finds exactly. */
@@ -100,6 +101,7 @@ function renderNav() {
     ...(u.emailVerified ? [] : [item('Bestätigungslink senden', resendVerification)]),
     item(u.proExpired ? 'PRO abgelaufen – verlängern' : u.proRenewable && !u.proRenewalRequestedAt ? `PRO läuft am ${fmtDate(u.proValidUntil)} ab – verlängern`
       : u.pro ? 'PRO-Mitgliedschaft' : u.proStatus === 'angefragt' ? 'PRO: Antrag in Prüfung' : 'PRO-Mitgliedschaft beantragen', openPro),
+    ...(u.organizations?.length ? [item(u.organizations.length === 1 ? `Organisation · ${u.organizations[0].name}` : 'Organisationen', () => openOrgs())] : []),
     u.hasPassword ? item('Passwort ändern', () => openAuth('change')) : item('Passwort festlegen', setPasswordByMail),
     ...providerItems,
     ...(isMod() ? [item('Moderation', () => openModeration('reported'))] : []),
@@ -518,6 +520,7 @@ modDialog.innerHTML = `
     <button type="button" role="tab" data-tab="log" aria-selected="false">Protokoll</button>
     <button type="button" role="tab" data-tab="users" aria-selected="false" data-admin>Konten</button>
     <button type="button" role="tab" data-tab="lists" aria-selected="false" data-admin>Schutzlisten</button>
+    <button type="button" role="tab" data-tab="orgs" aria-selected="false" data-admin>Organisationen</button>
   </div>
   <div id="mod-body" class="mod-body" aria-live="polite"></div>`;
 document.body.append(modDialog);
@@ -532,7 +535,7 @@ function openModeration(tab = 'reported') {
 }
 Account.openModeration = openModeration;
 
-const TAB_TITLE = { reported: 'Gemeldete Fotos', hidden: 'Ausgeblendete Fotos', log: 'Protokoll', users: 'Konten & Rollen', lists: 'Schutzlisten der Kantone' };
+const TAB_TITLE = { reported: 'Gemeldete Fotos', hidden: 'Ausgeblendete Fotos', log: 'Protokoll', users: 'Konten & Rollen', lists: 'Schutzlisten der Kantone', orgs: 'Organisationen' };
 
 async function showModTab(tab) {
   modTab = tab;
@@ -544,6 +547,7 @@ async function showModTab(tab) {
     if (tab === 'log') return renderLog(await api('/api/moderation/log'));
     if (tab === 'users') return renderUsers(await api('/api/users'));
     if (tab === 'lists') return renderLists(await api('/api/protected-species'));
+    if (tab === 'orgs') return renderAllOrgs(await api('/api/organizations'));
     const q = await api('/api/moderation/queue');
     $('mod-count').textContent = q.reported.length ? String(q.reported.length) : '';
     const items = tab === 'reported' ? q.reported : q.hidden.map((photo) => ({ photo, reports: [] }));
@@ -607,10 +611,13 @@ function proCell(u) {
     },
   });
   const label = u.proExpired ? 'abgelaufen' : PRO_LABEL[u.proStatus];
-  const parts = [el('span', { text: u.proStatus ? `${label}${u.organization ? ` · ${u.organization}` : ''}` : '–' })];
+  const parts = [el('span', { text: u.proStatus ? `${label}${u.organization ? ` · ${u.organization}` : ''}` : u.organizations?.some((o) => o.valid) ? 'über Organisation' : '–' })];
   if (u.proValidUntil) parts.push(el('span', { class: `muted small${u.proExpired ? ' danger' : ''}`, text: `${u.proExpired ? 'abgelaufen am' : 'gültig bis'} ${fmtDate(u.proValidUntil)}` }));
   if (u.proRenewalRequestedAt) parts.push(el('span', { class: 'small pro-renewal', text: `Verlängerung beantragt am ${fmtDate(u.proRenewalRequestedAt)}` }));
   if (u.proNote) parts.push(el('span', { class: 'muted small', text: u.proNote }));
+  for (const o of u.organizations || []) {
+    parts.push(el('span', { class: 'muted small', text: `${o.role === 'leitung' ? 'Leitung' : 'Mitglied'} von ${o.name}${o.valid ? '' : ' (nicht verifiziert)'}` }));
+  }
   if (u.proStatus === 'angefragt') parts.push(el('span', { class: 'pro-actions' }, [decide('verifiziert', 'Verifizieren', 'secondary'), decide('abgelehnt', 'Ablehnen')]));
   if (u.proStatus === 'verifiziert') {
     parts.push(el('span', { class: 'pro-actions' }, [
@@ -929,15 +936,20 @@ function openPro() {
   const u = Account.user;
   const close = el('button', { type: 'button', class: 'link', text: 'Schliessen', onclick: () => proDialog.close() });
   const intro = el('p', { class: 'muted', text: 'PRO-Mitglieder sind verifizierte Fachleute und Organisationen, etwa Forstdienste, kantonale Fachstellen oder Naturschutzorganisationen. Sie sehen geschützte Funde (seltene Pflanzen, Pilzstellen, Horste) mit genauer Lage. Alle anderen sehen davon nur ein 5-km-Raster, damit solche Orte nicht geplündert oder zertrampelt werden.' });
-  const body = [el('p', { class: 'eyebrow', text: 'PRO-Mitgliedschaft' }), el('h2', { id: 'pro-title', text: u.pro || u.proExpired ? `PRO · ${u.organizationRequested}` : 'Geschützte Funde sehen' }), intro];
+  const body = [el('p', { class: 'eyebrow', text: 'PRO-Mitgliedschaft' }), el('h2', { id: 'pro-title', text: u.pro || u.proExpired ? `PRO · ${u.organizationRequested || u.organization}` : 'Geschützte Funde sehen' }), intro];
   // Verification holds for a year; from 60 days before the end (and after it) it can be renewed.
   const renewing = u.proExpired || (u.proRenewable && !u.proRenewalRequestedAt);
-  if (u.pro && !renewing) {
+  if (u.proViaOrganization && u.proStatus !== 'angefragt') {
+    body.push(
+      el('p', { text: `Du siehst geschützte Funde als Mitglied von ${u.organization}${u.orgProUntil ? ` (verifiziert bis ${fmtDate(u.orgProUntil)})` : ''}. Die Leitung der Organisation bestätigt die Verifizierung jedes Jahr.` }),
+      el('div', { class: 'actions' }, [close, el('button', { type: 'button', class: 'btn primary', text: 'Organisation', onclick: () => { proDialog.close(); openOrgs(); } })]),
+    );
+  } else if (u.pro && !renewing) {
     body.push(
       el('p', { text: `Dein Konto ist verifiziert${u.proValidUntil ? ` bis ${fmtDate(u.proValidUntil)}` : ''}. Du siehst geschützte Funde und kannst Fotos schützen oder den Schutz aufheben.` }),
       ...(u.proRenewalRequestedAt ? [el('p', { class: 'small', text: `Verlängerung beantragt am ${fmtDate(u.proRenewalRequestedAt)}; sie wird geprüft.` })] : []),
       el('p', { class: 'muted small', text: 'Die Verifizierung gilt ein Jahr. Rund einen Monat vor dem Ablauf kommt eine Erinnerung per E-Mail.' }),
-      el('div', { class: 'actions' }, close),
+      el('div', { class: 'actions' }, [close, ...(u.organizations?.length ? [el('button', { type: 'button', class: 'btn primary', text: 'Mitglieder verwalten', onclick: () => { proDialog.close(); openOrgs(); } })] : [])]),
     );
   } else {
     const msg = el('p', { class: 'auth-error', role: 'alert', hidden: '' });
@@ -971,6 +983,110 @@ function openPro() {
   }
   proDialog.replaceChildren(...body);
   proDialog.showModal();
+}
+
+/* ---------- Organisations with several members ---------- */
+
+const orgDialog = el('dialog', { id: 'org-dialog', 'aria-labelledby': 'org-title' });
+document.body.append(orgDialog);
+const ORG_ROLE = { leitung: 'Leitung', mitglied: 'Mitglied' };
+
+/**
+ * One organisation with its members. `manage`: the current account leads it
+ * (or is an admin) and may add, remove and hand on the lead; `reload` after a change.
+ */
+function orgCard(o, { manage, reload }) {
+  const me = Account.user;
+  const msg = el('p', { class: 'auth-error', role: 'alert', hidden: '' });
+  const act = async (fn) => {
+    msg.hidden = true;
+    try {
+      await fn();
+      await reload();
+    } catch (err) {
+      msg.textContent = err.message;
+      msg.hidden = false;
+    }
+  };
+  const base = `/api/organizations/${o.id}/members`;
+  const status = o.valid ? `verifiziert bis ${fmtDate(o.validUntil)}`
+    : 'nicht verifiziert – die Mitglieder sehen keine geschützten Funde, bis eine Person der Leitung (wieder) verifiziert ist';
+  const rows = o.members.map((m) => {
+    const self = m.id === me.id;
+    const actions = [];
+    if (manage && !self) {
+      actions.push(
+        el('button', { type: 'button', class: 'link small', text: m.role === 'leitung' ? 'Zum Mitglied' : 'In die Leitung', onclick: () => act(() => jsonPost(`${base}/${m.id}`, { role: m.role === 'leitung' ? 'mitglied' : 'leitung' }, 'PATCH')) }),
+        el('button', { type: 'button', class: 'link small danger', text: 'Entfernen', onclick: () => confirm(`${m.name} aus ${o.name} entfernen?`) && act(() => api(`${base}/${m.id}`, { method: 'DELETE' })) }),
+      );
+    }
+    if (self) {
+      actions.push(el('button', { type: 'button', class: 'link small danger', text: 'Verlassen', onclick: () => confirm(`${o.name} verlassen? Geschützte Funde siehst du dann nur noch mit eigener PRO-Verifizierung.`) && act(() => api(`${base}/${m.id}`, { method: 'DELETE' })) }));
+    }
+    return el('li', { class: 'org-member' }, [
+      el('span', {}, [
+        el('strong', { text: m.name }),
+        el('span', { class: 'muted small', text: ` · ${ORG_ROLE[m.role]}${m.role === 'leitung' && m.verified ? ' · verifiziert' : ''}${m.email ? ` · ${m.email}` : ''}` }),
+      ]),
+      el('span', { class: 'pro-actions' }, actions),
+    ]);
+  });
+  const parts = [
+    el('h3', { text: o.name }),
+    el('p', { class: `small${o.valid ? '' : ' org-invalid'}`, text: status }),
+    el('ul', { class: 'org-members' }, rows),
+  ];
+  if (manage) {
+    const account = el('input', { id: `org-add-${o.id}`, required: '', maxlength: '200', placeholder: 'Name oder E-Mail-Adresse des Kontos', autocomplete: 'off' });
+    const role = el('select', { 'aria-label': 'Rolle' }, Object.entries(ORG_ROLE).reverse().map(([k, label]) => el('option', { value: k, text: label })));
+    const form = el('form', { class: 'org-add' }, [
+      el('label', { for: `org-add-${o.id}`, text: 'Mitglied aufnehmen' }),
+      el('div', { class: 'org-add-row' }, [account, role, el('button', { type: 'submit', class: 'btn primary', text: 'Aufnehmen' })]),
+      el('p', { class: 'muted small', text: 'Die Person braucht ein Konto mit bestätigter E-Mail-Adresse. Sie bekommt eine Mitteilung per E-Mail und sieht geschützte Funde, solange die Organisation verifiziert ist.' }),
+    ]);
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      act(() => jsonPost(base, { account: account.value, role: role.value }));
+    });
+    parts.push(form);
+  }
+  parts.push(msg);
+  return el('section', { class: 'org-card' }, parts);
+}
+
+async function openOrgs() {
+  const close = el('button', { type: 'button', class: 'link', text: 'Schliessen', onclick: () => orgDialog.close() });
+  const list = el('div', { class: 'org-list', 'aria-live': 'polite' });
+  const reload = async () => {
+    const orgs = await api('/api/organizations/mine');
+    // The account menu follows (e.g. after leaving).
+    const me = await api('/api/auth/me');
+    Account.user = me.user;
+    renderNav();
+    list.replaceChildren(...(orgs.length ? orgs.map((o) => orgCard(o, { manage: o.role === 'leitung', reload }))
+      : [el('p', { class: 'muted', text: 'Du gehörst keiner Organisation (mehr) an.' })]));
+  };
+  orgDialog.replaceChildren(
+    el('p', { class: 'eyebrow', text: 'PRO-Mitgliedschaft' }),
+    el('h2', { id: 'org-title', text: 'Organisation' }),
+    el('p', { class: 'muted small', text: 'Die Leitung einer verifizierten Organisation nimmt Kolleginnen und Kollegen auf; sie sehen geschützte Funde, ohne selbst einen Antrag zu stellen. Die Organisation gilt, solange mindestens eine Person der Leitung selbst verifiziert ist.' }),
+    list,
+    el('div', { class: 'actions' }, close),
+  );
+  orgDialog.showModal();
+  try {
+    await reload();
+  } catch (err) {
+    list.replaceChildren(el('p', { class: 'auth-error', text: err.message }));
+  }
+}
+Account.openOrgs = openOrgs;
+
+/** Admins: all organisations, to correct membership. */
+function renderAllOrgs(orgs) {
+  const reload = async () => renderAllOrgs(await api('/api/organizations'));
+  $('mod-body').replaceChildren(...(orgs.length ? orgs.map((o) => orgCard(o, { manage: true, reload }))
+    : [el('p', { class: 'mod-empty muted', text: 'Noch keine Organisationen. Sie entstehen, wenn ein PRO-Antrag verifiziert wird.' })]));
 }
 
 // Upload: without an account, a protected photo is invisible afterwards even to its uploader.
