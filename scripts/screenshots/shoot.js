@@ -1,6 +1,6 @@
 'use strict';
 // Takes the README screenshots from the demo server (see README.md here).
-// Usage: node shoot.js [hero map spot satellite sun species vektor touren walk schutz konto profil timelapse compare upload gletscher mobile]
+// Usage: node shoot.js [hero map spot satellite sun species vektor touren walk uebergang schutz konto profil timelapse compare upload gletscher mobile]
 // «mapillary» needs the demo server started with DEMO_MAPILLARY=1 (a Mapillary stand-in, see README.md).
 // «gletscher» uses the glacier demo server (BASE_GLETSCHER, default http://localhost:3124; see README.md).
 const path = require('path');
@@ -209,6 +209,40 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await settle(page, 4000);
     await page.screenshot({ path: out('durchgehen.jpg'), ...jpg });
     await page.close();
+  }
+
+  if (want('uebergang')) {
+    // A soft step in the walk-through, recorded as video: turn towards the way, walk ahead, and back again.
+    const dir = path.join(WORK, 'video');
+    fs.rmSync(dir, { recursive: true, force: true });
+    const vctx = await desktop(browser, { viewport: { width: 960, height: 600 }, recordVideo: { dir, size: { width: 960, height: 600 } } });
+    const page = await vctx.newPage();
+    await page.goto(`${BASE}/`);
+    await settle(page, 2000);
+    const ids = await page.evaluate(async () => {
+      const panos = [];
+      for (const s of await (await fetch('/api/spots')).json()) {
+        for (const p of (await (await fetch(`/api/spots/${s.id}`)).json()).photos) if (p.sequenceId === 'demo-360-waldweg') panos.push([p.takenAt, p.id]);
+      }
+      return panos.sort().map((x) => x[1]);
+    });
+    await page.evaluate((id) => Walk.open(id), ids[1]);
+    await settle(page, 2500);
+    for (let k = 0; k < 4; k++) await page.keyboard.press('a'); // look a little to the left first
+    await settle(page, 800);
+    const start = await page.evaluate(() => performance.now());
+    await page.locator('.walk-arrow.weg[aria-label^="Weiter"]').click();
+    await settle(page, 2300);
+    await page.keyboard.press('s');
+    await settle(page, 2000);
+    const end = await page.evaluate(() => performance.now());
+    const video = await page.video().path();
+    await vctx.close();
+    // The page clock started with the video: cut from shortly before the click to the end.
+    const from = Math.max(0, start / 1000 - 0.6);
+    execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-ss', from.toFixed(2), '-t', ((end - start) / 1000 + 0.6).toFixed(2), '-i', video,
+      '-vf', 'fps=10,scale=400:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=112[p];[b][p]paletteuse=dither=bayer:bayer_scale=4',
+      out('durchgehen-uebergang.gif')]);
   }
 
   if (only.includes('mapillary')) {

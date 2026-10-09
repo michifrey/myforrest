@@ -9,6 +9,9 @@
  * shows position, view cone and the recording. The spot's other dates are a
  * time switch. Pictures of the next steps are loaded ahead, so a walk keeps
  * working offline (service worker) once it has been seen.
+ * Steps are soft: a panorama first turns towards the chosen way, then the
+ * old view zooms ahead (or back) and fades while the new one arrives slightly
+ * zoomed in; a change of date crossfades (only a short fade with reduced motion).
  * With Mapillary set up, blue arrows lead to Mapillary pictures where there
  * are no own ones, and one can walk on there (ids "m<id>"); their creator and
  * licence stand at the top. A map layer shows Mapillary pictures to start from.
@@ -89,7 +92,7 @@
         style: `--x:${(Math.sin(rad) * 46).toFixed(1)}%;--y:${(-ahead * 34).toFixed(1)}%;--r:${rel.toFixed(1)}deg;--s:${(0.8 + 0.25 * (ahead + 1) / 2).toFixed(2)}`,
         title: `${what} · ${fmtDist(l.distanceM)} nach ${COMPASS_LONG[compass(l.bearing)]}${l.panorama ? ' · 360°' : ''}`,
         'aria-label': `${label}, ${fmtDist(l.distanceM)} nach ${COMPASS_LONG[compass(l.bearing)]}`,
-        onclick: () => go(l.id),
+        onclick: () => step(l),
       }, [el('span', { class: 'walk-chevron', 'aria-hidden': 'true' }), el('span', { class: 'walk-dist', text: fmtDist(l.distanceM) })]);
       return b;
     }));
@@ -128,8 +131,83 @@
   /** Own photos by number, Mapillary pictures as "m<id>". */
   const isMapillary = (id) => /^m\d+$/.test(String(id));
 
-  async function go(photoId, { dir = W.view, initial = false } = {}) {
+  /* ---------- Soft steps ---------- */
+
+  const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+  const frames = (ms, step) => new Promise((resolve) => {
+    const t0 = performance.now();
+    const tick = (now) => {
+      const t = Math.min(1, (now - t0) / ms);
+      step(ease(t));
+      if (t < 1) requestAnimationFrame(tick); else resolve();
+    };
+    requestAnimationFrame(tick);
+  });
+
+  /** Turns the panorama so one looks at `bearing` (° from north), quicker for small turns. */
+  function turnTo(bearing) {
+    const p = W.data?.photo;
+    const from = pano.yaw;
+    const delta = norm(bearing - viewDir());
+    if (Math.abs(delta) < 8) return Promise.resolve();
+    return frames(Math.min(600, Math.max(220, Math.abs(delta) * 4.5)), (t) => pano.set({ yaw: from + delta * t }))
+      .then(() => setView(((p.heading ?? 0) + pano.yaw + 360) % 360, false));
+  }
+
+  /** A still of the current view laid over it, to fade out once the next picture is there. */
+  function still() {
+    let node = null;
+    if (!canvas.hidden && pano?.ok) node = pano.snapshot();
+    else if (!flat.hidden && flat.complete && flat.naturalWidth) node = flat.cloneNode();
+    if (!node) return null;
+    node.removeAttribute('id');
+    node.className = `walk-still${node.tagName === 'IMG' ? ' flat' : ''}`;
+    node.setAttribute('aria-hidden', 'true');
+    root.insertBefore(node, root.querySelector('.walk-top'));
+    return node;
+  }
+
+  /**
+   * Fades the still out: ahead it grows (one walks into the picture, towards `rel` degrees from
+   * the middle), back it shrinks, a change of date just fades. The new panorama arrives a little
+   * zoomed in and eases back to its field of view.
+   */
+  async function fadeStill(node, kind, rel = 0) {
+    if (!node) return;
+    const quiet = reduceMotion();
+    const scale = quiet || kind === 'zeit' ? 1 : kind === 'zurueck' ? 0.84 : 1.32;
+    const ox = 50 + Math.max(-35, Math.min(35, Math.sin((rel * Math.PI) / 180) * 45));
+    node.style.transformOrigin = `${ox}% 58%`;
+    const ms = quiet ? 160 : kind === 'zeit' ? 450 : 650;
+    const arrive = !quiet && kind !== 'zeit' && !canvas.hidden && pano?.ok;
+    const fov = pano?.fov ?? 75;
+    if (arrive) pano.set({ fov: fov * (kind === 'zurueck' ? 1.12 : 0.86) });
+    await Promise.all([
+      node.animate([{ opacity: 1, transform: 'scale(1)' }, { opacity: 0, transform: `scale(${scale})` }], { duration: ms, easing: 'ease-in', fill: 'forwards' }).finished.catch(() => {}),
+      arrive ? frames(ms, (t) => pano.set({ fov: fov * ((kind === 'zurueck' ? 1.12 : 0.86) + (1 - (kind === 'zurueck' ? 1.12 : 0.86)) * t) })) : null,
+    ]);
+    node.remove();
+  }
+
+  /** A step along an arrow: turn towards it, then walk. */
+  async function step(link) {
+    if (!W.data || W.stepping) return;
+    W.stepping = true;
+    try {
+      const rel = norm(link.bearing - W.view);
+      const back = link.direction === 'zurueck' || Math.abs(rel) > 110;
+      if (!back && !reduceMotion() && W.data.photo.panorama && !canvas.hidden && pano?.ok) await turnTo(link.bearing);
+      await go(link.id, { kind: back ? 'zurueck' : 'vor', rel: back ? 0 : norm(link.bearing - W.view) });
+    } finally {
+      W.stepping = false;
+    }
+  }
+
+  async function go(photoId, { dir = W.view, initial = false, kind = 'zeit', rel = 0 } = {}) {
     const token = ++W.token;
+    root.querySelectorAll('.walk-still').forEach((n) => n.remove());
+    const cover = initial ? null : still();
     root.classList.add('loading');
     let data;
     try {
@@ -137,10 +215,11 @@
       data = await api(isMapillary(photoId) ? `/api/walk/mapillary/${String(photoId).slice(1)}` : `/api/walk/${photoId}${at}`);
     } catch (err) {
       root.classList.remove('loading');
+      cover?.remove();
       $('walk-hint').textContent = `Bild nicht verfügbar (${err.message})`;
       return;
     }
-    if (token !== W.token) return;
+    if (token !== W.token) { cover?.remove(); return; }
     W.data = data;
     const p = data.photo;
     const mly = p.source === 'mapillary';
@@ -160,14 +239,17 @@
     flat.hidden = usePano;
     if (usePano) {
       await pano.load(p.url).catch(() => {});
-      if (token !== W.token) return;
+      if (token !== W.token) { cover?.remove(); return; }
       // Keep looking the same way as before the step; the first picture looks along its own heading.
       setView(initial ? (p.heading ?? 0) : dir);
     } else {
       flat.src = p.largeUrl || p.url;
+      await flat.decode().catch(() => {});
+      if (token !== W.token) { cover?.remove(); return; }
       setView(p.heading ?? (initial ? 0 : dir), false);
     }
     root.classList.remove('loading');
+    fadeStill(cover, kind, rel);
     renderMap();
     history.replaceState(null, '', `#durchgehen=${p.id}`);
     // The next steps are fetched ahead: smoother, and available offline afterwards.
@@ -225,8 +307,8 @@
     const key = e.key.toLowerCase();
     let handled = true;
     if (key === 'escape') close();
-    else if (key === 'arrowup' || key === 'w') { const l = wayTowards(0); if (l) go(l.id); }
-    else if (key === 'arrowdown' || key === 's') { const l = wayTowards(180); if (l) go(l.id); }
+    else if (key === 'arrowup' || key === 'w') { const l = wayTowards(0); if (l) step(l); }
+    else if (key === 'arrowdown' || key === 's') { const l = wayTowards(180); if (l) step(l); }
     else if ((key === 'arrowleft' || key === 'a') && W.data?.photo.panorama) setView(W.view - 15);
     else if ((key === 'arrowright' || key === 'd') && W.data?.photo.panorama) setView(W.view + 15);
     else handled = false;

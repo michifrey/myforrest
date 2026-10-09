@@ -10,8 +10,8 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
   (z. B. GPS-Spur von Garmin- und Nextbase-Kameras, verschlüsselte Viofo-Daten).
 
 - **Durchgehen ausbauen**: eigene Reihen zu Mapillary hochladen (OAuth bei Mapillary, ohne geschützte Funde);
-  weiche Übergänge zwischen Panoramen (Überblenden, Zoom in Gehrichtung); Wege aus dem Wegnetz statt nur aus
-  Reihen und Spots.
+  Wege aus dem Wegnetz statt nur aus Reihen und Spots; Übergänge mit Tiefe (die Nachbarbilder anhand gemeinsamer
+  Bildmerkmale ineinander morphen statt nur zoomen).
 - **360°-Rohdateien**: Insta360-`.insv` und GoPro-MAX-`.360` direkt lesen (Fischaugen stitchen, GPS aus dem
   Datei-Trailer). Braucht Beispieldateien der Kameras und deren Objektivdaten; bis dahin über den Export
   als 360°-MP4.
@@ -82,6 +82,7 @@ Aus früheren Versionen dieser Roadmap:
 - 360°-Fotos beim Upload erkennen, Panoramen über eine Drehung der Kugel ausrichten und vergleichen
 - Durchgehen wie Street View: Pfeile entlang der Aufnahme und zu Spots in der Nähe, Blickrichtung bleibt beim Schritt
 - Startseite mit wechselnden Landschaften (Wald, Gletscher, Gebirge, Wüste)
+- Weiche Übergänge im Durchgehen: zum Weg drehen, Zoom in Gehrichtung mit Überblendung
 - Mapillary-Bilder im Durchgehen und auf der Karte, wo es keine eigenen gibt (über den Server, mit Urheber und Lizenz)
 - Landschaftsprofile Gletscher, Gebirge und Trockengebiet: Umrisse aus Gletscherinventaren pro Jahr, Eis im Spätsommer und
   Schneeschmelze aus Sentinel-2, Archivfotos mit Datum von Hand, Beobachtungen und Auswertung je Landschaft

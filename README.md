@@ -312,6 +312,12 @@ Blickrichtung bleibt beim Schritt erhalten, *Zeit* wechselt zu einem anderen Jah
 kleine Karte zeigt, wo man steht und wohin man schaut. Mit der Tastatur geht es mit W/S vor und zurück.
 Einmal gesehene Bilder gehen auch ohne Empfang, im Wald und in den Bergen.
 
+<p align="center"><img src="docs/screenshots/durchgehen-uebergang.gif" width="400" alt="Ein Schritt im Durchgehen: Drehung zum Weg, dann Zoom nach vorne mit Überblendung, danach zurück"></p>
+
+Die Schritte gehen **weich**: Ein 360°-Bild dreht sich zuerst zum gewählten Pfeil, dann zoomt das alte Bild
+in Gehrichtung und blendet aus, während das neue leicht herangezoomt ankommt; zurück zoomt es heraus, und ein
+Wechsel der *Zeit* blendet nur über.
+
 <p>
   <img src="docs/screenshots/durchgehen-mapillary.jpg" width="32%" alt="Durchgehen mit blaugrünen Pfeilen zu Mapillary-Bildern quer zum Waldweg">
   <img src="docs/screenshots/mapillary.jpg" width="32%" alt="Auf einem Mapillary-Bild mit Urheber und Lizenz oben links">
