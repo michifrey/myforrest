@@ -9,7 +9,10 @@
  * shows position, view cone and the recording. The spot's other dates are a
  * time switch. Pictures of the next steps are loaded ahead, so a walk keeps
  * working offline (service worker) once it has been seen.
- * API: GET /api/walk/:photoId (src/routes/walk.js).
+ * With Mapillary set up, blue arrows lead to Mapillary pictures where there
+ * are no own ones, and one can walk on there (ids "m<id>"); their creator and
+ * licence stand at the top. A map layer shows Mapillary pictures to start from.
+ * API: GET /api/walk/:photoId, /api/walk/mapillary/:id (src/routes/walk.js).
  * Uses the globals of app.js ($, el, api, state, fmtDate) and video.js (PanoViewer).
  */
 (function walkMode() {
@@ -32,6 +35,7 @@
       el('div', { class: 'walk-title' }, [
         el('strong', { id: 'walk-title', text: 'Durchgehen' }),
         el('span', { id: 'walk-meta', class: 'walk-meta' }),
+        el('a', { id: 'walk-credit', class: 'walk-credit', target: '_blank', rel: 'noopener', hidden: '' }),
       ]),
       el('label', { class: 'walk-time' }, [el('span', { text: 'Zeit' }), timeSel]),
       el('button', { type: 'button', id: 'walk-spot', class: 'walk-btn', text: 'Spot öffnen' }),
@@ -76,12 +80,15 @@
       const rel = norm(l.bearing - W.view);
       const rad = (rel * Math.PI) / 180;
       const ahead = Math.cos(rad);
+      const what = l.kind === 'weg' ? (l.direction === 'vor' ? 'Weiter auf der Aufnahme' : 'Zurück auf der Aufnahme')
+        : l.kind === 'mapillary' ? `Mapillary-Bild${l.creator ? ` von ${l.creator}` : ''}` : `Spot ${l.spotId}`;
+      const label = l.kind === 'weg' ? (l.direction === 'vor' ? 'Weiter' : 'Zurück') : l.kind === 'mapillary' ? 'Zum Mapillary-Bild' : `Zu Spot ${l.spotId}`;
       const b = el('button', {
         type: 'button',
-        class: `walk-arrow ${l.kind}${Math.abs(rel) < 35 ? ' ahead' : ''}`,
+        class: `walk-arrow ${l.kind}${l.source === 'mapillary' ? ' from-mapillary' : ''}${Math.abs(rel) < 35 ? ' ahead' : ''}`,
         style: `--x:${(Math.sin(rad) * 46).toFixed(1)}%;--y:${(-ahead * 34).toFixed(1)}%;--r:${rel.toFixed(1)}deg;--s:${(0.8 + 0.25 * (ahead + 1) / 2).toFixed(2)}`,
-        title: `${l.kind === 'weg' ? (l.direction === 'vor' ? 'Weiter auf der Aufnahme' : 'Zurück auf der Aufnahme') : `Spot ${l.spotId}`} · ${fmtDist(l.distanceM)} nach ${COMPASS_LONG[compass(l.bearing)]}${l.panorama ? ' · 360°' : ''}`,
-        'aria-label': `${l.kind === 'weg' ? (l.direction === 'vor' ? 'Weiter' : 'Zurück') : `Zu Spot ${l.spotId}`}, ${fmtDist(l.distanceM)} nach ${COMPASS_LONG[compass(l.bearing)]}`,
+        title: `${what} · ${fmtDist(l.distanceM)} nach ${COMPASS_LONG[compass(l.bearing)]}${l.panorama ? ' · 360°' : ''}`,
+        'aria-label': `${label}, ${fmtDist(l.distanceM)} nach ${COMPASS_LONG[compass(l.bearing)]}`,
         onclick: () => go(l.id),
       }, [el('span', { class: 'walk-chevron', 'aria-hidden': 'true' }), el('span', { class: 'walk-dist', text: fmtDist(l.distanceM) })]);
       return b;
@@ -118,13 +125,16 @@
 
   /* ---------- Moving ---------- */
 
+  /** Own photos by number, Mapillary pictures as "m<id>". */
+  const isMapillary = (id) => /^m\d+$/.test(String(id));
+
   async function go(photoId, { dir = W.view, initial = false } = {}) {
     const token = ++W.token;
     root.classList.add('loading');
     let data;
     try {
-      const at = W.data && !initial ? `?at=${encodeURIComponent(W.data.photo.takenAt)}` : '';
-      data = await api(`/api/walk/${photoId}${at}`);
+      const at = W.data && !initial && !W.data.photo.source ? `?at=${encodeURIComponent(W.data.photo.takenAt)}` : '';
+      data = await api(isMapillary(photoId) ? `/api/walk/mapillary/${String(photoId).slice(1)}` : `/api/walk/${photoId}${at}`);
     } catch (err) {
       root.classList.remove('loading');
       $('walk-hint').textContent = `Bild nicht verfügbar (${err.message})`;
@@ -133,7 +143,15 @@
     if (token !== W.token) return;
     W.data = data;
     const p = data.photo;
-    $('walk-title').textContent = `Spot ${p.spotId}`;
+    const mly = p.source === 'mapillary';
+    $('walk-title').textContent = mly ? 'Mapillary' : `Spot ${p.spotId}`;
+    $('walk-spot').hidden = mly;
+    const credit = $('walk-credit');
+    credit.hidden = !mly;
+    if (mly) {
+      credit.href = p.pageUrl;
+      credit.textContent = `Bild: ${p.creator || 'unbekannt'} · Mapillary · ${p.license}`;
+    }
     timeSel.replaceChildren(...data.times.map((t) => el('option', { value: String(t.id), text: `${fmtDate(t.takenAt)}${t.panorama ? ' · 360°' : ''}` })));
     timeSel.value = String(p.id);
     timeSel.closest('label').hidden = data.times.length < 2;
@@ -187,8 +205,9 @@
     document.documentElement.classList.remove('walk-open');
     const last = W.data?.photo;
     history.replaceState(null, '', W.returnHash || location.pathname + location.search);
-    // Back in the app at the place one walked to.
-    if (last && state.spot?.id !== last.spotId) openSpot(last.spotId, last.id).catch(() => {});
+    // Back in the app at the place one walked to (on a Mapillary picture: the map there).
+    if (last?.source === 'mapillary') map.setView([last.lat, last.lon], Math.max(map.getZoom(), 17));
+    else if (last && state.spot?.id !== last.spotId) openSpot(last.spotId, last.id).catch(() => {});
   }
 
   /* ---------- Input ---------- */
@@ -223,11 +242,54 @@
     if (p) open(p.id);
   });
   const fromHash = () => {
-    const m = location.hash.match(/^#durchgehen=(\d+)$/);
-    if (m && !W.open) open(Number(m[1]));
+    const m = location.hash.match(/^#durchgehen=(m?\d+)$/);
+    if (m && !W.open) open(isMapillary(m[1]) ? m[1] : Number(m[1]));
   };
   window.addEventListener('hashchange', fromHash);
   fromHash();
+
+  /* ---------- Mapillary on the map ---------- */
+
+  // Pictures as small dots from zoom 17 (the search covers the middle of the map); a click starts walking there.
+  const mlyLayer = L.layerGroup();
+  let mlyOn = false;
+  let mlyTimer = null;
+  async function loadMapillary() {
+    if (!mlyOn) return;
+    const z = map.getZoom();
+    const btn = $('mapillary-toggle');
+    if (z < 17) {
+      mlyLayer.clearLayers();
+      btn.title = 'Zum Anzeigen näher heranzoomen';
+      return;
+    }
+    const c = map.getCenter();
+    const b = map.getBounds();
+    const half = 0.0045; // the server searches at most 0.01° per side
+    const box = [Math.max(b.getWest(), c.lng - half), Math.max(b.getSouth(), c.lat - half), Math.min(b.getEast(), c.lng + half), Math.min(b.getNorth(), c.lat + half)];
+    const list = await api(`/api/mapillary/images?bbox=${box.map((v) => v.toFixed(5)).join(',')}`).catch(() => null);
+    if (!list || !mlyOn) return;
+    mlyLayer.clearLayers();
+    btn.title = list.length ? `${list.length} Mapillary-Bilder im Kartenzentrum` : 'Keine Mapillary-Bilder im Kartenzentrum';
+    for (const m of list) {
+      L.circleMarker([m.lat, m.lon], { radius: m.panorama ? 5 : 4, className: `mapillary-dot${m.panorama ? ' pano' : ''}` })
+        .bindTooltip(`Mapillary${m.panorama ? ' · 360°' : ''}${m.takenAt ? ` · ${fmtDate(m.takenAt)}` : ''}${m.creator ? ` · ${m.creator}` : ''}`)
+        .on('click', () => open(m.id))
+        .addTo(mlyLayer);
+    }
+  }
+  (async function initMapillary() {
+    while (!state.config.landscapes) await new Promise((r) => setTimeout(r, 50));
+    if (!state.config.mapillary) return;
+    const btn = $('mapillary-toggle');
+    btn.hidden = false;
+    btn.addEventListener('click', () => {
+      mlyOn = !mlyOn;
+      btn.setAttribute('aria-pressed', String(mlyOn));
+      if (mlyOn) { mlyLayer.addTo(map); loadMapillary(); } else mlyLayer.remove();
+    });
+    map.on('moveend', () => { clearTimeout(mlyTimer); mlyTimer = setTimeout(loadMapillary, 300); });
+  }());
 
   window.Walk = { open, close };
 }());

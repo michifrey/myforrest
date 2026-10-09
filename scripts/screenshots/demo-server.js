@@ -5,6 +5,40 @@ const path = require('path');
 const { createApp } = require('../../src/app');
 const glacier = require('./glacier-demo');
 
+// DEMO_MAPILLARY=1: a stand-in for the Mapillary API, a 360° sequence crossing the forest track of the
+// walk-through (seed.js) from north-west to south-east, with panoramas drawn like the demo ones.
+const MLY_CENTRE = { lat: 47.37388, lon: 8.57279 };
+const MLY = [-3, -2, -1, 1, 2, 3].map((k, i) => ({
+  id: String(4100 + i),
+  computed_geometry: { type: 'Point', coordinates: [MLY_CENTRE.lon - 0.00024 * k, MLY_CENTRE.lat + 0.00018 * k] },
+  computed_compass_angle: 135,
+  captured_at: Date.parse(`2025-08-14T09:${String(20 + i).padStart(2, '0')}:00Z`),
+  is_pano: true,
+  creator: { username: 'waldlaeufer_zh' },
+  sequence: 'demo-mly-quer',
+}));
+async function mapillaryFetch(url) {
+  const u = new URL(url);
+  if (u.hostname === 'graph.mapillary.com' && u.pathname === '/images') {
+    const [w, s, e, n] = u.searchParams.get('bbox').split(',').map(Number);
+    return Response.json({ data: MLY.filter((m) => { const [lon, lat] = m.computed_geometry.coordinates; return lon >= w && lon <= e && lat >= s && lat <= n; }) });
+  }
+  const one = /^\/(\d+)$/.exec(u.pathname);
+  if (u.hostname === 'graph.mapillary.com' && one) {
+    if (u.searchParams.get('fields') === 'thumb_2048_url') return Response.json({ thumb_2048_url: `https://mapillary.demo.invalid/${one[1]}.jpg` });
+    const m = MLY.find((x) => x.id === one[1]);
+    return m ? Response.json(m) : new Response('{}', { status: 404 });
+  }
+  if (u.hostname === 'mapillary.demo.invalid') {
+    const id = Number(u.pathname.slice(1, -4));
+    const file = path.join(work, `mly-${id}.jpg`);
+    await require('./scene').renderPano(900 + id % 100 * 5, { season: 'summer', jitter: id }, file);
+    const buf = await require('fs').promises.readFile(file);
+    return new Response(buf, { headers: { 'content-type': 'image/jpeg' } });
+  }
+  return new Response('offline', { status: 503 });
+}
+
 const DAY = 86400000;
 const hash = (s) => {
   let h = 2166136261;
@@ -107,6 +141,7 @@ const work = process.env.DEMO_DIR || path.join(__dirname, '.demo');
 const app = createApp({
   dataDir: path.join(work, 'data'),
   // DEMO_GLETSCHER=1: the glacier inventories of the demo glacier (written by seed-gletscher.js).
+  ...(process.env.DEMO_MAPILLARY === '1' ? { mapillaryToken: 'MLY|demo', mapillaryFetch } : {}),
   glacierFiles: process.env.DEMO_GLETSCHER === '1' ? Object.keys(glacier.inventories()).map((f) => path.join(work, 'gletscher', f)).join(',') : '',
   weatherFetch,
   tileOptions: { precompute: false },

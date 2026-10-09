@@ -1,6 +1,7 @@
 'use strict';
 // Takes the README screenshots from the demo server (see README.md here).
 // Usage: node shoot.js [hero map spot satellite sun species vektor touren walk schutz konto profil timelapse compare upload gletscher mobile]
+// «mapillary» needs the demo server started with DEMO_MAPILLARY=1 (a Mapillary stand-in, see README.md).
 // «gletscher» uses the glacier demo server (BASE_GLETSCHER, default http://localhost:3124; see README.md).
 const path = require('path');
 const fs = require('fs');
@@ -207,6 +208,34 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.evaluate((id) => Walk.open(id), ids[1]);
     await settle(page, 4000);
     await page.screenshot({ path: out('durchgehen.jpg'), ...jpg });
+    await page.close();
+  }
+
+  if (only.includes('mapillary')) {
+    // Walking the forest track with Mapillary pictures across it, then on one of them, and the map layer.
+    const page = await ctx.newPage();
+    await page.goto(`${BASE}/`);
+    await settle(page, 2000);
+    const ids = await page.evaluate(async () => {
+      const panos = [];
+      for (const s of await (await fetch('/api/spots')).json()) {
+        for (const p of (await (await fetch(`/api/spots/${s.id}`)).json()).photos) if (p.sequenceId === 'demo-360-waldweg') panos.push([p.takenAt, p.id]);
+      }
+      return panos.sort().map((x) => x[1]);
+    });
+    await page.evaluate((id) => Walk.open(id), ids[1]);
+    await settle(page, 5000);
+    await page.screenshot({ path: out('durchgehen-mapillary.jpg'), ...jpg });
+    await page.click('.walk-arrow.mapillary');
+    await settle(page, 6000);
+    await page.screenshot({ path: out('mapillary.jpg'), ...jpg });
+    await page.keyboard.press('Escape');
+    await settle(page, 1000);
+    await page.evaluate(() => document.querySelector('#explore').scrollIntoView());
+    await page.click('#mapillary-toggle');
+    await page.evaluate(() => map.setView([47.37388, 8.57279], 17, { animate: false }));
+    await settle(page, 3500);
+    await page.screenshot({ path: out('mapillary-karte.jpg'), ...jpg });
     await page.close();
   }
 

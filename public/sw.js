@@ -23,7 +23,7 @@
 
 importScripts('offline-queue.js');
 
-const SHELL_VERSION = 'v12';
+const SHELL_VERSION = 'v13';
 const DATA_VERSION = 'v1';
 const CACHE = {
   shell: `myforrest-shell-${SHELL_VERSION}`,
@@ -209,7 +209,10 @@ self.addEventListener('fetch', (event) => {
   // Sign-in redirects to Google/GitHub and back must reach the server untouched; the data export is
   // a large one-off download that has no place in the cache.
   if (path === 'sw.js' || path.startsWith('api/auth/oauth/') || path.startsWith('api/profile/export')) return;
-  if (path.startsWith('api/')) {
+  // Mapillary pictures (served by this server) never change: kept like own photos, for walking offline.
+  if (/^api\/mapillary\/images\/\d+\/file$/.test(path)) {
+    event.respondWith(cacheFirst(event, CACHE.uploads, { max: LIMIT.uploads }));
+  } else if (path.startsWith('api/')) {
     event.respondWith(networkFirst(event, CACHE.api, { max: LIMIT.api, timeoutMs: API_TIMEOUT_MS }));
   } else if (path.startsWith('uploads/')) {
     event.respondWith(cacheFirst(event, CACHE.uploads, { max: LIMIT.uploads }));

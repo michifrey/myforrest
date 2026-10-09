@@ -233,6 +233,11 @@ Distanz darunter:
 - **Gold: zu anderen Spots** im Umkreis von 80 m. Pro Spot zählt ein Bild, ein Panorama wenn vorhanden,
   sonst das Bild, das zeitlich am nächsten am gerade betrachteten liegt. Pro Himmelsrichtung (45°) steht nur
   der nächste Spot, damit der Ring lesbar bleibt.
+- **Blaugrün: zu Mapillary-Bildern** im Umkreis von 80 m, wenn Mapillary eingerichtet ist (siehe unten), und
+  nur in Himmelsrichtungen ohne eigene Bilder: Eigene Bilder haben Vorrang, Mapillary füllt die Lücken.
+
+Liegen zwei Ziele weniger als 25° auseinander, bleibt das erste (Reihe vor Spot vor Mapillary), damit sich
+die Pfeile nicht überdecken.
 
 Beim Schritt bleibt die Blickrichtung erhalten: Wer nach Osten schaut und weitergeht, schaut im nächsten
 Panorama wieder nach Osten. Die Richtung der Bildmitte kommt aus dem Video bzw. aus `GPano:PoseHeadingDegrees`
@@ -244,6 +249,27 @@ Bedienung: **W**/**↑** geht in Blickrichtung, **S**/**↓** zurück, **A**/**D
 beendet und öffnet den Spot, an dem man zuletzt stand. Ein Link wie `…/#durchgehen=123` öffnet ein Bild direkt.
 Die Bilder der nächsten Schritte werden vorgeladen. Was man einmal gesehen hat, geht so auch ohne Empfang, im
 Wald, in den Bergen und abseits von Strassen.
+
+#### Mapillary
+
+Wo es noch keine eigenen Bilder gibt, zeigt das Durchgehen auf Wunsch Bilder von
+[Mapillary](https://www.mapillary.com), der offenen Strassen- und Wegbild-Sammlung. Dafür braucht der Server
+einen Client-Token aus dem Entwicklerbereich von Mapillary (`MAPILLARY_TOKEN`); ohne ihn ist alles aus.
+
+- **Im Durchgehen** führen blaugrüne Pfeile zu Mapillary-Bildern. Auf einem Mapillary-Bild geht es entlang
+  seiner Mapillary-Reihe weiter (weisse Pfeile mit blaugrünem Rand), zu eigenen Spots (gold) und zu anderen
+  Mapillary-Bildern. Oben stehen Urheber und Lizenz mit Link zum Bild auf mapillary.com, z. B. *Bild:
+  waldlaeufer_zh · Mapillary · CC BY-SA 4.0*. Ein Link wie `…/#durchgehen=m123` öffnet ein Mapillary-Bild direkt.
+- **Auf der Karte** zeigt der Knopf *Mapillary* die Bilder als blaugrüne Punkte (360°-Bilder mit dunklem Rand),
+  ab Zoomstufe 17 im Zentrum der Karte; ein Klick startet das Durchgehen dort.
+- **Nur der Server spricht mit Mapillary**: Der Token bleibt dort, und die Bilder kommen von MyForrest
+  (`/api/mapillary/images/:id/file`). So laden 360°-Bilder ohne CORS-Probleme in die 360°-Ansicht, der Browser
+  meldet sich nicht bei Mapillary, und einmal gesehene Bilder gehen offline (Service Worker). Suchen werden
+  pro Feld von rund 450 m eine Woche lang zwischengespeichert, Bilder 30 Tage in `data/mapillary/`.
+- Fällt Mapillary aus, geht das Durchgehen mit den eigenen Bildern weiter; die Karte meldet es.
+
+Grenzen: Eigene Reihen lassen sich noch nicht zu Mapillary hochladen. Wie gut Mapillary einen Ort abdeckt,
+hängt von der Community ab; im Wald und in den Bergen ist das oft dünner als an Strassen.
 
 ## Bildanalyse
 

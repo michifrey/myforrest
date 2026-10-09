@@ -36,6 +36,10 @@ sleep 15                                      # Höhen der Spots (Gebirge-Erkenn
 node scripts/screenshots/shoot.js gletscher   # BASE_GLETSCHER, Standard http://localhost:3124
 ```
 
+Die Mapillary-Bilder (`durchgehen-mapillary.jpg`, `mapillary.jpg`, `mapillary-karte.jpg`) brauchen den Demo-Server
+mit `DEMO_MAPILLARY=1`: Er ersetzt die Mapillary-API durch eine Reihe gezeichneter Panoramen quer zum Waldweg.
+Danach `node scripts/screenshots/shoot.js mapillary` (nur auf ausdrücklichen Wunsch, nicht bei «alle Bilder»).
+
 Arbeitsdateien (Datenbank, Fotos, Kachel-Cache, GIF-Einzelbilder) liegen in `scripts/screenshots/.demo`
 bzw. `.demo-gletscher`.
 Umgebungsvariablen: `PORT` bzw. `BASE` (Adresse des Demo-Servers), `OUT` (Zielordner der Bilder),

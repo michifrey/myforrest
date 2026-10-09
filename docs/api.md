@@ -5,7 +5,7 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 
 | Methode  | Pfad                         | Zweck                                                    |
 |----------|------------------------------|----------------------------------------------------------|
-| `GET`    | `/api/config`                | Tag-Vokabular, Aktivitäten, aktivierte Features, Landschaftsprofile (`landscapes`: Bezeichnung und Beobachtungen je Profil) und Gletscherinventare (`glaciers.years`, `null` ohne Umrisse) |
+| `GET`    | `/api/config`                | Tag-Vokabular, Aktivitäten, aktivierte Features (u. a. `mapillary`), Landschaftsprofile (`landscapes`: Bezeichnung und Beobachtungen je Profil) und Gletscherinventare (`glaciers.years`, `null` ohne Umrisse) |
 | `GET`    | `/api/spots?tag=…`           | Alle Spots mit Anzahl Fotos, Zeitraum, Tags, Blickrichtung (`heading`), Landschaft (`landscape`) und Vorschaubild (`latestThumbUrl`) |
 | `GET`    | `/api/spots/:id`             | Ein Spot mit Blickrichtung, Landschaft (`landscape`, `landscapeSource`: `upload`, `auto`, `manual` oder `null`) und allen Fotos chronologisch (jedes Foto mit `url`, `thumbUrl` und `largeUrl`, `archive` für Archivfotos, `panorama` für 360°-Bilder und `alignment`: bei Fotos die Homographie `h`, bei Panoramen `kind: 'rotation'` mit der Drehung `r`, `yaw` und `tilt`) |
 | `GET`    | `/thumbs/:datei`             | Vorschaubilder (WebP)                                    |
@@ -22,7 +22,10 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `POST`   | `/api/spots/:id/split`       | Spot aufteilen: ohne Body nach Blickrichtung, mit `{ photoIds }` diese Fotos in einen neuen Spot; Antwort `spots` (alle betroffenen Spots), danach neu ausgerichtet |
 | `GET`    | `/api/photos/:id/change?to=` | Veränderte Fläche zwischen zwei ausgerichteten Fotos, mit eingeordneten Regionen |
 | `GET`    | `/api/photos/:id/change.png?to=` | Heatmap der Veränderung (PNG, in der Ansicht des ersten Fotos) |
-| `GET`    | `/api/walk/:id?at=`          | Durchgehen: das Bild, Wege entlang seiner Reihe (`weg`, vor/zurück, bis 500 m) und zu Spots im Umkreis von 80 m (`spot`), je mit Richtung und Distanz, die anderen Bilder des Spots (`times`) und der Verlauf der Reihe (`track`); `at` wählt bei Spots das zeitlich nächste Bild |
+| `GET`    | `/api/walk/:id?at=`          | Durchgehen: das Bild, Wege entlang seiner Reihe (`weg`, vor/zurück, bis 500 m), zu Spots im Umkreis von 80 m (`spot`) und mit `MAPILLARY_TOKEN` zu Mapillary-Bildern in freien Richtungen (`mapillary`, mit `creator`, `license`, `pageUrl`), je mit Richtung und Distanz, die anderen Bilder des Spots (`times`) und der Verlauf der Reihe (`track`); `at` wählt bei Spots das zeitlich nächste Bild |
+| `GET`    | `/api/walk/mapillary/:id`    | Durchgehen ab einem Mapillary-Bild (Id ohne `m`): das Bild (`id` = `m<id>`, `source: 'mapillary'`) und Wege entlang seiner Mapillary-Reihe, zu Spots und zu anderen Mapillary-Bildern |
+| `GET`    | `/api/mapillary/images?bbox=` | Mapillary-Bilder in einem Ausschnitt (höchstens 0,01° pro Seite) für die Karte; 404 ohne Token, 502 wenn Mapillary nicht erreichbar ist |
+| `GET`    | `/api/mapillary/images/:id/file` | Das Mapillary-Bild selbst (2048 px, 360°-Bilder 2:1), vom Server geladen und zwischengespeichert |
 | `GET`    | `/api/photos/:id/aligned.jpg?frame=` | 360°-Panorama in die Blickrichtung eines anderen Panoramas desselben Spots gedreht (JPEG 2048 × 1024, mit ETag) |
 | `GET`    | `/api/weather/day?lat=&lon=&date=` | Stundenwerte eines Tages (Einstrahlung, Regen, Bewölkung, Temperatur): Messung oder Prognose |
 | `GET`    | `/api/weather/day/spots?date=` | Tagesniederschlag an allen Spots                       |
