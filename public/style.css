@@ -1559,6 +1559,14 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 .profile-figures { display: flex; gap: 0.8rem; flex-wrap: wrap; margin-top: 0.2rem; font-weight: 600; }
 .profile-figures .muted { font-weight: 400; }
 .profile-here { stroke: #fff; stroke-width: 2; fill: var(--gold); fill-opacity: 1; }
+.profile-line.sensor { stroke: var(--text); stroke-width: 1.8; }
+.profile-series { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.35rem; }
+.series-btn {
+  font: 600 0.74rem/1.2 var(--font-body); padding: 0.25rem 0.6rem; border-radius: 999px; cursor: pointer;
+  background: transparent; border: 1px solid var(--border); color: var(--muted);
+}
+.series-btn[aria-pressed="true"] { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.series-ramp { display: inline-block; width: 4.5rem; height: 0.55rem; border-radius: 999px; align-self: center; }
 
 /* Own photo requests: done or run out (tours.js) */
 .req-mine { display: flex; flex-wrap: wrap; gap: 0.2rem 0.6rem; align-items: baseline; padding: 0.35rem 0; border-top: 1px solid var(--border); }

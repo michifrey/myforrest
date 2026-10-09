@@ -227,8 +227,9 @@ map.geo.admin.ch. Ein Klick auf ein Objekt zeigt seine Angaben.
 *Touren & Aufträge* hält fest, wo man unterwegs ist. Eine Route lässt sich auf der Karte **zeichnen**
 (Klick für Klick; der Wege-Magnet zieht die Linie auf Wege und Pfade), mit dem Handy per GPS **aufzeichnen** oder als GPX, FIT
 (Sportuhr, Velocomputer), TCX, KML oder GeoJSON **importieren**. Ein **Höhenprofil** zeigt Auf- und Abstieg; aus
-FIT-Dateien fasst das Panel auch Puls, Leistung, Schrittfrequenz, Temperatur und die Developer-Felder von
-Zusatzsensoren zusammen (nur für einen selbst sichtbar). Gelbe Kilometer-Marken zeigen den Verlauf, jede Route geht auch als GPX
+FIT-, GPX- und TCX-Dateien fasst das Panel auch Puls, Leistung, Schrittfrequenz, Temperatur und die Developer-Felder
+von Zusatzsensoren zusammen; das Profil zeigt sie auch entlang der Strecke und färbt die Route danach ein, etwa
+wo es im Wald kühler war (nur für einen selbst sichtbar). Gelbe Kilometer-Marken zeigen den Verlauf, jede Route geht auch als GPX
 wieder hinaus. Mit dem eigenen Routing-Server bevorzugt der Magnet Forststrassen und Rückegassen und führt
 während der Schutzzeit um **Wildruhezonen** herum, die die Karte beim Planen zeigt, ebenso um **Holzerei**: Ein
 Foto mit *Holzschlag* sperrt die Stelle sechs Wochen, der Forstdienst sperrt Wege mit Enddatum. Mit Konto lassen sich Touren speichern und veröffentlichen; andere sehen eine öffentliche

@@ -189,7 +189,7 @@ module.exports = function profileRoutes(app, { db, thumbs, accounts, uploadDir, 
       }));
       const tracks = db.prepare('SELECT * FROM tracks WHERE owner_id = ? ORDER BY created_at, id').all(user.id);
       for (const t of tracks) {
-        const points = JSON.parse(t.points_json).map(([lat, lon, ele, time]) => ({ lat, lon, ...(ele !== null ? { ele } : {}), ...(time !== null ? { time } : {}) }));
+        const points = JSON.parse(t.points_json).map(([lat, lon, ele, time, sensors]) => ({ lat, lon, ...(ele !== null ? { ele } : {}), ...(time !== null ? { time } : {}), ...(sensors || {}) }));
         await zip.add(`touren/${t.id}_${safeName(t.name)}.gpx`, toGpx({ name: t.name, activity: t.activity, points }), { date: new Date(t.created_at) });
         // Heart rate, power … from a FIT file: not in the GPX, so next to it.
         if (t.sensors_json) await zip.add(`touren/${t.id}_${safeName(t.name)}_sensoren.json`, json(JSON.parse(t.sensors_json)), { date: new Date(t.created_at) });

@@ -57,7 +57,7 @@ const SCHEMA = `
     kind        TEXT NOT NULL CHECK (kind IN ('gezeichnet', 'aufgezeichnet', 'importiert')),
     activity    TEXT,
     visibility  TEXT NOT NULL DEFAULT 'privat' CHECK (visibility IN ('privat', 'oeffentlich')),
-    points_json TEXT NOT NULL, -- [[lat, lon, ele|null, time|null], …]
+    points_json TEXT NOT NULL, -- [[lat, lon, ele|null, time|null, { hr, power, … }?], …]
     distance_m  REAL NOT NULL,
     start_lat   REAL NOT NULL,
     start_lon   REAL NOT NULL,
@@ -116,28 +116,45 @@ const angleDiff = (a, b) => Math.abs((((a - b) % 360) + 540) % 360 - 180);
 const dayDe = (ms) => new Date(ms).toISOString().slice(0, 10).split('-').reverse().join('.');
 const clean = (v, max) => (v === undefined || v === null ? null : String(v).trim().slice(0, max) || null);
 
-/** [{lat, lon}] or [[lat, lon, ele?, time?]] → validated points, or null. */
+const SENSOR_KEYS = ['hr', 'power', 'cadence', 'steps', 'temp'];
+const SENSOR_RANGE = { hr: [20, 260], power: [0, 3000], cadence: [0, 300], steps: [0, 400], temp: [-60, 70] };
+
+/** [{lat, lon}] or [[lat, lon, ele?, time?, sensors?]] → validated points, or null. Sensor values outside sane ranges are dropped. */
 function readPoints(input) {
   if (!Array.isArray(input) || input.length < 2 || input.length > MAX_POINTS) return null;
   const out = [];
   for (const p of input) {
-    const [lat, lon, ele, time] = Array.isArray(p) ? p : [p?.lat, p?.lon, p?.ele, p?.time];
+    const [lat, lon, ele, time, sensors] = Array.isArray(p) ? p : [p?.lat, p?.lon, p?.ele, p?.time, p];
     if (!isValidCoord(Number(lat), Number(lon))) return null;
     const q = { lat: Number(lat), lon: Number(lon) };
     if (ele !== null && ele !== undefined && Number.isFinite(Number(ele))) q.ele = Math.round(Number(ele) * 10) / 10;
     const t = typeof time === 'string' ? Date.parse(time) : Number(time);
     if (time !== null && time !== undefined && Number.isFinite(t)) q.time = t;
+    if (sensors && typeof sensors === 'object') {
+      for (const k of SENSOR_KEYS) {
+        const v = Number(sensors[k]);
+        if (sensors[k] !== null && sensors[k] !== undefined && v >= SENSOR_RANGE[k][0] && v <= SENSOR_RANGE[k][1]) q[k] = Math.round(v * 10) / 10;
+      }
+    }
     out.push(q);
   }
   return out;
 }
-const packPoints = (points) => JSON.stringify(points.map((p) => [
-  Math.round(p.lat * 1e7) / 1e7, Math.round(p.lon * 1e7) / 1e7, p.ele ?? null, p.time ?? null,
-]));
-const unpackPoints = (json) => JSON.parse(json).map(([lat, lon, ele, time]) => {
+const sensorsOf = (p) => {
+  const s = {};
+  for (const k of SENSOR_KEYS) if (p[k] !== undefined) s[k] = p[k];
+  return Object.keys(s).length ? s : null;
+};
+const packPoints = (points) => JSON.stringify(points.map((p) => {
+  const row = [Math.round(p.lat * 1e7) / 1e7, Math.round(p.lon * 1e7) / 1e7, p.ele ?? null, p.time ?? null];
+  const s = sensorsOf(p);
+  return s ? [...row, s] : row;
+}));
+const unpackPoints = (json) => JSON.parse(json).map(([lat, lon, ele, time, sensors]) => {
   const p = { lat, lon };
   if (ele !== null) p.ele = ele;
   if (time !== null) p.time = time;
+  if (sensors) Object.assign(p, sensors);
   return p;
 });
 
@@ -197,6 +214,7 @@ module.exports = function registerTracks(app, ctx) {
   /** Points as the viewer may see them: owners get everything, others no times and no ends. */
   function visiblePoints(t, user) {
     const points = unpackPoints(t.points_json);
+    // Sensor values (heart rate …) only for the owner, like the times.
     if (user && (user.id === t.owner_id)) return points;
     return trimEnds(points, PRIVACY_ZONE_M).map(({ lat, lon, ele }) => (ele === undefined ? { lat, lon } : { lat, lon, ele }));
   }

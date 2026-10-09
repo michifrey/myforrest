@@ -22,8 +22,8 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
   die Wildruhezonen regelmässig selbst von geo.admin.ch laden statt aus einer Datei; Sperrungen der Forstdienste
   aus ihren eigenen Systemen übernehmen (z. B. Holzschlag-Planung der Kantone).
 - **Touren**: Abgleich mit Strava/Komoot per OAuth (braucht dort registrierte Apps), Aufzeichnung im
-  Hintergrund (braucht eine native Hülle, Browser stoppen GPS im Hintergrund); die Sensorwerte entlang der
-  Strecke zeigen (z. B. Puls oder Temperatur im Höhenprofil, kühlere Waldabschnitte).
+  Hintergrund (braucht eine native Hülle, Browser stoppen GPS im Hintergrund); Temperaturen vieler Touren zu
+  einer Karte kühler Waldabschnitte zusammenführen (mit Korrektur für Tageszeit und Wetter).
 
 - **Landschaften ausbauen**: im Trockengebiet Ausrichtung am Horizont, wo Dünen keine festen Punkte haben,
   und längere Offline-Zeiten; im Gebirge Routing mit SAC-Skala und Gefahrenkarten (Steinschlag, Lawinen);
@@ -76,8 +76,8 @@ Aus früheren Versionen dieser Roadmap:
   umgehen, BRouter-Image per GitHub-Workflow in der Registry
 - Sperrungen bei Holzerei: automatisch aus Holzschlag-Fotos, von Hand durch den Forstdienst; der Wege-Magnet
   führt darum herum
-- Touren: FIT-Dateien direkt lesen, mit Sensorwerten und Developer-Feldern (z. B. Laufleistung), Höhenprofil
-  der Route, Push-Nachricht bei erledigtem Fotoauftrag, Ablaufdatum für Aufträge
+- Touren: FIT-Dateien direkt lesen, mit Sensorwerten und Developer-Feldern (z. B. Laufleistung), auch aus GPX
+  und TCX; Höhenprofil der Route, wahlweise mit Puls, Leistung oder Temperatur entlang der Strecke, Push-Nachricht bei erledigtem Fotoauftrag, Ablaufdatum für Aufträge
 - Video statt Einzelbilder (GoPro mit GPMF, 360°-MP4, GPX), unscharfe Bilder werden ersetzt oder verworfen
 - 360°-Fotos beim Upload erkennen, Panoramen über eine Drehung der Kugel ausrichten und vergleichen
 - Durchgehen wie Street View: Pfeile entlang der Aufnahme und zu Spots in der Nähe, Blickrichtung bleibt beim Schritt

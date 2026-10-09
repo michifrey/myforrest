@@ -21,7 +21,10 @@
  * that stands for a standard field fills in where the watch has none (e.g.
  * running power from the foot pod), the others are listed under their name.
  *
- * parseFit(buffer) → { name, points: [{ lat, lon, ele?, time? }], sensors: [{ key, label, unit, avg, min, max, n }] }
+ * The standard values also stay with each point (hr, power, cadence or steps, temp), for the profile.
+ *
+ * parseFit(buffer) → { name, points: [{ lat, lon, ele?, time?, hr?, power?, cadence?, steps?, temp? }],
+ *                      sensors: [{ key, label, unit, avg, min, max, n }] }
  */
 
 const FIT_EPOCH = Date.UTC(1989, 11, 31); // ms
@@ -169,31 +172,36 @@ function parseFit(buf) {
         type: f[2], scale: f[6] || 1, offset: f[7] || 0, native: f[14] ?? null,
       });
     }
-    if (def.global === RECORD) {
-      const own = new Set();
-      for (const [num, key] of Object.entries(STANDARD)) {
-        const v = f[num];
-        if (v === null || v === undefined || ((key === 'hr' || key === 'cadence') && v === 0)) continue;
-        own.add(Number(num));
-        add(key, null, null, v);
-      }
-      for (const { d, value } of msg.dev) {
-        // Stands for a standard field: fills in where the watch has none.
-        if (d.native !== null && STANDARD[d.native]) {
-          if (!own.has(d.native)) add(STANDARD[d.native], null, null, value);
-        } else add(`dev:${d.name}`, d.name, d.units, value);
-      }
+    if (def.global !== RECORD) return;
+    const values = {}; // standard sensor values of this record, for the point
+    for (const [num, key] of Object.entries(STANDARD)) {
+      const v = f[num];
+      if (v === null || v === undefined || ((key === 'hr' || key === 'cadence') && v === 0)) continue;
+      values[key] = v;
+      add(key, null, null, v);
     }
-    if (def.global !== RECORD || f[0] === null || f[1] === null || f[0] === undefined || f[1] === undefined) return;
+    for (const { d, value } of msg.dev) {
+      // Stands for a standard field: fills in where the watch has none.
+      if (d.native !== null && STANDARD[d.native]) {
+        const key = STANDARD[d.native];
+        if (values[key] === undefined && !(key === 'hr' && value === 0)) { values[key] = value; add(key, null, null, value); }
+      } else add(`dev:${d.name}`, d.name, d.units, value);
+    }
+    if (f[0] === null || f[1] === null || f[0] === undefined || f[1] === undefined) return;
     const p = { lat: f[0] * SEMI, lon: f[1] * SEMI };
     if (Math.abs(p.lat) > 90 || Math.abs(p.lon) > 180 || (p.lat === 0 && p.lon === 0)) return;
     const ele = f[78] ?? f[2];
     if (ele !== null && ele !== undefined) p.ele = Math.round((ele / 5 - 500) * 10) / 10;
     if (f[253] !== null && f[253] !== undefined) p.time = FIT_EPOCH + f[253] * 1000;
+    for (const [key, v] of Object.entries(values)) p[key] = Math.round(v * 10) / 10;
     points.push(p);
   }
 
   const SPORTS = { 1: 'Lauf', 2: 'Velofahrt', 11: 'Spaziergang', 17: 'Wanderung' };
+  // Runs: steps per minute along the route as well (see summarize).
+  if (sport === RUNNING) {
+    for (const p of points) if (p.cadence !== undefined) { p.steps = p.cadence * 2; delete p.cadence; }
+  }
   return { name: SPORTS[sport] || null, points, sensors: summarize(stats, sport) };
 }
 
@@ -204,13 +212,23 @@ function summarize(stats, sport) {
   for (const [key, s] of stats) {
     // Watches store running cadence per leg (strides); people count steps.
     const k = key === 'cadence' && sport === RUNNING ? 'steps' : key;
-    const x = k === 'steps' ? 2 : 1;
+    const x = key === 'cadence' && k === 'steps' ? 2 : 1;
     const [label, unit] = LABELS[k] || [s.label, s.unit];
     out.push({ key: k, label, unit, avg: round((s.sum / s.n) * x), min: round(s.min * x), max: round(s.max * x), n: s.n });
   }
   const ORDER = ['hr', 'power', 'cadence', 'steps', 'temp'];
   const order = (e) => (ORDER.includes(e.key) ? ORDER.indexOf(e.key) : ORDER.length);
   return out.sort((a, b) => order(a) - order(b)).slice(0, 20);
+}
+
+/** The same sums from per-point values (GPX and TCX with sensor extensions). */
+function summarizePoints(points) {
+  const stats = new Map();
+  for (const key of SENSOR_KEYS) {
+    const v = points.map((p) => p[key]).filter(Number.isFinite);
+    if (v.length) stats.set(key, { sum: v.reduce((a, b) => a + b, 0), min: v.reduce((a, b) => Math.min(a, b)), max: v.reduce((a, b) => Math.max(a, b)), n: v.length });
+  }
+  return summarize(stats, null);
 }
 
 /**
@@ -271,4 +289,6 @@ function writeFit(points, { compressAfter = Infinity, developer = [], sport = nu
   return Buffer.concat([header, data, Buffer.alloc(2)]);
 }
 
-module.exports = { parseFit, writeFit, isFit };
+const SENSOR_KEYS = ['hr', 'power', 'cadence', 'steps', 'temp'];
+
+module.exports = { parseFit, writeFit, isFit, summarizePoints, SENSOR_KEYS };
