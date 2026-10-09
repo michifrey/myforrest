@@ -15,9 +15,105 @@ npm test
 
 ## Auf dem Handy
 
-Browser lassen die Kamera für das Live-Overlay nur über HTTPS zu (oder auf `localhost`). Im Heimnetz geht das z. B. mit einem Tunnel (`cloudflared tunnel --url http://localhost:3000`)
-oder einem Reverse-Proxy wie Caddy. Ohne HTTPS öffnet sich die normale Kamera-App: Das Foto landet
+Browser lassen die Kamera für das Live-Overlay nur über HTTPS zu (oder auf `localhost`). Im Heimnetz geht das z. B. mit einem Tunnel (siehe
+[unten](#zum-testen-server-auf-dem-eigenen-pc-mit-cloudflare-tunnel)) oder einem Reverse-Proxy wie Caddy. Ohne HTTPS öffnet sich die normale Kamera-App: Das Foto landet
 trotzdem am richtigen Spot, nur ohne Overlay.
+
+## Zum Testen: Server auf dem eigenen PC mit Cloudflare Tunnel
+
+Für erste Versuche mit dem Handy oder der [Android-App](android.md) reicht der eigene PC: MyForrest läuft dort,
+und [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) gibt ihm
+eine HTTPS-Adresse, die das Handy von überall erreicht. Kein Router, keine Firewall und kein Zertifikat sind
+einzurichten; der Tunnel verbindet von innen nach aussen. Der PC muss dafür laufen (Ruhezustand aus). Für den
+Dauerbetrieb ist ein Server besser ([Eigener Server: VPS und Synology](hosting.md)).
+
+### 1. Programme installieren
+
+Unter Windows in PowerShell, danach PowerShell schliessen und neu öffnen:
+
+```powershell
+winget install OpenJS.NodeJS.LTS
+winget install Git.Git
+winget install Cloudflare.cloudflared
+winget install Gyan.FFmpeg   # nur für Video-Uploads
+```
+
+Unter macOS `brew install node git cloudflared ffmpeg`, unter Linux Node.js ≥ 22.5 und `cloudflared` aus den
+[Paketen von Cloudflare](https://pkg.cloudflare.com/).
+
+### 2. MyForrest holen und starten
+
+```powershell
+cd $HOME
+git clone https://github.com/michifrey/myforrest.git
+cd myforrest
+npm install
+$env:TRUST_PROXY = "loopback"
+npm start
+```
+
+`TRUST_PROXY=loopback` lässt den Server hinter dem Tunnel die Adresse der Besucher sehen; sonst teilen sich alle
+dieselbe Begrenzung für Anmeldungen. (Unter macOS und Linux: `TRUST_PROXY=loopback npm start`.) Steht
+`http://localhost:3000` im Fenster, zeigt der Browser auf dem PC die Karte. Das Fenster offen lassen.
+
+### 3. Tunnel öffnen (ohne Konto)
+
+In einem zweiten Fenster:
+
+```powershell
+cloudflared tunnel --url http://localhost:3000
+```
+
+Nach ein paar Sekunden steht dort eine Adresse wie `https://gentle-forest-example-words.trycloudflare.com`. Sie
+im Browser des Handys öffnen oder in der Android-App auf dem Startbildschirm eingeben und *Verbinden*.
+
+Bei jedem Start von `cloudflared` gibt es eine **neue Zufallsadresse**. Die Android-App zeigt dann wieder ihren
+Startbildschirm, wo die neue Adresse eingegeben wird (oder lange auf das App-Symbol drücken → *Server
+wechseln*). Für eine feste Adresse siehe Schritt 5.
+
+### 4. Konto anlegen
+
+In der App *Anmelden → Registrieren*. Ohne `SMTP_URL` verschickt MyForrest keine E-Mails, sondern schreibt den
+Bestätigungslink ins erste Fenster (Server-Log); ihn kopieren und im Browser öffnen. Das erste Konto wird Admin.
+Fotos und Datenbank liegen im Ordner `data` (siehe `DATA_DIR`) und bleiben bei jedem Neustart erhalten.
+
+### 5. Feste Adresse mit eigener Domain
+
+Liegt eine Domain bei Cloudflare (z. B. `example.org`), bekommt der Tunnel eine feste Adresse wie
+`app.example.org`:
+
+```powershell
+cloudflared tunnel login                      # öffnet den Browser, Domain auswählen
+cloudflared tunnel create myforrest           # gibt die ID des Tunnels aus
+cloudflared tunnel route dns myforrest app.example.org
+```
+
+Dazu die Datei `.cloudflared\config.yml` im Benutzerordner (unter macOS/Linux `~/.cloudflared/config.yml`):
+
+```yaml
+tunnel: <ID>
+credentials-file: C:\Users\<name>\.cloudflared\<ID>.json
+ingress:
+  - hostname: app.example.org
+    service: http://localhost:3000
+  - service: http_status:404
+```
+
+Starten mit `cloudflared tunnel run myforrest`, MyForrest dazu mit derselben Adresse:
+
+```powershell
+$env:PUBLIC_URL = "https://app.example.org"
+$env:TRUST_PROXY = "loopback"
+npm start
+```
+
+Die feste Adresse lässt sich als Variable `APP_URL` in die Android-App bauen, dann fragt sie nicht mehr danach
+(siehe [Android-App → Auf GitHub](android.md#auf-github)).
+
+!!! warning "Öffentlich erreichbar"
+    Über den Tunnel ist der Server im Internet erreichbar, auch unter der zufälligen Adresse. Nur laufen lassen,
+    solange getestet wird, und vor einem echten Betrieb [Betrieb und Datenschutz](betrieb.md#vor-einem-öffentlichen-betrieb)
+    lesen.
 
 ## Umgebungsvariablen
 

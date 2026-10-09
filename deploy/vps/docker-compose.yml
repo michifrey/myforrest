@@ -1,0 +1,35 @@
+# MyForrest on a small server (VPS) with automatic HTTPS from Caddy (Let's Encrypt).
+# Guide: docs/hosting.md. In this folder: a file .env with DOMAIN=… (and optionally ADMIN_EMAIL, SMTP_URL),
+# then `docker compose up -d --build`. Data (database, photos) in ./data next to this file.
+services:
+  myforrest:
+    build: ../..
+    restart: unless-stopped
+    environment:
+      PUBLIC_URL: https://${DOMAIN:?DOMAIN fehlt in .env}
+      # Caddy sits in front, in the Docker network (private addresses): its X-Forwarded-For counts.
+      TRUST_PROXY: uniquelocal
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      SMTP_URL: ${SMTP_URL:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+    volumes:
+      - ./data:/app/data
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [myforrest]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

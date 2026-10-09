@@ -17,6 +17,7 @@ nav:
   - Selbst hosten:
       - Tech-Onboarding: tech-onboarding.md
       - Installation und Konfiguration: installation.md
+      - Eigener Server (VPS, Synology): hosting.md
       - Betrieb und Datenschutz: betrieb.md
   - Entwickeln:
       - Architektur: architektur.md

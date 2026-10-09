@@ -1,0 +1,5 @@
+# HTTPS for MyForrest: Caddy gets and renews the certificate for DOMAIN by itself.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy myforrest:3000
+}

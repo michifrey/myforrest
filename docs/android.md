@@ -31,7 +31,8 @@ wie im Browser. Neue Funktionen kommen deshalb ohne neue App-Version: Die App l�
    sich die Adresse dort oder über die Verknüpfung *Server wechseln* (lange auf das App-Symbol drücken).
 
 Die App braucht einen laufenden MyForrest-Server; ohne ihn zeigt sie nur den Startbildschirm. Wie man einen
-einrichtet: [Tech-Onboarding](tech-onboarding.md) und [Installation](installation.md).
+einrichtet: [Eigener Server: VPS und Synology](hosting.md); zum Ausprobieren
+reicht der eigene PC mit einem [Cloudflare Tunnel](installation.md#zum-testen-server-auf-dem-eigenen-pc-mit-cloudflare-tunnel).
 
 Voraussetzung: Android 8.0 oder neuer. Der Server braucht HTTPS, sonst geben WebView und Browser Kamera und
 Standort nicht frei.

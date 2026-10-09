@@ -1,0 +1,18 @@
+# MyForrest on a Synology NAS (Container Manager, DSM 7.2). Guide: docs/hosting.md.
+# The project folder holds this file and the source code in ./app (the ZIP from GitHub, unpacked).
+# HTTPS comes from the reverse proxy of DSM (or a Cloudflare tunnel); MyForrest listens on port 3000.
+services:
+  myforrest:
+    build: ./app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # The address under which MyForrest is reached from outside (change it).
+      PUBLIC_URL: https://myforrest.example.synology.me
+      # The reverse proxy of DSM comes from the Docker network (private addresses): its X-Forwarded-For counts.
+      TRUST_PROXY: uniquelocal
+      # ADMIN_EMAIL: du@example.org
+      # SMTP_URL: smtps://user:passwort@smtp.example.org
+    volumes:
+      - ./data:/app/data

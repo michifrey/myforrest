@@ -493,6 +493,7 @@ jedes Dokument hier im Repository und auf der Website.
 | [Android-App](docs/android.md) · [Website](https://michifrey.github.io/myforrest/android/) | Fahrtmodus und Aufzeichnung im Hintergrund, Installieren, selbst bauen und signieren |
 | [Tech-Onboarding](docs/tech-onboarding.md) · [Website](https://michifrey.github.io/myforrest/tech-onboarding/) | Selbst hosten: Voraussetzungen, Speicherplatz, Lizenzen, Ports, Zertifikate, ausgehende Verbindungen, Checkliste |
 | [Installation und Konfiguration](docs/installation.md) · [Website](https://michifrey.github.io/myforrest/installation/) | Voraussetzungen, HTTPS fürs Handy, Umgebungsvariablen, externer Detektor, Phänologie-Daten |
+| [Eigener Server: VPS und Synology](docs/hosting.md) · [Website](https://michifrey.github.io/myforrest/hosting/) | Dauerbetrieb mit Docker: VPS mit Caddy (HTTPS automatisch) oder Synology NAS mit Container Manager |
 | [Betrieb, Datenschutz und Datenquellen](docs/betrieb.md) · [Website](https://michifrey.github.io/myforrest/betrieb/) | Hinweise für einen öffentlichen Betrieb, externe Dienste und Quellenangaben |
 | [Architektur](docs/architektur.md) · [Website](https://michifrey.github.io/myforrest/architektur/) | Aufbau des Codes, Module im Überblick |
 | [REST-API](docs/api.md) · [Website](https://michifrey.github.io/myforrest/api/) | Alle Routen des Servers |
