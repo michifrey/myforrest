@@ -127,6 +127,6 @@ final class NativeBridge {
   @JavascriptInterface
   public void chooseServer() {
     if (!activity.trusted()) return;
-    activity.runOnUiThread(() -> activity.askServer(false));
+    activity.runOnUiThread(activity::askServer);
   }
 }

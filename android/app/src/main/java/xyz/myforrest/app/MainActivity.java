@@ -3,7 +3,6 @@ package xyz.myforrest.app;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -11,7 +10,6 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.text.InputType;
 import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
@@ -21,7 +19,9 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.EditText;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.ProgressBar;
 import android.widget.FrameLayout;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -42,6 +42,8 @@ public class MainActivity extends Activity {
   private static WeakReference<MainActivity> visible = new WeakReference<>(null);
 
   private WebView web;
+  private StartScreen start;
+  private ProgressBar progress;
   private String server;
   private volatile String pageOrigin = "";
   private volatile String serverOrigin = "";
@@ -63,6 +65,14 @@ public class MainActivity extends Activity {
     web = new WebView(this);
     FrameLayout root = new FrameLayout(this);
     root.addView(web);
+    // A thin bar at the top while a page loads, so a slow server does not look like an empty app.
+    progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+    progress.setMax(100);
+    progress.setVisibility(View.GONE);
+    root.addView(progress, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,
+        Math.round(4 * getResources().getDisplayMetrics().density), Gravity.TOP));
+    start = new StartScreen(this, this::connected);
+    root.addView(start.view());
     setContentView(root);
 
     WebSettings s = web.getSettings();
@@ -81,7 +91,7 @@ public class MainActivity extends Activity {
     web.setWebChromeClient(new Chrome());
 
     server = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_SERVER, BuildConfig.SERVER_URL);
-    if (server == null || server.isEmpty()) askServer(true);
+    if (server == null || server.isEmpty()) start.show(null, null);
     else load(getIntent());
   }
 
@@ -95,7 +105,7 @@ public class MainActivity extends Activity {
   /** The start page, or the path of a launcher shortcut (e.g. /?action=fahrt). */
   private void load(Intent intent) {
     if (intent != null && "server".equals(intent.getStringExtra("action"))) {
-      askServer(false);
+      askServer();
       return;
     }
     Uri base = Uri.parse(server);
@@ -119,28 +129,17 @@ public class MainActivity extends Activity {
     return !serverOrigin.isEmpty() && serverOrigin.equals(pageOrigin);
   }
 
-  /** Asks for the server address (first start, or "Server wechseln"). */
-  void askServer(boolean first) {
-    EditText input = new EditText(this);
-    input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-    input.setHint("https://myforrest.example.org");
-    if (server != null) input.setText(server);
-    AlertDialog.Builder b = new AlertDialog.Builder(this)
-        .setTitle("MyForrest-Server")
-        .setMessage("Adresse des MyForrest-Servers, mit dem die App arbeitet (HTTPS, damit Kamera und GPS gehen).")
-        .setView(input)
-        .setCancelable(!first)
-        .setPositiveButton("Verbinden", (d, w) -> {
-          String v = input.getText().toString().trim();
-          if (!v.matches("(?i)^https?://.*")) v = "https://" + v;
-          while (v.endsWith("/") && v.length() > 8) v = v.substring(0, v.length() - 1);
-          server = v + "/";
-          getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_SERVER, server).apply();
-          load(null);
-        });
-    if (first) b.setNegativeButton("Beenden", (d, w) -> finish());
-    else b.setNegativeButton("Abbrechen", null);
-    b.show();
+  /** The start screen with the address (shortcut "Server wechseln", or from the page). */
+  void askServer() {
+    start.show(server, null);
+  }
+
+  /** The start screen checked the address: remembered, and the page is loaded. */
+  private void connected(String address) {
+    server = address;
+    getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_SERVER, server).apply();
+    start.hide();
+    load(null);
   }
 
   /* ---------- Recording ---------- */
@@ -226,7 +225,8 @@ public class MainActivity extends Activity {
   @Override
   @SuppressWarnings("deprecation") // still called without predictive back (targetSdk 35)
   public void onBackPressed() {
-    if (web.canGoBack()) web.goBack();
+    if (start.shown() && server != null && !server.isEmpty() && web.getUrl() != null) start.hide();
+    else if (!start.shown() && web.canGoBack()) web.goBack();
     else super.onBackPressed();
   }
 
@@ -296,13 +296,10 @@ public class MainActivity extends Activity {
     @Override
     public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
       if (!request.isForMainFrame()) return;
-      // Offline the service worker of the page answers; this is only reached without one (first start).
-      new AlertDialog.Builder(MainActivity.this)
-          .setTitle("Keine Verbindung")
-          .setMessage(server + " ist nicht erreichbar (" + error.getDescription() + ").")
-          .setPositiveButton("Erneut versuchen", (d, w) -> view.reload())
-          .setNeutralButton("Server ändern", (d, w) -> askServer(false))
-          .show();
+      // Offline the service worker of the page answers; this is only reached without one (first start, or
+      // the server is gone): back to the start screen, which tries again with "Verbinden".
+      start.show(server, "Keine Verbindung zu " + server + " (" + error.getDescription() + "). "
+          + "Ist der Server gestartet und das Handy online?");
     }
   }
 
@@ -345,6 +342,12 @@ public class MainActivity extends Activity {
         pendingFiles = null;
         return false;
       }
+    }
+
+    @Override
+    public void onProgressChanged(WebView view, int percent) {
+      progress.setProgress(percent);
+      progress.setVisibility(percent < 100 ? View.VISIBLE : View.GONE);
     }
 
     @Override

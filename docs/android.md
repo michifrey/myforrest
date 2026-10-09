@@ -22,9 +22,15 @@ wie im Browser. Neue Funktionen kommen deshalb ohne neue App-Version: Die App l�
    (alle Versionen unter [Releases](https://github.com/michifrey/myforrest/releases)). Wer selbst baut, siehe unten.
 2. Die Datei öffnen und die Installation aus dieser Quelle erlauben. Steht im Release *Testversion
    (Debug-Signatur)*, vor einem Update die alte Version deinstallieren (siehe [Auf GitHub](#auf-github)).
-3. Beim ersten Start fragt die App nach der **Adresse des Servers** (z. B. `https://myforrest.example.org`),
-   ausser sie wurde beim Bauen fest eingetragen. Wechseln lässt sie sich später über die Verknüpfung
-   *Server wechseln* (lange auf das App-Symbol drücken).
+3. Beim ersten Start zeigt die App ihren **Startbildschirm** und fragt nach der Adresse des Servers (z. B.
+   `https://myforrest.example.org`), ausser sie wurde beim Bauen fest eingetragen. *Verbinden* prüft zuerst,
+   ob dort ein MyForrest-Server antwortet (`/api/config`), und sagt sonst, was nicht stimmt (Adresse nicht
+   gefunden, Zertifikat, kein MyForrest-Server). Ist der Server später nicht erreichbar und nichts im
+   Offline-Speicher, erscheint wieder der Startbildschirm. Wechseln lässt sich die Adresse über die
+   Verknüpfung *Server wechseln* (lange auf das App-Symbol drücken).
+
+Die App braucht einen laufenden MyForrest-Server; ohne ihn zeigt sie nur den Startbildschirm. Wie man einen
+einrichtet: [Tech-Onboarding](tech-onboarding.md) und [Installation](installation.md).
 
 Voraussetzung: Android 8.0 oder neuer. Der Server braucht HTTPS, sonst geben WebView und Browser Kamera und
 Standort nicht frei.
@@ -75,6 +81,7 @@ oder noch laufend.
 ```text
 android/app/src/main/java/xyz/myforrest/app/
   MainActivity.java     WebView mit der Web-App, Erlaubnisse, Dateiauswahl, Serveradresse
+  StartScreen.java      Startbildschirm ohne Server: Adresse eingeben, Verbindung prüfen
   NativeBridge.java     window.MyForrestNative für die Seite (nur für den eingestellten Server)
   TrackingService.java  Dienst im Vordergrund: GPS (LocationManager), Kamera (Camera2), Auswahl
   Session.java          die laufende Aufzeichnung auf dem Gerät: meta.json, route.jsonl, held/, kept/
