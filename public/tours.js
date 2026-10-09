@@ -15,11 +15,14 @@
  * The route under construction stays in this browser (localStorage) until it is
  * saved; suggestions are computed by the server without storing the route.
  * Relies on globals from app.js (map, state, api, el, $, openSpot, distanceM,
- * fmtDate, setPicked) and account.js (Account).
+ * fmtDate, setPicked), account.js (Account) and native.js (nativeApp).
  */
 (function toursMode() {
   const STORE = 'myforrest.route.v1';
   const RECORDING = 'myforrest.recording.v1';
+  // The Android app records the GPS track in the background, also with the screen off; a browser only while
+  // the page is in front.
+  const native = window.nativeApp?.has('tour') ? window.nativeApp : null;
   const COMPASS = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'];
   const COMPASS_LONG = { N: 'Norden', NO: 'Nordosten', O: 'Osten', SO: 'Südosten', S: 'Süden', SW: 'Südwesten', W: 'Westen', NW: 'Nordwesten' };
   const compass = (deg) => COMPASS[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
@@ -404,13 +407,28 @@
 
   /* ---------- Recording with GPS ---------- */
 
-  async function startRecording() {
-    if (!navigator.geolocation) return setStatus('Dieses Gerät kann keinen Standort liefern.');
-    const points = loadRecording(); // continues an interrupted recording
-    if (!points.length && routePoints().length > 1 && !T.route.savedId && !confirm('Die aktuelle Route wird ersetzt. Aufzeichnung starten?')) return;
+  async function startRecording(attach = false) {
+    if (!native && !navigator.geolocation) return setStatus('Dieses Gerät kann keinen Standort liefern.');
+    let points = loadRecording(); // continues an interrupted recording
+    if (!attach && !points.length && routePoints().length > 1 && !T.route.savedId && !confirm('Die aktuelle Route wird ersetzt. Aufzeichnung starten?')) return;
+    if (native) {
+      // The app holds the whole track (with the points so far); the page takes it from there.
+      if (!attach) {
+        const err = native.start('tour', { points });
+        if (err) return setStatus(err);
+      }
+      points = [];
+    }
     T.route = { ...emptyRoute(), raw: points, kind: 'aufgezeichnet', hasTime: true, name: `Aufzeichnung ${fmtDate(new Date().toISOString())}` };
-    const rec = { points, started: points[0]?.time || Date.now(), watch: null, wake: null, timer: null, here: null };
+    const rec = { points, started: points[0]?.time || Date.now(), watch: null, wake: null, timer: null, here: null, native: Boolean(native) };
     T.recorder = rec;
+    if (native) {
+      setStatus(attach ? 'Die Aufzeichnung läuft in der App weiter.' : 'Aufzeichnung startet …');
+      rec.timer = setInterval(() => { pullNative(rec); renderRoute(); }, 1000);
+      pullNative(rec);
+      changed();
+      return;
+    }
     rec.watch = navigator.geolocation.watchPosition((pos) => {
       const c = pos.coords;
       if (c.accuracy > 40) return setStatus(`Warte auf genaueres GPS (±${Math.round(c.accuracy)} m) …`);
@@ -434,10 +452,36 @@
   function loadRecording() {
     try { return JSON.parse(localStorage.getItem(RECORDING)) || []; } catch { return []; }
   }
+  /** The new points of the app's recording; ends with it (e.g. "Beenden" in the notification). */
+  function pullNative(rec) {
+    if (T.recorder !== rec) return;
+    const st = native.state();
+    const fresh = native.route(rec.points.length);
+    if (fresh.length) {
+      rec.points.push(...fresh);
+      if (rec.points.length === fresh.length && fresh[0].time) rec.started = fresh[0].time;
+      try { localStorage.setItem(RECORDING, JSON.stringify(rec.points)); } catch { /* full */ }
+      const p = rec.points.at(-1);
+      if (rec.here) rec.here.setLatLng(ll(p));
+      else rec.here = L.circleMarker(ll(p), { radius: 7, className: 'gps-here', interactive: false }).addTo(routeLayer);
+      changed();
+    }
+    if (st.running) {
+      if (st.status) setStatus(st.status);
+      return;
+    }
+    stopRecording();
+    if (st.error) setStatus(st.error);
+  }
   function stopRecording() {
     const rec = T.recorder;
     if (!rec) return;
-    navigator.geolocation.clearWatch(rec.watch);
+    if (rec.native) {
+      native.stop();
+      rec.points.push(...native.route(rec.points.length));
+      native.clear();
+    }
+    if (rec.watch !== null) navigator.geolocation.clearWatch(rec.watch);
     clearInterval(rec.timer);
     rec.wake?.release?.();
     T.recorder = null;
@@ -1024,7 +1068,8 @@
     $('tour-record').textContent = T.recorder ? 'Aufnahme beenden' : 'Aufzeichnen';
     $('tour-record').classList.toggle('recording', Boolean(T.recorder));
     $('tour-draw').setAttribute('aria-pressed', String(!r.raw && !T.recorder));
-    $('tour-hint').textContent = T.recorder ? 'Die Aufzeichnung läuft, solange diese Seite offen ist. Der Bildschirm bleibt dafür an.'
+    $('tour-hint').textContent = T.recorder?.native ? 'Die Aufzeichnung läuft in der App, auch bei gesperrtem Bildschirm. Beenden geht hier oder in der Benachrichtigung.'
+      : T.recorder ? 'Die Aufzeichnung läuft, solange diese Seite offen ist. Der Bildschirm bleibt dafür an.'
       : r.raw ? 'Aufgezeichnete und importierte Touren lassen sich speichern und exportieren. «Neu beginnen» startet eine neue Route.'
         : 'Klicke auf die Karte, um Wegpunkte zu setzen. Punkte lassen sich verschieben.';
     $('tour-follow-wrap').hidden = !state.config.routing || Boolean(r.raw);
@@ -1141,10 +1186,29 @@
     const saved = JSON.parse(localStorage.getItem(STORE));
     if (saved && (saved.waypoints?.length || saved.raw?.length)) T.route = { ...emptyRoute(), ...saved };
   } catch { /* nothing stored */ }
-  if (loadRecording().length) {
+  // In the app: a recording still running, or ended meanwhile (notification) or by the system.
+  const nativeRec = native?.state();
+  let attach = false;
+  if (nativeRec?.mode === 'tour' && nativeRec.running) {
+    attach = true;
+  } else if (nativeRec?.mode === 'tour' && (nativeRec.finished || nativeRec.interrupted)) {
+    const pts = native.route(0);
+    native.clear();
+    try {
+      if (nativeRec.finished) localStorage.removeItem(RECORDING);
+      else if (pts.length >= loadRecording().length) localStorage.setItem(RECORDING, JSON.stringify(pts));
+    } catch { /* full */ }
+    if (nativeRec.finished && pts.length > 1) {
+      T.route = { ...emptyRoute(), raw: pts, kind: 'aufgezeichnet', hasTime: true, name: `Aufzeichnung ${fmtDate(new Date(pts[0].time || Date.now()).toISOString())}` };
+      try { localStorage.setItem(STORE, JSON.stringify(T.route)); } catch { /* private mode */ }
+      setStatus('Aufzeichnung beendet – jetzt speichern oder als GPX exportieren.');
+    }
+  }
+  if (!attach && loadRecording().length) {
     T.route = { ...emptyRoute(), raw: loadRecording(), kind: 'aufgezeichnet', hasTime: true, name: 'Unterbrochene Aufzeichnung' };
     setStatus('Eine unterbrochene Aufzeichnung wurde wiederhergestellt. «Aufzeichnen» setzt sie fort.');
   }
+  if (attach) startRecording(true);
   renderRoute();
   drawRoute();
   loadRequests();

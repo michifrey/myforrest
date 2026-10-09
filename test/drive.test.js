@@ -139,3 +139,31 @@ test('server: drive pictures take the course as heading and are not stored twice
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
 });
+
+/**
+ * The Android app (android/, DriveSelector.java) runs the same selection in its background service. Both
+ * are checked against the cases in test/fixtures/drive-select-cases.json: here the web version, in
+ * `./gradlew test` the Java one. UPDATE_FIXTURES=1 writes the file anew from drive-select.js.
+ */
+test('the same decisions as the Android app (shared cases)', () => {
+  const file = path.join(__dirname, 'fixtures', 'drive-select-cases.json');
+  const frames = drive();
+  const spotAt = (i, heading) => ({ id: 100 + i, lat: frames[i].lat + 5 / 111320, lon: 8.5001, heading });
+  // JSON has no NaN: missing values are null, as the app passes them.
+  const json = (x) => JSON.parse(JSON.stringify(x));
+  const cases = [
+    { name: 'strecke', spots: [], options: { everyM: 150 }, frames },
+    { name: 'spots', spots: [spotAt(50, 0), spotAt(120, 180), spotAt(220, null)], options: { onlySpots: true }, frames },
+    { name: 'gemischt', spots: [spotAt(80, 0), spotAt(260, null)], options: { everyM: 100 },
+      frames: frames.map((f, i) => ({ ...f, accuracy: i % 37 === 5 ? 80 : f.accuracy, lat: i % 53 === 7 ? null : f.lat, hash: i % 3 ? f.hash : 'ffff0000ffff0000', speed: i % 11 === 0 ? 12 : null })) },
+    { name: 'rueckweg', spots: [spotAt(50, 0), spotAt(120, 180), spotAt(220, null)], options: { onlySpots: true },
+      frames: frames.slice(0, 200).reverse().map((f, i) => ({ ...f, id: 1000 + i, time: f.time + 86400000 + i * 6000 })) },
+  ].map((c) => {
+    const sel = ds.createSelector(c.spots, c.options);
+    const decisions = [...json(c.frames).flatMap((f) => sel.offer(f)), ...sel.finish()];
+    const s = sel.stats();
+    return json({ ...c, frames: c.frames, decisions, stats: { kept: s.kept, total: s.total, counts: s.counts, spots: s.spots, distanceM: Math.round(s.distanceM) } });
+  });
+  if (process.env.UPDATE_FIXTURES) fs.writeFileSync(file, `${JSON.stringify(json(cases))}\n`);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), json(cases));
+});

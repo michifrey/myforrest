@@ -23,7 +23,7 @@
 
 importScripts('offline-queue.js');
 
-const SHELL_VERSION = 'v13';
+const SHELL_VERSION = 'v14';
 const DATA_VERSION = 'v1';
 const CACHE = {
   shell: `myforrest-shell-${SHELL_VERSION}`,
@@ -60,6 +60,7 @@ const PRECACHE = [
   'offline-queue.js',
   'pwa.js',
   'offline-map.js',
+  'native.js',
   'drive-select.js',
   'drive.js',
   'manifest.webmanifest',

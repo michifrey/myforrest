@@ -5,7 +5,10 @@
    seconds, records the road as a route and uploads only the pictures
    worth keeping (drive-select.js decides on the device).
    Uses the globals of app.js ($, el, api, state, fmtDate), account.js
-   (Account, openAuth) and offline-queue.js (offlineQueue).
+   (Account, openAuth), offline-queue.js (offlineQueue) and native.js (nativeApp).
+   In the Android app the app itself takes the pictures and the route, also
+   with the screen off; this page then only shows the counters and puts the
+   kept pictures into its upload queue.
    ========================================================= */
 (function driveMode() {
   const ROUTE_KEY = 'myforrest-drive-route'; // the route of a drive in progress (survives a reload)
@@ -19,7 +22,11 @@
     set(k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch { /* full or private */ } },
   };
 
+  // The Android app: camera, GPS and the selection run in its background service.
+  const native = window.nativeApp?.has('drive') ? window.nativeApp : null;
+
   const D = {
+    native: false, nativeState: null, nativeTimer: null, nativeBusy: false,
     running: false, stream: null, watch: null, timer: null, flushTimer: null, wake: null,
     selector: null, frames: new Map(), seq: 0, fix: null, route: [], started: 0,
     kept: { spot: 0, abstand: 0 }, bytesKept: 0, bytesSeen: 0, shots: 0, queued: 0,
@@ -40,7 +47,10 @@
       el('div', {}, [el('strong', { id: 'drive-title', text: 'Fahrtmodus' }), el('div', { id: 'drive-status', class: 'cam-info', text: 'Handy in die Halterung, Kamera nach vorn.' })]),
       el('button', { type: 'button', id: 'drive-close', class: 'icon', 'aria-label': 'Schliessen', text: '×' }),
     ]),
-    el('div', { class: 'drive-preview' }, [el('video', { id: 'drive-video', muted: '', playsinline: '', autoplay: '' })]),
+    el('div', { class: 'drive-preview' }, [
+      el('video', { id: 'drive-video', muted: '', playsinline: '', autoplay: '' }),
+      el('p', { id: 'drive-native', class: 'drive-native', hidden: '', text: 'Die App fotografiert mit der Kamera nach vorn, auch bei gesperrtem Bildschirm oder mit einer anderen App im Vordergrund. Beenden geht hier oder in der Benachrichtigung.' }),
+    ]),
     el('div', { class: 'drive-stats' }, [
       stat('drive-shots', 'Bilder gemacht'),
       stat('drive-kept', 'behalten'),
@@ -63,7 +73,8 @@
   const mb = (bytes) => (bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : bytes >= 1e6 ? `${Math.round(bytes / 1e6)} MB` : `${Math.round(bytes / 1e3)} kB`);
 
   function render() {
-    const s = D.selector?.stats();
+    const n = D.native && D.nativeState;
+    const s = n ? { distanceM: n.distanceM || 0, counts: n.counts || {} } : D.selector?.stats();
     $('drive-shots').textContent = String(D.shots);
     $('drive-kept').textContent = String(D.kept.spot + D.kept.abstand);
     $('drive-km').textContent = s ? (s.distanceM / 1000).toFixed(1) : '0.0';
@@ -137,6 +148,7 @@
 
   /** Into the upload queue: sent in the background, also after losing the connection in the forest. */
   async function enqueue({ blob, frame }, decision) {
+    // true when the picture is in the queue
     const fd = new FormData();
     const at = new Date(frame.time).toISOString();
     fd.append('photos', blob, `fahrt-${at.replace(/[:.]/g, '-')}.jpg`);
@@ -151,8 +163,10 @@
     try {
       await offlineQueue.add(fd);
       D.queued++;
+      return true;
     } catch (err) {
       status(`Bild konnte nicht gespeichert werden: ${err.message}`);
+      return false;
     }
   }
 
@@ -213,10 +227,87 @@
     }
   }
 
+  /* ---------- In the Android app ---------- */
+
+  const newTrip = () => (crypto.randomUUID ? crypto.randomUUID() : `fahrt-${Date.now()}`);
+
+  function startNative() {
+    const st = native.state();
+    if (st.mode === 'drive' && st.running) return attachNative();
+    D.settings = { interval: Number($('drive-interval').value), everyM: Number($('drive-every').value) };
+    store.set(SETTINGS_KEY, D.settings);
+    const spots = (state.spots || []).map((s) => ({ id: s.id, lat: s.lat, lon: s.lon, heading: Number.isFinite(s.heading) ? s.heading : null }));
+    const err = native.start('drive', { ...D.settings, spots, trip: newTrip() });
+    if (err) return status(err);
+    status('Kamera und GPS starten …');
+    attachNative();
+  }
+
+  /** Shows the drive of the app: on start, and when the page is opened again during or after a drive. */
+  function attachNative() {
+    Object.assign(D, { native: true, running: true, nativeState: native.state() });
+    $('drive-video').hidden = true;
+    $('drive-native').hidden = false;
+    clearInterval(D.nativeTimer);
+    D.nativeTimer = setInterval(syncNative, 2000);
+    render();
+    return syncNative();
+  }
+
+  /** Counters from the app; its kept pictures into the upload queue; the end of the drive. */
+  async function syncNative() {
+    if (D.nativeBusy) return;
+    D.nativeBusy = true;
+    try {
+      const st = native.state();
+      D.nativeState = st;
+      D.trip = st.options?.trip || D.trip;
+      Object.assign(D, { shots: st.shots || 0, bytesSeen: st.bytesSeen || 0, bytesKept: st.bytesKept || 0, kept: { spot: 0, abstand: 0, ...st.kept } });
+      for (const k of native.kept()) {
+        const blob = native.frame(k.id);
+        if (!blob) { native.ack(k.id); continue; }
+        if (!(await enqueue({ blob, frame: k }, k))) break; // storage full: stays in the app, next round
+        native.ack(k.id);
+      }
+      if (st.error) status(st.error);
+      else if (st.running && st.status) status(st.status);
+      if (D.running && !st.running) await finishNative(st);
+      render();
+    } finally {
+      D.nativeBusy = false;
+    }
+  }
+
+  async function finishNative(st) {
+    clearInterval(D.nativeTimer);
+    D.nativeTimer = null;
+    D.running = false;
+    if (st.error && !st.shots) { // e.g. no permission for the location
+      native.clear();
+      status(st.error);
+      return render();
+    }
+    const points = native.route(0);
+    const tour = await saveRoute(points, st.started || Date.now());
+    native.clear();
+    const kept = (st.kept?.spot || 0) + (st.kept?.abstand || 0);
+    const why = st.interrupted ? 'Fahrt wurde unterbrochen' : 'Fahrt beendet';
+    status(`${why}: ${st.shots || 0} Bilder gemacht, ${kept} behalten${tour ? `, Route «${tour.name}» gespeichert` : points.length > 1 ? ', Route wird gespeichert, sobald Netz da ist' : ''}.`);
+    render();
+    sendQueue();
+  }
+
+  async function stopNative() {
+    status('Fahrt wird beendet …');
+    native.stop(); // waits for the last picture
+    await syncNative();
+  }
+
   /* ---------- Start and stop ---------- */
 
   async function start() {
     if (!Account.user) return openAuth('login', { intro: 'Im Fahrtmodus werden Bilder und Route deinem Konto zugeordnet.', then: start });
+    if (native) return startNative();
     if (!navigator.geolocation || !navigator.mediaDevices?.getUserMedia) return status('Dieses Gerät kann keine Kamera und kein GPS liefern (HTTPS nötig).');
     D.settings = { interval: Number($('drive-interval').value), everyM: Number($('drive-every').value) };
     store.set(SETTINGS_KEY, D.settings);
@@ -235,7 +326,7 @@
     Object.assign(D, { running: true, frames: new Map(), shots: 0, bytesSeen: 0, bytesKept: 0, kept: { spot: 0, abstand: 0 }, route: store.get(ROUTE_KEY, []), started: Date.now() });
     if (D.route.length) D.started = D.route[0].time;
     // One drive, one sequence: kept across a reload as long as the route is.
-    D.trip = (D.route.length && store.get(TRIP_KEY, null)) || (crypto.randomUUID ? crypto.randomUUID() : `fahrt-${Date.now()}`);
+    D.trip = (D.route.length && store.get(TRIP_KEY, null)) || newTrip();
     store.set(TRIP_KEY, D.trip);
     D.watch = navigator.geolocation.watchPosition(onPosition, (err) => status(`GPS: ${err.message}`), { enableHighAccuracy: true, maximumAge: 1000, timeout: 30000 });
     D.timer = setInterval(() => shoot().catch((err) => status(err.message)), D.settings.interval * 1000);
@@ -247,6 +338,7 @@
 
   async function stop() {
     if (!D.running) return;
+    if (D.native) return stopNative();
     clearInterval(D.timer);
     clearInterval(D.flushTimer);
     navigator.geolocation.clearWatch(D.watch);
@@ -280,7 +372,7 @@
   $('drive-toggle').addEventListener('click', () => (D.running ? stop() : start()));
   $('drive-close').addEventListener('click', close);
   document.addEventListener('visibilitychange', async () => {
-    if (!D.running) return;
+    if (!D.running || D.native) return;
     if (document.hidden) return;
     // Back in view: the screen lock and the camera may need a new start.
     try { D.wake = await navigator.wakeLock?.request('screen'); } catch { /* not allowed */ }
@@ -293,5 +385,11 @@
   setTimeout(saveUnsaved, 5000);
 
   window.Drive = { open, start, stop, state: D };
-  if (new URLSearchParams(location.search).get('action') === 'fahrt') setTimeout(open, 0);
+  // The app: a drive still running (page reloaded), or ended meanwhile (from the notification, by the system).
+  const pending = native?.state();
+  if (pending?.mode === 'drive' && (pending.running || pending.finished || pending.interrupted || pending.waiting)) {
+    setTimeout(() => { open(); attachNative(); }, 0);
+  } else if (new URLSearchParams(location.search).get('action') === 'fahrt') setTimeout(open, 0);
+  // Ended from the notification while the page is open.
+  window.addEventListener('myforrest-native', () => { if (D.native && D.running) syncNative(); });
 }());
