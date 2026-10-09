@@ -227,5 +227,6 @@ Docker-Compose-Vorlage und auf Kubernetes läuft er schon mit; allein startet er
 
 ## Weiter
 
+- [Tech-Onboarding](tech-onboarding.md): alles fürs Hosten auf einen Blick (Speicher, Lizenzen, Ports, Zertifikate, ausgehende Verbindungen)
 - [Betrieb, Datenschutz und Datenquellen](betrieb.md): was vor einem öffentlichen Betrieb zu beachten ist
 - [Architektur](architektur.md) und [REST-API](api.md)
