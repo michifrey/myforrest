@@ -18,6 +18,8 @@ services:
       ROUTER_URL: http://brouter:17777/brouter
       # Forest profile of the own BRouter (deploy/brouter/profiles); brouter.de does not have it.
       ROUTER_PROFILE: myforrest-wald
+      # nginx (and a TLS proxy on the host) in front, on private addresses: rate limits per client from X-Forwarded-For.
+      TRUST_PROXY: ${TRUST_PROXY:-uniquelocal}
       # Wildlife rest areas as GeoJSON (BAFU, geo.admin.ch) in the data volume: routed around in their protection period.
       WILDRUHE_GEOJSON: ${WILDRUHE_GEOJSON:-}
     volumes:

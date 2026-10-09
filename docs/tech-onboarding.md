@@ -19,7 +19,7 @@ Alternativ das `Dockerfile` im Repository (Node 22 + ffmpeg, Daten im Volume `/a
 ```bash
 docker build -t myforrest .
 docker run -d -p 3000:3000 -v myforrest-data:/app/data \
-  -e PUBLIC_URL=https://wald.example.ch -e REQUIRE_LOGIN=1 myforrest
+  -e PUBLIC_URL=https://wald.example.ch -e REQUIRE_LOGIN=1 -e TRUST_PROXY=uniquelocal myforrest
 ```
 
 ### Vollausbau: mit Geodiensten und eigenem Routing
@@ -192,8 +192,10 @@ wald.example.ch {
 }
 ```
 
-Caddy setzt `X-Forwarded-Proto` von sich aus; bei eigenem nginx `proxy_set_header X-Forwarded-Proto $scheme;`
-setzen. `PUBLIC_URL` muss die öffentliche HTTPS-Adresse sein (Links in Mails, OAuth-Rücksprung, Kacheln).
+Caddy setzt `X-Forwarded-Proto` und `X-Forwarded-For` von sich aus; bei eigenem nginx
+`proxy_set_header X-Forwarded-Proto $scheme;` und `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`
+setzen. Dazu `TRUST_PROXY` (hier `loopback`, bei Containern im privaten Netz `uniquelocal`), damit die Rate-Limits
+die Adresse der Person sehen und nicht die des Proxys. `PUBLIC_URL` muss die öffentliche HTTPS-Adresse sein (Links in Mails, OAuth-Rücksprung, Kacheln).
 
 Weitere Schlüssel, die keine TLS-Zertifikate sind, aber wie Secrets behandelt werden:
 
@@ -263,6 +265,7 @@ Dann bleiben nur Open-Meteo (Wetter) und die Kartenkacheln im Browser; der eigen
 
 - [ ] Domain und DNS, TLS über den Reverse Proxy, Port 80 leitet auf 443 um
 - [ ] `PUBLIC_URL=https://…` gesetzt
+- [ ] `TRUST_PROXY` passend zum Reverse Proxy gesetzt (sonst gelten die Anmelde-Sperren für alle gemeinsam)
 - [ ] `REQUIRE_LOGIN=1` (besser `REQUIRE_VERIFIED_EMAIL=1`) und `ADMIN_EMAIL` gesetzt
 - [ ] `SMTP_URL` und `MAIL_FROM` gesetzt, Testmail angekommen
 - [ ] Proxy erlaubt Uploads bis 4 GB und hat lange Timeouts
@@ -272,10 +275,3 @@ Dann bleiben nur Open-Meteo (Wetter) und die Kartenkacheln im Browser; der eigen
 - [ ] Firewall: eingehend nur 80/443, ausgehend die Hosts aus [Abschnitt 6](#6-ausgehende-verbindungen)
 - [ ] Eigener BRouter statt `brouter.de`, bei viel Verkehr eigener Kachelanbieter statt OpenStreetMap
 - [ ] Datenschutzerklärung (EXIF in Originalfotos, Backups, externe Dienste), siehe [Betrieb](betrieb.md)
-
-## Bekannte Punkte
-
-- **Rate-Limits hinter einem Proxy:** Die App setzt Express' `trust proxy` nicht. Hinter einem Reverse Proxy
-  sieht sie deshalb für alle Anfragen die IP-Adresse des Proxys, und die Sperren für Anmelden und Registrieren
-  pro IP gelten für alle Nutzenden gemeinsam. Bis das einstellbar ist, betrifft das nur Instanzen mit vielen
-  gleichzeitigen Anmeldungen.

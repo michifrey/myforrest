@@ -13,6 +13,11 @@
   Kameramodell). Ausnahmen sind die Vorschaubilder und die aus HEIC umgewandelten JPEGs, die keine
   EXIF-Daten enthalten. Vor einem öffentlichen Betrieb sollten Metadaten entfernt und Personen sowie
   Kennzeichen automatisch verpixelt werden.
+- Hinter einem Reverse Proxy `TRUST_PROXY` setzen (z. B. `loopback`, wenn der Proxy auf demselben Rechner läuft,
+  `uniquelocal` für Container im privaten Netz). Sonst sieht die App für alle Anfragen die Adresse des Proxys, und
+  die Sperren für Anmelden und Registrieren pro IP-Adresse treffen alle Nutzenden gemeinsam. Nur Proxys eintragen,
+  die `X-Forwarded-For` selbst setzen bzw. ergänzen; wer `true` setzt, ohne dass ein Proxy davor steht, lässt
+  gefälschte Adressen zu. Die Vorlagen für Docker Compose und Kubernetes setzen `uniquelocal`.
 - Die Rate-Limits (Tabelle `rate_limits`) speichern IP- und E-Mail-Adressen nur als SHA-256-Hash und
   höchstens 24 Stunden. Das ist eine Pseudonymisierung, keine Anonymisierung: Ein Hash einer IP-Adresse
   lässt sich durch Durchprobieren zurückrechnen, deshalb die kurze Aufbewahrung. Wer eine Sperre von Hand aufheben will: `DELETE FROM rate_limits;` in der Datenbank.

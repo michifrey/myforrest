@@ -50,6 +50,18 @@ const isPanoramaSize = (w, h) => w >= PANORAMA_MIN_WIDTH && Math.abs(w / h - 2) 
 const NEOPHYTE_MIN_SCORE = 0.3;
 const TREE_MIN_SCORE = 0.25;
 
+/**
+ * TRUST_PROXY as Express takes it: a number of proxy hops ("1"), "true" for all, or addresses and
+ * subnets ("loopback", "10.0.0.0/8, 172.16.0.0/12"). Unset or empty = trust no proxy.
+ */
+function parseTrustProxy(value) {
+  const v = (value ?? '').trim();
+  if (!v || v === 'false') return false;
+  if (v === 'true') return true;
+  if (/^\d+$/.test(v)) return Number(v);
+  return v;
+}
+
 function createApp({
   dataDir = path.join(__dirname, '..', 'data'),
   spotRadiusM = 25,
@@ -78,6 +90,9 @@ function createApp({
   glacierFiles = process.env.GLETSCHER_GEOJSON || '',
   // Spots without a profile above this height become mountain spots (src/landscapes.js); 0 = off.
   mountainMinM = MOUNTAIN_MIN_M,
+  // Reverse proxies whose X-Forwarded-For counts (Express 'trust proxy'), so rate limits see the client's
+  // address instead of the proxy's. Off by default: otherwise anyone could fake the header.
+  trustProxy = parseTrustProxy(process.env.TRUST_PROXY),
 } = {}) {
   const uploadDir = path.join(dataDir, 'uploads');
   const tmpDir = path.join(dataDir, 'tmp');
@@ -95,6 +110,7 @@ function createApp({
   }).fields([{ name: 'photos', maxCount: 200 }, { name: 'gpx', maxCount: 1 }]);
 
   const app = express();
+  if (trustProxy !== false) app.set('trust proxy', trustProxy);
   app.locals.db = db;
   // Tracks (src/routes/tracks.js) carry up to 20 000 points; everything else stays small.
   const smallJson = express.json({ limit: '100kb' });
@@ -1224,4 +1240,4 @@ function createApp({
   return app;
 }
 
-module.exports = { createApp };
+module.exports = { createApp, parseTrustProxy };
