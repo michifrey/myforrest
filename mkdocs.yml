@@ -13,6 +13,7 @@ copyright: MyForrest · Inhalte unter der Lizenz des Repositorys
 nav:
   - Startseite: index.md
   - Funktionen: funktionen.md
+  - Android-App: android.md
   - Selbst hosten:
       - Tech-Onboarding: tech-onboarding.md
       - Installation und Konfiguration: installation.md

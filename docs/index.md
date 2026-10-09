@@ -21,7 +21,7 @@ jeder Seite führt *Diese Seite bearbeiten* direkt zur Datei auf GitHub; daraus 
     Was MyForrest kann, mit Screenshots und den Verfahren dahinter: Spots, Zeitreise, Vorher/Nachher,
     Wiederholungsfotos, Wetter und Satellit, Arten, Touren, Gletscher.
 
-    [Funktionen im Detail](funktionen.md)
+    [Funktionen im Detail](funktionen.md) · [Android-App](android.md)
 
 -   **Selbst hosten**
 
