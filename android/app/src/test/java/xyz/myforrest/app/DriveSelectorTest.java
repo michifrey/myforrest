@@ -28,7 +28,8 @@ public class DriveSelectorTest {
   }
 
   private static double num(JSONObject o, String key) {
-    return o.isNull(key) || !o.has(key) ? Double.NaN : o.getDouble(key);
+    // null and missing both give NaN (optDouble: no checked exception in Android's org.json either)
+    return o.optDouble(key, Double.NaN);
   }
 
   @Test
