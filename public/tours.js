@@ -228,28 +228,81 @@
       $('tour-profile').hidden = true;
     }
   }
+  // Sensor series of the route (FIT, GPX or TCX with sensor values), shown instead of the height.
+  const SERIES = { hr: ['Puls', '/min'], power: ['Leistung', ' W'], cadence: ['Trittfrequenz', '/min'], steps: ['Schrittfrequenz', '/min'], temp: ['Temperatur', ' °C'] };
+  const SHORT = { cadence: 'Kadenz', steps: 'Schritte' };
+  const RAMPS = { temp: ['#2b6cb0', '#efe3a1', '#c0392b'], other: ['#f2df74', '#e07b39', '#8e1b3a'] };
+  /** Series with values at half of the points or more. */
+  const seriesOf = (pts) => Object.keys(SERIES).filter((k) => pts.reduce((n, p) => n + (Number.isFinite(p[k]) ? 1 : 0), 0) >= pts.length / 2);
+  const activeSeries = (pts) => (T.series && T.series !== 'ele' && seriesOf(pts).includes(T.series) ? T.series : 'ele');
+  /** Mean of a sensor value over n stretches of equal length: [{ d, v }] and, per point, its stretch. */
+  function sensorBins(pts, key, n = 120) {
+    const cum = cumulative(pts);
+    const total = cum.at(-1) || 1;
+    const acc = Array.from({ length: n }, () => ({ sum: 0, k: 0 }));
+    const binOf = cum.map((c) => Math.min(n - 1, Math.floor((c / total) * n)));
+    pts.forEach((p, i) => { if (Number.isFinite(p[key])) { acc[binOf[i]].sum += p[key]; acc[binOf[i]].k += 1; } });
+    return { bins: acc.map((b, i) => ({ d: ((i + 0.5) / n) * total, v: b.k ? b.sum / b.k : null })), binOf, total };
+  }
+  function rampColor(key, f) {
+    const stops = (RAMPS[key] || RAMPS.other).map((h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)));
+    const x = Math.max(0, Math.min(1, f)) * (stops.length - 1);
+    const i = Math.min(stops.length - 2, Math.floor(x));
+    const c = stops[i].map((v, j) => Math.round(v + (stops[i + 1][j] - v) * (x - i)));
+    return `rgb(${c.join(',')})`;
+  }
+  const fmtVal = (key, v) => `${Number(v).toLocaleString('de-CH', { maximumFractionDigits: key === 'temp' ? 1 : 0 })}${SERIES[key][1]}`;
+
   function renderProfile(pr, pts) {
     const box = $('tour-profile');
-    const z = pr.samples.map((s) => s.ele).filter(Number.isFinite);
+    const key = activeSeries(pts);
+    const sensor = key !== 'ele' ? sensorBins(pts, key) : null;
+    const samples = sensor ? sensor.bins : pr.samples.map((s) => ({ d: s.d, v: s.ele }));
+    const z = samples.map((s) => s.v).filter(Number.isFinite);
     if (z.length < 2) { box.hidden = true; return; }
     const W = 300;
     const H = 64;
     const lo = Math.min(...z);
-    const hi = Math.max(...z, lo + 20); // flat routes do not look like mountains
-    const total = pr.samples.at(-1).d || 1;
+    const hi = Math.max(...z, lo + (sensor ? 1 : 20)); // flat routes do not look like mountains
+    const total = sensor ? sensor.total : (pr.samples.at(-1).d || 1);
     const x = (d) => (d / total) * W;
     const y = (e) => H - 4 - ((e - lo) / (hi - lo)) * (H - 10);
-    const line = pr.samples.filter((s) => Number.isFinite(s.ele)).map((s) => `${x(s.d).toFixed(1)},${y(s.ele).toFixed(1)}`);
-    const svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Höhenprofil von ${pr.min} bis ${pr.max} m">`
-      + `<polygon class="profile-area" points="0,${H} ${line.join(' ')} ${W},${H}"/><polyline class="profile-line" points="${line.join(' ')}"/>`
+    const line = samples.filter((s) => Number.isFinite(s.v)).map((s) => `${x(s.d).toFixed(1)},${y(s.v).toFixed(1)}`);
+    const label = sensor ? `${SERIES[key][0]} entlang der Route, ${fmtVal(key, lo)} bis ${fmtVal(key, hi)}` : `Höhenprofil von ${pr.min} bis ${pr.max} m`;
+    const svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${label}">`
+      + (sensor ? '' : `<polygon class="profile-area" points="0,${H} ${line.join(' ')} ${W},${H}"/>`)
+      + `<polyline class="profile-line${sensor ? ' sensor' : ''}" points="${line.join(' ')}"/>`
       + '<line class="profile-cursor" x1="-10" x2="-10" y1="0" y2="64"/></svg>';
     box.innerHTML = svg;
-    box.append(el('div', { class: 'profile-figures small' }, [
-      el('span', { text: `↑ ${pr.ascent} m` }), el('span', { text: `↓ ${pr.descent} m` }),
-      el('span', { class: 'muted', text: `${pr.min}–${pr.max} m ü. M.${pr.source === 'modell' ? ' · Höhenmodell' : ''}` }),
-    ]));
+    const avail = seriesOf(pts);
+    if (avail.length) {
+      const chip = (k, text) => el('button', {
+        type: 'button', class: 'series-btn', 'aria-pressed': String(k === key), text,
+        onclick: () => { T.series = k; renderProfile(pr, pts); drawRoute(); },
+      });
+      box.prepend(el('div', { class: 'profile-series', role: 'group', 'aria-label': 'Im Profil zeigen' }, [chip('ele', 'Höhe'), ...avail.map((k) => chip(k, SHORT[k] || SERIES[k][0]))]));
+    }
+    if (sensor) {
+      const avg = z.reduce((a, b) => a + b, 0) / z.length;
+      const figures = [
+        el('span', { text: `Ø ${fmtVal(key, avg)}` }),
+        el('span', { class: 'series-ramp', style: `background: linear-gradient(90deg, ${rampColor(key, 0)}, ${rampColor(key, 0.5)}, ${rampColor(key, 1)})`, title: 'Farben der Strecke auf der Karte' }),
+        el('span', { class: 'muted', text: `${fmtVal(key, lo).replace(SERIES[key][1], '')}–${fmtVal(key, hi)}` }),
+      ];
+      if (key === 'temp') {
+        // Where it was coolest, e.g. in a shady forest stretch.
+        const c = samples.filter((s) => Number.isFinite(s.v)).reduce((a, b) => (b.v < a.v ? b : a));
+        figures.push(el('span', { class: 'muted', text: `kühlste Stelle bei km ${(c.d / 1000).toLocaleString('de-CH', { maximumFractionDigits: 1 })}` }));
+      }
+      box.append(el('div', { class: 'profile-figures small' }, figures));
+    } else {
+      box.append(el('div', { class: 'profile-figures small' }, [
+        el('span', { text: `↑ ${pr.ascent} m` }), el('span', { text: `↓ ${pr.descent} m` }),
+        el('span', { class: 'muted', text: `${pr.min}–${pr.max} m ü. M.${pr.source === 'modell' ? ' · Höhenmodell' : ''}` }),
+      ]));
+    }
     box.hidden = false;
-    // Hover: where on the route, at what height.
+    // Hover: where on the route, at what height or value.
     const svgEl = box.querySelector('svg');
     const cursor = box.querySelector('.profile-cursor');
     const cum = cumulative(pts);
@@ -259,13 +312,15 @@
       const f = (d - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1);
       return [pts[i - 1].lat + (pts[i].lat - pts[i - 1].lat) * f, pts[i - 1].lon + (pts[i].lon - pts[i - 1].lon) * f];
     };
+    const valued = samples.filter((s) => Number.isFinite(s.v));
     svgEl.addEventListener('pointermove', (e) => {
       const r = svgEl.getBoundingClientRect();
       const d = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * total;
-      const s = pr.samples.reduce((a, b) => (Math.abs(b.d - d) < Math.abs(a.d - d) ? b : a));
+      const s = valued.reduce((a, b) => (Math.abs(b.d - d) < Math.abs(a.d - d) ? b : a));
+      const text = `km ${(d / 1000).toFixed(1)} · ${sensor ? fmtVal(key, s.v) : `${Math.round(s.v)} m ü. M.`}`;
       cursor.setAttribute('x1', x(d)); cursor.setAttribute('x2', x(d));
-      svgEl.setAttribute('aria-label', `km ${(d / 1000).toFixed(1)}: ${Math.round(s.ele)} m ü. M.`);
-      box.title = `km ${(d / 1000).toFixed(1)} · ${Math.round(s.ele)} m ü. M.`;
+      svgEl.setAttribute('aria-label', text);
+      box.title = text;
       profileMarker.setLatLng(at(d * (cum.at(-1) / total))).addTo(map);
     });
     svgEl.addEventListener('pointerleave', () => { profileMarker.remove(); cursor.setAttribute('x1', -10); cursor.setAttribute('x2', -10); });
@@ -281,7 +336,24 @@
     const pts = routePoints();
     if (pts.length > 1) {
       L.polyline(pts.map(ll), { color: '#fff', weight: 7, opacity: 0.7, interactive: false }).addTo(routeLayer);
-      L.polyline(pts.map(ll), { className: 'route-line', weight: 4, opacity: 0.9, interactive: false }).addTo(routeLayer);
+      const key = activeSeries(pts);
+      if (key === 'ele') L.polyline(pts.map(ll), { className: 'route-line', weight: 4, opacity: 0.9, interactive: false }).addTo(routeLayer);
+      else {
+        // Coloured by the series shown in the profile, one piece per stretch.
+        const { bins, binOf } = sensorBins(pts, key);
+        const v = bins.map((b) => b.v).filter(Number.isFinite);
+        const lo = Math.min(...v);
+        const span = (Math.max(...v) - lo) || 1;
+        let start = 0;
+        for (let i = 1; i <= pts.length; i++) {
+          if (i < pts.length && binOf[i] === binOf[start]) continue;
+          const val = bins[binOf[start]].v;
+          L.polyline(pts.slice(start, Math.min(i + 1, pts.length)).map(ll), {
+            color: Number.isFinite(val) ? rampColor(key, (val - lo) / span) : '#999', weight: 5, opacity: 0.95, interactive: false,
+          }).addTo(routeLayer);
+          start = i;
+        }
+      }
     }
     const r = T.route;
     if (r.raw) {
@@ -424,7 +496,11 @@
         kind: T.route.kind,
         activity: $('tour-activity').value || null,
         visibility: $('tour-public').checked ? 'oeffentlich' : 'privat',
-        points: pts.map((p) => [p.lat, p.lon, p.ele ?? null, p.time ?? null]),
+        points: pts.map((p) => {
+          const row = [p.lat, p.lon, p.ele ?? null, p.time ?? null];
+          const sensors = Object.fromEntries(Object.keys(SERIES).filter((k) => Number.isFinite(p[k])).map((k) => [k, p[k]]));
+          return Object.keys(sensors).length ? [...row, sensors] : row;
+        }),
         sensors: T.route.sensors || undefined,
       });
       T.route.savedId = t.id;

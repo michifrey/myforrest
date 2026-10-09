@@ -940,10 +940,22 @@ wird.
   **Developer-Felder**, die Apps und Zusatzsensoren (z. B. ein Stryd-Laufsensor, ein CORE-Temperatursensor) in
   die Datei schreiben, mit ihrem Namen und ihrer Einheit aus der Datei. Steht ein solches Feld für einen
   Standardwert (z. B. die Laufleistung des Fusssensors), springt es ein, wo die Uhr selbst keinen hat, und
-  zählt nicht doppelt. Gespeichert bleiben die Werte bei der Tour; **nur wer die Tour gespeichert hat, sieht sie**,
-  auch bei öffentlichen Touren nicht andere, denn Puls und Ähnliches sind Gesundheitsdaten. Ins GPX gehen sie nicht.
+  zählt nicht doppelt. Auch **GPX** (Garmins TrackPointExtension mit Puls, Kadenz und Temperatur, Leistung wie
+  bei Strava) und **TCX** (Puls, Kadenz, Leistung) bringen ihre Werte mit. Gespeichert bleiben sie bei der Tour,
+  Punkt für Punkt; **nur wer die Tour gespeichert hat, sieht sie**, auch bei öffentlichen Touren nicht andere,
+  denn Puls und Ähnliches sind Gesundheitsdaten. Im eigenen GPX-Download stehen sie wieder als TrackPointExtension.
 
 ![Sensorwerte einer importierten FIT-Datei: Puls, Leistung, Schrittfrequenz, Temperatur und ein Developer-Feld](screenshots/fit-sensoren.jpg)
+
+- **Sensorwerte entlang der Strecke**: Über dem Profil wählen *Höhe*, *Puls*, *Leistung*, *Schritte* bzw. *Kadenz*
+  und *Temperatur*, was das Profil zeigt (Mittel über 120 gleich lange Abschnitte). Die Strecke auf der Karte
+  färbt sich dann nach diesem Wert, bei der Temperatur von Blau (kühl) nach Rot (warm), sonst von Gelb nach
+  Dunkelrot; die Farbskala steht unter dem Profil. Bei der Temperatur nennt das Panel die **kühlste Stelle**,
+  oft ein schattiger Waldabschnitt oder ein Bachtobel. Der Fühler der Uhr misst nahe am Körper und reagiert
+  träge: Er zeigt Unterschiede entlang der Strecke, nicht die genaue Lufttemperatur. Ein externer Fühler
+  (z. B. Garmin Tempe) misst genauer.
+
+![Temperatur entlang einer Laufrunde: kühler im Wald, die Strecke ist danach eingefärbt](screenshots/sensoren-entlang.jpg)
 
 - **Exportieren**: jede Route als GPX, mit Höhe und Zeit, wo vorhanden.
 - **Höhenprofil**: Unter der Länge zeigt das Panel das Profil der Route mit Auf- und Abstieg und tiefstem
@@ -1185,8 +1197,8 @@ prüfen lassen muss, gibt es **Organisationen**:
 - *Meine Daten herunterladen*: Im Profil lädt *Mit Originalfotos* (mit Grössenangabe) oder *Nur Daten* ein
   ZIP mit allem, was zum Konto gehört: `konto.json` (Name, E-Mail, Rolle, Lizenz, Anmeldungen über
   Google/GitHub, PRO, Organisationen), `fotos.geojson` (Ort, Zeit, Blickrichtung, Tags, Notiz, Lizenz, Bestimmungen; in QGIS
-  zu öffnen), die Originaldateien unter `fotos/`, die Touren als GPX (mit den Sensorwerten aus FIT-Dateien als
-  `…_sensoren.json` daneben), Fotoaufträge, eigene Meldungen und
+  zu öffnen), die Originaldateien unter `fotos/`, die Touren als GPX (mit den Sensorwerten als TrackPointExtension und ihrer
+  Zusammenfassung als `…_sensoren.json` daneben), Fotoaufträge, eigene Meldungen und
   gefolgte Spots, dazu eine `LIESMICH.txt`. Nicht enthalten sind der Passwort-Hash, Sitzungen, Push-Schlüssel
   und Fotos anderer Personen. Das Archiv wird beim Download zusammengestellt und gestreamt, ohne Kompression
   (Fotos sind schon komprimiert), ab 4 GB als ZIP64; höchstens 5 Exporte pro Stunde. Der Service Worker legt

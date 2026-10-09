@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { parseFit, writeFit } = require('../src/fit');
-const { parseTrackFile } = require('../src/trackfile');
+const { parseTrackFile, toGpx } = require('../src/trackfile');
 const { sampleAlong, climb } = require('../src/routegeo');
 const { createApp } = require('../src/app');
 
@@ -53,6 +53,33 @@ test('FIT sensors: heart rate, power, cadence as steps for runs, temperature, an
   assert.deepEqual(parseFit(writeFit(run())).sensors, []);
   assert.equal(parseTrackFile(writeFit(run()), 'x.fit').sensors, undefined);
   assert.equal(parseTrackFile(fit, 'x.fit').sensors.length, 5);
+});
+
+test('sensor values per point: FIT, Garmin GPX extensions, TCX; GPX export and back', () => {
+  const pts = run(10).map((p, i) => ({ ...p, hr: 120 + i, cadence: 85, temp: 15 - i, dev: { Power: 200 + i } }));
+  const fit = parseFit(writeFit(pts, { sport: 1, developer: [{ name: 'Power', units: 'Watts', native: 7 }] }));
+  assert.deepEqual(['hr', 'steps', 'temp', 'power'].map((k) => fit.points[3][k]), [123, 170, 12, 203]);
+  assert.equal(fit.points[3].cadence, undefined, 'runs: steps instead of strides');
+
+  const gpx = `<?xml version="1.0"?><gpx xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1"><trk><trkseg>
+    <trkpt lat="47.36" lon="8.58"><ele>500</ele><time>2026-05-01T08:00:00Z</time><extensions><power>210</power><gpxtpx:TrackPointExtension><gpxtpx:atemp>18</gpxtpx:atemp><gpxtpx:hr>131</gpxtpx:hr><gpxtpx:cad>88</gpxtpx:cad></gpxtpx:TrackPointExtension></extensions></trkpt>
+    <trkpt lat="47.361" lon="8.58"><ele>505</ele><time>2026-05-01T08:00:30Z</time><extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>139</gpxtpx:hr></gpxtpx:TrackPointExtension></extensions></trkpt>
+  </trkseg></trk></gpx>`;
+  const g = parseTrackFile(gpx, 'lauf.gpx');
+  assert.deepEqual([g.points[0].hr, g.points[0].cadence, g.points[0].temp, g.points[0].power, g.points[1].hr], [131, 88, 18, 210, 139]);
+  assert.deepEqual(g.sensors.map((x) => [x.key, x.avg]), [['hr', 135], ['power', 210], ['cadence', 88], ['temp', 18]]);
+  // Out as GPX with the same extensions, and back in.
+  const again = parseTrackFile(toGpx({ name: 'x', points: g.points }), 'x.gpx');
+  assert.deepEqual(again.points.map((p) => [p.hr, p.power, p.cadence, p.temp]), g.points.map((p) => [p.hr, p.power, p.cadence, p.temp]));
+
+  const tcx = `<TrainingCenterDatabase><Activities><Activity Sport="Running"><Lap><Track>
+    <Trackpoint><Time>2026-05-01T08:00:00Z</Time><Position><LatitudeDegrees>47.36</LatitudeDegrees><LongitudeDegrees>8.58</LongitudeDegrees></Position><HeartRateBpm><Value>142</Value></HeartRateBpm><Extensions><ns3:TPX><ns3:RunCadence>82</ns3:RunCadence><ns3:Watts>250</ns3:Watts></ns3:TPX></Extensions></Trackpoint>
+    <Trackpoint><Time>2026-05-01T08:00:05Z</Time><Position><LatitudeDegrees>47.3602</LatitudeDegrees><LongitudeDegrees>8.58</LongitudeDegrees></Position><HeartRateBpm><Value>144</Value></HeartRateBpm></Trackpoint>
+  </Track></Lap></Activity></Activities></TrainingCenterDatabase>`;
+  const t = parseTrackFile(tcx, 'lauf.tcx');
+  assert.deepEqual([t.points[0].hr, t.points[0].steps, t.points[0].power, t.points[1].hr, t.points[1].steps], [142, 164, 250, 144, undefined]);
+  // Without sensor values: nothing extra.
+  assert.equal(parseTrackFile(toGpx({ name: 'x', points: run(3) }), 'x.gpx').sensors, undefined);
 });
 
 test('elevation profile: samples along the route, ascent and descent without noise', () => {
@@ -149,6 +176,16 @@ test('FIT sensors are kept with an imported tour, for its owner only', async () 
     assert.equal((await anna.json(`/api/tracks/${saved.id}`)).sensors[0].label, 'Puls');
     assert.equal((await ben.json(`/api/tracks/${saved.id}`)).sensors, null, 'health data: not for others');
     assert.equal((await ben.json('/api/tracks')).find((x) => x.id === saved.id).sensors, null);
+    // The values along the route: for the owner (also in the GPX download), not for others.
+    const withValues = t.points.map((p) => [p.lat, p.lon, p.ele, p.time, { hr: p.hr }]);
+    const along = await anna.json('/api/tracks', { method: 'POST', json: { name: 'Lauf 2', kind: 'importiert', visibility: 'oeffentlich', points: withValues } });
+    assert.equal((await anna.json(`/api/tracks/${along.id}`)).points[10].hr, 140);
+    assert.ok((await ben.json(`/api/tracks/${along.id}`)).points.every((p) => p.hr === undefined));
+    assert.match(await (await anna.req(`/api/tracks/${along.id}.gpx`)).text(), /<gpxtpx:hr>140<\/gpxtpx:hr>/);
+    assert.doesNotMatch(await (await ben.req(`/api/tracks/${along.id}.gpx`)).text(), /gpxtpx:hr>/);
+    // Implausible values are dropped.
+    const odd = await anna.json('/api/tracks', { method: 'POST', json: { kind: 'importiert', points: withValues.map((p) => [...p.slice(0, 4), { hr: 999, temp: 12 }]) } });
+    assert.deepEqual([odd.points[0].hr, odd.points[0].temp], [undefined, 12]);
     // Drawn tours carry none, and junk is dropped.
     const drawn = await anna.json('/api/tracks', { method: 'POST', json: { kind: 'gezeichnet', points, sensors: t.sensors } });
     assert.equal(drawn.sensors, null);

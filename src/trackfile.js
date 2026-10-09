@@ -5,14 +5,15 @@
  * writes GPX. Supported: GPX (tracks, routes, or waypoints when nothing else),
  * Garmin TCX, KML (LineString and gx:Track) and GeoJSON (LineString,
  * MultiLineString, Features, with optional `coordTimes`), NMEA (dashcams) and FIT (binary, as a Buffer). Points carry
- * `lat`, `lon` and, when known, `ele` (m) and `time` (ms since epoch).
+ * `lat`, `lon` and, when known, `ele` (m) and `time` (ms since epoch), and sensor values `hr`, `power`,
+ * `cadence` or `steps`, `temp` (FIT records, Garmin's GPX TrackPointExtension, TCX), summed up as `sensors`.
  *
  * parseTrackFile(text, filename?) → { name, format, points, hasTime, sensors? } (sensors: FIT only, see fit.js)
  * toGpx(track) → GPX 1.1 string
  */
 
 const { parseNmea, looksLikeNmea } = require('./dashcam');
-const { parseFit, isFit } = require('./fit');
+const { parseFit, isFit, summarizePoints, SENSOR_KEYS } = require('./fit');
 
 const MAX_POINTS = 20000;
 
@@ -39,11 +40,25 @@ const timeOf = (s) => {
 };
 const valid = (p) => Number.isFinite(p.lat) && Number.isFinite(p.lon) && Math.abs(p.lat) <= 90 && Math.abs(p.lon) <= 180;
 
-function point(lat, lon, ele, time) {
+function point(lat, lon, ele, time, sensors = null) {
   const p = { lat, lon };
   if (Number.isFinite(ele)) p.ele = Math.round(ele * 10) / 10;
   if (Number.isFinite(time)) p.time = time;
+  if (sensors) for (const k of SENSOR_KEYS) if (Number.isFinite(sensors[k])) p[k] = Math.round(sensors[k] * 10) / 10;
   return p;
+}
+
+/** Heart rate, cadence, power, temperature from a GPX or TCX point (Garmin TrackPointExtension, Strava, TCX). */
+function sensorsOf(body) {
+  if (!/<(?:\w+:)?(?:hr|cad|atemp|power|Watts|HeartRateBpm|Cadence|RunCadence)\b/.test(body)) return null;
+  const hr = tagText(body, 'HeartRateBpm');
+  return {
+    hr: num(hr !== null ? tagText(hr, 'Value') : tagText(body, 'hr')),
+    cadence: num(tagText(body, 'cad') ?? tagText(body, 'Cadence')),
+    steps: num(tagText(body, 'RunCadence')) * 2, // TCX: strides per minute
+    power: num(tagText(body, 'power') ?? tagText(body, 'Watts')),
+    temp: num(tagText(body, 'atemp')),
+  };
 }
 
 function parseGpxPoints(xml, tag) {
@@ -53,7 +68,7 @@ function parseGpxPoints(xml, tag) {
   while ((m = re.exec(xml))) {
     const body = m[2] || '';
     const ele = num(tagText(body, 'ele'));
-    out.push(point(attr(m[1], 'lat'), attr(m[1], 'lon'), ele, timeOf(tagText(body, 'time'))));
+    out.push(point(attr(m[1], 'lat'), attr(m[1], 'lon'), ele, timeOf(tagText(body, 'time')), sensorsOf(body)));
   }
   return out.filter(valid);
 }
@@ -75,7 +90,7 @@ function parseTcx(xml) {
   while ((m = re.exec(xml))) {
     const lat = num(tagText(m[1], 'LatitudeDegrees'));
     const lon = num(tagText(m[1], 'LongitudeDegrees'));
-    points.push(point(lat, lon, num(tagText(m[1], 'AltitudeMeters')), timeOf(tagText(m[1], 'Time'))));
+    points.push(point(lat, lon, num(tagText(m[1], 'AltitudeMeters')), timeOf(tagText(m[1], 'Time')), sensorsOf(m[1])));
   }
   const name = tagText(xml, 'Notes') || tagText(xml, 'Name') || tagText(xml, 'Id');
   return { name, points: points.filter(valid) };
@@ -174,20 +189,31 @@ function finish(parsed, format, filename) {
   points = thin(points);
   const fallback = String(filename || '').replace(/\.[^.]+$/, '') || null;
   const out = { name: parsed.name || fallback, format, points, hasTime: points.some((p) => p.time !== undefined) };
-  if (parsed.sensors?.length) out.sensors = parsed.sensors;
+  const sensors = parsed.sensors || summarizePoints(parsed.points);
+  if (sensors.length) out.sensors = sensors;
   return out;
 }
 
 function toGpx({ name, points, activity }) {
   const pts = points.map((p) => {
+    // Sensor values as Garmin's TrackPointExtension (power as Strava writes it); steps go back as strides.
+    const cad = Number.isFinite(p.cadence) ? p.cadence : Number.isFinite(p.steps) ? Math.round(p.steps / 2) : null;
+    const tpx = [
+      Number.isFinite(p.temp) ? `<gpxtpx:atemp>${p.temp}</gpxtpx:atemp>` : '',
+      Number.isFinite(p.hr) ? `<gpxtpx:hr>${Math.round(p.hr)}</gpxtpx:hr>` : '',
+      cad !== null ? `<gpxtpx:cad>${Math.round(cad)}</gpxtpx:cad>` : '',
+    ].join('');
+    const ext = (tpx ? `<gpxtpx:TrackPointExtension>${tpx}</gpxtpx:TrackPointExtension>` : '')
+      + (Number.isFinite(p.power) ? `<power>${Math.round(p.power)}</power>` : '');
     const inner = [
       Number.isFinite(p.ele) ? `<ele>${p.ele}</ele>` : '',
       Number.isFinite(p.time) ? `<time>${new Date(p.time).toISOString()}</time>` : '',
+      ext ? `<extensions>${ext}</extensions>` : '',
     ].join('');
     return `      <trkpt lat="${p.lat.toFixed(7)}" lon="${p.lon.toFixed(7)}">${inner}</trkpt>`;
   }).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="MyForrest" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="MyForrest" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">
   <trk>
     <name>${escapeXml(name || 'Tour')}</name>${activity ? `\n    <type>${escapeXml(activity)}</type>` : ''}
     <trkseg>
