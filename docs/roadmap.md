@@ -69,6 +69,9 @@ Was als Nächstes geplant ist. Was der Prototyp heute schon kann, steht unter
 
 Aus früheren Versionen dieser Roadmap:
 
+- Doku-Website (Projekt-Wiki) aus `docs/*.md` mit Suche und *Seite bearbeiten*, über GitHub Pages, eigene Domain
+  vorbereitet
+
 - Fahrtmodus: das Handy als Dashcam im Auto, Route automatisch, Auswahl und Deduplizierung der Bilder auf dem
   Gerät; GPS von Dashcam-Videos (NMEA, Novatek) direkt aus der Datei; Fahrtbilder in der Zeitreise markiert
   und ausblendbar

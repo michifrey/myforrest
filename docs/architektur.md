@@ -96,6 +96,7 @@ deploy/qgis-server/  Vorlage: MyForrest + QGIS Server (WMS/WMTS/WFS) + BRouter +
 deploy/brouter/      Eigener Routing-Server (BRouter) für den Wege-Magnet, lädt seine Routing-Daten selbst
 Dockerfile           Container für MyForrest (mit ffmpeg)
 docs/                Dokumentation; docs/screenshots/ enthält die Bilder für das README
+mkdocs.yml           Doku-Website aus docs/ (MkDocs Material), gebaut und veröffentlicht von .github/workflows/docs.yml
 public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet die Landschaften der Startseite (Wald, Gletscher, Gebirge, Wüste) und wechselt sie,
                      sun.js berechnet Sonnenstand und Einstrahlung, sunmap.js den Kartenmodus „Sonne & Wetter“,
                      hotspots.js den Kartenmodus „Arten & Neophyten“,

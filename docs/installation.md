@@ -56,11 +56,11 @@ trotzdem am richtigen Spot, nur ohne Overlay.
 | `AGOV_ISSUER`, `AGOV_CLIENT_ID`, `AGOV_PRIVATE_KEY_FILE` | – | Aktiviert „Mit AGOV anmelden“ (siehe [unten](#agov)); `AGOV_ACR_VALUES` fordert eine Authentifizierungsqualität an |
 | `…_PRIVATE_KEY_FILE` | – | Bei allen OpenID-Connect-Diensten (`EDUID_`, `OIDC_`, `AGOV_`): privater Schlüssel (PEM, RSA oder EC P-256) statt Client-Secret, Anmeldung per `private_key_jwt` |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_LABEL` | – | Ein weiterer OpenID-Connect-Dienst (z. B. Microsoft Entra ID einer Organisation, Keycloak) mit eigener Beschriftung |
-| `ROUTER_URL`       | `https://brouter.de/brouter` | Routing-Dienst im Format von [BRouter](https://brouter.de) für den Wege-Magnet beim Zeichnen von Touren; leer (`ROUTER_URL=`) = aus, dann gerade Linien. Für den Betrieb einen [eigenen BRouter](../deploy/brouter/README.md) nehmen, z. B. `http://brouter:17777/brouter` |
+| `ROUTER_URL`       | `https://brouter.de/brouter` | Routing-Dienst im Format von [BRouter](https://brouter.de) für den Wege-Magnet beim Zeichnen von Touren; leer (`ROUTER_URL=`) = aus, dann gerade Linien. Für den Betrieb einen [eigenen BRouter](https://github.com/michifrey/myforrest/blob/main/deploy/brouter/README.md) nehmen, z. B. `http://brouter:17777/brouter` |
 | `PRO_VALID_DAYS`   | `365`    | Wie lange eine PRO-Verifizierung gilt, bevor sie bestätigt werden muss |
 | `CANTON_LOOKUP_URL` | geo.admin.ch | Dienst für den Kanton eines Spots (swisstopo identify); leer = aus, dann zählt jede kantonale Schutzliste |
 | `SENSITIVE_SPECIES` | – | Weitere Gattungen oder Arten (kommagetrennt), deren Funde automatisch geschützt werden, z. B. `Trollius,Lilium bulbiferum` |
-| `ROUTER_PROFILE`   | `hiking-mountain` | BRouter-Profil für das Routing; mit dem eigenen BRouter `myforrest-wald` (Waldprofil, siehe [deploy/brouter](../deploy/brouter/README.md)) |
+| `ROUTER_PROFILE`   | `hiking-mountain` | BRouter-Profil für das Routing; mit dem eigenen BRouter `myforrest-wald` (Waldprofil, siehe [deploy/brouter](https://github.com/michifrey/myforrest/blob/main/deploy/brouter/README.md)) |
 | `WILDRUHE_GEOJSON` | – | GeoJSON-Datei mit Wildruhezonen (WGS84 oder LV95, z. B. BAFU-Datensatz von geo.admin.ch); der Wege-Magnet führt während der Schutzzeit um sie herum |
 | `HOLZSCHLAG_SPERRE_TAGE` | `42` | So lange sperrt ein Foto mit *Holzschlag / Rodung* die Wege 80 m darum herum für den Wege-Magnet |
 | `WILDRUHE_SEASON`  | `12-20/04-30` | Schutzzeit (Monat-Tag/Monat-Tag) für Zonen ohne eigene Angabe; `immer` = ganzjährig |
@@ -217,14 +217,14 @@ Jahr der beginnenden Blattverfärbung).
 ## Mit Docker und QGIS Server
 
 `Dockerfile` baut MyForrest samt ffmpeg. Für Karten als WMS/WMTS/WFS (z. B. für map.geo.admin.ch) gibt es
-unter [`deploy/qgis-server`](../deploy/qgis-server/README.md) eine Vorlage mit Docker Compose: MyForrest,
+unter [`deploy/qgis-server`](https://github.com/michifrey/myforrest/blob/main/deploy/qgis-server/README.md) eine Vorlage mit Docker Compose: MyForrest,
 QGIS Server, nginx und ein Dienst, der das GeoPackage alle 15 Minuten neu exportiert. Das QGIS-Projekt
 mit den Stilen liegt bei und wird mit `build-project.py` (PyQGIS) neu erzeugt.
 
 ## Eigener Routing-Server
 
 Der Wege-Magnet nutzt ohne Einstellung den öffentlichen Dienst `brouter.de`. Einen eigenen BRouter samt
-Routing-Daten für die Schweiz bringt [`deploy/brouter`](../deploy/brouter/README.md) mit: In der
+Routing-Daten für die Schweiz bringt [`deploy/brouter`](https://github.com/michifrey/myforrest/blob/main/deploy/brouter/README.md) mit: In der
 Docker-Compose-Vorlage und auf Kubernetes läuft er schon mit; allein startet er mit `docker run` und wird
 über `ROUTER_URL=http://localhost:17777/brouter` eingebunden.
 
