@@ -71,4 +71,46 @@ function trimEnds(points, m) {
   return points.slice(from, to + 1);
 }
 
-module.exports = { lengthM, bbox, nearRoute, trimEnds };
+/**
+ * Points every `step` metres along a route (`n` at most), with the distance
+ * from the start (`d`, m) and the elevation interpolated where both
+ * neighbours have one.
+ */
+function sampleAlong(points, n = 100) {
+  const cum = [0];
+  for (let i = 1; i < points.length; i++) cum.push(cum[i - 1] + distanceM(points[i - 1], points[i]));
+  const total = cum.at(-1) || 0;
+  const count = Math.max(2, Math.min(n, Math.round(total / 10) + 1));
+  const out = [];
+  let j = 1;
+  for (let k = 0; k < count; k++) {
+    const d = (total * k) / (count - 1);
+    while (j < points.length - 1 && cum[j] < d) j++;
+    const a = points[j - 1];
+    const b = points[j] || a;
+    const f = cum[j] > cum[j - 1] ? (d - cum[j - 1]) / (cum[j] - cum[j - 1]) : 0;
+    const p = { d: Math.round(d), lat: a.lat + (b.lat - a.lat) * f, lon: a.lon + (b.lon - a.lon) * f };
+    if (Number.isFinite(a.ele) && Number.isFinite(b.ele)) p.ele = Math.round((a.ele + (b.ele - a.ele) * f) * 10) / 10;
+    out.push(p);
+  }
+  return out;
+}
+
+/**
+ * Elevation profile from samples with `ele`: ascent and descent count a change
+ * only once it exceeds `threshold` metres (GPS and model noise), min and max.
+ */
+function climb(samples, threshold = 3) {
+  const z = samples.map((s) => s.ele).filter(Number.isFinite);
+  if (z.length < 2) return { ascent: null, descent: null, min: null, max: null };
+  let ascent = 0;
+  let descent = 0;
+  let ref = z[0];
+  for (const v of z.slice(1)) {
+    if (v - ref >= threshold) { ascent += v - ref; ref = v; } else if (ref - v >= threshold) { descent += ref - v; ref = v; }
+  }
+  return { ascent: Math.round(ascent), descent: Math.round(descent), min: Math.round(Math.min(...z)), max: Math.round(Math.max(...z)) };
+}
+
+module.exports = {
+  sampleAlong, climb, lengthM, bbox, nearRoute, trimEnds };

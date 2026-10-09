@@ -8,7 +8,7 @@ const sharp = require('sharp');
 
 const { transaction } = require('../db');
 const { isValidCoord, positionAt } = require('../geo');
-const { parseGpx } = require('../gpx');
+const { parseTrackPoints } = require('../gpx');
 const { parseTags } = require('../tags');
 const { isLandscape } = require('../landscapes');
 const { assignSpot, refreshSpot } = require('../spots');
@@ -207,7 +207,7 @@ module.exports = function videoRoutes(app, ctx) {
       }
     }
     if (!frames.length && gpxFile) {
-      const track = parseGpx(await fsp.readFile(gpxFile.path, 'utf8'));
+      const track = parseTrackPoints(await fsp.readFile(gpxFile.path));
       if (!track.length) throw new HttpError(400, 'GPX-Datei enthält keine Punkte mit Zeitstempel');
       // Position every second of the video on the track (interpolated, as for photos).
       const points = [];

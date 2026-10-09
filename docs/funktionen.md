@@ -883,11 +883,19 @@ wird.
   auseinander, mit Zeit und Höhe). Der Bildschirm bleibt dabei an (Wake Lock), denn Browser stoppen GPS
   für Seiten im Hintergrund. Die Punkte liegen laufend im Browser; nach einem Neuladen lässt sich die
   Aufzeichnung fortsetzen.
-- **Importieren**: GPX (Tracks, Routen oder Wegpunkte), Garmin TCX, KML (LineString und `gx:Track`) und
-  GeoJSON (LineString, MultiLineString, mit `coordTimes`) sowie NMEA von Dashcams (`.nmea`), bis 14 MB und
-  20 000 Punkte. FIT-Dateien bitte in
-  Garmin Connect oder Strava als GPX exportieren.
+- **Importieren**: GPX (Tracks, Routen oder Wegpunkte), Garmin TCX, KML (LineString und `gx:Track`),
+  GeoJSON (LineString, MultiLineString, mit `coordTimes`), NMEA von Dashcams (`.nmea`) und **FIT** direkt
+  von Sportuhren und Velocomputern (Garmin, Wahoo, Polar, Coros, Suunto; bis 10 MB), bis 20 000 Punkte. FIT
+  liest die App selbst (`src/fit.js`): die *record*-Meldungen mit Position, Höhe und Zeit, auch mit
+  komprimierten Zeitstempeln. Eine FIT-Datei taugt auch im Upload als GPS-Track für Fotos und Videos ohne GPS.
 - **Exportieren**: jede Route als GPX, mit Höhe und Zeit, wo vorhanden.
+- **Höhenprofil**: Unter der Länge zeigt das Panel das Profil der Route mit Auf- und Abstieg und tiefstem
+  und höchstem Punkt. Die Höhen kommen aus der Route selbst (Aufzeichnung, Import, Wege-Magnet), sonst aus
+  dem Höhenmodell (Open-Meteo, 100 Punkte entlang der Strecke in einer Anfrage, zwischengespeichert). Auf-
+  und Abstieg zählen erst ab 3 m Änderung, damit GPS-Rauschen nicht mitzählt. Mit der Maus oder dem Finger
+  über das Profil fahren zeigt die Stelle auf der Karte, mit Kilometer und Höhe.
+
+![Höhenprofil einer importierten FIT-Datei](screenshots/hoehenprofil.jpg)
 
 Die aktuelle Route bleibt im Browser, bis sie gespeichert wird. **Speichern** braucht ein Konto; Touren sind
 privat, bis man sie veröffentlicht. Andere sehen eine öffentliche Tour ohne Zeiten und ohne die ersten und
@@ -916,6 +924,13 @@ preisgeben. Wer ohnehin vorbeikommt, macht das Foto. Erledigt ist ein Auftrag, s
   davon abweicht,
 - zum angefragten Spot gehört, oder
 - über *Foto dafür hochladen* im Auftrag hochgeladen wird und höchstens 150 m entfernt liegt.
+
+Ein Auftrag gilt **1 Woche, 1 Monat, 3 Monate** (Standard) **oder 1 Jahr**, oder bis er erledigt ist.
+Danach verschwindet er von Karte und Vorschlägen und zählt nicht mehr als erledigt, auch wenn später dort
+ein Foto entsteht. Wer den Auftrag mit Konto erstellt hat, sieht im Tab *Aufträge* seine erledigten und
+abgelaufenen Aufträge, mit Link zum Foto, und bekommt beim Erledigen eine **Push-Nachricht** (wenn Push im
+Konto-Menü eingeschaltet ist), ausser beim eigenen Foto. Ist das Foto ein geschützter Fund, verlinkt die
+Nachricht es nur für PRO-Mitglieder.
 
 Wer den Auftrag mit Konto erstellt hat, kann ihn zurückziehen; Moderation ebenso. Pro Konto bzw.
 Adresse sind 20 Aufträge pro Stunde möglich.

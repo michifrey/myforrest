@@ -32,10 +32,11 @@
  */
 
 const { createLimiter, isModerator, canSeeProtected } = require('../auth');
+const { withOrgPro } = require('../orgs');
 const { distanceM, isValidCoord } = require('../geo');
 const { parseTrackFile, toGpx, MAX_POINTS } = require('../trackfile');
 const { createWildlife } = require('../wildlife');
-const { lengthM, bbox, nearRoute, trimEnds } = require('../routegeo');
+const { lengthM, bbox, nearRoute, trimEnds, sampleAlong, climb } = require('../routegeo');
 
 const KINDS = ['gezeichnet', 'aufgezeichnet', 'importiert'];
 const VISIBILITY = ['privat', 'oeffentlich'];
@@ -84,7 +85,14 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS photo_requests_status ON photo_requests (status, lat, lon);
 `;
 // Requests at protected finds are shown to verified PRO members only.
-const REQUEST_MIGRATIONS = [['protected', 'INTEGER NOT NULL DEFAULT 0']];
+const REQUEST_MIGRATIONS = [
+  ['protected', 'INTEGER NOT NULL DEFAULT 0'],
+  // Open requests end on their own after this (null = until done or withdrawn); shown as "abgelaufen".
+  ['expires_at', 'INTEGER'],
+];
+const REQUEST_DAYS = [7, 30, 90, 365];
+// Open and not run out (SQL condition, ? = now).
+const OPEN_SQL = "status = 'offen' AND (expires_at IS NULL OR expires_at > ?)";
 
 const angleDiff = (a, b) => Math.abs((((a - b) % 360) + 540) % 360 - 180);
 const dayDe = (ms) => new Date(ms).toISOString().slice(0, 10).split('-').reverse().join('.');
@@ -118,6 +126,8 @@ const unpackPoints = (json) => JSON.parse(json).map(([lat, lon, ele, time]) => {
 module.exports = function registerTracks(app, ctx) {
   const { db, spotRadiusM, satelliteAlerts = () => [], routerUrl = null, routerFetch = fetch, routerProfile = 'hiking-mountain', accounts = null } = ctx;
   const wildlife = ctx.wildlife || createWildlife();
+  const elevation = ctx.elevation || null;
+  const push = ctx.push || null;
   db.exec(SCHEMA);
   const reqCols = new Set(db.prepare('PRAGMA table_info(photo_requests)').all().map((c) => c.name));
   for (const [col, type] of REQUEST_MIGRATIONS) if (!reqCols.has(col)) db.exec(`ALTER TABLE photo_requests ADD COLUMN ${col} ${type}`);
@@ -169,8 +179,9 @@ module.exports = function registerTracks(app, ctx) {
   }
 
   app.post('/api/tracks/parse', (req, res) => {
-    const text = req.body?.text;
-    if (typeof text !== 'string' || !text.trim()) return fail(res, 400, 'Keine Datei übermittelt');
+    // Text formats as `text`; binary ones (FIT) as `base64`.
+    const text = typeof req.body?.base64 === 'string' ? Buffer.from(req.body.base64, 'base64') : req.body?.text;
+    if (!(Buffer.isBuffer(text) ? text.length : typeof text === 'string' && text.trim())) return fail(res, 400, 'Keine Datei übermittelt');
     try {
       const t = parseTrackFile(text, clean(req.body.filename, 200) || '');
       res.json({ ...t, distanceM: Math.round(lengthM(t.points)) });
@@ -292,6 +303,33 @@ module.exports = function registerTracks(app, ctx) {
     }
   });
 
+  /**
+   * Elevation profile of a route: from the points' own elevations (recorded,
+   * imported, routed) when most have one, else from the elevation model.
+   * { points: [[lat, lon, ele?], …] } → { samples: [{ d, ele }], ascent, descent, min, max, source }
+   */
+  app.post('/api/route-profile', async (req, res) => {
+    const points = readPoints(req.body?.points);
+    if (!points) return fail(res, 400, `Ein Profil braucht 2 bis ${MAX_POINTS} gültige Punkte`);
+    const withEle = points.filter((p) => Number.isFinite(p.ele)).length;
+    const ownElevation = withEle >= 0.8 * points.length;
+    // With own elevations, the few points without one are left out (e.g. the clicked waypoints of a routed line).
+    // 100 samples: one request to the elevation service.
+    let samples = sampleAlong(ownElevation ? points.filter((p) => Number.isFinite(p.ele)) : points, 100);
+    let source = 'route';
+    if (!ownElevation) {
+      if (!elevation) return fail(res, 501, 'Kein Höhenmodell eingerichtet');
+      try {
+        const z = await elevation.many(samples);
+        samples = samples.map((s, i) => ({ ...s, ele: z[i] }));
+        source = 'modell';
+      } catch (err) {
+        return fail(res, 502, `Höhenprofil nicht verfügbar (${err.message})`);
+      }
+    }
+    res.json({ samples: samples.map(({ d, ele }) => ({ d, ele: Number.isFinite(ele) ? ele : null })), ...climb(samples), source, distanceM: Math.round(lengthM(points)) });
+  });
+
   /** Wildlife rest areas in their protection period within a bbox (GeoJSON, for the map). */
   app.get('/api/wildlife-zones', (req, res) => {
     const b = String(req.query.bbox || '').split(',').map(Number);
@@ -319,7 +357,8 @@ module.exports = function registerTracks(app, ctx) {
       spotId: r.spot_id,
       title: r.title,
       note: r.note,
-      status: r.status,
+      status: r.status === 'offen' && r.expires_at && r.expires_at <= Date.now() ? 'abgelaufen' : r.status,
+      expiresAt: r.expires_at ? new Date(r.expires_at).toISOString().slice(0, 10) : null,
       protected: Boolean(r.protected),
       photoId: r.photo_id,
       createdAt: new Date(r.created_at).toISOString().slice(0, 10), // day only
@@ -329,9 +368,10 @@ module.exports = function registerTracks(app, ctx) {
   }
 
   app.get('/api/photo-requests', (req, res) => {
-    const status = req.query.status === 'alle' ? null : 'offen';
-    const rows = db.prepare(`SELECT * FROM photo_requests WHERE (? IS NULL AND status != 'zurueckgezogen') OR status = ?
-      ORDER BY created_at DESC LIMIT 2000`).all(status, status);
+    const all = req.query.status === 'alle';
+    const rows = all
+      ? db.prepare("SELECT * FROM photo_requests WHERE status != 'zurueckgezogen' ORDER BY created_at DESC LIMIT 2000").all()
+      : db.prepare(`SELECT * FROM photo_requests WHERE ${OPEN_SQL} ORDER BY created_at DESC LIMIT 2000`).all(Date.now());
     const photoOk = (pid) => Boolean(db.prepare(`SELECT 1 FROM photos p WHERE p.id = ? AND ${photoVisible(req)}`).get(pid));
     res.json(rows.filter((r) => requestVisible(req, r)).map((r) => {
       const j = requestJson(r, req.user);
@@ -363,9 +403,14 @@ module.exports = function registerTracks(app, ctx) {
     const wait = requestLimit.blocked(key);
     if (wait) return res.status(429).set('Retry-After', String(wait)).json({ error: 'Zu viele Aufträge – bitte später wieder' });
     requestLimit.hit(key);
-    const id = Number(db.prepare(`INSERT INTO photo_requests (lat, lon, heading, radius_m, spot_id, title, note, requester_id, created_at, protected)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(lat, lon, heading === null ? null : ((heading % 360) + 360) % 360,
-      Math.max(REQUEST_RADIUS_M, spotRadiusM), spotId, title, clean(b.note, 1000), req.user?.id ?? null, Date.now(), protect ? 1 : 0).lastInsertRowid);
+    // Valid for 7, 30, 90 or 365 days, or until done (no expiresInDays).
+    const days = b.expiresInDays === undefined || b.expiresInDays === null || b.expiresInDays === '' ? null : Number(b.expiresInDays);
+    if (days !== null && !REQUEST_DAYS.includes(days)) return fail(res, 400, `expiresInDays: ${REQUEST_DAYS.join(', ')} oder leer`);
+    const now = Date.now();
+    const id = Number(db.prepare(`INSERT INTO photo_requests (lat, lon, heading, radius_m, spot_id, title, note, requester_id, created_at, protected, expires_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(lat, lon, heading === null ? null : ((heading % 360) + 360) % 360,
+      Math.max(REQUEST_RADIUS_M, spotRadiusM), spotId, title, clean(b.note, 1000), req.user?.id ?? null, now, protect ? 1 : 0,
+      days === null ? null : now + days * 86400000).lastInsertRowid);
     res.status(201).json(requestJson(db.prepare('SELECT * FROM photo_requests WHERE id = ?').get(id), req.user));
   });
 
@@ -383,8 +428,8 @@ module.exports = function registerTracks(app, ctx) {
   function fulfil(photoId, requestId = null) {
     const p = db.prepare('SELECT id, spot_id, lat, lon, heading FROM photos WHERE id = ?').get(photoId);
     if (!p) return [];
-    const open = db.prepare("SELECT * FROM photo_requests WHERE status = 'offen' AND lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?")
-      .all(p.lat - 0.002, p.lat + 0.002, p.lon - 0.003, p.lon + 0.003);
+    const open = db.prepare(`SELECT * FROM photo_requests WHERE ${OPEN_SQL} AND lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?`)
+      .all(Date.now(), p.lat - 0.002, p.lat + 0.002, p.lon - 0.003, p.lon + 0.003);
     const done = open.filter((r) => {
       const d = distanceM(p, r);
       if (r.id === Number(requestId) && d <= 150) return true;
@@ -394,7 +439,26 @@ module.exports = function registerTracks(app, ctx) {
     });
     const mark = db.prepare("UPDATE photo_requests SET status = 'erledigt', photo_id = ?, done_at = ? WHERE id = ?");
     for (const r of done) mark.run(photoId, Date.now(), r.id);
+    notifyDone(done, photoId);
     return done.map((r) => r.id);
+  }
+
+  /** A push message to whoever asked (not when they took the photo themselves). */
+  function notifyDone(done, photoId) {
+    if (!push || !done.length) return;
+    const photo = db.prepare('SELECT * FROM photos WHERE id = ?').get(photoId);
+    for (const r of done) {
+      if (!r.requester_id || r.requester_id === photo.uploader_id) continue;
+      const requester = db.prepare('SELECT * FROM users WHERE id = ?').get(r.requester_id);
+      // A protected find is only linked for those who may see it.
+      const visible = !photo.protected || canSeeProtected(withOrgPro(db, requester));
+      push.send(r.requester_id, {
+        title: 'Fotoauftrag erledigt',
+        body: `«${r.title}»: Jemand hat das Foto gemacht${visible ? '' : ' (geschützter Fund, nur für PRO sichtbar)'}.`,
+        url: visible ? `./?spot=${photo.spot_id}&photo=${photo.id}` : './',
+        tag: `auftrag-${r.id}`,
+      }).catch((err) => console.warn(`Mitteilung zum Auftrag ${r.id}: ${err.message}`));
+    }
   }
 
   /* ---------- Suggestions along a route ---------- */
@@ -405,7 +469,7 @@ module.exports = function registerTracks(app, ctx) {
     if (!route) return fail(res, 400, `Die Route braucht 2 bis ${MAX_POINTS} gültige Punkte`);
     const maxM = Math.min(1000, Math.max(20, Number(b.maxDistanceM) || 150));
     const candidates = [];
-    for (const r of db.prepare("SELECT * FROM photo_requests WHERE status = 'offen'").all().filter((x) => requestVisible(req, x))) {
+    for (const r of db.prepare(`SELECT * FROM photo_requests WHERE ${OPEN_SQL}`).all(Date.now()).filter((x) => requestVisible(req, x))) {
       candidates.push({ kind: 'auftrag', requestId: r.id, spotId: r.spot_id, lat: r.lat, lon: r.lon, heading: r.heading, title: r.title, text: r.note });
     }
     const alerted = new Set();

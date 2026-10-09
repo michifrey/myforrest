@@ -1,6 +1,7 @@
 'use strict';
 
 const { parseNmea, looksLikeNmea } = require('./dashcam');
+const { parseFit, isFit } = require('./fit');
 
 const attr = (attrs, name) => {
   const m = attrs.match(new RegExp(`\\b${name}\\s*=\\s*["']([^"']+)["']`));
@@ -29,4 +30,10 @@ function parseGpx(xml) {
   return points.sort((a, b) => a.time - b.time);
 }
 
-module.exports = { parseGpx };
+/** Timestamped points from a track file of any kind (GPX, NMEA or FIT), as a buffer. */
+function parseTrackPoints(buf) {
+  if (isFit(buf)) return parseFit(buf).points.filter((p) => Number.isFinite(p.time)).map((p) => ({ lat: p.lat, lon: p.lon, time: p.time }));
+  return parseGpx(buf.toString('utf8'));
+}
+
+module.exports = { parseGpx, parseTrackPoints };

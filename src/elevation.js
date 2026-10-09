@@ -114,7 +114,32 @@ function createElevation({ db, fetchImpl = fetch }) {
     return value;
   }
 
-  return { lookup, terrain, horizon };
+  /**
+   * Elevations at many points (≤ 100 per request to the service, cached per
+   * point rounded to ~10 m): [m] in the order of `points` ([{ lat, lon }]).
+   */
+  async function many(points) {
+    const key = (p) => `elev4:${p.lat.toFixed(4)},${p.lon.toFixed(4)}`;
+    const out = points.map((p) => { const row = get.get(key(p)); return row ? JSON.parse(row.json) : null; });
+    const missing = points.map((p, i) => i).filter((i) => out[i] === null);
+    for (let k = 0; k < missing.length; k += 100) {
+      const batch = missing.slice(k, k + 100);
+      const url = `${ENDPOINT}?latitude=${batch.map((i) => points[i].lat.toFixed(5)).join(',')}`
+        + `&longitude=${batch.map((i) => points[i].lon.toFixed(5)).join(',')}`;
+      const res = await fetchImpl(url, { signal: AbortSignal.timeout(15000) });
+      if (!res.ok) throw new Error(`Höhendienst antwortete mit HTTP ${res.status}`);
+      const z = (await res.json()).elevation;
+      if (!Array.isArray(z) || z.length !== batch.length) throw new Error('Höhendienst lieferte keine Höhen');
+      batch.forEach((i, j) => {
+        if (!Number.isFinite(z[j])) return;
+        out[i] = Math.round(z[j] * 10) / 10;
+        set.run(key(points[i]), JSON.stringify(out[i]), Date.now());
+      });
+    }
+    return out;
+  }
+
+  return { lookup, terrain, horizon, many };
 }
 
 const HORIZON_DIRS = 36;

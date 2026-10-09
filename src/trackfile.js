@@ -4,7 +4,7 @@
  * Reads tracks from the files sports watches and route planners export and
  * writes GPX. Supported: GPX (tracks, routes, or waypoints when nothing else),
  * Garmin TCX, KML (LineString and gx:Track) and GeoJSON (LineString,
- * MultiLineString, Features, with optional `coordTimes`) and NMEA (dashcams). Points carry
+ * MultiLineString, Features, with optional `coordTimes`), NMEA (dashcams) and FIT (binary, as a Buffer). Points carry
  * `lat`, `lon` and, when known, `ele` (m) and `time` (ms since epoch).
  *
  * parseTrackFile(text, filename?) → { name, format, points, hasTime }
@@ -12,6 +12,7 @@
  */
 
 const { parseNmea, looksLikeNmea } = require('./dashcam');
+const { parseFit, isFit } = require('./fit');
 
 const MAX_POINTS = 20000;
 
@@ -148,8 +149,11 @@ function thin(points, max = MAX_POINTS) {
 }
 
 function parseTrackFile(text, filename) {
+  // FIT is binary: a Buffer (or its text already decoded) with ".FIT" at byte 8.
+  if (Buffer.isBuffer(text) && isFit(text)) return finish(parseFit(text), 'fit', filename);
+  if (Buffer.isBuffer(text)) text = text.toString('utf8');
   const format = detect(text, filename);
-  if (!format) throw new Error('Unbekanntes Format – unterstützt sind GPX, TCX, KML, GeoJSON und NMEA');
+  if (!format) throw new Error('Unbekanntes Format – unterstützt sind GPX, TCX, KML, GeoJSON, NMEA und FIT');
   let parsed;
   try {
     parsed = {
@@ -159,6 +163,10 @@ function parseTrackFile(text, filename) {
   } catch (err) {
     throw new Error(`Datei konnte nicht gelesen werden (${err.message})`);
   }
+  return finish(parsed, format, filename);
+}
+
+function finish(parsed, format, filename) {
   let points = parsed.points;
   // Recorded tracks come in time order; files sometimes do not.
   if (points.length && points.every((p) => p.time !== undefined)) points = [...points].sort((a, b) => a.time - b.time);

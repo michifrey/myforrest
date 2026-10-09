@@ -48,6 +48,7 @@ src/landscapes.js    Landschaftsprofile (Wald, Gletscher, Gebirge, Trockengebiet
 src/glaciers.js      Gletscherumrisse aus Inventaren (GeoJSON, WGS84/LV95, Jahr aus Eigenschaft oder Dateiname): Eis pro Jahr an einem Ort, Abstand, Umrisse für die Karte
 src/routes/landscapes.js  Landschaft eines Spots setzen, Gletscher am Spot, Umrisse (/api/glaciers)
 src/lenient-fetch.js HTTP-Client für BRouters eigenen Server (Kopfzeilen nur mit \n)
+src/fit.js           FIT-Dateien von Sportuhren und Velocomputern lesen (record-Meldungen, komprimierte Zeitstempel)
 src/dashcam.js       GPS von Dashcams: NMEA-Text und Novatek-freeGPS-Blöcke im Video, NMEA-Dateien
 src/gpx.js           GPX-Parser
 src/mp4.js           MP4-Boxen lesen: Telemetrie-Spur, Startzeit, Dauer, 360°-Metadaten
