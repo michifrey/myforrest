@@ -13,6 +13,7 @@
  *   GET    /api/route                   path between waypoints from a routing service (ROUTER_URL, BRouter),
  *                                        around wildlife rest areas in their protection period (WILDRUHE_GEOJSON)
  *   GET    /api/wildlife-zones?bbox=    those areas as GeoJSON, for the map
+ *   GET/POST/DELETE /api/closures       temporary closures during forestry work (src/closures.js)
  *   POST   /api/route-suggestions       photo requests and spots worth a visit near a route (satellite early warning,
  *                                       series not continued for a year); the route is not stored
  *   GET    /api/photo-requests          open (and recently done) requests
@@ -36,6 +37,7 @@ const { withOrgPro } = require('../orgs');
 const { distanceM, isValidCoord } = require('../geo');
 const { parseTrackFile, toGpx, MAX_POINTS } = require('../trackfile');
 const { createWildlife } = require('../wildlife');
+const { createClosures } = require('../closures');
 const { lengthM, bbox, nearRoute, trimEnds, sampleAlong, climb } = require('../routegeo');
 
 const KINDS = ['gezeichnet', 'aufgezeichnet', 'importiert'];
@@ -128,6 +130,7 @@ module.exports = function registerTracks(app, ctx) {
   const wildlife = ctx.wildlife || createWildlife();
   const elevation = ctx.elevation || null;
   const push = ctx.push || null;
+  const closures = createClosures(db);
   db.exec(SCHEMA);
   const reqCols = new Set(db.prepare('PRAGMA table_info(photo_requests)').all().map((c) => c.name));
   for (const [col, type] of REQUEST_MIGRATIONS) if (!reqCols.has(col)) db.exec(`ALTER TABLE photo_requests ADD COLUMN ${col} ${type}`);
@@ -284,7 +287,10 @@ module.exports = function registerTracks(app, ctx) {
     const lonlats = pts.map(([la, lo]) => `${lo.toFixed(6)},${la.toFixed(6)}`).join('|');
     // Wildlife rest areas in their protection period: no-go areas for the router.
     const wild = wildlife.near(pts.map(([lat, lon]) => ({ lat, lon })));
-    const nogo = wild.zones.length ? `&polygons=${encodeURIComponent(wildlife.polygonsParam(wild.zones))}` : '';
+    // Forestry closures (logging): no-go circles.
+    const closed = closures.near(pts.map(([lat, lon]) => ({ lat, lon })));
+    const nogo = (wild.zones.length ? `&polygons=${encodeURIComponent(wildlife.polygonsParam(wild.zones))}` : '')
+      + (closed.closures.length ? `&nogos=${encodeURIComponent(closures.nogosParam(closed.closures))}` : '');
     const url = `${routerUrl}?lonlats=${encodeURIComponent(lonlats)}&profile=${encodeURIComponent(routerProfile)}&alternativeidx=0&format=geojson${nogo}`;
     try {
       const r = await routerFetch(url, { signal: AbortSignal.timeout(20000) });
@@ -297,6 +303,8 @@ module.exports = function registerTracks(app, ctx) {
         points, distanceM: Math.round(lengthM(points)),
         // Zones considered, and zones a waypoint lies in (no way around those).
         wildlifeZones: wild.zones.map((z) => z.name), insideWildlifeZones: wild.inside,
+        closures: closed.closures.map((c) => ({ reason: c.reason, until: c.until })),
+        insideClosures: closed.inside.map((c) => ({ reason: c.reason, until: c.until })),
       });
     } catch (err) {
       fail(res, 502, `Routing-Dienst nicht erreichbar (${err.message})`);
@@ -328,6 +336,51 @@ module.exports = function registerTracks(app, ctx) {
       }
     }
     res.json({ samples: samples.map(({ d, ele }) => ({ d, ele: Number.isFinite(ele) ? ele : null })), ...climb(samples), source, distanceM: Math.round(lengthM(points)) });
+  });
+
+  /* ---------- Closures during forestry work ---------- */
+
+  const mayClose = (u) => Boolean(u) && (canSeeProtected(u) || isModerator(u));
+  const closureJson = (c, req) => ({ ...c, mine: Boolean(req.user && c.createdBy === req.user.id), createdBy: undefined,
+    removable: !c.auto && Boolean(req.user && (c.createdBy === req.user.id || isModerator(req.user))) });
+
+  app.get('/api/closures', (req, res) => {
+    const b = String(req.query.bbox || '').split(',').map(Number);
+    if (b.length !== 4 || !b.every(Number.isFinite)) return fail(res, 400, 'bbox=west,süd,ost,nord');
+    res.json({ closures: closures.active(b).map((c) => closureJson(c, req)), mayClose: mayClose(req.user) });
+  });
+
+  /** PRO members and moderation: close a place until a date (logging). */
+  app.post('/api/closures', (req, res) => {
+    if (!req.user) return fail(res, 401, 'Bitte zuerst anmelden');
+    if (!mayClose(req.user)) return fail(res, 403, 'Sperrungen setzen nur verifizierte PRO-Mitglieder (Forstdienst) und die Moderation');
+    const b = req.body || {};
+    let lat = Number(b.lat);
+    let lon = Number(b.lon);
+    let spotId = null;
+    if (b.spotId !== undefined && b.spotId !== null && b.spotId !== '') {
+      const spot = db.prepare('SELECT id, lat, lon FROM spots WHERE id = ?').get(Number(b.spotId));
+      if (!spot) return fail(res, 400, 'Spot nicht gefunden');
+      [spotId, lat, lon] = [spot.id, spot.lat, spot.lon];
+    }
+    if (!isValidCoord(lat, lon)) return fail(res, 400, 'Ungültige Koordinaten');
+    const radiusM = b.radiusM === undefined ? 100 : Number(b.radiusM);
+    if (!(radiusM >= 20 && radiusM <= 500)) return fail(res, 400, 'radiusM: 20 bis 500 m');
+    const until = Date.parse(`${String(b.until || '')}T23:59:59Z`);
+    if (!Number.isFinite(until) || until <= Date.now() || until > Date.now() + 366 * 86400000) {
+      return fail(res, 400, 'until: ein Datum (JJJJ-MM-TT) in den nächsten 12 Monaten');
+    }
+    const reason = clean(b.reason, 120) || 'Holzerei';
+    const id = closures.add({ lat, lon, radiusM, reason, until, spotId, userId: req.user.id });
+    res.status(201).json({ id, lat, lon, radiusM, reason, until: new Date(until).toISOString().slice(0, 10), spotId });
+  });
+
+  app.delete('/api/closures/:id', (req, res) => {
+    const c = closures.get(Number(req.params.id));
+    if (!c) return fail(res, 404, 'Sperrung nicht gefunden');
+    if (!req.user || (c.created_by !== req.user.id && !isModerator(req.user))) return fail(res, req.user ? 403 : 401, 'Nur wer die Sperrung gesetzt hat, oder die Moderation');
+    closures.remove(c.id);
+    res.status(204).end();
   });
 
   /** Wildlife rest areas in their protection period within a bbox (GeoJSON, for the map). */
