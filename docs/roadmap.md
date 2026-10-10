@@ -14,9 +14,8 @@ mit echten Dateien und Diensten; das steht jeweils als offener Punkt dabei.
   (z. B. GPS-Spur von Garmin- und Nextbase-Kameras, verschlüsselte Viofo-Daten).
 
 - **Durchgehen ausbauen**: eigene Reihen zu Mapillary hochladen (OAuth bei Mapillary, ohne geschützte Funde);
-  Wege auch von Mapillary-Bildern aus; Schritte mit Tiefe auch zwischen Panoramen (über die Drehung der Kugel)
-  und mit echter Parallaxe (Tiefenschätzung statt einer Ebene); das Wegnetz mit einer echten Overpass-Instanz im
-  Betrieb prüfen.
+  Schritte mit echter Parallaxe (Tiefenschätzung statt einer Ebene); das Wegnetz mit einer echten Overpass-Instanz
+  im Betrieb prüfen.
 - **360°-Rohdateien**: Insta360-`.insv` und GoPro-MAX-`.360` direkt lesen (Fischaugen stitchen, GPS aus dem
   Datei-Trailer). Braucht Beispieldateien der Kameras und deren Objektivdaten; bis dahin über den Export
   als 360°-MP4.
@@ -97,8 +96,9 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 - Durchgehen wie Street View: Pfeile entlang der Aufnahme und zu Spots in der Nähe, Blickrichtung bleibt beim Schritt
 - Startseite mit wechselnden Landschaften (Wald, Gletscher, Gebirge, Wüste)
 - Weiche Übergänge im Durchgehen: zum Weg drehen, Zoom in Gehrichtung mit Überblendung
-- Durchgehen entlang der Wege aus OpenStreetMap (Overpass), Schritte mit Tiefe zwischen flachen Fotos (Morph über
-  die gemeinsamen Bildmerkmale)
+- Durchgehen entlang der Wege aus OpenStreetMap (Overpass), auch von Mapillary-Bildern aus; Schritte mit Tiefe
+  zwischen flachen Fotos (Morph über die gemeinsamen Bildmerkmale) und zwischen Panoramen (Drehung der Kugel), auch
+  beim Wechsel der Zeit
 - Mapillary-Bilder im Durchgehen und auf der Karte, wo es keine eigenen gibt (über den Server, mit Urheber und Lizenz)
 
 ### Landschaften und Gletscher

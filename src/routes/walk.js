@@ -7,8 +7,9 @@
  *   GET /api/walk/mapillary/:imageId        a Mapillary picture as the place one stands
  *   GET /api/mapillary/images?bbox=         Mapillary pictures for the map layer
  *   GET /api/mapillary/images/:id/file      the picture itself (served from here, cached)
- *   GET /api/walk/transition/:from/:to      how picture `from` lies in picture `to` (flat photos):
- *                                           a homography for a step with depth, or null
+ *   GET /api/walk/transition/:from/:to      how picture `from` lies in picture `to`, for a step with
+ *                                           depth: a homography `h` (flat photos) or a rotation `r`
+ *                                           (panoramas), or null
  *
  * Returns the photo and the ways on from it:
  *   - `weg`:  the previous and next photo of the same recording (video, drive,
@@ -18,7 +19,7 @@
  *             one, the one closest in time to `at`), at most one per 45° sector
  *             (the nearest), so the ring stays readable;
  *   - `pfad`: with the path network (src/waynet.js, WEGNETZ_URL) own pictures
- *             up to 300 m along paths, in the direction the path leaves, with
+ *             up to 300 m along paths (also from a Mapillary picture), in the direction the path leaves, with
  *             the distance along the path and the path itself (`path`);
  *   - `mapillary`: Mapillary pictures within 80 m (src/mapillary.js, with a
  *             token), in the sectors left free by own pictures: they fill the
@@ -133,6 +134,27 @@ module.exports = function registerWalk(app, { db, accounts, thumbs, mapillary = 
     }
   }
 
+  /**
+   * Adds the `pfad` arrows (own pictures up to 300 m along the path network) to `links` and their spots to
+   * `linked`; returns the ways around for the mini map. Without the network (no WEGNETZ_URL, Overpass not
+   * reachable) nothing is added and the arrows of the other kinds remain.
+   */
+  async function alongPaths(req, here, at, excludeSpot, links, linked) {
+    if (!waynet?.enabled()) return [];
+    try {
+      const targets = ownNear(req, here, at, excludeSpot, WAYNET_MAX_M).filter((p) => !linked.has(p.spot_id));
+      const r = await waynet.reach(here, targets);
+      const link = linkFrom(here);
+      fillSectors(links, r.links.map((f) => link(photoBrief(f.target), 'pfad', {
+        bearing: f.bearing, distanceM: f.distanceM, straightM: Math.round(distanceM(here, f.target)), path: f.path,
+      })));
+      for (const l of links) if (l.spotId) linked.add(l.spotId);
+      return r.ways;
+    } catch {
+      return [];
+    }
+  }
+
   app.get('/api/walk/:id', async (req, res, next) => {
     const id = Number(req.params.id);
     if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: 'Ungültige ID' });
@@ -160,20 +182,7 @@ module.exports = function registerWalk(app, { db, accounts, thumbs, mapillary = 
 
       // Along the path network: own pictures up to 300 m along paths (not those of the recording's own steps).
       const linked = new Set(links.map((l) => l.spotId));
-      let paths = [];
-      if (waynet?.enabled()) {
-        try {
-          const targets = ownNear(req, here, at, photo.spot_id, WAYNET_MAX_M).filter((p) => !linked.has(p.spot_id));
-          const r = await waynet.reach(here, targets);
-          paths = r.ways;
-          fillSectors(links, r.links.map((f) => link(photoBrief(f.target), 'pfad', {
-            bearing: f.bearing, distanceM: f.distanceM, straightM: Math.round(distanceM(here, f.target)), path: f.path,
-          })));
-          for (const l of links) linked.add(l.spotId);
-        } catch {
-          // Without the network (Overpass not reachable) the arrows of the other kinds remain.
-        }
-      }
+      const paths = await alongPaths(req, here, at, photo.spot_id, links, linked);
       // Other spots nearby; the spots linked already are left out.
       fillSectors(links, ownNear(req, here, at, photo.spot_id).filter((p) => !linked.has(p.spot_id)).map((p) => link(photoBrief(p), 'spot')));
       fillSectors(links, (await mapillaryNear(here)).map((m) => link(mapillaryBrief(m), 'mapillary')), { freeOnly: true });
@@ -189,9 +198,11 @@ module.exports = function registerWalk(app, { db, accounts, thumbs, mapillary = 
 
   /* ---------- Steps with depth ---------- */
 
-  // How photo `from` lies in photo `to`, in normalised image coordinates (src/align.js), for a step that
-  // moves the old picture into the new one instead of only zooming. Flat photos only; computed once, then
-  // kept (photos do not change). Null when the two share too few features.
+  // How photo `from` lies in photo `to`, for a step with depth: between flat photos a homography in
+  // normalised image coordinates (src/align.js), so the old picture moves into the new one instead of only
+  // zooming; between panoramas the rotation of the sphere (src/sphere.js), so one looks at the same scenery
+  // after the step even when the headings are off. Computed once, then kept (photos do not change). Null
+  // when the two share too few features, and between a photo and a panorama.
   db.exec(`CREATE TABLE IF NOT EXISTS walk_transitions (
     from_id INTEGER NOT NULL, to_id INTEGER NOT NULL, h TEXT, inliers INTEGER, computed_at INTEGER NOT NULL,
     PRIMARY KEY (from_id, to_id)
@@ -207,24 +218,25 @@ module.exports = function registerWalk(app, { db, accounts, thumbs, mapillary = 
     const get = db.prepare(`SELECT * FROM photos p WHERE p.id = ? AND ${visible(req)}`);
     const [a, b] = [get.get(from), get.get(to)];
     if (!a || !b) return res.status(404).json({ error: 'Foto nicht gefunden' });
-    if (!transition || a.panorama || b.panorama) return res.json({ h: null, inliers: null });
+    const key = a.panorama ? 'r' : 'h';
+    if (!transition || Boolean(a.panorama) !== Boolean(b.panorama)) return res.json({ [key]: null, inliers: null });
     try {
       let row = getTransition.get(from, to);
       if (!row) {
-        const key = `${from}:${to}`;
+        const pair = `${from}:${to}`;
         // One at a time: feature matching is heavy, and the client asks for the next steps ahead.
-        if (!computing.has(key)) {
+        if (!computing.has(pair)) {
           const job = queue.then(() => transition(a, b)).catch(() => null).then((r) => {
             putTransition.run(from, to, r ? JSON.stringify(r.h) : null, r?.inliers ?? null, Date.now());
-          }).finally(() => computing.delete(key));
-          computing.set(key, job);
+          }).finally(() => computing.delete(pair));
+          computing.set(pair, job);
           queue = job;
         }
-        await computing.get(key);
+        await computing.get(pair);
         row = getTransition.get(from, to);
       }
       res.set('Cache-Control', 'private, max-age=604800');
-      res.json({ h: row?.h ? JSON.parse(row.h) : null, inliers: row?.inliers ?? null });
+      res.json({ [key]: row?.h ? JSON.parse(row.h) : null, inliers: row?.inliers ?? null });
     } catch (err) {
       next(err);
     }
@@ -250,10 +262,13 @@ module.exports = function registerWalk(app, { db, accounts, thumbs, mapillary = 
       const after = seq.filter((x) => x.takenAt > m.takenAt).sort((a, b) => a.takenAt.localeCompare(b.takenAt))[0];
       if (before) links.push(link(mapillaryBrief(before), 'weg', { direction: 'zurueck' }));
       if (after) links.push(link(mapillaryBrief(after), 'weg', { direction: 'vor' }));
-      // Own spots first, then other Mapillary pictures.
-      fillSectors(links, ownNear(req, here, Date.parse(m.takenAt) || Date.now()).map((p) => link(photoBrief(p), 'spot')));
+      // Own pictures along the paths, then own spots nearby, then other Mapillary pictures.
+      const at = Date.parse(m.takenAt) || Date.now();
+      const linked = new Set();
+      const paths = await alongPaths(req, here, at, null, links, linked);
+      fillSectors(links, ownNear(req, here, at).filter((p) => !linked.has(p.spot_id)).map((p) => link(photoBrief(p), 'spot')));
       fillSectors(links, around.filter((x) => x.id !== m.id && x.sequence !== m.sequence).map((x) => link(mapillaryBrief(x), 'mapillary')), { freeOnly: true });
-      res.json({ photo: mapillaryBrief(m), links, times: [], sequence: null, track: [], paths: [] });
+      res.json({ photo: mapillaryBrief(m), links, times: [], sequence: null, track: [], paths });
     } catch (err) {
       if (err.httpStatus || err.name === 'TimeoutError' || err instanceof TypeError) {
         return res.status(502).json({ error: `Mapillary nicht erreichbar (${err.message})` });

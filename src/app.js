@@ -1242,10 +1242,17 @@ function createApp({
   require('./routes/profile')(app, { db, thumbs, accounts, uploadDir, rateLimits });
   require('./routes/protection')(app, { db, accounts, sensitiveLists, cantons, reprotect });
   /**
-   * How flat photo `a` lies in flat photo `b` (normalised homography a → b) for a walk step with depth:
-   * from the alignment when both are aligned in the same spot's frame, else by matching their features.
+   * How photo `a` lies in photo `b` for a walk step with depth: between flat photos a normalised homography
+   * a → b, between panoramas the rotation of the sphere taking a's directions onto b's. From the alignment when
+   * both are aligned in the same spot's frame, else by matching their features.
    */
   async function photoTransition(a, b) {
+    if (a.panorama && b.panorama) {
+      const frame = a.spot_id === b.spot_id && a.align_h && b.align_h;
+      if (frame) return { h: sphere.multiply(sphere.transpose(JSON.parse(b.align_h)), JSON.parse(a.align_h)).map((v) => Math.round(v * 1e9) / 1e9), inliers: null };
+      const r = await alignPanoramas(path.join(uploadDir, a.file), path.join(uploadDir, b.file), { getFeatures: cachedFeatures });
+      return r ? { h: r.r, inliers: r.inliers } : null;
+    }
     const back = a.spot_id === b.spot_id && a.align_h && b.align_h ? invert(JSON.parse(b.align_h)) : null;
     if (back) return { h: multiply(back, JSON.parse(a.align_h)).map((v) => Math.round(v * 1e9) / 1e9), inliers: null };
     return alignImages(path.join(uploadDir, a.file), path.join(uploadDir, b.file), { getFeatures: cachedFeatures });

@@ -16,6 +16,8 @@
  * pictures up to 300 m away, pointing where the path leaves. Between two flat
  * photos that share enough features a step has depth: the old picture moves
  * into its place in the new one (a homography from the server) while it fades.
+ * Between two panoramas the server's rotation of the sphere keeps one looking
+ * at the same scenery after the step, even where the headings are off.
  * With Mapillary set up, blue arrows lead to Mapillary pictures where there
  * are no own ones, and one can walk on there (ids "m<id>"); their creator and
  * licence stand at the top. A map layer shows Mapillary pictures to start from.
@@ -224,14 +226,30 @@
     return [dw, 0, (w - dw) / 2, 0, dh, (h - dh) / 2, 0, 0, 1];
   }
 
-  /** How the current photo lies in photo `toId` ({ h } from the server), asked at most once per pair. */
+  /**
+   * How the current photo lies in picture `to` ({ id, panorama, source }): { h } between flat photos,
+   * { r } between panoramas (from the server, asked at most once per pair), or null.
+   */
   const transitions = new Map();
-  function transitionTo(toId) {
+  function transitionTo(to) {
     const from = W.data?.photo;
-    if (!from || from.panorama || from.source || isMapillary(toId)) return Promise.resolve(null);
-    const key = `${from.id}:${toId}`;
-    if (!transitions.has(key)) transitions.set(key, api(`/api/walk/transition/${from.id}/${toId}`).then((r) => r.h).catch(() => null));
+    if (!from || from.source || to.source === 'mapillary' || isMapillary(to.id) || Boolean(from.panorama) !== Boolean(to.panorama)) return Promise.resolve(null);
+    const key = `${from.id}:${to.id}`;
+    if (!transitions.has(key)) {
+      transitions.set(key, api(`/api/walk/transition/${from.id}/${to.id}`).then((r) => (r.h || r.r ? r : null)).catch(() => null));
+    }
     return transitions.get(key);
+  }
+  /** The transition to `to` if it comes within 1.2 s (usually it was asked ahead), else null. */
+  const transitionSoon = (to) => (reduceMotion() ? Promise.resolve(null)
+    : Promise.race([transitionTo(to), new Promise((r) => setTimeout(() => r(null), 1200))]));
+
+  /** Yaw and pitch (°) in the next panorama that show what (yaw, pitch) showed in the current one, through rotation `r`. */
+  function turnedView(r, yaw, pitch) {
+    const [y, p] = [yaw, pitch].map((d) => (d * Math.PI) / 180);
+    const v = [Math.cos(p) * Math.sin(y), Math.sin(p), Math.cos(p) * Math.cos(y)];
+    const w = [0, 1, 2].map((i) => r[i * 3] * v[0] + r[i * 3 + 1] * v[1] + r[i * 3 + 2] * v[2]);
+    return { yaw: (Math.atan2(w[0], w[2]) * 180) / Math.PI, pitch: (Math.asin(Math.max(-1, Math.min(1, w[1]))) * 180) / Math.PI };
   }
 
   /**
@@ -270,18 +288,19 @@
     try {
       const rel = norm(link.bearing - W.view);
       const back = link.direction === 'zurueck' || Math.abs(rel) > 110;
-      const flatStep = !reduceMotion() && !W.data.photo.panorama && !link.panorama && !W.data.photo.source && link.source !== 'mapillary';
       // The transform is usually there already (asked ahead); a slow answer does not hold the step up.
-      const h = flatStep ? await Promise.race([transitionTo(link.id), new Promise((r) => setTimeout(() => r(null), 1200))]) : null;
+      const t = await transitionSoon(link);
       if (!back && !reduceMotion() && W.data.photo.panorama && !canvas.hidden && pano?.ok) await turnTo(link.bearing);
-      await go(link.id, { kind: back ? 'zurueck' : 'vor', rel: back ? 0 : norm(link.bearing - W.view), h });
+      await go(link.id, { kind: back ? 'zurueck' : 'vor', rel: back ? 0 : norm(link.bearing - W.view), h: t?.h, r: t?.r });
     } finally {
       W.stepping = false;
     }
   }
 
-  async function go(photoId, { dir = W.view, initial = false, kind = 'zeit', rel = 0, h = null } = {}) {
+  async function go(photoId, { dir = W.view, initial = false, kind = 'zeit', rel = 0, h = null, r = null } = {}) {
     const token = ++W.token;
+    // Where one looks in the current panorama, to turn it into the next one with `r`.
+    const before = W.data?.photo.panorama && !canvas.hidden && pano?.ok ? { yaw: pano.yaw, pitch: pano.pitch } : null;
     root.querySelectorAll('.walk-still').forEach((n) => n.remove());
     const cover = initial ? null : still();
     root.classList.add('loading');
@@ -316,8 +335,15 @@
     if (usePano) {
       await pano.load(p.url).catch(() => {});
       if (token !== W.token) { cover?.remove(); return; }
-      // Keep looking the same way as before the step; the first picture looks along its own heading.
-      setView(initial ? (p.heading ?? 0) : dir);
+      if (r && before && !initial) {
+        // The same scenery as before the step, through the rotation between the two panoramas.
+        const v = turnedView(r, before.yaw, before.pitch);
+        pano.set(v);
+        setView(((p.heading ?? 0) + v.yaw + 360) % 360, false);
+      } else {
+        // Keep looking the same way as before the step; the first picture looks along its own heading.
+        setView(initial ? (p.heading ?? 0) : dir);
+      }
     } else {
       flat.src = p.largeUrl || p.url;
       await flat.decode().catch(() => {});
@@ -332,8 +358,8 @@
     for (const l of data.links) {
       const img = new Image();
       img.src = l.panorama ? l.url : (l.largeUrl || l.url);
-      // Between flat photos also how they lie in each other, for a step with depth.
-      if (!p.panorama && !l.panorama && !mly && l.source !== 'mapillary') transitionTo(l.id);
+      // Also how they lie in each other, for a step with depth.
+      if (!reduceMotion()) transitionTo(l);
     }
   }
 
@@ -378,7 +404,13 @@
     close();
     if (p) openSpot(p.spotId, p.id).then(() => $('explore').scrollIntoView({ behavior: 'smooth' })).catch(() => {});
   });
-  timeSel.addEventListener('change', () => go(Number(timeSel.value)));
+  // Another date at the same spot: aligned photos move into each other, panoramas keep looking at the same place.
+  timeSel.addEventListener('change', async () => {
+    const id = Number(timeSel.value);
+    const to = W.data?.times.find((x) => x.id === id) || { id };
+    const t = await transitionSoon(to);
+    go(id, { h: t?.h, r: t?.r });
+  });
   // On the document: after a step, the arrow that had the focus is gone.
   document.addEventListener('keydown', (e) => {
     if (!W.open || e.target === timeSel) return;

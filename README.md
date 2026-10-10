@@ -344,7 +344,8 @@ Einmal gesehene Bilder gehen auch ohne Empfang, im Wald und in den Bergen.
 Die Schritte gehen **weich**: Ein 360°-Bild dreht sich zuerst zum gewählten Pfeil, dann zoomt das alte Bild
 in Gehrichtung und blendet aus, während das neue leicht herangezoomt ankommt; zurück zoomt es heraus, und ein
 Wechsel der *Zeit* blendet nur über. Zwischen zwei flachen Fotos mit gemeinsamen Bildmerkmalen hat der Schritt
-**Tiefe**: Das alte Bild wandert dorthin, wo sein Inhalt im neuen liegt, statt nur zu zoomen.
+**Tiefe**: Das alte Bild wandert dorthin, wo sein Inhalt im neuen liegt, statt nur zu zoomen. Zwischen zwei
+Panoramen sorgt die Drehung der Kugel dafür, dass man nach dem Schritt auf dieselbe Landschaft schaut.
 
 <p align="center"><img src="docs/screenshots/durchgehen-wegnetz.jpg" width="720" alt="Durchgehen am Windwurf-Spot: Pfeile entlang der Wege, die kleine Karte zeigt das Wegnetz und die Wege der Pfeile gestrichelt"></p>
 
