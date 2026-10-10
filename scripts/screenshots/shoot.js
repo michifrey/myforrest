@@ -1,6 +1,6 @@
 'use strict';
 // Takes the README screenshots from the demo server (see README.md here).
-// Usage: node shoot.js [hero map spot satellite sun species vektor touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher mobile]
+// Usage: node shoot.js [hero map spot satellite sun schatten species vektor touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher mobile]
 // «mapillary» needs the demo server started with DEMO_MAPILLARY=1 (a Mapillary stand-in, see README.md).
 // «gletscher» uses the glacier demo server (BASE_GLETSCHER, default http://localhost:3124; see README.md).
 const path = require('path');
@@ -92,6 +92,22 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await settle(page, 5000);
     await page.evaluate(() => document.activeElement?.blur());
     await page.screenshot({ path: out('sun.jpg'), ...jpg });
+    await page.close();
+  }
+
+  if (want('schatten')) {
+    // Low evening sun: the hill shades the forest to its east; DWD radar on top.
+    const page = await explore(ctx);
+    await page.click('#sun-toggle');
+    await settle(page, 1500);
+    await page.fill('#sun-date', '2026-10-09');
+    await page.dispatchEvent('#sun-date', 'change');
+    await page.evaluate(() => { const s = document.querySelector('#sun-slider'); s.value = 17 * 60 + 50; s.dispatchEvent(new Event('input', { bubbles: true })); });
+    await page.selectOption('#dwd-layer', 'radar');
+    await settle(page, 5000);
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.screenshot({ path: out('licht-schatten.jpg'), ...jpg });
+    await page.selectOption('#dwd-layer', '');
     await page.close();
   }
 

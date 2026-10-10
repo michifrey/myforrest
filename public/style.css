@@ -1636,6 +1636,14 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 /* Cool stretches from shared tour temperatures (sunmap.js) */
 .cool-box { margin: 0.6rem 0 0.2rem; }
 .cool-box p { margin: 0.25rem 0 0; }
+.shade-box { margin: 0.2rem 0 0.7rem; }
+.shade-box .toggle { margin-top: 0; }
+.shade-box p { margin: 0.25rem 0 0; }
+.dwd-row { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.45rem; font-weight: 500; color: var(--muted); }
+.dwd-row select { flex: 1; min-width: 0; }
+.shade-ramp { display: inline-block; width: 3.2rem; height: 0.6rem; border-radius: 3px; vertical-align: middle;
+  background: linear-gradient(90deg, rgba(20, 32, 58, 0.75), rgba(20, 32, 58, 0.25), transparent, rgba(255, 196, 80, 0.6)); }
+.leaflet-sunshade-pane img, .leaflet-dwd-pane img { pointer-events: none; }
 .cool-ramp {
   display: inline-block; width: 3.6rem; height: 0.55rem; border-radius: 999px; vertical-align: middle;
   background: linear-gradient(90deg, rgb(43, 108, 176), rgb(239, 227, 161), rgb(192, 57, 43));

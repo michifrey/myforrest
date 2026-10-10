@@ -59,6 +59,10 @@ mit echten Dateien und Diensten; das steht jeweils als offener Punkt dabei.
   des laufenden Jahres aus den Sofortmeldern.
 - **Stürme genauer**: auch die vergangenen Stürme aus feiner aufgelösten Daten (Stationsmessungen von
   MeteoSchweiz statt ERA5), Gewitterböen (lokal, im Modell kaum sichtbar) aus Warnungen der Wetterdienste.
+- **Licht, Schatten und Wetterkarten**: die DWD-Ebenen gegen den echten Dienst prüfen (Namen, Zeiten des Radars;
+  bisher mit Testdaten im Format der Capabilities); ein Radar für die ganze Schweiz (MeteoSchweiz, sobald als
+  offener Dienst verfügbar); Schatten von Wald und Gebäuden aus einem Oberflächenmodell (swissSURFACE3D) statt
+  nur vom Gelände; ferne Berge bei sehr tiefer Sonne mitrechnen.
 - **Vegetationsdichte verfeinern**: Himmel und Vegetation mit einem Segmentierungsmodell statt Farbregeln
   trennen (Schnee, helle Felsen und Mauern gelten heute teils als Himmel); Kennzahlen nur im Bildteil
   vergleichen, den alle Fotos eines Spots abdecken.
@@ -122,6 +126,8 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
   Kreuzvalidierung nach Spots, getrennt für Laub- und Nadelwald
 - Frühwarnung als Push-Nachricht an Leute, die den Spot regelmässig besuchen oder ihm folgen
 - Angleichung von Landsat an Sentinel-2 aus den Überlappungsjahren
+- Licht und Schatten auf der Karte: Geländeschatten zur gewählten Zeit, steil besonnte Hänge, Tag, Nacht und
+  Dämmerung; Niederschlagsradar und Warnungen des DWD einblendbar
 
 ### Arten und geschützte Funde
 
