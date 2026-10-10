@@ -210,4 +210,42 @@ function lv95Tile(z, x, y, style = 'grau') {
   return render(toLatLon, res, style);
 }
 
-module.exports = { mercatorTile, lv95Tile };
+/** Elevation tile in the Terrarium encoding (as the AWS elevation tiles), from the demo terrain. */
+function terrariumTile(z, x, y) {
+  const n = 2 ** z;
+  const buf = Buffer.alloc(TILE * TILE * 3);
+  for (let j = 0; j < TILE; j++) {
+    for (let i = 0; i < TILE; i++) {
+      const lon = ((x + (i + 0.5) / TILE) / n) * 360 - 180;
+      const lat = (Math.atan(Math.sinh(Math.PI * (1 - (2 * (y + (j + 0.5) / TILE)) / n))) * 180) / Math.PI;
+      const v = (lat < 46.9 ? glacier.elevation(lat, lon) : elevation(lat, lon)) + 32768;
+      const o = (j * TILE + i) * 3;
+      buf[o] = Math.floor(v / 256); buf[o + 1] = Math.floor(v) % 256; buf[o + 2] = Math.floor((v % 1) * 256);
+    }
+  }
+  return sharp(buf, { raw: { width: TILE, height: TILE, channels: 3 } }).png().toBuffer();
+}
+
+/** A rain band for the DWD radar (WMS 1.3.0 GetMap in EPSG:3857), drifting east with the time. */
+function radarImage(bbox, width, height, time) {
+  const [x0, y0, x1, y1] = bbox;
+  const R = 6378137;
+  const shift = time ? ((Date.parse(time) / 60000) % 1440) * 0.00002 : 0;
+  const buf = Buffer.alloc(width * height * 4);
+  for (let j = 0; j < height; j++) {
+    for (let i = 0; i < width; i++) {
+      const mx = x0 + ((i + 0.5) / width) * (x1 - x0);
+      const my = y1 - ((j + 0.5) / height) * (y1 - y0);
+      const lon = (mx / R) * (180 / Math.PI) - shift;
+      const lat = (2 * Math.atan(Math.exp(my / R)) - Math.PI / 2) * (180 / Math.PI);
+      const band = Math.exp(-(((lat - 47.379 - (lon - 8.56) * 0.6) / 0.0025) ** 2)) * fbm(lon * 250, lat * 250);
+      if (band < 0.22) continue;
+      const c = band > 0.5 ? [240, 200, 30] : band > 0.36 ? [60, 170, 70] : [120, 190, 240];
+      const o = (j * width + i) * 4;
+      buf[o] = c[0]; buf[o + 1] = c[1]; buf[o + 2] = c[2]; buf[o + 3] = 230;
+    }
+  }
+  return sharp(buf, { raw: { width, height, channels: 4 } }).png().toBuffer();
+}
+
+module.exports = { mercatorTile, lv95Tile, terrariumTile, radarImage };

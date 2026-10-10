@@ -102,11 +102,13 @@ ausserhalb von `docs/` zeigen auf GitHub (`https://github.com/michifrey/myforres
 | Copernicus Sentinel-2 über [Earth Search](https://earth-search.aws.element84.com/v1) (Element 84, AWS Open Data) | Satellitenkontext NDVI/NDMI ab 2017, Frühwarnung | `earth-search.aws.element84.com`, `sentinel-cogs.s3.us-west-2.amazonaws.com` |
 | Landsat Collection 2 (USGS) über [Microsoft Planetary Computer](https://planetarycomputer.microsoft.com) | Satellitenkontext vor 2017 und Überlappung 2017–2018 | `planetarycomputer.microsoft.com`, `landsateuwest.blob.core.windows.net` |
 | Deutscher Wetterdienst, Open Data | Phänologie-Referenzdaten, Jahres- und Sofortmelder ([laden](installation.md#phänologie-referenzdaten-laden)) | `opendata.dwd.de` |
+| Deutscher Wetterdienst, [GeoServer](https://maps.dwd.de) (WMS) | Niederschlagsradar und Warnungen über der Karte; der Server liest nur die Capabilities, die Bilder lädt der Browser | `maps.dwd.de` |
 | MeteoSchweiz, Open Government Data | Phänologie-Referenzdaten Schweiz ([laden](installation.md#phänologie-referenzdaten-laden)) | `data.geo.admin.ch` |
 | [Pl@ntNet](https://my.plantnet.org) (optional, API-Key) | Pflanzenbestimmung | `my-api.plantnet.org` |
 | [BRouter](https://brouter.de) (Standard, `ROUTER_URL`) | Wege-Magnet: gezeichnete Touren folgen den Wegen; der Server schickt nur die Wegpunkte, ohne Konto oder IP der Person. Mit dem [eigenen BRouter](https://github.com/michifrey/myforrest/blob/main/deploy/brouter/README.md) bleibt das im eigenen Netz; dieser lädt nur seine Routing-Daten (OpenStreetMap, ODbL) | `brouter.de` (öffentlicher Dienst bzw. Download der Segmente) oder Host aus `ROUTER_URL` |
 | Push-Dienste der Browser (Google, Mozilla, Apple, Microsoft) | Push-Nachrichten der Frühwarnung und der Sturmwarnung | `fcm.googleapis.com`, `updates.push.services.mozilla.com`, `web.push.apple.com`, `*.notify.windows.com` |
 | OpenStreetMap | Kartenkacheln (im Browser) | – |
+| [Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (AWS Open Data) | Höhenkacheln für Licht und Schatten auf der Karte (im Browser) | – |
 | swisstopo (geo.admin.ch) | Landeskarte und Luftbild der Vektorkarte LV95 (im Browser) | – |
 | swisstopo (geo.admin.ch), swissBOUNDARIES3D | Kanton eines Spots für die kantonalen Schutzlisten (einmal pro Spot) | `api3.geo.admin.ch` |
 | BAFU, Wildruhezonen über geo.admin.ch (optional, `WILDRUHE_LAYER`) | Sperrflächen für den Wege-Magnet und die Karte; pro Feld gespeichert, wöchentlich neu angefragt | `api3.geo.admin.ch` |

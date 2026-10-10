@@ -219,7 +219,13 @@ Der Kartenmodus *Sonne & Wetter* zeigt für ein beliebiges Datum und eine Uhrzei
 Sonnenstand, den Schatten eines 25-m-Baums und die Richtung von Auf- und Untergang. Der Geländehorizont aus
 dem Höhenmodell blockiert die Sonne hinter Hügeln (*Sonne ab 05:29*, *Sonne bis 20:36*). Das Panel nennt
 Sonnenhöhe, Einstrahlung bei klarem Himmel und gemessen, Himmelssicht, Sonnenstunden und Regen. An jedem
-Spot steht die Regenmenge des Tages. *Kühle Abschnitte aus Touren* legt eine Karte darüber, wo es kühler oder
+Spot steht die Regenmenge des Tages. *Licht und Schatten auf der Karte* dunkelt ab, was zur gewählten Zeit im
+Schatten von Hügeln und Bergen liegt, färbt steil besonnte Hänge golden und zeigt Nacht und Dämmerung; dazu
+lässt sich eine Karte des Deutschen Wetterdienstes einblenden (Niederschlagsradar, Warnungen).
+
+![Licht und Schatten am Abend, mit dem Niederschlagsradar des DWD](docs/screenshots/licht-schatten.jpg)
+
+*Kühle Abschnitte aus Touren* legt eine Karte darüber, wo es kühler oder
 wärmer ist, aus den Temperaturen, die Läuferinnen und Läufer mit ihren Touren anonym teilen (bereinigt um
 Wetter, Tageszeit und Körperwärme, erst ab drei Touren von zwei Personen pro 100-m-Zelle).
 
@@ -522,8 +528,8 @@ jedes Dokument hier im Repository und auf der Website.
 
 Kartendaten © OpenStreetMap-Mitwirkende, Landeskarte und Luftbild © swisstopo. Wetterdaten von
 [Open-Meteo.com](https://open-meteo.com) (ERA5, CC BY 4.0). Enthält modifizierte Copernicus-Sentinel-Daten;
-Landsat-Daten mit freundlicher Genehmigung des U.S. Geological Survey. Phänologie-Daten: Deutscher
-Wetterdienst und MeteoSchweiz. Pflanzenbestimmung mit Pl@ntNet. Bilder von Mapillary (CC BY-SA 4.0) mit Urheber im Bild. Wegnetz © OpenStreetMap-Mitwirkende (ODbL). Gletscherumrisse aus den geladenen Inventaren, z. B.
+Landsat-Daten mit freundlicher Genehmigung des U.S. Geological Survey. Phänologie-Daten, Niederschlagsradar und Warnungen:
+Deutscher Wetterdienst; Phänologie auch MeteoSchweiz. Höhenkacheln: Terrain Tiles (AWS Open Data, u. a. EU-DEM). Pflanzenbestimmung mit Pl@ntNet. Bilder von Mapillary (CC BY-SA 4.0) mit Urheber im Bild. Wegnetz © OpenStreetMap-Mitwirkende (ODbL). Gletscherumrisse aus den geladenen Inventaren, z. B.
 GLAMOS. Details unter [Datenquellen](docs/betrieb.md#externe-datenquellen-und-netzzugang).
 
 Der Code steht unter der [Apache-Lizenz 2.0](LICENSE).

@@ -895,6 +895,43 @@ und ein beliebiges Datum in Vergangenheit oder Zukunft:
 Der Tagesverlauf lässt sich mit dem Schieberegler, im Diagramm oder per Abspielen durchgehen. Der
 Sonnenstand wird lokal berechnet (NOAA-Algorithmus) und funktioniert für jedes Datum.
 
+### Licht und Schatten auf der Karte
+
+*Licht und Schatten auf der Karte* (im Panel von *Sonne & Wetter*, standardmässig an) legt den Sonnenstand
+der gewählten Zeit über die ganze Karte, nicht nur über den Spot:
+
+- **Geländeschatten** (ab Zoomstufe 9): was im Schatten von Hügeln, Graten und Bergen liegt, wird dunkel,
+  ebenso Hänge, die von der Sonne abgewandt sind; Hänge, auf die die Sonne steil fällt, leuchten leicht golden.
+  Das Panel nennt Sonnenhöhe, Richtung und den Anteil der Karte im Schatten. Mit *Abspielen* wandern die
+  Schatten durch den Tag.
+- **Tag und Nacht**: wo die Sonne unter dem Horizont steht, wird die Karte dunkelblau, mit weichem Übergang
+  durch die bürgerliche und nautische Dämmerung (bis −12°). Weit herausgezoomt sieht man so die
+  Tag-Nacht-Grenze über Europa wandern.
+
+Gerechnet wird im Browser (`public/shade.js`): Für jede Zelle des Höhenmodells läuft ein Strahl Richtung
+Sonne, bis er höher ist als alles Gelände ringsum. Die Höhen kommen als Kacheln der
+[Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (AWS Open Data, in Europa EU-DEM mit ~25 m),
+eine Kachel Rand rund um den Ausschnitt; Berge weiter weg werfen keinen Schatten auf die Karte (bei sehr
+tiefer Sonne fehlt so ein Teil der langen Schatten). Bäume und Gebäude sind nicht im Höhenmodell; den Schatten
+eines einzelnen Baums zeigt weiterhin die Linie am Spot.
+
+### DWD-Karten einblenden
+
+Unter *DWD-Karte* lässt sich eine Karte des Deutschen Wetterdienstes über die Karte legen (WMS von
+`maps.dwd.de`, frei mit Quellenangabe):
+
+- **Niederschlagsradar**: das Radarbild zur gewählten Zeit (5-Minuten-Schritte), solange der DWD es noch
+  vorhält, sonst das neueste; das Panel sagt, welches gezeigt wird.
+- **Wetterwarnungen**: die aktuellen Warnungen nach Gemeinden.
+- **Waldbrandgefahr**, sobald der DWD eine solche Ebene anbietet.
+
+Welche Ebenen es gibt und für welche Zeiten das Radar Bilder hat, liest der Server einmal pro Stunde aus den
+Capabilities des DWD (`GET /api/dwd/layers`); ist der DWD nicht erreichbar, bietet er Radar und Warnungen
+trotzdem an. Die Bilder lädt der Browser direkt vom DWD. Die Karten decken Deutschland und das Grenzgebiet
+ab, in der Nordschweiz also meist noch das Radar.
+
+![Licht und Schatten am Abend: der Hügel wirft seinen Schatten nach Osten, darüber ein Regenband im Radar](screenshots/licht-schatten.jpg)
+
 ### Kühle Abschnitte aus Touren
 
 *Kühle Abschnitte aus Touren* im Panel von *Sonne & Wetter* legt eine Karte über die Umgebung: Zellen von
