@@ -105,6 +105,7 @@ deploy/brouter/      Eigener Routing-Server (BRouter) für den Wege-Magnet, läd
 deploy/vps/          Vorlage: MyForrest + Caddy (HTTPS automatisch) per Docker Compose für einen VPS, siehe hosting.md
 deploy/synology/     Vorlage: MyForrest für den Container Manager einer Synology NAS, siehe hosting.md
 Dockerfile           Container für MyForrest (mit ffmpeg)
+render.yaml          Blueprint für Render: Docker-Dienst mit Disk, Deploy bei jedem Push auf main, siehe hosting.md
 docs/                Dokumentation; docs/screenshots/ enthält die Bilder für das README
 mkdocs.yml           Doku-Website aus docs/ (MkDocs Material), gebaut und veröffentlicht von .github/workflows/docs.yml
 public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet die Landschaften der Startseite (Wald, Gletscher, Gebirge, Wüste) und wechselt sie,

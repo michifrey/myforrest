@@ -1,0 +1,26 @@
+# Render Blueprint: MyForrest as a Docker web service with a persistent disk for database and photos.
+# In Render: New → Blueprint → this repository → Apply. Every push to main deploys anew.
+# Guide: docs/hosting.md (section "Render"). The free plan has no disk, so at least "starter" is needed.
+services:
+  - type: web
+    name: myforrest
+    runtime: docker
+    branch: main
+    region: frankfurt
+    plan: starter # 0.5 CPU, 512 MB; for many photos or videos better a larger plan (e.g. 1c-2g)
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/config
+    autoDeployTrigger: commit
+    disk:
+      name: data
+      mountPath: /app/data
+      sizeGB: 10
+    envVars:
+      # Requests reach the app through Render's proxies; the address of the visitor is in X-Forwarded-For.
+      - key: TRUST_PROXY
+        value: "true"
+      # Asked for when the Blueprint is created (optional, can stay empty).
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: SMTP_URL
+        sync: false

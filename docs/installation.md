@@ -25,7 +25,7 @@ Für erste Versuche mit dem Handy oder der [Android-App](android.md) reicht der 
 und [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) gibt ihm
 eine HTTPS-Adresse, die das Handy von überall erreicht. Kein Router, keine Firewall und kein Zertifikat sind
 einzurichten; der Tunnel verbindet von innen nach aussen. Der PC muss dafür laufen (Ruhezustand aus). Für den
-Dauerbetrieb ist ein Server besser ([Eigener Server: VPS und Synology](hosting.md)).
+Dauerbetrieb ist ein Server besser ([Eigener Server: VPS, Synology und Render](hosting.md)).
 
 ### 1. Programme installieren
 
