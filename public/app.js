@@ -166,6 +166,81 @@ state.markers.addTo(map);
 map.on('click focus', () => map.scrollWheelZoom.enable());
 map.on('mouseout', () => map.scrollWheelZoom.disable());
 
+/* ---------- Own location ---------- */
+
+// The browser (or the app, whose WebView passes the request on to Android) is asked for the location when the
+// page opens; with it the map starts where one is instead of the overview of all spots, unless one came by a
+// link, opened a spot or moved the map meanwhile. Once declined, it is not asked again by itself; "Mein
+// Standort" on the map asks at any time. The position stays in the browser: it only moves the map (and with it
+// what the map section shows, e.g. the sun and weather of the map centre).
+const LOCATE_KEY = 'myforrest.standort';
+// Deep links (walk-through, spot, filter) bring their own view; plain section anchors like #how do not.
+const fromLink = new URLSearchParams(location.search);
+let viewTouched = /=/.test(location.hash) || fromLink.has('spot') || fromLink.has('filter');
+let ownView = false;
+map.on('dragstart', () => { viewTouched = true; });
+map.getContainer().addEventListener('wheel', () => { viewTouched = true; }, { passive: true });
+const atStart = () => !viewTouched && !state.spot;
+const me = { dot: null, ring: null };
+function showMe(lat, lon, accuracy) {
+  const at = L.latLng(lat, lon);
+  if (!me.dot) {
+    me.ring = L.circle(at, { radius: accuracy, className: 'me-accuracy', interactive: false }).addTo(map);
+    me.dot = L.circleMarker(at, { radius: 7, className: 'me-dot' }).bindTooltip('Ihr Standort').addTo(map);
+  }
+  me.dot.setLatLng(at);
+  me.ring.setLatLng(at).setRadius(Math.min(accuracy, 2000));
+}
+/** Asks for the position; `center`: always move the map there, else only while it still shows the start view. */
+function locate({ center = false, quiet = false } = {}) {
+  if (!navigator.geolocation) {
+    if (!quiet) alert('Standortbestimmung wird nicht unterstützt');
+    return;
+  }
+  locateBtn?.classList.add('busy');
+  navigator.geolocation.getCurrentPosition((pos) => {
+    locateBtn?.classList.remove('busy');
+    try { localStorage.setItem(LOCATE_KEY, 'ja'); } catch { /* private mode */ }
+    const { latitude: lat, longitude: lon, accuracy } = pos.coords;
+    showMe(lat, lon, accuracy);
+    if (center || atStart()) {
+      // As close as the position is precise: a GPS fix shows the paths around, a rough one the region.
+      map.setView([lat, lon], accuracy <= 100 ? 15 : accuracy <= 1000 ? 14 : accuracy <= 3000 ? 13 : 11);
+      viewTouched = true;
+      ownView = true; // the overview of all spots, loaded later, does not take the view back
+    }
+  }, (err) => {
+    locateBtn?.classList.remove('busy');
+    // Declined: not asked again by itself (the button still asks).
+    if (err.code === err.PERMISSION_DENIED) { try { localStorage.setItem(LOCATE_KEY, 'nein'); } catch { /* private mode */ } }
+    if (!quiet) alert(err.code === err.PERMISSION_DENIED ? 'Der Standort ist im Browser bzw. in der App nicht freigegeben.' : `Standort nicht verfügbar: ${err.message}`);
+  }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 });
+}
+let locateBtn = null;
+L.Control.Locate = L.Control.extend({
+  onAdd() {
+    const bar = L.DomUtil.create('div', 'leaflet-bar locate-control');
+    locateBtn = L.DomUtil.create('a', 'locate-btn', bar);
+    locateBtn.href = '#';
+    locateBtn.title = 'Mein Standort';
+    locateBtn.setAttribute('role', 'button');
+    locateBtn.setAttribute('aria-label', 'Karte auf meinen Standort setzen');
+    locateBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+    L.DomEvent.disableClickPropagation(bar);
+    L.DomEvent.on(locateBtn, 'click', (e) => { L.DomEvent.preventDefault(e); locate({ center: true }); });
+    return bar;
+  },
+});
+new L.Control.Locate({ position: 'bottomleft' }).addTo(map);
+(async function askOnFirstVisit() {
+  let asked = null;
+  try { asked = localStorage.getItem(LOCATE_KEY); } catch { /* private mode */ }
+  if (asked === 'nein' || !navigator.geolocation) return;
+  const perm = await navigator.permissions?.query({ name: 'geolocation' }).catch(() => null);
+  if (perm?.state === 'denied') return;
+  locate({ quiet: true });
+}());
+
 const pinKind = (spot) => {
   if (spot.tags.includes('neophyt')) return 'neo';
   if (spot.tags.some((t) => DAMAGE_TAGS.includes(t))) return 'damage';
@@ -299,7 +374,7 @@ async function loadSpots({ fit = false } = {}) {
   renderStats(!filter);
   renderStormBanner(spots);
   loadProtectedCells();
-  if (fit && state.spots.length) {
+  if (fit && state.spots.length && !(fit === 'start' && ownView)) {
     // Keep spots clear of the floating toolbar and (on wide screens) the side panel.
     const wide = window.matchMedia('(min-width: 861px)').matches;
     map.fitBounds(L.latLngBounds(state.spots.map((s) => [s.lat, s.lon])), {
@@ -1556,6 +1631,7 @@ async function stormNote(a, b, change, current) {
   // Links from push messages: ?spot=<id> opens a spot, ?filter=satellite shows the spots with early warnings.
   const openFromUrl = async (href) => {
     const q = new URL(href, location.href).searchParams;
+    if (q.has('spot') || q.has('filter')) viewTouched = true; // the link's view, not the own location
     if (q.get('filter') === 'satellite' || q.get('filter') === 'sturm') {
       $('tag-filter').value = q.get('filter') === 'sturm' ? '@sturmwarnung' : '@satellite';
       await loadSpots({ fit: true });
@@ -1567,6 +1643,6 @@ async function stormNote(a, b, change, current) {
   navigator.serviceWorker?.addEventListener('message', (e) => {
     if (e.data?.type === 'myforrest-open') openFromUrl(e.data.url);
   });
-  await loadSpots({ fit: true });
+  await loadSpots({ fit: 'start' });
   await openFromUrl(location.href);
 })();

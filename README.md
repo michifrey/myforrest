@@ -61,6 +61,12 @@ Marker melden:
 Beim Überfahren eines Markers fasst ein Tooltip alles zusammen: Veränderung, Wetter, Sturm, Satellit,
 Baumarten und Blickrichtung. Schraffierte Quadrate stehen für geschützte Funde (Abschnitt 11).
 
+<p align="center"><img src="docs/screenshots/standort.jpg" width="640" alt="Karte am eigenen Standort mit blauem Punkt und dem Knopf Mein Standort"></p>
+
+Beim Öffnen fragt der Browser bzw. die Android-App nach dem **Standort**. Mit ihm beginnt die Karte dort, wo
+man ist (blauer Punkt), statt mit der Übersicht aller Spots; der Knopf *Mein Standort* unten links holt ihn
+jederzeit wieder. Der Standort bleibt im Browser.
+
 <p>
   <img src="docs/screenshots/spot-aufteilen-vorher.jpg" width="49%" alt="Spot mit Fotos in verschiedene Richtungen und dem Angebot, ihn aufzuteilen">
   <img src="docs/screenshots/spot-aufteilen-nachher.jpg" width="49%" alt="Nach dem Aufteilen: Spot nach Osten mit Link zum Spot nach Westen">

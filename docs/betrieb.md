@@ -31,6 +31,9 @@
   mit mindestens 3 Touren von 2 Personen, ohne Zeiten, ohne Namen und ohne die ersten und letzten 200 m. Für die
   Eichung fragt der Server Open-Meteo nach der Lufttemperatur am Tag der Tour, für einen auf ~2 km gerundeten
   Rasterpunkt (Tabelle `cool_checks`).
+- Den eigenen Standort fragt die Karte im Browser ab und nutzt ihn nur dort, um die Karte zu setzen; er geht
+  nicht an den Server. Ob jemand abgelehnt hat, merkt sich der Browser (`localStorage`, Schlüssel
+  `myforrest.standort`).
 - Ausgeblendete Fotos werden nicht mehr ausgeliefert, können aber noch bis zu 7 Tage im Browser-Cache von
   Personen liegen, die sie vorher gesehen haben.
 - Kartendaten © OpenStreetMap-Mitwirkende. Bei stärkerer Nutzung braucht es einen eigenen
