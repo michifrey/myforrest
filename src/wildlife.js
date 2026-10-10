@@ -2,10 +2,16 @@
 
 /**
  * Wildlife rest areas (Wildruhezonen) for routing: the wege magnet routes
- * around them during their protection period. The areas come from a GeoJSON
- * file the operator provides (WILDRUHE_GEOJSON), e.g. the federal dataset
- * "Wild- und Vogelschutzgebiete / Wildruhezonen" of BAFU from geo.admin.ch,
- * in WGS84 or LV95 (EPSG:2056). OpenStreetMap does not hold them reliably.
+ * around them during their protection period. OpenStreetMap does not hold
+ * them reliably. They come from
+ *   - a GeoJSON file the operator provides (WILDRUHE_GEOJSON), e.g. the
+ *     federal dataset of BAFU from geo.admin.ch, in WGS84 or LV95 (EPSG:2056);
+ *   - and/or straight from geo.admin.ch (WILDRUHE_LAYER, the layer id, e.g.
+ *     ch.bafu.wrz-wildruhezonen_portal): the identify service of api3.geo.admin.ch
+ *     (WILDRUHE_API) is asked per cell of CELL degrees around a route or map
+ *     section, and each cell is kept and asked again after WILDRUHE_REFRESH_DAYS
+ *     (default 7), so changes to the zones arrive without anyone updating a file.
+ *     When the service fails, the last answer stays in use.
  *
  * Protection period: a text like "20.12.–30.04." in any property of an area
  * (the federal data names it in the regulations), else WILDRUHE_SEASON
@@ -16,9 +22,13 @@
  */
 
 const fs = require('node:fs');
-const { lv95ToWgs84 } = require('./lv95');
+const { lv95ToWgs84, wgs84ToLv95 } = require('./lv95');
 
 const MAX_ZONES = 40;
+const CELL = 0.2; // ° (about 22 × 15 km): zones are fetched and kept per cell
+const MAX_FETCH_CELLS = 12; // a larger section (zoomed-out map) uses only the cells already kept
+const PAGE = 200;
+const DEFAULT_API = 'https://api3.geo.admin.ch/rest/services/api/MapServer/identify';
 const MAX_VERTICES = 200;
 const NEAR_M = 3000; // zones this close to the route's box are sent along
 
@@ -88,9 +98,9 @@ function insideRing(ring, lat, lon) {
   return inside;
 }
 
-/** Zones from GeoJSON text: [{ name, season, rings: [[lon, lat]…] (outer rings), bbox }]. */
+/** Zones from GeoJSON (text or object): [{ name, season, rings: [[lon, lat]…] (outer rings), bbox }]. */
 function parseZones(text, { defaultSeason = '12-20/04-30' } = {}) {
-  const doc = JSON.parse(text);
+  const doc = typeof text === 'string' ? JSON.parse(text) : text;
   const crs = JSON.stringify(doc.crs || '');
   const features = doc.type === 'FeatureCollection' ? doc.features : [doc];
   const fallback = parseSeason(defaultSeason);
@@ -102,7 +112,7 @@ function parseZones(text, { defaultSeason = '12-20/04-30' } = {}) {
     // LV95 when declared or when the numbers are metres.
     const lv95 = /2056/.test(crs) || Math.abs(polys[0][0][0][0]) > 1000;
     const rings = polys.map((p) => p[0].map(([x, y]) => (lv95 ? lv95ToWgs84(x, y).reverse() : [x, y])));
-    const props = f.properties || {};
+    const props = f.properties || f.attributes || {};
     const name = String(props.name || props.Name || props.wrz_name || props.WRZ_Name || props.bezeichnung || props.Bezeichnung || 'Wildruhezone');
     // The first property naming a period ("20.12.–30.04.") or "ganzjährig"; else the default.
     let season = fallback;
@@ -115,18 +125,28 @@ function parseZones(text, { defaultSeason = '12-20/04-30' } = {}) {
     const all = rings.flat();
     const lons = all.map((p) => p[0]);
     const lats = all.map((p) => p[1]);
-    zones.push({ name, season, rings, bbox: [Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)] });
+    zones.push({ id: f.featureId ?? f.id ?? null, name, season, rings, bbox: [Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)] });
   }
   return zones;
 }
 
+/** Answers of the identify service (`results`, GeoJSON features) → a FeatureCollection. */
+function identifyToGeojson(body) {
+  return { type: 'FeatureCollection', features: (body?.results || []).filter((r) => r.geometry?.type) };
+}
+
 /**
- * Wildlife rest areas from a file (read once, again when it changes).
- * near(points, date) → { zones (in season, near the route), inside (names of zones containing a waypoint) }.
+ * Wildlife rest areas from a file (read once, again when it changes) and/or from geo.admin.ch (per cell, kept in
+ * the database). near(points, date) → { zones (in season, near the route), inside (names of zones containing a
+ * waypoint) }; within(box, date) → zones touching a box. Both are async: cells not yet kept are fetched first.
  */
-function createWildlife({ file = process.env.WILDRUHE_GEOJSON || '', season = process.env.WILDRUHE_SEASON || '12-20/04-30' } = {}) {
+function createWildlife({
+  file = process.env.WILDRUHE_GEOJSON || '', season = process.env.WILDRUHE_SEASON || '12-20/04-30',
+  layer = process.env.WILDRUHE_LAYER || '', api = process.env.WILDRUHE_API || DEFAULT_API,
+  refreshDays = Number(process.env.WILDRUHE_REFRESH_DAYS || 7), db = null, fetchImpl = fetch, now = () => Date.now(),
+} = {}) {
   let cache = { mtime: -1, zones: [] };
-  function zones() {
+  function fileZones() {
     if (!file) return [];
     try {
       const { mtimeMs } = fs.statSync(file);
@@ -138,16 +158,95 @@ function createWildlife({ file = process.env.WILDRUHE_GEOJSON || '', season = pr
     return cache.zones;
   }
 
-  /** Zones in their protection period that touch a box [west, south, east, north]. */
-  const within = (box, date = new Date()) => zones()
-    .filter((z) => inSeason(z.season, date) && z.bbox[0] <= box[2] && z.bbox[2] >= box[0] && z.bbox[1] <= box[3] && z.bbox[3] >= box[1]);
+  /* ---------- geo.admin.ch, per cell ---------- */
 
-  function near(points, date = new Date()) {
+  const remote = Boolean(layer && api);
+  const memory = new Map(); // cell → { fetchedAt, zones }
+  if (remote && db) {
+    db.exec('CREATE TABLE IF NOT EXISTS wildlife_cells (cell TEXT PRIMARY KEY, layer TEXT NOT NULL, fetched_at INTEGER NOT NULL, json TEXT NOT NULL)');
+  }
+  const getCell = remote && db ? db.prepare('SELECT fetched_at, json FROM wildlife_cells WHERE cell = ? AND layer = ?') : null;
+  const putCell = remote && db ? db.prepare('INSERT OR REPLACE INTO wildlife_cells (cell, layer, fetched_at, json) VALUES (?, ?, ?, ?)') : null;
+  const pending = new Map();
+
+  function kept(key) {
+    if (memory.has(key)) return memory.get(key);
+    const row = getCell?.get(key, layer);
+    if (!row) return null;
+    const entry = { fetchedAt: row.fetched_at, zones: parseZones(row.json, { defaultSeason: season }) };
+    memory.set(key, entry);
+    return entry;
+  }
+
+  /** All zones of one cell from the identify service (paged), as GeoJSON text. */
+  async function fetchCell(cx, cy) {
+    const corners = [[cy * CELL, cx * CELL], [(cy + 1) * CELL, (cx + 1) * CELL], [cy * CELL, (cx + 1) * CELL], [(cy + 1) * CELL, cx * CELL]]
+      .map(([lat, lon]) => wgs84ToLv95(lat, lon));
+    const es = corners.map((c) => c[0]);
+    const ns = corners.map((c) => c[1]);
+    const box = [Math.min(...es), Math.min(...ns), Math.max(...es), Math.max(...ns)].map((v) => Math.round(v)).join(',');
+    const features = [];
+    for (let offset = 0; offset < 5 * PAGE; offset += PAGE) {
+      const q = new URLSearchParams({
+        geometry: box, geometryType: 'esriGeometryEnvelope', layers: `all:${layer}`, sr: '2056', tolerance: '0',
+        mapExtent: box, imageDisplay: '1000,1000,96', returnGeometry: 'true', geometryFormat: 'geojson', limit: String(PAGE), offset: String(offset),
+      });
+      const res = await fetchImpl(`${api}?${q}`, { signal: AbortSignal.timeout(20000), headers: { accept: 'application/json' } });
+      if (!res.ok) throw new Error(`Wildruhezonen (geo.admin.ch): HTTP ${res.status}`);
+      const page = identifyToGeojson(await res.json()).features;
+      features.push(...page);
+      if (page.length < PAGE) break;
+    }
+    return JSON.stringify({ type: 'FeatureCollection', features });
+  }
+
+  /** The zones of a cell: kept ones, fetched again when older than refreshDays (the old ones stay on failure). */
+  async function cell(cx, cy, { fetchMissing = true } = {}) {
+    const key = `${cx}:${cy}`;
+    const have = kept(key);
+    const stale = !have || now() - have.fetchedAt > refreshDays * 86400000;
+    if (!stale || !fetchMissing) return have?.zones || [];
+    if (!pending.has(key)) {
+      pending.set(key, fetchCell(cx, cy).then((json) => {
+        const entry = { fetchedAt: now(), zones: parseZones(json, { defaultSeason: season }) };
+        memory.set(key, entry);
+        putCell?.run(key, layer, entry.fetchedAt, json);
+        return entry.zones;
+      }).catch((err) => {
+        console.error(err.message);
+        return have?.zones || [];
+      }).finally(() => pending.delete(key)));
+    }
+    return pending.get(key);
+  }
+
+  /** Zones from geo.admin.ch touching a box (without duplicates of zones spanning several cells). */
+  async function remoteZones(box) {
+    if (!remote) return [];
+    const cells = [];
+    for (let cx = Math.floor(box[0] / CELL); cx <= Math.floor(box[2] / CELL); cx++) {
+      for (let cy = Math.floor(box[1] / CELL); cy <= Math.floor(box[3] / CELL); cy++) cells.push([cx, cy]);
+    }
+    const fetchMissing = cells.length <= MAX_FETCH_CELLS;
+    const seen = new Map();
+    for (const zones of await Promise.all(cells.map(([x, y]) => cell(x, y, { fetchMissing })))) {
+      for (const z of zones) seen.set(z.id ?? `${z.name}:${z.bbox.join(',')}`, z);
+    }
+    return [...seen.values()];
+  }
+
+  /** Zones in their protection period that touch a box [west, south, east, north]. */
+  async function within(box, date = new Date()) {
+    const all = [...fileZones(), ...await remoteZones(box)];
+    return all.filter((z) => inSeason(z.season, date) && z.bbox[0] <= box[2] && z.bbox[2] >= box[0] && z.bbox[1] <= box[3] && z.bbox[3] >= box[1]);
+  }
+
+  async function near(points, date = new Date()) {
     const lats = points.map((p) => p.lat);
     const lons = points.map((p) => p.lon);
     const dLat = NEAR_M / 111320;
     const dLon = NEAR_M / (111320 * Math.cos(toRad(lats[0])));
-    const hits = within([Math.min(...lons) - dLon, Math.min(...lats) - dLat, Math.max(...lons) + dLon, Math.max(...lats) + dLat], date);
+    const hits = await within([Math.min(...lons) - dLon, Math.min(...lats) - dLat, Math.max(...lons) + dLon, Math.max(...lats) + dLat], date);
     // A waypoint inside a zone: routing around it is impossible, so it is not sent (and named).
     const inside = hits.filter((z) => points.some((p) => z.rings.some((r) => insideRing(r, p.lat, p.lon))));
     return { zones: hits.filter((z) => !inside.includes(z)).slice(0, MAX_ZONES), inside: inside.map((z) => z.name) };
@@ -162,7 +261,7 @@ function createWildlife({ file = process.env.WILDRUHE_GEOJSON || '', season = pr
     }).join('|');
   }
 
-  return { zones, within, near, polygonsParam, enabled: () => Boolean(file) };
+  return { zones: fileZones, within, near, polygonsParam, enabled: () => Boolean(file) || remote, source: remote ? (file ? 'beide' : 'geoadmin') : (file ? 'datei' : null) };
 }
 
-module.exports = { createWildlife, parseZones, parseSeason, inSeason, simplify, insideRing };
+module.exports = { createWildlife, parseZones, parseSeason, inSeason, simplify, insideRing, identifyToGeojson, CELL };

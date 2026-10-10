@@ -20,7 +20,9 @@ services:
       ROUTER_PROFILE: myforrest-wald
       # nginx (and a TLS proxy on the host) in front, on private addresses: rate limits per client from X-Forwarded-For.
       TRUST_PROXY: ${TRUST_PROXY:-uniquelocal}
-      # Wildlife rest areas as GeoJSON (BAFU, geo.admin.ch) in the data volume: routed around in their protection period.
+      # Wildlife rest areas, routed around in their protection period: straight from geo.admin.ch (BAFU layer, kept per
+      # cell and asked again weekly) and/or as a GeoJSON file in the data volume.
+      WILDRUHE_LAYER: ${WILDRUHE_LAYER-ch.bafu.wrz-wildruhezonen_portal}
       WILDRUHE_GEOJSON: ${WILDRUHE_GEOJSON:-}
     volumes:
       - myforrest-data:/app/data

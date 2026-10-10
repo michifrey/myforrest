@@ -14,9 +14,8 @@ mit echten Dateien und Diensten; das steht jeweils als offener Punkt dabei.
   (z. B. GPS-Spur von Garmin- und Nextbase-Kameras, verschlüsselte Viofo-Daten).
 
 - **Durchgehen ausbauen**: eigene Reihen zu Mapillary hochladen (OAuth bei Mapillary, ohne geschützte Funde);
-  Wege auch von Mapillary-Bildern aus; Schritte mit Tiefe auch zwischen Panoramen (über die Drehung der Kugel)
-  und mit echter Parallaxe (Tiefenschätzung statt einer Ebene); das Wegnetz mit einer echten Overpass-Instanz im
-  Betrieb prüfen.
+  Schritte mit echter Parallaxe (Tiefenschätzung statt einer Ebene); das Wegnetz mit einer echten Overpass-Instanz
+  im Betrieb prüfen.
 - **360°-Rohdateien**: Insta360-`.insv` und GoPro-MAX-`.360` direkt lesen (Fischaugen stitchen, GPS aus dem
   Datei-Trailer). Braucht Beispieldateien der Kameras und deren Objektivdaten; bis dahin über den Export
   als 360°-MP4.
@@ -24,8 +23,9 @@ mit echten Dateien und Diensten; das steht jeweils als offener Punkt dabei.
   kantonalen Listen direkt von den Fachstellen bzw. Info Flora beziehen (sobald es dafür eine offene
   Schnittstelle gibt).
 - **Eigener Routing-Server**: den ersten Lauf des Image-Workflows und echte Segmente von brouter.de prüfen;
-  die Wildruhezonen regelmässig selbst von geo.admin.ch laden statt aus einer Datei; Sperrungen der Forstdienste
-  aus ihren eigenen Systemen übernehmen (z. B. Holzschlag-Planung der Kantone).
+  das Laden der Wildruhezonen von geo.admin.ch gegen den echten Dienst prüfen (Name der Ebene, Attribute der
+  Schutzzeit); Sperrungen der Forstdienste aus ihren eigenen Systemen übernehmen (z. B. Holzschlag-Planung der
+  Kantone).
 - **Touren**: Abgleich mit Strava/Komoot per OAuth (braucht dort registrierte Apps); die Karte kühler Abschnitte
   mit Messnetzen in der Nähe vergleichen (z. B. Stadtklima-Messnetze), sobald es genug echte Touren gibt.
 
@@ -97,8 +97,9 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 - Durchgehen wie Street View: Pfeile entlang der Aufnahme und zu Spots in der Nähe, Blickrichtung bleibt beim Schritt
 - Startseite mit wechselnden Landschaften (Wald, Gletscher, Gebirge, Wüste)
 - Weiche Übergänge im Durchgehen: zum Weg drehen, Zoom in Gehrichtung mit Überblendung
-- Durchgehen entlang der Wege aus OpenStreetMap (Overpass), Schritte mit Tiefe zwischen flachen Fotos (Morph über
-  die gemeinsamen Bildmerkmale)
+- Durchgehen entlang der Wege aus OpenStreetMap (Overpass), auch von Mapillary-Bildern aus; Schritte mit Tiefe
+  zwischen flachen Fotos (Morph über die gemeinsamen Bildmerkmale) und zwischen Panoramen (Drehung der Kugel), auch
+  beim Wechsel der Zeit
 - Mapillary-Bilder im Durchgehen und auf der Karte, wo es keine eigenen gibt (über den Server, mit Urheber und Lizenz)
 
 ### Landschaften und Gletscher
@@ -136,6 +137,7 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 
 - Eigener Routing-Server: Waldprofil (Forststrassen und Rückegassen zuerst), Wildruhezonen in der Schutzzeit
   umgehen, BRouter-Image per GitHub-Workflow in der Registry
+- Wildruhezonen direkt von geo.admin.ch, pro Feld gespeichert und wöchentlich neu angefragt
 - Sperrungen bei Holzerei: automatisch aus Holzschlag-Fotos, von Hand durch den Forstdienst; der Wege-Magnet
   führt darum herum
 - Touren: FIT-Dateien direkt lesen, mit Sensorwerten und Developer-Feldern (z. B. Laufleistung), auch aus GPX

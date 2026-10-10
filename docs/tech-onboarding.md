@@ -222,6 +222,7 @@ ohne die jeweilige Funktion weiter.
 | `earth-search.aws.element84.com`, `sentinel-cogs.s3.us-west-2.amazonaws.com` | Sentinel-2 (NDVI/NDMI ab 2017), Frühwarnung | pro Spot, täglich (`SATELLITE_WATCH_HOURS`); ~4,4 MB pro Szene | `SENTINEL_STAC_URL=` |
 | `planetarycomputer.microsoft.com`, `landsateuwest.blob.core.windows.net` | Landsat vor 2017 | pro Spot | `LANDSAT_STAC_URL=` |
 | `api3.geo.admin.ch` | Kanton eines Spots (Schutzlisten) | einmal pro Spot | `CANTON_LOOKUP_URL=` |
+| `api3.geo.admin.ch` | Wildruhezonen (`WILDRUHE_LAYER`) | pro Feld von rund 22 × 15 km, wöchentlich | ohne `WILDRUHE_LAYER` aus |
 | `brouter.de` | Wege-Magnet (Standard) bzw. Download der Routing-Segmente für den eigenen BRouter | beim Zeichnen von Touren / alle 30 Tage | `ROUTER_URL=` oder eigener BRouter |
 | `my-api.plantnet.org` | Pflanzenbestimmung | auf Knopfdruck | ohne `PLANTNET_API_KEY` aus |
 | `opendata.dwd.de` | Phänologie-Referenzdaten | nur bei `POST /api/phenoref/sync` | Dateien manuell importieren |

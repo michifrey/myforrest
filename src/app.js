@@ -106,6 +106,7 @@ function createApp({
   // Mapillary pictures in the walk-through and on the map (src/mapillary.js); off without a token.
   mapillaryToken = process.env.MAPILLARY_TOKEN || '', mapillaryFetch = fetch,
   waynetUrl = process.env.WEGNETZ_URL || '', waynetFetch = fetch,
+  wildlifeLayer = undefined, wildlifeFetch = fetch,
   // Reverse proxies whose X-Forwarded-For counts (Express 'trust proxy'), so rate limits see the client's
   // address instead of the proxy's. Off by default: otherwise anyone could fake the header.
   trustProxy = parseTrustProxy(process.env.TRUST_PROXY),
@@ -138,8 +139,8 @@ function createApp({
     db, requireLogin, requireVerifiedEmail, adminEmail, rateLimits, oauth, mailer, publicUrl: process.env.PUBLIC_URL || null,
   };
   const accounts = registerAccounts(app, accountsCtx);
-  // Wildlife rest areas (WILDRUHE_GEOJSON): the path magnet routes around them in their protection period.
-  const wildlife = createWildlife();
+  // Wildlife rest areas (WILDRUHE_GEOJSON, WILDRUHE_LAYER): the path magnet routes around them in their protection period.
+  const wildlife = createWildlife({ db, fetchImpl: wildlifeFetch, ...(wildlifeLayer !== undefined ? { layer: wildlifeLayer } : {}) });
   // Glacier inventories (GLETSCHER_GEOJSON): glacier spots, the outlines on the map, where the ice was.
   const glaciers = createGlaciers({ files: glacierFiles });
   const mapillary = createMapillary({ db, dataDir, token: mapillaryToken, fetchImpl: mapillaryFetch });
@@ -1242,10 +1243,17 @@ function createApp({
   require('./routes/profile')(app, { db, thumbs, accounts, uploadDir, rateLimits });
   require('./routes/protection')(app, { db, accounts, sensitiveLists, cantons, reprotect });
   /**
-   * How flat photo `a` lies in flat photo `b` (normalised homography a → b) for a walk step with depth:
-   * from the alignment when both are aligned in the same spot's frame, else by matching their features.
+   * How photo `a` lies in photo `b` for a walk step with depth: between flat photos a normalised homography
+   * a → b, between panoramas the rotation of the sphere taking a's directions onto b's. From the alignment when
+   * both are aligned in the same spot's frame, else by matching their features.
    */
   async function photoTransition(a, b) {
+    if (a.panorama && b.panorama) {
+      const frame = a.spot_id === b.spot_id && a.align_h && b.align_h;
+      if (frame) return { h: sphere.multiply(sphere.transpose(JSON.parse(b.align_h)), JSON.parse(a.align_h)).map((v) => Math.round(v * 1e9) / 1e9), inliers: null };
+      const r = await alignPanoramas(path.join(uploadDir, a.file), path.join(uploadDir, b.file), { getFeatures: cachedFeatures });
+      return r ? { h: r.r, inliers: r.inliers } : null;
+    }
     const back = a.spot_id === b.spot_id && a.align_h && b.align_h ? invert(JSON.parse(b.align_h)) : null;
     if (back) return { h: multiply(back, JSON.parse(a.align_h)).map((v) => Math.round(v * 1e9) / 1e9), inliers: null };
     return alignImages(path.join(uploadDir, a.file), path.join(uploadDir, b.file), { getFeatures: cachedFeatures });

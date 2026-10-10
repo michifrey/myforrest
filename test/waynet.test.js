@@ -152,3 +152,55 @@ test('walk API: how one flat photo lies in another, for a step with depth', asyn
     assert.equal((await fetch(`${base}/api/walk/transition/${a.id}/9999`)).status, 404);
   });
 });
+
+test('walk API: between two panoramas the rotation of the sphere, so one looks at the same scenery', async () => {
+  const sphere = require('../src/sphere');
+  const { alignPanoramas } = require('../src/align');
+  const [PW, PH] = [2048, 1024];
+  const { data } = await sharp(path.join(__dirname, 'fixtures', 'align-a.jpg')).resize(PW, PH, { fit: 'fill' }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const xmp = '<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?><x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description rdf:about="" xmlns:GPano="http://ns.google.com/photos/1.0/panorama/" GPano:ProjectionType="equirectangular"/></rdf:RDF></x:xmpmeta><?xpacket end="w"?>';
+  const jpeg = (raw) => sharp(raw, { raw: { width: PW, height: PH, channels: 3 } }).jpeg({ quality: 92 }).withXmp(xmp).toBuffer();
+  const bufA = await jpeg(data);
+  const bufB = await jpeg(sphere.remap({ data, width: PW, height: PH }, sphere.fromAngles(70, 3, 0), PW, PH));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'myforrest-wnp-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'a.jpg'), bufA);
+    fs.writeFileSync(path.join(dir, 'b.jpg'), bufB);
+    const direct = await alignPanoramas(path.join(dir, 'a.jpg'), path.join(dir, 'b.jpg'));
+    assert.ok(direct, 'the two panoramas match');
+    await withServer({}, async (base) => {
+      const blob = (buf) => new Blob([buf], { type: 'image/jpeg' });
+      const a = await upload(base, blob(bufA), { ...at(0, 0), takenAt: '2025-05-01T08:00:00Z' });
+      const b = await upload(base, blob(bufB), { ...at(0, 40), takenAt: '2026-05-01T08:00:00Z' });
+      assert.equal(a.panorama, true);
+      assert.notEqual(a.spotId, b.spotId);
+      const r = await (await fetch(`${base}/api/walk/transition/${a.id}/${b.id}`)).json();
+      assert.ok(r.r, 'rotation found');
+      assert.equal(r.h, undefined);
+      r.r.forEach((v, i) => assert.ok(Math.abs(v - direct.r[i]) < 1e-6, `r[${i}]`));
+      // Between a panorama and a flat photo: nothing.
+      const flat = await upload(base, fixture('align-a.jpg'), { ...at(0, 80), takenAt: '2026-05-02T08:00:00Z' });
+      assert.deepEqual(await (await fetch(`${base}/api/walk/transition/${a.id}/${flat.id}`)).json(), { r: null, inliers: null });
+    });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('walk API: from a Mapillary picture, arrows along the paths to own pictures', async () => {
+  const item = { id: '5001', computed_geometry: { type: 'Point', coordinates: [at(0, 3).lon, at(0, 3).lat] }, computed_compass_angle: 90, captured_at: Date.parse('2024-06-01T10:00:00Z'), is_pano: true, sequence: 'seqX' };
+  const mapillaryFetch = async (url) => {
+    const u = new URL(url);
+    if (u.pathname === '/images') return Response.json({ data: [item] });
+    if (u.pathname === '/5001') return Response.json(item);
+    return new Response('{}', { status: 404 });
+  };
+  await withServer({ waynetUrl: 'https://overpass.example/api/interpreter', waynetFetch: async () => Response.json(OVERPASS), mapillaryToken: 'MLY|test', mapillaryFetch }, async (base) => {
+    const branch = await upload(base, await plain('#6b4a3a'), { ...at(41, 110), takenAt: '2026-05-01T08:05:00Z' });
+    const w = await (await fetch(`${base}/api/walk/mapillary/5001`)).json();
+    const pfad = w.links.filter((l) => l.kind === 'pfad');
+    assert.deepEqual(pfad.map((l) => l.id), [branch.id]);
+    assert.ok(Math.abs(pfad[0].bearing - 90) < 2 && Math.abs(pfad[0].distanceM - 150) <= 3, JSON.stringify(pfad[0]));
+    assert.equal(w.paths.length, 2);
+  });
+});

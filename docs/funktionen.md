@@ -259,7 +259,7 @@ Das Wegnetz kommt pro Feld von rund 1,1 × 0,75 km und wird 30 Tage zwischengesp
 nur der Ausschnitt des Felds, nichts über die Bilder oder wer sie anschaut. Wege, die man zu Fuss nicht gehen
 darf (Autobahnen, `access=private`, `foot=no`), fehlen. Ist die Overpass-API nicht erreichbar, bleiben die
 anderen Pfeile. Grenzen: Das Wegnetz ist so gut wie OpenStreetMap am Ort; Trampelpfade, die dort fehlen, kennt
-die App nicht. Wege gehen von eigenen Bildern aus, nicht von Mapillary-Bildern.
+die App nicht. Auch von einem Mapillary-Bild aus führen Pfeile entlang der Wege zu eigenen Bildern.
 
 **Weiche Übergänge**: Bei einem 360°-Bild dreht sich der Blick zuerst zum gewählten Pfeil (bis 0,6 s,
 kürzer bei kleinen Drehungen). Dann bleibt das bisherige Bild als Standbild stehen, bis das nächste geladen ist,
@@ -277,8 +277,17 @@ Transformation (eine Homographie) rechnet der Server mit derselben Bildregistrie
 deren Ausrichtung. Er rechnet sie einmal pro Paar, je eine nach der anderen, und speichert sie. Die Ansicht
 fragt sie für die nächsten Schritte schon im Voraus an. Fehlt sie nach 1,2 s, ist sie unplausibel (Bildmitte
 ausserhalb des Bildschirms, Massstab unter ¼ oder über 4) oder passen die Bilder nicht zusammen, gibt es den
-gewohnten Zoom. Grenzen: Eine Homographie beschreibt eine Ebene; Vordergrund und Hintergrund bewegen sich
-deshalb gleich, echte Parallaxe gibt es nicht. Panoramen und Mapillary-Bilder bekommen den Zoom.
+gewohnten Zoom.
+
+Zwischen zwei **Panoramen** rechnet der Server statt einer Homographie die **Drehung der Kugel**, die das eine
+Panorama ins andere überführt (dieselbe wie bei der Ausrichtung von Panoramen). Nach dem Schritt schaut man damit
+auf dieselbe Landschaft wie vorher, auch wenn die Kameras unterschiedlich gehalten wurden oder eine Blickrichtung
+fehlt; ohne Drehung gilt wie bisher die gespeicherte Blickrichtung. Dasselbe gilt beim Wechsel der *Zeit*:
+ausgerichtete Fotos desselben Spots gehen ineinander über, Panoramen bleiben auf derselben Stelle.
+
+Grenzen: Eine Homographie beschreibt eine Ebene; Vordergrund und Hintergrund bewegen sich deshalb gleich, echte
+Parallaxe gibt es nicht. Die Drehung der Kugel stimmt für ferne Landschaft; was nah ist, liegt nach einem Schritt
+von 40 m natürlich anders. Mapillary-Bilder bekommen den Zoom.
 
 Beim Schritt bleibt die Blickrichtung erhalten: Wer nach Osten schaut und weitergeht, schaut im nächsten
 Panorama wieder nach Osten. Die Richtung der Bildmitte kommt aus dem Video bzw. aus `GPano:PoseHeadingDegrees`
@@ -1125,10 +1134,13 @@ wird.
 - **Eigener Routing-Server mit Waldprofil**: Mit dem eigenen BRouter ([`deploy/brouter`](https://github.com/michifrey/myforrest/blob/main/deploy/brouter/README.md))
   gilt das Profil `myforrest-wald`: Forststrassen zuerst, Rückegassen fast gleich gut, dann Pfade; Strassen
   mit Verkehr werden umgangen, Autobahnen und schwierige Bergwege (ab SAC T5) nie genommen.
-- **Wildruhezonen**: Ist eine Datei mit den Zonen hinterlegt (`WILDRUHE_GEOJSON`, z. B. der BAFU-Datensatz von
-  geo.admin.ch), führt der Magnet während der Schutzzeit (aus dem Text der Zone, sonst 20.12.–30.4.) um sie
-  herum, und die Karte zeigt sie beim Planen gestrichelt (ab Zoom 11, mit Name und Schutzzeit). Das Panel
-  sagt, um welche Zonen die Route geführt wurde; liegt ein Wegpunkt in einer Zone, weist es darauf hin.
+- **Wildruhezonen**: Lädt die App die Zonen direkt von geo.admin.ch (`WILDRUHE_LAYER`, die Ebene des BAFU) oder
+  ist eine Datei hinterlegt (`WILDRUHE_GEOJSON`), führt der Magnet während der Schutzzeit (aus dem Text der Zone,
+  sonst 20.12.–30.4.) um sie herum. Von geo.admin.ch fragt die App die Zonen pro Feld von rund 22 × 15 km rund um
+  eine Route oder den Kartenausschnitt an, speichert sie und fragt nach einer Woche wieder (`WILDRUHE_REFRESH_DAYS`).
+  So kommen neue oder geänderte Zonen an, ohne dass jemand eine Datei nachführt; fällt der Dienst aus, bleiben die
+  gespeicherten Zonen. Auf der Karte lädt sie ab Zoom 12 nach, darunter zeigt sie die schon gespeicherten Felder.
+  Die Karte zeigt die Zonen beim Planen gestrichelt (ab Zoom 11, mit Name und Schutzzeit). Das Panel sagt, um welche Zonen die Route geführt wurde; liegt ein Wegpunkt in einer Zone, weist es darauf hin.
 
 ![Wildruhezone beim Planen einer Route](screenshots/wildruhezonen.jpg)
 
