@@ -34,6 +34,8 @@ configMapGenerator:
       - ROUTER_PROFILE=myforrest-wald
       # nginx in front (private pod addresses): rate limits per client from X-Forwarded-For.
       - TRUST_PROXY=uniquelocal
+      # Wildlife rest areas straight from geo.admin.ch (BAFU layer), kept per cell and asked again weekly.
+      - WILDRUHE_LAYER=ch.bafu.wrz-wildruhezonen_portal
 images:
   # Built locally with podman and loaded into the cluster (start.sh); never pulled.
   - name: myforrest

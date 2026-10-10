@@ -106,6 +106,7 @@ function createApp({
   // Mapillary pictures in the walk-through and on the map (src/mapillary.js); off without a token.
   mapillaryToken = process.env.MAPILLARY_TOKEN || '', mapillaryFetch = fetch,
   waynetUrl = process.env.WEGNETZ_URL || '', waynetFetch = fetch,
+  wildlifeLayer = undefined, wildlifeFetch = fetch,
   // Reverse proxies whose X-Forwarded-For counts (Express 'trust proxy'), so rate limits see the client's
   // address instead of the proxy's. Off by default: otherwise anyone could fake the header.
   trustProxy = parseTrustProxy(process.env.TRUST_PROXY),
@@ -138,8 +139,8 @@ function createApp({
     db, requireLogin, requireVerifiedEmail, adminEmail, rateLimits, oauth, mailer, publicUrl: process.env.PUBLIC_URL || null,
   };
   const accounts = registerAccounts(app, accountsCtx);
-  // Wildlife rest areas (WILDRUHE_GEOJSON): the path magnet routes around them in their protection period.
-  const wildlife = createWildlife();
+  // Wildlife rest areas (WILDRUHE_GEOJSON, WILDRUHE_LAYER): the path magnet routes around them in their protection period.
+  const wildlife = createWildlife({ db, fetchImpl: wildlifeFetch, ...(wildlifeLayer !== undefined ? { layer: wildlifeLayer } : {}) });
   // Glacier inventories (GLETSCHER_GEOJSON): glacier spots, the outlines on the map, where the ice was.
   const glaciers = createGlaciers({ files: glacierFiles });
   const mapillary = createMapillary({ db, dataDir, token: mapillaryToken, fetchImpl: mapillaryFetch });

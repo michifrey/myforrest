@@ -258,7 +258,8 @@ FIT-, GPX- und TCX-Dateien fasst das Panel auch Puls, Leistung, Schrittfrequenz,
 von Zusatzsensoren zusammen; das Profil zeigt sie auch entlang der Strecke und färbt die Route danach ein, etwa
 wo es im Wald kühler war (nur für einen selbst sichtbar). Gelbe Kilometer-Marken zeigen den Verlauf, jede Route geht auch als GPX
 wieder hinaus. Mit dem eigenen Routing-Server bevorzugt der Magnet Forststrassen und Rückegassen und führt
-während der Schutzzeit um **Wildruhezonen** herum, die die Karte beim Planen zeigt, ebenso um **Holzerei**: Ein
+während der Schutzzeit um **Wildruhezonen** herum (direkt von geo.admin.ch, wöchentlich aktuell), die die Karte
+beim Planen zeigt, ebenso um **Holzerei**: Ein
 Foto mit *Holzschlag* sperrt die Stelle sechs Wochen, der Forstdienst sperrt Wege mit Enddatum. Mit Konto lassen sich Touren speichern und veröffentlichen; andere sehen eine öffentliche
 Tour ohne Zeiten und ohne die ersten und letzten 200 m. Über eine Tour mit Zeitstempeln lassen sich im
 Upload auch Fotos ohne GPS verorten.

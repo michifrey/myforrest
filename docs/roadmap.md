@@ -23,8 +23,9 @@ mit echten Dateien und Diensten; das steht jeweils als offener Punkt dabei.
   kantonalen Listen direkt von den Fachstellen bzw. Info Flora beziehen (sobald es dafür eine offene
   Schnittstelle gibt).
 - **Eigener Routing-Server**: den ersten Lauf des Image-Workflows und echte Segmente von brouter.de prüfen;
-  die Wildruhezonen regelmässig selbst von geo.admin.ch laden statt aus einer Datei; Sperrungen der Forstdienste
-  aus ihren eigenen Systemen übernehmen (z. B. Holzschlag-Planung der Kantone).
+  das Laden der Wildruhezonen von geo.admin.ch gegen den echten Dienst prüfen (Name der Ebene, Attribute der
+  Schutzzeit); Sperrungen der Forstdienste aus ihren eigenen Systemen übernehmen (z. B. Holzschlag-Planung der
+  Kantone).
 - **Touren**: Abgleich mit Strava/Komoot per OAuth (braucht dort registrierte Apps); die Karte kühler Abschnitte
   mit Messnetzen in der Nähe vergleichen (z. B. Stadtklima-Messnetze), sobald es genug echte Touren gibt.
 
@@ -136,6 +137,7 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 
 - Eigener Routing-Server: Waldprofil (Forststrassen und Rückegassen zuerst), Wildruhezonen in der Schutzzeit
   umgehen, BRouter-Image per GitHub-Workflow in der Registry
+- Wildruhezonen direkt von geo.admin.ch, pro Feld gespeichert und wöchentlich neu angefragt
 - Sperrungen bei Holzerei: automatisch aus Holzschlag-Fotos, von Hand durch den Forstdienst; der Wege-Magnet
   führt darum herum
 - Touren: FIT-Dateien direkt lesen, mit Sensorwerten und Developer-Feldern (z. B. Laufleistung), auch aus GPX

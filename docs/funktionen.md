@@ -1134,10 +1134,13 @@ wird.
 - **Eigener Routing-Server mit Waldprofil**: Mit dem eigenen BRouter ([`deploy/brouter`](https://github.com/michifrey/myforrest/blob/main/deploy/brouter/README.md))
   gilt das Profil `myforrest-wald`: Forststrassen zuerst, Rückegassen fast gleich gut, dann Pfade; Strassen
   mit Verkehr werden umgangen, Autobahnen und schwierige Bergwege (ab SAC T5) nie genommen.
-- **Wildruhezonen**: Ist eine Datei mit den Zonen hinterlegt (`WILDRUHE_GEOJSON`, z. B. der BAFU-Datensatz von
-  geo.admin.ch), führt der Magnet während der Schutzzeit (aus dem Text der Zone, sonst 20.12.–30.4.) um sie
-  herum, und die Karte zeigt sie beim Planen gestrichelt (ab Zoom 11, mit Name und Schutzzeit). Das Panel
-  sagt, um welche Zonen die Route geführt wurde; liegt ein Wegpunkt in einer Zone, weist es darauf hin.
+- **Wildruhezonen**: Lädt die App die Zonen direkt von geo.admin.ch (`WILDRUHE_LAYER`, die Ebene des BAFU) oder
+  ist eine Datei hinterlegt (`WILDRUHE_GEOJSON`), führt der Magnet während der Schutzzeit (aus dem Text der Zone,
+  sonst 20.12.–30.4.) um sie herum. Von geo.admin.ch fragt die App die Zonen pro Feld von rund 22 × 15 km rund um
+  eine Route oder den Kartenausschnitt an, speichert sie und fragt nach einer Woche wieder (`WILDRUHE_REFRESH_DAYS`).
+  So kommen neue oder geänderte Zonen an, ohne dass jemand eine Datei nachführt; fällt der Dienst aus, bleiben die
+  gespeicherten Zonen. Auf der Karte lädt sie ab Zoom 12 nach, darunter zeigt sie die schon gespeicherten Felder.
+  Die Karte zeigt die Zonen beim Planen gestrichelt (ab Zoom 11, mit Name und Schutzzeit). Das Panel sagt, um welche Zonen die Route geführt wurde; liegt ein Wegpunkt in einer Zone, weist es darauf hin.
 
 ![Wildruhezone beim Planen einer Route](screenshots/wildruhezonen.jpg)
 

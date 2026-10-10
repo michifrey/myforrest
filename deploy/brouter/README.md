@@ -51,9 +51,10 @@ Schwierige Bergwege kosten mehr (T3 × 1,5, T4 × 3), Steigungen zählen mit (wi
 nutzt das Profil mit `ROUTER_PROFILE=myforrest-wald`; die Vorlagen für Docker Compose und Kubernetes setzen das.
 brouter.de kennt das Profil nicht, dort bleibt `hiking-mountain`.
 
-**Wildruhezonen** stehen nicht verlässlich in OpenStreetMap. MyForrest liest sie aus einer GeoJSON-Datei
-(`WILDRUHE_GEOJSON`, z. B. der Datensatz *Wildruhezonen* des BAFU von geo.admin.ch, in WGS84 oder LV95) und
-gibt die Zonen in der Nähe einer Anfrage während ihrer Schutzzeit als Sperrflächen mit (`polygons=…`). Die
+**Wildruhezonen** stehen nicht verlässlich in OpenStreetMap. MyForrest lädt sie direkt von geo.admin.ch
+(`WILDRUHE_LAYER=ch.bafu.wrz-wildruhezonen_portal`, in den Vorlagen für Docker Compose und Kubernetes gesetzt; pro
+Feld von rund 22 × 15 km gespeichert und nach einer Woche neu angefragt) und/oder liest sie aus einer GeoJSON-Datei
+(`WILDRUHE_GEOJSON`, in WGS84 oder LV95). Es gibt die Zonen in der Nähe einer Anfrage während ihrer Schutzzeit als Sperrflächen mit (`polygons=…`). Die
 Schutzzeit kommt aus dem Text einer Zone („20.12. bis 30.4.“, „ganzjährig“), sonst aus `WILDRUHE_SEASON`
 (Standard `12-20/04-30`). Liegt ein Wegpunkt selbst in einer Zone, wird diese nicht gesperrt, sondern genannt.
 
@@ -118,7 +119,8 @@ Browser stört das nicht, `fetch` von Node lehnt solche Antworten ab; MyForrest 
 - **Noch offen:**
   - der Lauf mit den echten Segmenten von brouter.de;
   - der erste Lauf des Workflows;
-  - der Datensatz der Wildruhezonen selbst (aus der Sandbox gesperrt; Format nach geo.admin.ch, getestet mit
-    nachgebauten Zonen).
+  - der Datensatz der Wildruhezonen selbst und der Identify-Dienst von geo.admin.ch mit der Ebene
+    `ch.bafu.wrz-wildruhezonen_portal` (aus der Sandbox gesperrt; Format nach geo.admin.ch, getestet mit
+    nachgebauten Antworten). Heisst die Ebene anders, `WILDRUHE_LAYER` anpassen.
 - **Neue BRouter-Version:** Falls das Release-Archiv anders aufgebaut ist, bricht der Bau mit einer klaren
   Meldung ab; dann `BROUTER_VERSION` anpassen.

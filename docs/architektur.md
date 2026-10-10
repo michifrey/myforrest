@@ -45,7 +45,7 @@ src/routes/climate.js  Routen und Analyse-Hooks für Stürme, Phänologie-Refere
 src/elevation.js     Geländehöhe, Hangneigung, Exposition und Geländeform (Copernicus-DEM über Open-Meteo)
 src/exif.js          Aufnahmezeit, GPS und Blickrichtung aus den Bilddaten
 src/closures.js      Sperrungen bei Holzerei (aus Holzschlag-Fotos und von Hand) als Sperrkreise für BRouter
-src/wildlife.js      Wildruhezonen (GeoJSON, WGS84/LV95, Schutzzeit) als Sperrflächen für BRouter
+src/wildlife.js      Wildruhezonen (Datei oder pro Feld von geo.admin.ch, gespeichert und wöchentlich neu; WGS84/LV95, Schutzzeit) als Sperrflächen für BRouter
 src/landscapes.js    Landschaftsprofile (Wald, Gletscher, Gebirge, Trockengebiet): Beobachtungen je Profil, welche Profile Schnee und Eis auswerten, Höhe für Gebirge-Spots
 src/glaciers.js      Gletscherumrisse aus Inventaren (GeoJSON, WGS84/LV95, Jahr aus Eigenschaft oder Dateiname): Eis pro Jahr an einem Ort, Abstand, Umrisse für die Karte
 src/glamos.js        Längenänderung der Gletscherzungen (GLAMOS-CSV): Zuordnung über SGI-Id oder Name, aufsummierte Kurve, Rate der letzten zehn Jahre

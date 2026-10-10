@@ -160,6 +160,9 @@ Die feste Adresse lässt sich als Variable `APP_URL` in die Android-App bauen, d
 | `SENSITIVE_SPECIES` | – | Weitere Gattungen oder Arten (kommagetrennt), deren Funde automatisch geschützt werden, z. B. `Trollius,Lilium bulbiferum` |
 | `ROUTER_PROFILE`   | `hiking-mountain` | BRouter-Profil für das Routing; mit dem eigenen BRouter `myforrest-wald` (Waldprofil, siehe [deploy/brouter](https://github.com/michifrey/myforrest/blob/main/deploy/brouter/README.md)) |
 | `WILDRUHE_GEOJSON` | – | GeoJSON-Datei mit Wildruhezonen (WGS84 oder LV95, z. B. BAFU-Datensatz von geo.admin.ch); der Wege-Magnet führt während der Schutzzeit um sie herum |
+| `WILDRUHE_LAYER` | – (in Docker Compose und Kubernetes `ch.bafu.wrz-wildruhezonen_portal`) | Wildruhezonen direkt von geo.admin.ch laden: Id der Ebene im Kartenviewer; die Zonen kommen pro Feld von rund 22 × 15 km und werden gespeichert |
+| `WILDRUHE_API` | `https://api3.geo.admin.ch/rest/services/api/MapServer/identify` | Identify-Dienst für `WILDRUHE_LAYER` |
+| `WILDRUHE_REFRESH_DAYS` | `7` | Nach so vielen Tagen fragt die App ein Feld wieder an; schlägt das fehl, bleiben die gespeicherten Zonen |
 | `HOLZSCHLAG_SPERRE_TAGE` | `42` | So lange sperrt ein Foto mit *Holzschlag / Rodung* die Wege 80 m darum herum für den Wege-Magnet |
 | `WILDRUHE_SEASON`  | `12-20/04-30` | Schutzzeit (Monat-Tag/Monat-Tag) für Zonen ohne eigene Angabe; `immer` = ganzjährig |
 | `WEGNETZ_URL` | – | Overpass-API für das Wegnetz aus OpenStreetMap (z. B. `https://overpass-api.de/api/interpreter` oder eine eigene Instanz); im Durchgehen führen Pfeile dann entlang der Wege ([Details](funktionen.md#durchgehen-wie-street-view)) |

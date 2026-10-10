@@ -60,9 +60,9 @@ test('routing goes around zones in their protection period; a waypoint inside on
   await withZones(async (file) => {
     const w = createWildlife({ file });
     const route = [{ lat: 47.36, lon: 8.58 }, { lat: 47.36, lon: 8.60 }];
-    assert.deepEqual(w.near(route, new Date('2027-01-10')).zones.map((z) => z.name), ['Adlisberg', 'Zürichberg']);
-    assert.deepEqual(w.near(route, new Date('2026-10-09')).zones.map((z) => z.name), ['Zürichberg']);
-    const inside = w.near([{ lat: 47.365, lon: 8.59 }, { lat: 47.36, lon: 8.60 }], new Date('2027-01-10'));
+    assert.deepEqual((await w.near(route, new Date('2027-01-10'))).zones.map((z) => z.name), ['Adlisberg', 'Zürichberg']);
+    assert.deepEqual((await w.near(route, new Date('2026-10-09'))).zones.map((z) => z.name), ['Zürichberg']);
+    const inside = await w.near([{ lat: 47.365, lon: 8.59 }, { lat: 47.36, lon: 8.60 }], new Date('2027-01-10'));
     assert.deepEqual([inside.zones.map((z) => z.name), inside.inside], [['Zürichberg'], ['Adlisberg']]);
     assert.match(w.polygonsParam(inside.zones), /^8\.557000,47\.377000,8\.563000,47\.377000,/);
 
@@ -96,6 +96,56 @@ test('routing goes around zones in their protection period; a waypoint inside on
       fs.rmSync(dataDir, { recursive: true, force: true });
     }
   });
+});
+
+test('wildlife rest areas straight from geo.admin.ch: per cell, kept, asked again after a week', async () => {
+  const { DatabaseSync } = require('node:sqlite');
+  const db = new DatabaseSync(':memory:');
+  const asked = [];
+  let up = true;
+  // The identify service as geo.admin.ch answers: GeoJSON features in LV95, the period in an attribute.
+  const lv = square(47.365, 8.59).map(([lon, lat]) => wgs84ToLv95(lat, lon));
+  const fetchImpl = async (url) => {
+    const u = new URL(url);
+    asked.push(u);
+    if (!up) return new Response('busy', { status: 503 });
+    return Response.json({ results: [
+      { type: 'Feature', featureId: 4711, layerBodId: 'ch.bafu.wrz-wildruhezonen_portal', properties: { wrz_name: 'Adlisberg', bestimmungen: 'vom 20.12. bis 30.4.' }, geometry: { type: 'Polygon', coordinates: [lv] } },
+      { type: 'Feature', featureId: 4712, properties: { wrz_name: 'Ohne Fläche' } },
+    ] });
+  };
+  let t = Date.parse('2027-01-10T08:00:00Z');
+  const make = () => createWildlife({ file: '', layer: 'ch.bafu.wrz-wildruhezonen_portal', db, fetchImpl, now: () => t });
+  const w = make();
+  assert.equal(w.enabled(), true);
+  const route = [{ lat: 47.36, lon: 8.58 }, { lat: 47.36, lon: 8.60 }];
+  const r = await w.near(route, new Date('2027-01-10'));
+  assert.deepEqual(r.zones.map((z) => z.name), ['Adlisberg']);
+  const first = asked.length;
+  assert.ok(first >= 1 && first <= 4, String(first));
+  const q = asked[0].searchParams;
+  assert.equal(q.get('layers'), 'all:ch.bafu.wrz-wildruhezonen_portal');
+  assert.equal(q.get('geometryFormat'), 'geojson');
+  assert.equal(q.get('sr'), '2056');
+  assert.ok(Number(q.get('geometry').split(',')[0]) > 2e6, 'box in LV95');
+  // Zones spanning several cells count once; out of season they are not sent.
+  assert.equal((await w.within([8.0, 47.0, 9.0, 47.6], new Date('2027-01-10'))).length, 1);
+  assert.deepEqual((await w.near(route, new Date('2026-10-09'))).zones, []);
+  // Kept in the database: a restarted server asks nothing within the week …
+  const again = make();
+  assert.deepEqual((await again.near(route, new Date('2027-01-10'))).zones.map((z) => z.name), ['Adlisberg']);
+  assert.equal(asked.length, first);
+  // … and after it asks again; when geo.admin.ch fails, the kept zones stay in use.
+  t += 8 * 86400000;
+  up = false;
+  assert.deepEqual((await again.near(route, new Date('2027-01-10'))).zones.map((z) => z.name), ['Adlisberg']);
+  assert.ok(asked.length > first);
+  // A large map section does not fetch cells it has never seen.
+  const fresh = createWildlife({ file: '', layer: 'x', fetchImpl, now: () => t });
+  asked.length = 0;
+  assert.deepEqual(await fresh.within([5.9, 45.8, 10.5, 47.8]), []);
+  assert.equal(asked.length, 0);
+  db.close();
 });
 
 test("BRouter's own server: header lines with a bare \\n, gzip body", async () => {

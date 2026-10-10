@@ -11,7 +11,8 @@
  *   DELETE /api/tracks/:id
  *   GET    /api/tracks/:id.gpx          download as GPX
  *   GET    /api/route                   path between waypoints from a routing service (ROUTER_URL, BRouter),
- *                                        around wildlife rest areas in their protection period (WILDRUHE_GEOJSON)
+ *                                        around wildlife rest areas in their protection period (WILDRUHE_GEOJSON,
+ *                                        WILDRUHE_LAYER from geo.admin.ch)
  *   GET    /api/wildlife-zones?bbox=    those areas as GeoJSON, for the map
  *   GET/POST/DELETE /api/closures       temporary closures during forestry work (src/closures.js)
  *   GET    /api/cool-cells?bbox=        map of cool stretches from shared tour temperatures (src/coolmap.js),
@@ -361,7 +362,7 @@ module.exports = function registerTracks(app, ctx) {
     }
     const lonlats = pts.map(([la, lo]) => `${lo.toFixed(6)},${la.toFixed(6)}`).join('|');
     // Wildlife rest areas in their protection period: no-go areas for the router.
-    const wild = wildlife.near(pts.map(([lat, lon]) => ({ lat, lon })));
+    const wild = await wildlife.near(pts.map(([lat, lon]) => ({ lat, lon })));
     // Forestry closures (logging): no-go circles.
     const closed = closures.near(pts.map(([lat, lon]) => ({ lat, lon })));
     const nogo = (wild.zones.length ? `&polygons=${encodeURIComponent(wildlife.polygonsParam(wild.zones))}` : '')
@@ -459,10 +460,10 @@ module.exports = function registerTracks(app, ctx) {
   });
 
   /** Wildlife rest areas in their protection period within a bbox (GeoJSON, for the map). */
-  app.get('/api/wildlife-zones', (req, res) => {
+  app.get('/api/wildlife-zones', async (req, res) => {
     const b = String(req.query.bbox || '').split(',').map(Number);
     if (b.length !== 4 || !b.every(Number.isFinite)) return fail(res, 400, 'bbox=west,süd,ost,nord');
-    const zones = wildlife.within(b).slice(0, 200);
+    const zones = (await wildlife.within(b)).slice(0, 200);
     res.json({
       type: 'FeatureCollection',
       features: zones.map((z) => ({
