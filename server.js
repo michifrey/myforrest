@@ -1,5 +1,8 @@
 'use strict';
 
+// On Render the public address comes as RENDER_EXTERNAL_URL (render.yaml); PUBLIC_URL wins when set.
+if (!process.env.PUBLIC_URL && process.env.RENDER_EXTERNAL_URL) process.env.PUBLIC_URL = process.env.RENDER_EXTERNAL_URL;
+
 const { createApp } = require('./src/app');
 
 const port = Number(process.env.PORT) || 3000;

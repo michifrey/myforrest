@@ -1,16 +1,17 @@
-# Eigener Server: VPS und Synology
+# Eigener Server: VPS, Synology und Render
 
-Zwei Wege, MyForrest dauerhaft unter einer eigenen HTTPS-Adresse zu betreiben, damit Handy, Browser und die
+Drei Wege, MyForrest dauerhaft unter einer eigenen HTTPS-Adresse zu betreiben, damit Handy, Browser und die
 [Android-App](android.md) es jederzeit erreichen. Beide nutzen das `Dockerfile` des Repositorys und eine
-fertige Compose-Datei. Zum blossen Ausprobieren auf dem eigenen PC reicht ein
+fertige Vorlage im Repository. Zum blossen Ausprobieren auf dem eigenen PC reicht ein
 [Cloudflare Tunnel](installation.md#zum-testen-server-auf-dem-eigenen-pc-mit-cloudflare-tunnel).
 
-| | VPS (gemieteter Server) | Synology NAS |
-|---|---|---|
-| Kosten | ab etwa 5 Franken/Euro im Monat | vorhandenes Gerät |
-| HTTPS | Caddy holt das Zertifikat selbst | Reverse Proxy von DSM mit Let's Encrypt, oder Cloudflare Tunnel |
-| Erreichbar | immer, feste IP | solange das NAS läuft; Weiterleitung im Router oder Tunnel |
-| Vorlage | [`deploy/vps`](https://github.com/michifrey/myforrest/tree/main/deploy/vps) | [`deploy/synology`](https://github.com/michifrey/myforrest/tree/main/deploy/synology) |
+| | VPS (gemieteter Server) | Synology NAS | Render (Plattform) |
+|---|---|---|---|
+| Kosten | ab etwa 5 Franken/Euro im Monat | vorhandenes Gerät | Plan *Starter* plus Disk, nach Preisliste von Render |
+| HTTPS | Caddy holt das Zertifikat selbst | Reverse Proxy von DSM mit Let's Encrypt, oder Cloudflare Tunnel | von Render, mit Adresse `….onrender.com` |
+| Aktualisieren | `git pull` und neu bauen | ZIP kopieren und neu erstellen | **automatisch bei jedem Push auf `main`** |
+| Grenzen | keine | Leistung des NAS | Grösse und Dauer von Uploads nach den Regeln von Render; eine Instanz |
+| Vorlage | [`deploy/vps`](https://github.com/michifrey/myforrest/tree/main/deploy/vps) | [`deploy/synology`](https://github.com/michifrey/myforrest/tree/main/deploy/synology) | [`render.yaml`](https://github.com/michifrey/myforrest/blob/main/render.yaml) |
 
 Für eine kleine Instanz genügen **2 CPU-Kerne, 2–4 GB RAM** und Platz für die Fotos (rund 5 GB pro 1000 Fotos,
 siehe [Tech-Onboarding](tech-onboarding.md#2-speicherplatz)). Vor einem öffentlichen Betrieb
@@ -174,6 +175,30 @@ starten (*Projekt → Aktion → Neu erstellen*).
   anfassen), dann *Projekt → Aktion → Neu erstellen*.
 - **Sichern:** den Ordner `docker/myforrest/data` mit **Hyper Backup** sichern, am besten mit kurz gestopptem
   Projekt (*Aktion → Stoppen*), damit die Datenbank in sich stimmig ist.
+
+## Render mit GitHub
+
+[Render](https://render.com) baut MyForrest aus dem `Dockerfile` direkt aus GitHub und deployt jeden Push auf
+`main` neu. Die Vorlage [`render.yaml`](https://github.com/michifrey/myforrest/blob/main/render.yaml) (ein
+*Blueprint*) legt alles fest: Docker, Region Frankfurt, Gesundheitsprüfung auf `/api/config` und eine **Disk**
+von 10 GB unter `/app/data` für Datenbank und Fotos. Ohne Disk wären die Daten nach jedem Deploy weg; der
+kostenlose Plan hat keine, darum steht in der Vorlage der Plan *Starter*.
+
+1. Im [Dashboard von Render](https://dashboard.render.com) **New → Blueprint** wählen.
+2. GitHub verbinden (falls noch nicht geschehen) und das Repository **myforrest** auswählen. Render findet
+   `render.yaml` und zeigt den Dienst `myforrest` mit Disk an.
+3. Die Felder `ADMIN_EMAIL` und `SMTP_URL` ausfüllen oder leer lassen, dann **Apply** (bzw. *Deploy Blueprint*).
+4. Der erste Build dauert einige Minuten. Danach ist MyForrest unter `https://myforrest-….onrender.com`
+   erreichbar (die Adresse steht oben im Dienst). Diese Adresse übernimmt MyForrest selbst als `PUBLIC_URL`
+   (aus `RENDER_EXTERNAL_URL`).
+5. Konto anlegen: ohne `SMTP_URL` steht der Bestätigungslink unter **Logs** im Dienst.
+
+Weitere Einstellungen ([Umgebungsvariablen](installation.md#umgebungsvariablen)) im Dienst unter
+**Environment**; eine eigene Domain unter **Settings → Custom Domains** (dann `PUBLIC_URL` auf diese Adresse
+setzen). Mit vielen Fotos oder Videos ist der Plan *Starter* (512 MB RAM) knapp; im Dienst unter
+**Settings → Instance Type** grösser wählen. Für Backups der Disk die Snapshots von Render nutzen (siehe deren Doku zu *Persistent Disks*).
+
+Für die App: die Adresse in der App eingeben oder auf GitHub als Variable `APP_URL` hinterlegen.
 
 ## Wenn etwas nicht geht
 
