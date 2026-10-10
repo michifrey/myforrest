@@ -183,6 +183,21 @@ gibt den Platz frei. Die App bittet den Browser, die Daten dauerhaft zu behalten
 Fotos, die innerhalb von 25 m aufgenommen wurden, werden automatisch zu
 einem *Spot* zusammengefasst. Die Farbe zeigt Schäden (orange) oder Neophyten (violett).
 
+### Eigener Standort
+
+![Karte am eigenen Standort mit blauem Punkt und dem Knopf «Mein Standort» unten links](screenshots/standort.jpg)
+
+Beim Öffnen fragt der Browser (bzw. die Android-App) nach dem Standort. Gibt man ihn frei, beginnt die Karte
+dort statt mit der Übersicht aller Spots: ein blauer Punkt mit einem Kreis für die Genauigkeit, so nah, wie der
+Standort genau ist (GPS bis 100 m: Zoom 15, bis 1 km: 14, bis 3 km: 13, sonst 11). Kommt man über einen Link
+(Spot, Durchgehen, Push-Nachricht mit Filter), hat man einen Spot geöffnet oder die Karte schon verschoben, bleibt
+die Karte, wo sie ist, und zeigt nur den Punkt. Wer ablehnt, wird nicht wieder gefragt; der Knopf **Mein
+Standort** unten links (über den Zoom-Knöpfen) fragt jederzeit und setzt die Karte auf den Standort. Mit ihm
+folgen auch die Kartenmodi, die von der Kartenmitte ausgehen (*Sonne & Wetter*).
+
+Der Standort bleibt im Browser: Er verschiebt nur die Karte und geht nicht an den Server. Was danach geladen
+wird, hängt wie sonst vom Kartenausschnitt ab (Spots, Wetter der Kartenmitte).
+
 ### Blickrichtung
 
 Spots werden zusätzlich nach Himmelsrichtung getrennt. Die Richtung stammt aus dem

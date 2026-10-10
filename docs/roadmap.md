@@ -89,6 +89,7 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 - Video statt Einzelbilder (GoPro mit GPMF, 360°-MP4, GPX), unscharfe Bilder werden ersetzt oder verworfen
 - 360°-Fotos beim Upload erkennen, Panoramen über eine Drehung der Kugel ausrichten und vergleichen
 - Spots mit gemischten Blickrichtungen auf Wunsch aufteilen
+- Eigener Standort: Browser und App fragen beim Öffnen danach, die Karte beginnt dort; Knopf «Mein Standort»
 - Karte und Spots entlang einer Route offline speichern; Benachrichtigung, wenn ein Upload im Hintergrund
   abgelehnt wurde
 

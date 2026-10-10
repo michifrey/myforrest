@@ -70,7 +70,8 @@ oder noch laufend.
 ## Was die App sonst anders macht
 
 - **Kamera und Standort der Seite** (Wiederholungsfoto mit Overlay, Standort auf der Karte) gibt die App nach
-  der Android-Erlaubnis frei, aber nur für den eingestellten Server.
+  der Android-Erlaubnis frei, aber nur für den eingestellten Server. Beim ersten Start fragt Android deshalb nach
+  dem Standort, sobald die Karte ihn wissen will ([Eigener Standort](funktionen.md#eigener-standort)).
 - **Links auf andere Seiten** öffnen sich im Browser. Die Anmeldung über GitHub, Microsoft, SWITCH edu-ID und
   andere OpenID-Connect-Dienste bleibt in der App. **Google** erlaubt die Anmeldung nicht in eingebetteten
   Ansichten; in der App deshalb mit E-Mail und Passwort oder einem der anderen Dienste anmelden.

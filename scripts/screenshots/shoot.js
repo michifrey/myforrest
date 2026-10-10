@@ -1,6 +1,6 @@
 'use strict';
 // Takes the README screenshots from the demo server (see README.md here).
-// Usage: node shoot.js [hero map spot satellite sun species vektor touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher mobile]
+// Usage: node shoot.js [hero map standort spot satellite sun species vektor touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher mobile]
 // «mapillary» needs the demo server started with DEMO_MAPILLARY=1 (a Mapillary stand-in, see README.md).
 // «gletscher» uses the glacier demo server (BASE_GLETSCHER, default http://localhost:3124; see README.md).
 const path = require('path');
@@ -51,6 +51,23 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     const page = await explore(ctx);
     await page.screenshot({ path: out('map.jpg'), ...jpg });
     await page.close();
+  }
+
+  if (want('standort')) {
+    // The browser shares the location: the map starts there, with the blue dot and the "Mein Standort" button.
+    const gctx = await desktop(browser, { permissions: ['geolocation'], geolocation: { latitude: 47.3712, longitude: 8.5745, accuracy: 30 } });
+    const page = await explore(gctx);
+    // The map down to the buttons at its bottom left (above the footer's tree line).
+    await page.evaluate(() => window.scrollBy(0, 120));
+    await settle(page, 1500);
+    const clip = await page.evaluate(() => {
+      const m = document.querySelector('#map').getBoundingClientRect();
+      const c = document.querySelector('.leaflet-bottom.leaflet-left').getBoundingClientRect();
+      const bottom = Math.min(c.bottom + 16, window.innerHeight);
+      return { x: m.x, y: bottom - 600, width: 960, height: 600 };
+    });
+    await page.screenshot({ path: out('standort.jpg'), clip, ...jpg });
+    await gctx.close();
   }
 
   if (want('spot')) {
