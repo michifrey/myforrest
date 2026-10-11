@@ -7,9 +7,9 @@ ohne echte Fotos, ohne Netz und ohne API-Schlüssel reproduzierbar sind.
 | Datei | Aufgabe |
 |-------|---------|
 | `scene.js` | Zeichnet Demo-Waldfotos (Windwurf mit Verjüngung, Borkenkäfer, Springkraut, Goldrute, frühe Verfärbung) |
-| `demo-server.js` | Startet die echte App mit einem synthetischen Open-Meteo-Ersatz (Wetter, Stürme, Nächte, Höhenmodell) und einem Overpass-Ersatz (Wegnetz am Waldweg) |
+| `demo-server.js` | Startet die echte App mit einem synthetischen Open-Meteo-Ersatz (Wetter, Stürme, Nächte, Höhenmodell), DWD-Capabilities und einem Overpass-Ersatz (Wegnetz am Waldweg) |
 | `seed.js` | Lädt die Demo-Fotos über die API hoch und ergänzt Pl@ntNet-Bestimmungen und Sentinel-/Landsat-Szenen direkt in der Datenbank |
-| `tiles.js` | Platzhalter-Kacheln für OpenStreetMap (Web Mercator) und die Landeskarte grau (LV95) |
+| `tiles.js` | Platzhalter-Kacheln für OpenStreetMap (Web Mercator) und die Landeskarte grau (LV95), Höhenkacheln (Terrarium) aus dem Demo-Gelände und ein gezeichnetes Regenband für das DWD-Radar |
 | `shoot.js` | Nimmt mit Playwright alle Screenshots auf und baut das Zeitraffer-GIF und das GIF eines Schritts im Durchgehen (`uebergang`, aus einer Videoaufnahme) |
 | `glacier-demo.js` | Der erfundene Demo-Gletscher: Umrisse 1850, 1973 und 2016, heutiges Eis und See, Gelände, GLAMOS-Längenänderung und ein Archiv-Katalog |
 | `seed-gletscher.js` | Eigener Datensatz für die Gletscher- und Gebirge-Bilder: Inventare, Fotos seit 2017, zwei Archivfotos, eine Alpweide, Schnee- und Eisanteil |

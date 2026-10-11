@@ -35,6 +35,7 @@ const { createWeather } = require('./weather');
 const { assess } = require('./irregularities');
 const { TREES, treeInfo, treeJson } = require('./trees');
 const { createElevation } = require('./elevation');
+const { createDwd } = require('./dwd');
 const registerAccounts = require('./routes/accounts');
 const { createOAuth, providersFromEnv } = require('./oauth');
 const { createMailer } = require('./mail');
@@ -107,6 +108,8 @@ function createApp({
   mapillaryToken = process.env.MAPILLARY_TOKEN || '', mapillaryFetch = fetch,
   waynetUrl = process.env.WEGNETZ_URL || '', waynetFetch = fetch,
   wildlifeLayer = undefined, wildlifeFetch = fetch,
+  // Maps of the Deutscher Wetterdienst over the sun mode (src/dwd.js): fetch for the capabilities.
+  dwdFetch = fetch,
   // Reverse proxies whose X-Forwarded-For counts (Express 'trust proxy'), so rate limits see the client's
   // address instead of the proxy's. Off by default: otherwise anyone could fake the header.
   trustProxy = parseTrustProxy(process.env.TRUST_PROXY),
@@ -120,6 +123,7 @@ function createApp({
   const thumbs = createThumbnails({ db, uploadDir, thumbDir: path.join(dataDir, 'thumbs') });
   const weather = createWeather({ db, fetchImpl: weatherFetch });
   const elevationService = createElevation({ db, fetchImpl: weatherFetch });
+  const dwd = createDwd({ fetchImpl: dwdFetch });
 
   const upload = multer({
     dest: tmpDir,
@@ -984,6 +988,12 @@ function createApp({
     } catch (err) {
       res.json({ source: null, angles: null, error: err.message });
     }
+  });
+
+  /** DWD maps to lay over the map (radar, warnings, fire danger) and for which times the radar has pictures. */
+  app.get('/api/dwd/layers', async (req, res) => {
+    res.set('Cache-Control', 'public, max-age=300');
+    res.json(await dwd.layers());
   });
 
   app.get('/api/trees', (req, res) => {

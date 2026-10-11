@@ -30,6 +30,22 @@ async function routeTiles(ctx) {
     if (!tileCache.has(key)) tileCache.set(key, await tiles.lv95Tile(z, x, y, 'grau'));
     await route.fulfill({ body: tileCache.get(key), contentType: 'image/png' });
   }));
+  // Elevation tiles for the light and shadow on the map, from the demo terrain.
+  await ctx.route(/elevation-tiles-prod\/terrarium\/(\d+)\/(\d+)\/(\d+)\.png/, safe(async (route) => {
+    const [, z, x, y] = route.request().url().match(/\/(\d+)\/(\d+)\/(\d+)\.png/).map(Number);
+    const key = `t${z}/${x}/${y}`;
+    if (!tileCache.has(key)) tileCache.set(key, await tiles.terrariumTile(z, x, y));
+    await route.fulfill({ body: tileCache.get(key), contentType: 'image/png', headers: { 'access-control-allow-origin': '*' } });
+  }));
+  // DWD maps: a drawn rain band for the radar, nothing for other layers.
+  await ctx.route(/maps\.dwd\.de\/geoserver\/dwd\/wms/, safe(async (route) => {
+    const q = new URL(route.request().url()).searchParams;
+    const get = (k) => q.get(k) ?? q.get(k.toUpperCase());
+    const bbox = get('bbox').split(',').map(Number);
+    const w = Number(get('width')); const h = Number(get('height'));
+    const body = /radar/i.test(get('layers')) ? await tiles.radarImage(bbox, w, h, get('time')) : await tiles.radarImage([0, 0, 1, 1], w, h, null);
+    await route.fulfill({ body, contentType: 'image/png' });
+  }));
 }
 
 async function launch(extra = []) {

@@ -149,6 +149,15 @@
         <input type="range" id="sun-slider" min="0" max="1439" step="5" value="720">
         <output id="sun-clock" for="sun-slider">12:00</output>
       </div>
+      <div class="shade-box">
+        <label class="toggle small"><input type="checkbox" id="shade-toggle" checked> Licht und Schatten auf der Karte</label>
+        <p id="shade-status" class="muted small" hidden></p>
+        <div class="dwd-row">
+          <label class="small" for="dwd-layer">DWD-Karte</label>
+          <select id="dwd-layer" class="small"><option value="">keine</option></select>
+        </div>
+        <p id="dwd-status" class="muted small" hidden></p>
+      </div>
       <div id="sun-tiles" class="sun-tiles"></div>
       <p id="sun-dayline" class="sun-dayline"></p>
       <div id="sun-charts"></div>
@@ -476,6 +485,7 @@
 
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="sun.js"></script>
+  <script src="shade.js"></script>
   <script src="forest.js"></script>
   <script src="app.js"></script>
   <script src="hotspots.js"></script>

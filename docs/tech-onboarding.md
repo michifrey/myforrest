@@ -139,7 +139,8 @@ Prüfen lässt sich das jederzeit mit `npx license-checker-rseidelsohn --product
 | swisstopo (Landeskarte, Luftbild, Kantone) | frei nutzbar mit Quellenangabe © swisstopo |
 | Open-Meteo (ERA5) | CC BY 4.0; nicht-kommerziell kostenlos, für kommerziellen Betrieb ein [API-Abo](https://open-meteo.com/en/pricing) |
 | Copernicus Sentinel-2, Landsat (USGS) | frei, mit Quellenangabe |
-| DWD-Phänologie | frei (GeoNutzV), mit Quellenangabe |
+| DWD-Phänologie, Radar und Warnungen (WMS) | frei (GeoNutzV), mit Quellenangabe |
+| Terrain Tiles (AWS, u. a. EU-DEM, SRTM) | frei, mit Quellenangabe der Quellen |
 | Pl@ntNet | eigene Nutzungsbedingungen, Kontingent je nach API-Key |
 | GLAMOS-Gletscherinventare | Nutzungsbedingungen des Inventars |
 | Fotos der Nutzenden | Lizenz pro Foto, Standard CC BY-SA 4.0 |

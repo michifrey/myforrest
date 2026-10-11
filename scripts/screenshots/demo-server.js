@@ -168,8 +168,16 @@ if (process.env.DEMO_GLETSCHER === '1') {
   fs.writeFileSync(path.join(glacierDir, 'archiv-katalog.csv'), glacier.archiveCsv());
 }
 const archiveFetch = async () => new Response(await sharp({ create: { width: 1200, height: 800, channels: 3, background: '#8a7d68' } }).jpeg().toBuffer(), { headers: { 'content-type': 'image/jpeg' } });
+/** DWD capabilities: radar pictures every 5 minutes on 8 and 9 October 2026 (the day of the screenshot), warnings. */
+async function dwdFetch() {
+  return new Response(`<WMS_Capabilities version="1.3.0"><Capability><Layer><Title>DWD</Title>
+    <Layer><Name>dwd:Niederschlagsradar</Name><Title>Radar</Title><Dimension name="time" units="ISO8601">2026-10-08T00:00:00Z/2026-10-09T23:55:00Z/PT5M</Dimension></Layer>
+    <Layer><Name>dwd:Warnungen_Gemeinden</Name><Title>Warnungen</Title></Layer></Layer></Capability></WMS_Capabilities>`);
+}
+
 const app = createApp({
   dataDir: path.join(work, 'data'),
+  dwdFetch,
   // DEMO_GLETSCHER=1: the glacier inventories of the demo glacier (written by seed-gletscher.js).
   ...(process.env.DEMO_MAPILLARY === '1' ? { mapillaryToken: 'MLY|demo', mapillaryFetch } : {}),
   glacierFiles: process.env.DEMO_GLETSCHER === '1' ? Object.keys(glacier.inventories()).map((f) => path.join(work, 'gletscher', f)).join(',') : '',

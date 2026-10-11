@@ -13,7 +13,11 @@
  * By default only tours of the chosen season (summer/winter) and time of day
  * (sun up or down) count; with the model's air temperature of that hour the
  * tooltip estimates the temperature in the cell.
- * Relies on globals from app.js (map, state, api, el, $) and sun.js (Sun).
+ * "Licht und Schatten auf der Karte" darkens the ground the terrain shades
+ * at the chosen time (elevation tiles, shade.js), tints slopes in a steep sun
+ * and shows night and twilight; a DWD map (radar, warnings) can go on top.
+ * Relies on globals from app.js (map, state, api, el, $), sun.js (Sun) and
+ * shade.js (Shade).
  */
 (function sunMode() {
   const TREE_HEIGHT = 25; // m, for the shadow
@@ -285,6 +289,243 @@
   try { $('cool-toggle').checked = localStorage.getItem('myforrest.cool') === '1'; } catch { /* private mode */ }
   map.on('moveend', () => coolOn() && drawCool());
 
+  /* ---------- Light and shadow over the whole map ---------- */
+
+  // Terrarium elevation tiles (AWS open data; in Europe EU-DEM, ~25 m), loaded straight from S3 (CORS open).
+  const DEM_TILES = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium';
+  const SHADE_MIN_ZOOM = 9; // terrain shadows from here on; night and twilight at every zoom
+  map.createPane('sunshade').style.zIndex = 240; // above the base map, below pins and lines
+  map.createPane('dwd').style.zIndex = 250;
+  let shadeOverlay = null;
+  let shadeToken = 0;
+  let shadeFrame = 0;
+  let dem = null; // { key, z, tx0, ty0, gw, gh, elev, missing }
+  const demTiles = new Map();
+  const shadeOn = () => sm.open && $('shade-toggle').checked;
+
+  /** Elevations of one Terrarium tile (256×256, row-major), or null when it cannot be loaded. */
+  function demTile(z, x, y) {
+    const key = `${z}/${x}/${y}`;
+    if (!demTiles.has(key)) {
+      if (demTiles.size > 400) demTiles.delete(demTiles.keys().next().value);
+      demTiles.set(key, new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          const c = document.createElement('canvas');
+          c.width = 256; c.height = 256;
+          const ctx = c.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(img, 0, 0);
+          const px = ctx.getImageData(0, 0, 256, 256).data;
+          const out = new Float32Array(65536);
+          for (let i = 0; i < 65536; i++) out[i] = Shade.terrarium(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]);
+          resolve(out);
+        };
+        img.onerror = () => { demTiles.delete(key); resolve(null); };
+        img.src = `${DEM_TILES}/${key}.png`;
+      }));
+    }
+    return demTiles.get(key);
+  }
+
+  /**
+   * Elevation grid for the view at DEM zoom map zoom − 2 (≤ 13), with one tile
+   * of margin all round, so hills just outside the view still cast shadows.
+   */
+  async function loadDem() {
+    const zoom = map.getZoom();
+    const z = Math.min(13, Math.round(zoom) - 2);
+    const s = 2 ** (z - zoom);
+    const b = map.getPixelBounds();
+    const n = 2 ** z;
+    const tx0 = Math.floor((b.min.x * s) / 256) - 1; const tx1 = Math.floor((b.max.x * s) / 256) + 1;
+    const ty0 = Math.max(0, Math.floor((b.min.y * s) / 256) - 1); const ty1 = Math.min(n - 1, Math.floor((b.max.y * s) / 256) + 1);
+    const key = `${z}/${tx0}/${ty0}/${tx1}/${ty1}`;
+    if (dem?.key === key) return dem;
+    const cols = tx1 - tx0 + 1; const rows = ty1 - ty0 + 1;
+    const tiles = await Promise.all(Array.from({ length: cols * rows }, (_, k) => demTile(z, (((tx0 + (k % cols)) % n) + n) % n, ty0 + Math.floor(k / cols))));
+    const gw = cols * 256; const gh = rows * 256;
+    const elev = new Float32Array(gw * gh);
+    let missing = 0;
+    tiles.forEach((tile, k) => {
+      const ox = (k % cols) * 256; const oy = Math.floor(k / cols) * 256;
+      if (!tile) missing++;
+      for (let y = 0; y < 256; y++) {
+        if (tile) elev.set(tile.subarray(y * 256, (y + 1) * 256), (oy + y) * gw + ox);
+        else elev.fill(-500, (oy + y) * gw + ox, (oy + y) * gw + ox + 256); // no data: low, casts no shadow
+      }
+    });
+    dem = { key, z, tx0, ty0, gw, gh, elev, missing, total: tiles.length };
+    return dem;
+  }
+
+  /** Sun altitude across a w×h grid, computed every `step` cells and interpolated in between. */
+  function altitudeGrid(t, w, h, step, latLngAt) {
+    const cw = Math.ceil(w / step) + 1; const ch = Math.ceil(h / step) + 1;
+    const lat = new Float32Array(cw * ch);
+    for (let j = 0; j < ch; j++) {
+      for (let i = 0; i < cw; i++) {
+        const ll = latLngAt(i * step, j * step);
+        lat[j * cw + i] = Sun.position(t, ll.lat, ll.lng).altitude;
+      }
+    }
+    return (x, y) => {
+      const fx = x / step; const fy = y / step;
+      const i = Math.min(cw - 2, Math.floor(fx)); const j = Math.min(ch - 2, Math.floor(fy));
+      const u = fx - i; const v = fy - j;
+      const a = lat[j * cw + i]; const b = lat[j * cw + i + 1]; const c = lat[(j + 1) * cw + i]; const d = lat[(j + 1) * cw + i + 1];
+      return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+    };
+  }
+
+  const scheduleShade = () => {
+    if (shadeFrame) return;
+    shadeFrame = requestAnimationFrame(() => { shadeFrame = 0; drawShade(); });
+  };
+
+  async function drawShade() {
+    const status = $('shade-status');
+    if (!shadeOn() || !sm.date) {
+      shadeOverlay?.remove();
+      shadeOverlay = null;
+      status.hidden = true;
+      return;
+    }
+    const token = ++shadeToken;
+    const t = dayStart(sm.date) + sm.minute * 60000;
+    const zoom = map.getZoom();
+    const centre = map.getCenter();
+    const sun = Sun.position(t, centre.lat, centre.lng);
+    let grid = null;
+    if (zoom >= SHADE_MIN_ZOOM && sun.altitude > 0) {
+      try { grid = await loadDem(); } catch { grid = null; }
+      if (token !== shadeToken || !shadeOn()) return;
+    }
+    // Output cells: DEM pixels of the view, or 8 screen pixels for night only.
+    const z = grid ? grid.z : zoom - 3;
+    const s = 2 ** (z - zoom);
+    const b = map.getPixelBounds();
+    const x0 = Math.floor(b.min.x * s); const y0 = Math.floor(b.min.y * s);
+    const w = Math.max(1, Math.ceil(b.max.x * s) - x0); const h = Math.max(1, Math.ceil(b.max.y * s) - y0);
+    const latLngAt = (x, y) => map.unproject([x0 + x, y0 + y], z);
+    const altAt = altitudeGrid(t, w, h, grid ? 32 : 8, latLngAt);
+    let lit = null;
+    if (grid) {
+      lit = Shade.light({
+        elev: grid.elev, gw: grid.gw, gh: grid.gh, cellM: Shade.metresPerPixel(centre.lat, z),
+        altitude: sun.altitude, azimuth: sun.azimuth,
+        x0: x0 - grid.tx0 * 256, y0: y0 - grid.ty0 * 256, w, h,
+      });
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    const img = ctx.createImageData(w, h);
+    const px = img.data;
+    let shaded = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const k = y * w + x;
+        let a = Shade.night(altAt(x + 0.5, y + 0.5)) * 0.62; // night: dark blue
+        let r = 12; let g = 20; let bl = 40;
+        if (lit) {
+          const v = lit[k];
+          if (v === 0) { shaded++; a = Math.max(a, 0.42); r = 20; g = 32; bl = 58; } else if (v < 1) {
+            a = Math.max(a, 0.34 * (1 - v)); r = 20; g = 32; bl = 58;
+          } else if (v > 1.05 && a === 0) {
+            a = Math.min(0.2, (v - 1) * 0.16); r = 255; g = 196; bl = 80; // steep in the sun: warm light
+          }
+        }
+        px[k * 4] = r; px[k * 4 + 1] = g; px[k * 4 + 2] = bl; px[k * 4 + 3] = Math.round(a * 255);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    const bounds = L.latLngBounds(latLngAt(0, 0), latLngAt(w, h));
+    const url = canvas.toDataURL();
+    if (shadeOverlay) shadeOverlay.setUrl(url).setBounds(bounds);
+    else shadeOverlay = L.imageOverlay(url, bounds, { pane: 'sunshade', interactive: false }).addTo(map);
+
+    const deg = (v) => `${fmtNum(Math.abs(v), 0)}°`;
+    let text;
+    if (sun.altitude <= -12) text = `Nacht – die Sonne steht ${deg(sun.altitude)} unter dem Horizont.`;
+    else if (sun.altitude <= 0) text = `Dämmerung – die Sonne steht ${deg(sun.altitude)} unter dem Horizont.`;
+    else if (!grid) text = zoom < SHADE_MIN_ZOOM ? 'Tag und Nacht; Schatten von Hügeln und Bergen ab näherem Zoom.' : 'Höhendaten nicht verfügbar, nur Tag und Nacht.';
+    else {
+      text = ` Schatten von Hügeln und Bergen bei Sonne ${deg(sun.altitude)} aus ${Sun.compass(sun.azimuth)}: ${Math.round((100 * shaded) / (w * h))} % der Karte im Schatten.`
+        + ' Steil besonnte Hänge golden. Höhenmodell ~25 m, ohne Bäume und Gebäude.'
+        + (grid.missing ? ` ${grid.missing} von ${grid.total} Höhenkacheln fehlen.` : '');
+    }
+    status.hidden = false;
+    status.replaceChildren(...(grid && sun.altitude > 0 ? [el('span', { class: 'shade-ramp', 'aria-hidden': 'true' })] : []), text);
+  }
+  $('shade-toggle').addEventListener('change', () => {
+    try { localStorage.setItem('myforrest.shade', $('shade-toggle').checked ? '1' : '0'); } catch { /* private mode */ }
+    drawShade();
+  });
+  try { $('shade-toggle').checked = localStorage.getItem('myforrest.shade') !== '0'; } catch { /* private mode */ }
+  map.on('moveend', () => shadeOn() && drawShade());
+
+  /* ---------- Maps of the Deutscher Wetterdienst ---------- */
+
+  let dwdInfo = null;
+  let dwdLayer = null;
+  async function loadDwd() {
+    if (dwdInfo) return;
+    try {
+      dwdInfo = await api('/api/dwd/layers');
+    } catch {
+      return;
+    }
+    const select = $('dwd-layer');
+    let saved = '';
+    try { saved = localStorage.getItem('myforrest.dwd') || ''; } catch { /* private mode */ }
+    select.replaceChildren(el('option', { value: '', text: 'keine' }), ...dwdInfo.layers.map((l) => el('option', { value: l.id, text: l.title })));
+    if (dwdInfo.layers.some((l) => l.id === saved)) select.value = saved;
+    drawDwd();
+  }
+
+  function drawDwd() {
+    const status = $('dwd-status');
+    const layer = dwdInfo?.layers.find((l) => l.id === $('dwd-layer').value);
+    if (!sm.open || !layer || !sm.date) {
+      dwdLayer?.remove();
+      dwdLayer = null;
+      status.hidden = true;
+      return;
+    }
+    if (!dwdLayer || dwdLayer.wmsParams.layers !== layer.name) {
+      dwdLayer?.remove();
+      dwdLayer = L.tileLayer.wms(dwdInfo.url, {
+        layers: layer.name, format: 'image/png', transparent: true, version: '1.3.0', opacity: 0.7, pane: 'dwd',
+        attribution: `&copy; <a href="https://www.dwd.de/">${dwdInfo.attribution}</a>`,
+      }).addTo(map);
+    }
+    // The radar shows the chosen time while DWD still has a picture of it, otherwise the newest one.
+    const t = dayStart(sm.date) + sm.minute * 60000;
+    let time = null;
+    if (layer.from && t >= layer.from && t <= layer.to) {
+      const step = (layer.stepMin || 5) * 60000;
+      time = new Date(Math.floor(t / step) * step).toISOString();
+    }
+    if ((dwdLayer.wmsParams.time || null) !== time) {
+      if (time) dwdLayer.wmsParams.time = time; else delete dwdLayer.wmsParams.time;
+      dwdLayer.redraw();
+    }
+    const when = (v) => new Date(v).toLocaleString('de-CH', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
+    let text;
+    if (layer.id === 'radar') {
+      text = time ? `Radarbild von ${clock(Date.parse(time))}.`
+        : `Neuestes Radarbild – für die gewählte Zeit hat der DWD keines${layer.from ? ` (vorhanden ${when(layer.from)} bis ${when(layer.to)})` : ''}.`;
+    } else if (layer.id === 'warnungen') text = 'Aktuelle Warnungen, unabhängig von der gewählten Zeit.';
+    else text = 'Aktuelle Karte des DWD.';
+    status.hidden = false;
+    status.textContent = `${text} Deutschland und Grenzgebiet · © ${dwdInfo.attribution}`;
+  }
+  $('dwd-layer').addEventListener('change', () => {
+    try { localStorage.setItem('myforrest.dwd', $('dwd-layer').value); } catch { /* private mode */ }
+    drawDwd();
+  });
+
   /* ---------- Panel ---------- */
 
   function tile(label, value, sub) {
@@ -500,6 +741,8 @@
     $('sun-slider').value = String(minute);
     renderPanel();
     drawMap();
+    if (shadeOn()) scheduleShade();
+    drawDwd();
     if (coolOn()) drawCool(); // another season or time of day, or only new tooltips
     for (const line of document.querySelectorAll('#sun-charts .now')) {
       line.setAttribute('x1', xOf(minute));
@@ -522,6 +765,8 @@
     renderCharts();
     drawMap();
     drawRain();
+    drawShade();
+    drawDwd();
     if (sm.horizonFor !== placeKeyNow) {
       fetchHorizon(p).then((h) => {
         if (token !== sm.loadToken) return;
@@ -562,6 +807,7 @@
       rainLayer.addTo(map);
       coolLayer.addTo(map);
       drawCool();
+      loadDwd();
       if (!sm.date) {
         const now = new Date();
         sm.minute = Math.floor((now.getHours() * 60 + now.getMinutes()) / 5) * 5;
@@ -576,6 +822,8 @@
       rainLayer.remove();
       coolLayer.remove();
       drawCool();
+      drawShade();
+      drawDwd();
     }
   }
 
