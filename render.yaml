@@ -1,4 +1,5 @@
-# Render Blueprint: MyForrest as a Docker web service with a persistent disk for database and photos.
+# Render Blueprint: MyForrest as a Docker web service with a persistent disk for database and photos, plus
+# two private services: the own routing server (BRouter) and the map server (QGIS Server for WMS/WMTS/WFS).
 # In Render: New → Blueprint → this repository → Apply. Every push to main deploys anew.
 # Guide: docs/hosting.md (section "Render"). The free plan has no disk, so at least "starter" is needed.
 services:
@@ -19,8 +20,62 @@ services:
       # Requests reach the app through Render's proxies; the address of the visitor is in X-Forwarded-For.
       - key: TRUST_PROXY
         value: "true"
+      # Path magnet through the own BRouter below (forest profile) instead of brouter.de.
+      - key: ROUTER_HOSTPORT
+        fromService: { type: pserv, name: myforrest-brouter, property: hostport }
+      - key: ROUTER_PROFILE
+        value: myforrest-wald
+      # WMS/WMTS/WFS of the map server below under https://<this address>/ows/ (and in the metadata record).
+      - key: OWS_HOSTPORT
+        fromService: { type: pserv, name: myforrest-karten, property: hostport }
+      # Overlays: wildlife rest areas straight from geo.admin.ch, path network from OpenStreetMap (Overpass).
+      - key: WILDRUHE_LAYER
+        value: ch.bafu.wrz-wildruhezonen_portal
+      - key: WEGNETZ_URL
+        value: https://overpass-api.de/api/interpreter
       # Asked for when the Blueprint is created (optional, can stay empty).
       - key: ADMIN_EMAIL
         sync: false
       - key: SMTP_URL
         sync: false
+
+  # Routing along paths (deploy/brouter): loads the routing data for Switzerland (≈ 400 MB) onto its disk on first
+  # start and renews it every 30 days. Only reachable from MyForrest.
+  - type: pserv
+    name: myforrest-brouter
+    runtime: docker
+    branch: main
+    region: frankfurt
+    plan: starter
+    dockerfilePath: ./deploy/brouter/Dockerfile
+    dockerContext: ./deploy/brouter
+    autoDeployTrigger: commit
+    disk:
+      name: segments
+      mountPath: /segments
+      sizeGB: 2
+    envVars:
+      - key: BBOX
+        value: "5.9,45.8,10.5,47.9"
+      # 512 MB plan: leave room next to the Java heap.
+      - key: JAVA_OPTS
+        value: "-Xms64M -Xmx320M -Xmn16M -DmaxRunningTime=60"
+      - key: MAX_THREADS
+        value: "2"
+
+  # Map server (deploy/render/karten): QGIS Server with the project of deploy/qgis-server; fetches the GeoPackage
+  # export from MyForrest every 15 minutes. Only reachable through MyForrest (/ows/).
+  - type: pserv
+    name: myforrest-karten
+    runtime: docker
+    branch: main
+    region: frankfurt
+    plan: starter # with many layers or heavy use a larger plan (QGIS renders in memory)
+    dockerfilePath: ./deploy/render/karten/Dockerfile
+    dockerContext: .
+    autoDeployTrigger: commit
+    envVars:
+      - key: MYFORREST_HOSTPORT
+        fromService: { type: web, name: myforrest, property: hostport }
+      - key: EXPORT_MINUTES
+        value: "15"

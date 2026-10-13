@@ -180,9 +180,25 @@ starten (*Projekt → Aktion → Neu erstellen*).
 
 [Render](https://render.com) baut MyForrest aus dem `Dockerfile` direkt aus GitHub und deployt jeden Push auf
 `main` neu. Die Vorlage [`render.yaml`](https://github.com/michifrey/myforrest/blob/main/render.yaml) (ein
-*Blueprint*) legt alles fest: Docker, Region Frankfurt, Gesundheitsprüfung auf `/api/config` und eine **Disk**
-von 10 GB unter `/app/data` für Datenbank und Fotos. Ohne Disk wären die Daten nach jedem Deploy weg; der
-kostenlose Plan hat keine, darum steht in der Vorlage der Plan *Starter*.
+*Blueprint*) legt drei Dienste fest, alle in Frankfurt:
+
+| Dienst | Art | Wofür | Disk |
+|--------|-----|-------|------|
+| `myforrest` | Web Service (öffentlich) | die App, Gesundheitsprüfung auf `/api/config` | 10 GB unter `/app/data` für Datenbank und Fotos |
+| `myforrest-brouter` | Private Service | eigener Routing-Server für den Wege-Magnet, mit dem Waldprofil ([BRouter](https://github.com/michifrey/myforrest/blob/main/deploy/brouter/README.md)); lädt beim ersten Start die Routing-Daten der Schweiz (rund 400 MB) | 2 GB unter `/segments` |
+| `myforrest-karten` | Private Service | Kartenserver: QGIS Server mit dem Projekt aus [`deploy/qgis-server`](https://github.com/michifrey/myforrest/blob/main/deploy/qgis-server/README.md) für WMS, WMTS und WFS; holt den GeoPackage-Export alle 15 Minuten von MyForrest | – |
+
+Die beiden privaten Dienste sind nur von MyForrest aus erreichbar. MyForrest findet sie über ihre interne Adresse
+(`ROUTER_HOSTPORT`, `OWS_HOSTPORT`, von Render eingesetzt) und reicht die Karten unter **`https://<Adresse>/ows/`**
+weiter; dort gibt es also die Geodienste unter derselben Adresse wie die App, und der Metadaten-Eintrag für
+geocat.ch nennt sie. Zusätzlich schaltet die Vorlage die **Overlays** ein: Wildruhezonen direkt von geo.admin.ch
+(`WILDRUHE_LAYER`) und das Wegnetz aus OpenStreetMap für das Durchgehen (`WEGNETZ_URL`).
+
+Ohne Disk wären die Daten nach jedem Deploy weg; der kostenlose Plan hat keine, darum steht in der Vorlage der
+Plan *Starter*. Jeder der drei Dienste kostet nach Preisliste von Render (Plan *Starter* je etwa 7 $ im Monat,
+dazu die Disks). Wer den Routing-Server oder den Kartenserver nicht will, löscht den Dienst in `render.yaml` und
+die Zeile mit `ROUTER_HOSTPORT` bzw. `OWS_HOSTPORT`; dann nutzt der Wege-Magnet `brouter.de`, und `/ows/` gibt es
+nicht.
 
 1. Im [Dashboard von Render](https://dashboard.render.com) **New → Blueprint** wählen.
 2. GitHub verbinden (falls noch nicht geschehen) und das Repository **myforrest** auswählen. Render findet
@@ -192,6 +208,21 @@ kostenlose Plan hat keine, darum steht in der Vorlage der Plan *Starter*.
    erreichbar (die Adresse steht oben im Dienst). Diese Adresse übernimmt MyForrest selbst als `PUBLIC_URL`
    (aus `RENDER_EXTERNAL_URL`).
 5. Konto anlegen: ohne `SMTP_URL` steht der Bestätigungslink unter **Logs** im Dienst.
+
+**Schon mit einer früheren Vorlage eingerichtet?** Render übernimmt Änderungen an `render.yaml` über den
+Blueprint: im Dashboard unter **Blueprints → myforrest** die neuen Dienste prüfen und **Sync** (bzw. *Manual
+Sync*) auslösen. Danach baut Render die beiden privaten Dienste und setzt bei MyForrest die neuen Variablen.
+Der Routing-Server braucht beim ersten Start einige Minuten für die Routing-Daten; bis dahin meldet der
+Wege-Magnet, dass der Routing-Dienst nicht erreichbar ist. Prüfen lässt sich alles von aussen:
+
+```text
+https://<Adresse>/api/config                                   "routing": true, "wildlifeZones": true
+https://<Adresse>/ows/?SERVICE=WMS&REQUEST=GetCapabilities      WMS des Kartenservers
+https://<Adresse>/api/metadata/geocat.xml                       nennt WMS, WMTS und WFS unter /ows/
+```
+
+Mit 512 MB (*Starter*) läuft QGIS Server für die Ebenen von MyForrest; wird es bei vielen gleichzeitigen
+Kartenanfragen knapp, im Dienst `myforrest-karten` unter **Settings → Instance Type** grösser wählen.
 
 Weitere Einstellungen ([Umgebungsvariablen](installation.md#umgebungsvariablen)) im Dienst unter
 **Environment**; eine eigene Domain unter **Settings → Custom Domains** (dann `PUBLIC_URL` auf diese Adresse

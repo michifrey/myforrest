@@ -107,6 +107,7 @@ function createApp({
   // Mapillary pictures in the walk-through and on the map (src/mapillary.js); off without a token.
   mapillaryToken = process.env.MAPILLARY_TOKEN || '', mapillaryFetch = fetch,
   waynetUrl = process.env.WEGNETZ_URL || '', waynetFetch = fetch,
+  owsUpstream = process.env.OWS_UPSTREAM || '', owsFetch = fetch,
   wildlifeLayer = undefined, wildlifeFetch = fetch,
   // Maps of the Deutscher Wetterdienst over the sun mode (src/dwd.js): fetch for the capabilities.
   dwdFetch = fetch,
@@ -1270,6 +1271,8 @@ function createApp({
   }
   require('./routes/walk')(app, { db, accounts, thumbs, mapillary, waynet, transition: photoTransition });
   require('./routes/ogc')(app, { db, spotRadiusM, dataDir, background, tiles: tileOptions });
+  // QGIS Server's WMS/WMTS/WFS under /ows/ when it runs as a private service (OWS_UPSTREAM, e.g. on Render).
+  require('./routes/ows-proxy')(app, { upstream: owsUpstream, fetchImpl: owsFetch });
   require('./routes/video')(app, { db, uploadDir, tmpDir, spotRadiusM, activities: ACTIVITIES, photoJson, getPhoto, setTags, alignPhoto, analyzeChange, analyzeContext, background, safeAlign, classifySpot });
   const push = require('./routes/push')(app, { db, idParam, adminEmail, ...pushOptions });
   app.locals.push = push;

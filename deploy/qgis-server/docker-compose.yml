@@ -59,6 +59,8 @@ services:
     environment:
       QGIS_PROJECT_FILE: /io/project/myforrest.qgz
       QGIS_SERVER_LOG_LEVEL: 1
+      # The nginx service below is in front: only FastCGI (port 9993) here.
+      SKIP_NGINX: "true"
       QGIS_SERVER_SERVICE_URL: ${PUBLIC_URL:-http://localhost:8080}/ows/
     volumes:
       - ./project:/io/project:ro
