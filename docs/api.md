@@ -5,7 +5,7 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 
 | Methode  | Pfad                         | Zweck                                                    |
 |----------|------------------------------|----------------------------------------------------------|
-| `GET`    | `/api/config`                | Tag-Vokabular, Aktivitäten, aktivierte Features (u. a. `mapillary`), Landschaftsprofile (`landscapes`: Bezeichnung und Beobachtungen je Profil) und Gletscherinventare (`glaciers.years`, `null` ohne Umrisse) |
+| `GET`    | `/api/config`                | Tag-Vokabular, Aktivitäten, aktivierte Features (u. a. `mapillary`, `terrain` für die 3D-Karte), Landschaftsprofile (`landscapes`: Bezeichnung und Beobachtungen je Profil) und Gletscherinventare (`glaciers.years`, `null` ohne Umrisse) |
 | `GET`    | `/api/spots?tag=…`           | Alle Spots mit Anzahl Fotos, Zeitraum, Tags, Blickrichtung (`heading`), Landschaft (`landscape`) und Vorschaubild (`latestThumbUrl`) |
 | `GET`    | `/api/spots/:id`             | Ein Spot mit Blickrichtung, Landschaft (`landscape`, `landscapeSource`: `upload`, `auto`, `manual` oder `null`) und allen Fotos chronologisch (jedes Foto mit `url`, `thumbUrl` und `largeUrl`, `archive` für Archivfotos, `panorama` für 360°-Bilder und `alignment`: bei Fotos die Homographie `h`, bei Panoramen `kind: 'rotation'` mit der Drehung `r`, `yaw` und `tilt`) |
 | `GET`    | `/thumbs/:datei`             | Vorschaubilder (WebP)                                    |
@@ -63,6 +63,7 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/spots/:id/glacier`     | Gletscher am Spot: `glacier` (Name, `latestYear`, `distanceM` zum Eis des neusten Inventars, `history` mit `ice` pro Inventarjahr, `id` als SGI-Id, falls vorhanden), `length` (Längenänderung aus GLAMOS: `total`, `firstYear`, `lastYear`, `recentRate` in m pro Jahr, `points` mit `year`, `change`, `cumulative`; sonst `null`) und `satellite` (Schnee- und Eisanteil: `monthly`, `summers` mit dem Spätsommerwert pro Jahr, `iceFreeSince`, `meltOut` mit dem Monat der Ausaperung pro Jahr, `status`) |
 | `GET`    | `/api/spots/:id/archive-suggestions` | Archivbilder aus dem Katalog (`ARCHIV_KATALOG`) in der Nähe: `enabled` und `items` (`id`, `title`, `year`, `date`, `distanceM`, `heading`, `source`, `license`, `page`, `importable`, `photoId`, falls schon übernommen) |
 | `POST`   | `/api/spots/:id/archive-suggestions/:itemId` | Archivbild als Archivfoto des Spots übernehmen (Anmeldung; 409, wenn die Lizenz es nicht erlaubt oder es schon übernommen ist; 502, wenn das Archiv das Bild nicht liefert); Antwort wie `POST /api/photos` |
+| `GET`    | `/api/terrain/:z/:x/:y.png`  | Geländekachel für die 3D-Karte (PNG, Terrarium-Kodierung: Höhe = R·256 + G + B/256 − 32768 m), Zoom 0–15; der Server holt sie einmal von `TERRAIN_URL` und hält sie unter `data/terrain`; `404` wo es keine Daten gibt oder ohne `TERRAIN_URL` |
 | `GET`    | `/api/glaciers?bbox=&year=`  | Gletscherumrisse als GeoJSON (vereinfacht, `name` und `year` pro Umriss), alle Inventare oder eines; `years` listet die Inventarjahre |
 | `POST`   | `/api/spots/:id/species`     | Baumart einem Spot zuordnen (`{ scientificName }`)       |
 | `DELETE` | `/api/spots/:id/species?name=` | Baumart vom Spot entfernen                             |

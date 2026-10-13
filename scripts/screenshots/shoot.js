@@ -155,6 +155,28 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.close();
   }
 
+  if (want('karte3d')) {
+    // The 3D map: the spots on the demo terrain, tilted, with the popup of a spot.
+    const page = await explore(ctx);
+    await page.click('#map3d-toggle');
+    await page.waitForFunction(() => window.Map3D?.map?.loaded(), null, { timeout: 120000, polling: 1000 });
+    await page.evaluate(() => window.Map3D.map.jumpTo({ center: [8.5745, 47.3738], zoom: 15.2, pitch: 64, bearing: -32 }));
+    await page.waitForFunction(() => window.Map3D.map.areTilesLoaded(), null, { timeout: 120000, polling: 1000 });
+    await settle(page, 3000);
+    await page.evaluate(() => window.Map3D.showSpot(1));
+    await settle(page, 4000);
+    await page.screenshot({ path: out('karte-3d.jpg'), ...jpg });
+    // From a spot: "Umgebung in 3D" looks the way its photos look.
+    await page.evaluate(() => window.Map3D.close());
+    await pin(page, 3).click();
+    await settle(page, 2500);
+    await page.click('#spot-3d');
+    await page.waitForFunction(() => window.Map3D?.map?.loaded(), null, { timeout: 120000, polling: 1000 });
+    await settle(page, 4000);
+    await page.screenshot({ path: out('karte-3d-spot.jpg'), ...jpg });
+    await page.close();
+  }
+
   if (want('timelapse')) {
     // Frames at twice the resolution, scaled down to 480 px for the GIF.
     const page = await explore(await desktop(browser, { deviceScaleFactor: 2 }));

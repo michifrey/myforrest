@@ -944,6 +944,41 @@ sinkt mit der Erdkrümmung (samt Lichtbrechung) ab. Der Rand eines Schattens ist
 Breite der Sonnenscheibe (0,53°), der Halbschatten ist bei fernen Bergen breiter als bei nahen. Bäume und
 Gebäude sind nicht im Höhenmodell; den Schatten eines einzelnen Baums zeigt weiterhin die Linie am Spot.
 
+### 3D-Karte
+
+![3D-Karte: Spots auf dem Gelände, schräg von oben, mit dem Popup eines Spots](screenshots/karte-3d.jpg)
+
+Der Knopf **3D** neben den Kartenmodi zeigt die Spots auf einem Geländemodell, schräg von oben. So sieht man,
+an welchem Hang, in welchem Tobel oder auf welcher Kuppe ein Spot liegt, und wie Wege und Bäche im Gelände
+verlaufen. Die Ansicht beginnt dort, wo die flache Karte gerade steht, gekippt um gut 60°.
+
+- **Bewegen**: ziehen verschiebt, das Mausrad zoomt; mit der rechten Maustaste (am Handy mit zwei Fingern)
+  kippen und drehen. Der Kompass oben rechts stellt die Karte wieder nach Norden.
+- **Spots** erscheinen in den Farben der Karte (grün unauffällig, orange Schäden, violett Neophyten), grösser
+  mit mehr Fotos; der gerade offene Spot hat einen goldenen Rand. Ein goldener Fächer auf dem Gelände zeigt die
+  Blickrichtung (wie die Sichtkegel der flachen Karte). Ein Klick zeigt Vorschaubild, Anzahl Fotos, Zeitraum und
+  Höhe; *Spot öffnen* führt zur Zeitreise.
+- **Aus einem Spot**: *Umgebung in 3D* (bei den Knöpfen unter dem Foto) öffnet die 3D-Karte am Spot, von
+  hinten in seine Blickrichtung, mit seinem Popup.
+- **Hintergrund**: *Karte (OSM)* oder *Luftbild (CH)*, das SWISSIMAGE-Luftbild von swisstopo (nur Schweiz).
+- **Überhöhung**: 1×, 1,5× (Standard), 2× oder 3×; im Mittelland macht erst die Überhöhung flache Hügel
+  sichtbar. Hintergrund und Überhöhung merkt sich das Gerät.
+- Die **Route** aus *Touren & Aufträge* (gezeichnet, aufgezeichnet oder importiert) liegt golden auf dem Gelände,
+  ebenso die **Gletscherumrisse** (das jüngste Inventar), wenn Inventare geladen sind.
+- **Route abfliegen** (erscheint, wenn eine Route da ist): die Kamera fliegt die Route ab, schräg von oben und
+  rund 300 m vorausschauend, in 20 bis 90 Sekunden je nach Länge. Ein zweiter Klick oder ein Griff in die
+  Karte hält an.
+- *Schliessen* (oder Esc) führt zurück auf die flache Karte, an den Ort, an dem man in 3D zuletzt war.
+
+Das Gelände kommt als Kacheln der [Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (AWS Open Data,
+in Europa EU-DEM mit rund 25 m, sonst SRTM). Der Server holt jede Kachel einmal und hält sie unter `data/terrain`
+(`GET /api/terrain/{z}/{x}/{y}.png`); der Browser spricht nur mit MyForrest, und offline bleiben besuchte
+Kacheln im Service Worker. MapLibre (dieselbe Bibliothek wie die Vektorkarte) lädt erst, wenn die 3D-Karte
+geöffnet wird. Ohne WebGL oder mit `TERRAIN_URL=` (leer) gibt es den Knopf nicht. In der Android-App
+funktioniert die 3D-Karte wie im Browser.
+
+![Die Umgebung eines Spots in 3D, in seine Blickrichtung](screenshots/karte-3d-spot.jpg)
+
 ### DWD-Karten einblenden
 
 Unter *DWD-Karte* lässt sich eine Karte des Deutschen Wetterdienstes über die Karte legen (WMS von

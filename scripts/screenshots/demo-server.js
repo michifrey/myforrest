@@ -6,6 +6,7 @@ const path = require('path');
 const sharp = require('sharp');
 const { createApp } = require('../../src/app');
 const glacier = require('./glacier-demo');
+const tiles = require('./tiles');
 
 // DEMO_MAPILLARY=1: a stand-in for the Mapillary API, a 360° sequence crossing the forest track of the
 // walk-through (seed.js) from north-west to south-east, with panoramas drawn like the demo ones.
@@ -185,6 +186,11 @@ const app = createApp({
     glamosFiles: path.join(glacierDir, 'glamos-laenge.csv'), archiveFiles: path.join(glacierDir, 'archiv-katalog.csv'), archiveFetch,
   } : {}),
   weatherFetch,
+  // Terrain of the 3D map from the demo terrain (the same hills as the placeholder map and the shadows).
+  terrainFetch: async (url) => {
+    const [z, x, y] = url.match(/\/(\d+)\/(\d+)\/(\d+)\.png$/).slice(1).map(Number);
+    return new Response(await tiles.terrariumTile(z, x, y), { headers: { 'Content-Type': 'image/png' } });
+  },
   waynetUrl: 'https://overpass.demo.invalid/api/interpreter', waynetFetch: overpassFetch,
   tileOptions: { precompute: false },
   // Sign-in buttons for the screenshots; the demo never talks to Google, GitHub, Microsoft, Switch or AGOV.

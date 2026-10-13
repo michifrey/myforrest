@@ -966,6 +966,8 @@
       setTab('auftraege');
     },
   };
+  /** The current route as points ({ lat, lon }), e.g. for the 3D map. */
+  Tours.points = () => routePoints();
   window.Tours = Tours;
 
   /* ---------- Panel ---------- */

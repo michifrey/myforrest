@@ -613,7 +613,7 @@ $('spot-on-map').addEventListener('click', () => {
   map.setView([lat, lon], Math.max(map.getZoom(), 17));
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape' || $('spot').hidden || document.querySelector('dialog[open]') || !$('camera').hidden) return;
+  if (e.key !== 'Escape' || $('spot').hidden || document.querySelector('dialog[open], [aria-modal="true"]:not([hidden])') || !$('camera').hidden) return;
   if (e.target !== document.body && !e.target.closest?.('#explore')) return; // e.g. the account menu has its own
   closeSpot();
 });

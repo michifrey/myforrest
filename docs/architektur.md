@@ -61,6 +61,7 @@ src/mp4.js           MP4-Boxen lesen: Telemetrie-Spur, Startzeit, Dauer, 360°-M
 src/gpmf.js          GoPro-Telemetrie (GPMF): GPS5/GPS9, GPSU, SCAL
 src/video.js         Bilder entlang der Strecke planen, Blickrichtung, Schärfe und Wahl des schärfsten Bildes, ffmpeg-Aufruf
 src/routes/video.js  Video-Upload und Fortschritt (/api/videos)
+src/routes/terrain.js  Geländekacheln der 3D-Karte: einmal von TERRAIN_URL geholt, unter data/terrain gehalten (/api/terrain)
 src/routes/walk.js   Durchgehen: Nachbarbilder entlang einer Reihe, entlang der Wege, zu Spots und zu Mapillary-Bildern in der Nähe, Schritte mit Tiefe (/api/walk, /api/mapillary)
 src/waynet.js        Wegnetz aus OpenStreetMap (Overpass, pro Feld zwischengespeichert): Standort auf den Weg setzen, kürzeste Wege zu Bildern, Richtung, in die der Weg wegführt
 src/mapillary.js     Mapillary API v4: Suche pro Feld (zwischengespeichert), Bild über den Server (Token bleibt dort), Urheber und Lizenz
@@ -127,6 +128,7 @@ public/offline-queue.js  Warteschlange für Uploads ohne Verbindung (IndexedDB, 
 public/pwa.js        Registrierung, Warteschlangen-Anzeige, Installieren-Knopf, Kamera-Aufnahme im Upload, Erlaubnis für Benachrichtigungen
 public/offline-map.js  Karte und Spots entlang einer Route offline speichern (eigener Cache pro Route)
 public/drive-select.js  Fahrtmodus: welche der Bilder einer Fahrt behalten werden (Spots, Abstand, Stillstand, Schärfe, Differenz-Hash)
+public/map3d.js      3D-Karte: Spots, Route und Gletscher auf dem Gelände mit MapLibre (erst beim Öffnen geladen)
 public/drive.js      Fahrtmodus (Handy als Dashcam): Kamera, GPS-Route, Upload über die Warteschlange; in der Android-App nur Anzeige und Upload
 public/native.js     Brücke zur Android-App (nativeApp, im Browser null): Aufzeichnung und Fahrtmodus im Hintergrund
 android/             Android-App (Java, ohne Bibliotheken): WebView mit der Web-App, Dienst im Vordergrund für GPS und Kamera,
