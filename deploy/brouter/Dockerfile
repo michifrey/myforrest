@@ -35,7 +35,8 @@ ENV BBOX="5.9,45.8,10.5,47.9" \
     MAX_THREADS=4 \
     JAVA_OPTS="-Xms128M -Xmx512M -Xmn16M -DmaxRunningTime=60"
 
-USER 1000
+# Starts as root only to hand /segments to user 1000 (disks of hosting platforms belong to root); BRouter itself
+# runs as user 1000 (entrypoint.sh).
 VOLUME ["/segments"]
 EXPOSE 17777
 ENTRYPOINT ["/usr/local/bin/brouter-entrypoint"]

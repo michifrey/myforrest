@@ -76,6 +76,7 @@ src/lv95.js          Schweizer Landeskoordinaten LV95 ↔ WGS84 (Näherungsforme
 src/geodata.js       Daten als GIS-Collections (Spots, Fotos, Funde, Ausbreitungsfronten)
 src/gpkg.js          GeoPackage-Schreiber (OGC GeoPackage 1.3) ohne GDAL
 src/routes/ogc.js    OGC API – Features und GeoPackage-Export
+src/routes/ows-proxy.js  /ows/ an QGIS Server weiterreichen (OWS_UPSTREAM), mit der öffentlichen Adresse für die Links der Capabilities
 src/tiles.js         Vektorkacheln: WebMercatorQuad, Kachelindex (geojson-vt), MVT-Kodierung (vt-pbf)
 src/tiles-lv95.js    Vektorkacheln im Schweizer Kachelgitter LV95 (swisstopo): Zuschnitt pro Kachel, MVT-Kodierung
 src/tile-cache.js    Vorberechnete Kacheln in data/tiles/tiles.db (pro Datenversion, gzip, Umschalten am Ende)
@@ -104,6 +105,7 @@ deploy/qgis-server/  Vorlage: MyForrest + QGIS Server (WMS/WMTS/WFS) + BRouter +
 deploy/brouter/      Eigener Routing-Server (BRouter) für den Wege-Magnet, lädt seine Routing-Daten selbst
 deploy/vps/          Vorlage: MyForrest + Caddy (HTTPS automatisch) per Docker Compose für einen VPS, siehe hosting.md
 deploy/synology/     Vorlage: MyForrest für den Container Manager einer Synology NAS, siehe hosting.md
+deploy/render/karten/  Kartenserver für Render: QGIS Server mit dem Projekt, holt den GeoPackage-Export selbst (render.yaml)
 Dockerfile           Container für MyForrest (mit ffmpeg)
 render.yaml          Blueprint für Render: Docker-Dienst mit Disk, Deploy bei jedem Push auf main, siehe hosting.md
 docs/                Dokumentation; docs/screenshots/ enthält die Bilder für das README

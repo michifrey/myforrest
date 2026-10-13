@@ -1,4 +1,4 @@
-# QGIS Server (FastCGI on 5555) with the project from deploy/qgis-server. The
+# QGIS Server (FastCGI on 9993) with the project from deploy/qgis-server. The
 # GeoPackage it publishes lives in an emptyDir that the "export" sidecar
 # refreshes from MyForrest every 15 minutes, so no shared volume is needed.
 apiVersion: apps/v1
@@ -32,10 +32,12 @@ spec:
           env:
             - { name: QGIS_PROJECT_FILE, value: /io/project/myforrest.qgz }
             - { name: QGIS_SERVER_LOG_LEVEL, value: "1" }
+            # nginx runs in its own pod: only FastCGI here.
+            - { name: SKIP_NGINX, value: "true" }
             - { name: QGIS_SERVER_SERVICE_URL, value: http://localhost:8080/ows/ }
           ports:
             - name: fcgi
-              containerPort: 5555
+              containerPort: 9993
           volumeMounts:
             - { name: project, mountPath: /io/project, readOnly: true }
             - { name: data, mountPath: /io/data, readOnly: true }
@@ -73,5 +75,5 @@ spec:
   selector: { app.kubernetes.io/name: qgis-server }
   ports:
     - name: fcgi
-      port: 5555
+      port: 9993
       targetPort: fcgi

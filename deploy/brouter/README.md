@@ -32,6 +32,10 @@ eine Erneuerung fehl, läuft der Server mit den vorhandenen Daten weiter.
 | `PORT`, `MAX_THREADS` | `17777`, `4` | Port und gleichzeitige Berechnungen |
 | `JAVA_OPTS` | `-Xms128M -Xmx512M …` | Speicher; 512 MB reichen für die Schweiz |
 
+Der Container startet als root, übergibt das Segment-Verzeichnis dem Benutzer 1000 (Disks von Plattformen wie
+Render gehören root) und startet BRouter als dieser Benutzer. Auf Render läuft er als privater Dienst
+`myforrest-brouter` aus [`render.yaml`](https://github.com/michifrey/myforrest/blob/main/render.yaml).
+
 ## Waldprofil `myforrest-wald`
 
 Für Leute, die im Wald unterwegs sind. Kosten pro Meter (1 = Forststrasse); ein Umweg wird genommen, solange
