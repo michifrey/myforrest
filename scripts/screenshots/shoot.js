@@ -162,6 +162,14 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.evaluate(() => window.Map3D.showSpot(1));
     await settle(page, 4000);
     await page.screenshot({ path: out('karte-3d.jpg'), ...jpg });
+    // From a spot: "Umgebung in 3D ansehen" looks the way its photos look.
+    await page.evaluate(() => window.Map3D.close());
+    await pin(page, 3).click();
+    await settle(page, 2500);
+    await page.click('#spot-3d');
+    await page.waitForFunction(() => window.Map3D?.map?.loaded(), null, { timeout: 120000, polling: 1000 });
+    await settle(page, 4000);
+    await page.screenshot({ path: out('karte-3d-spot.jpg'), ...jpg });
     await page.close();
   }
 

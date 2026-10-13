@@ -926,8 +926,11 @@ verlaufen. Die Ansicht beginnt dort, wo die flache Karte gerade steht, gekippt u
 - **Bewegen**: ziehen verschiebt, das Mausrad zoomt; mit der rechten Maustaste (am Handy mit zwei Fingern)
   kippen und drehen. Der Kompass oben rechts stellt die Karte wieder nach Norden.
 - **Spots** erscheinen in den Farben der Karte (grün unauffällig, orange Schäden, violett Neophyten), grösser
-  mit mehr Fotos; der gerade offene Spot hat einen goldenen Rand. Ein Klick zeigt Vorschaubild, Anzahl Fotos,
-  Zeitraum und Höhe; *Spot öffnen* führt zur Zeitreise.
+  mit mehr Fotos; der gerade offene Spot hat einen goldenen Rand. Ein goldener Fächer auf dem Gelände zeigt die
+  Blickrichtung (wie die Sichtkegel der flachen Karte). Ein Klick zeigt Vorschaubild, Anzahl Fotos, Zeitraum und
+  Höhe; *Spot öffnen* führt zur Zeitreise.
+- **Aus einem Spot**: *Umgebung in 3D ansehen* (unter dem Titel des Spots) öffnet die 3D-Karte am Spot, von
+  hinten in seine Blickrichtung, mit seinem Popup.
 - **Hintergrund**: *Karte (OSM)* oder *Luftbild (CH)*, das SWISSIMAGE-Luftbild von swisstopo (nur Schweiz).
 - **Überhöhung**: 1×, 1,5× (Standard), 2× oder 3×; im Mittelland macht erst die Überhöhung flache Hügel
   sichtbar. Hintergrund und Überhöhung merkt sich das Gerät.
@@ -941,6 +944,8 @@ in Europa EU-DEM mit rund 25 m, sonst SRTM). Der Server holt jede Kachel einmal 
 Kacheln im Service Worker. MapLibre (dieselbe Bibliothek wie die Vektorkarte) lädt erst, wenn die 3D-Karte
 geöffnet wird. Ohne WebGL oder mit `TERRAIN_URL=` (leer) gibt es den Knopf nicht. In der Android-App
 funktioniert die 3D-Karte wie im Browser.
+
+![Die Umgebung eines Spots in 3D, in seine Blickrichtung](screenshots/karte-3d-spot.jpg)
 
 ### DWD-Karten einblenden
 

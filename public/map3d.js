@@ -44,6 +44,23 @@
     };
   }
 
+  /** The view direction of the spots as a fan of 60° and 45 m on the ground, like the cones of the flat map. */
+  function coneFeatures() {
+    const R = 45;
+    const features = [];
+    for (const s of state.spots || []) {
+      if (!Number.isFinite(s.heading)) continue;
+      const ring = [[s.lon, s.lat]];
+      for (let a = -30; a <= 30; a += 6) {
+        const t = ((s.heading + a) * Math.PI) / 180;
+        ring.push([s.lon + (Math.sin(t) * R) / (111320 * Math.cos((s.lat * Math.PI) / 180)), s.lat + (Math.cos(t) * R) / 111320]);
+      }
+      ring.push([s.lon, s.lat]);
+      features.push({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [ring] }, properties: { id: s.id } });
+    }
+    return { type: 'FeatureCollection', features };
+  }
+
   function routeFeature() {
     const pts = window.Tours?.points?.() || [];
     return {
@@ -67,6 +84,7 @@
         hill: { ...dem },
         spots: { type: 'geojson', data: spotFeatures() },
         route: { type: 'geojson', data: routeFeature() },
+        cones: { type: 'geojson', data: coneFeatures() },
         glaciers: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
       },
       layers: [
@@ -75,6 +93,7 @@
         { id: 'hillshade', type: 'hillshade', source: 'hill', paint: { 'hillshade-exaggeration': 0.3, 'hillshade-shadow-color': '#2b3a2c' } },
         { id: 'glacier-fill', type: 'fill', source: 'glaciers', paint: { 'fill-color': '#9ad0ec', 'fill-opacity': 0.45 } },
         { id: 'glacier-line', type: 'line', source: 'glaciers', paint: { 'line-color': '#3d8fc0', 'line-width': 1.2 } },
+        { id: 'cones', type: 'fill', source: 'cones', paint: { 'fill-color': '#c9a227', 'fill-opacity': 0.4 } },
         { id: 'route-casing', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.8 } },
         { id: 'route', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#c9a227', 'line-width': 4 } },
         {
@@ -139,8 +158,10 @@
     view.map.setLayoutProperty('swissimage', 'visibility', base === 'luftbild' ? 'visible' : 'none');
   }
 
-  async function open() {
+  /** Opens the 3D view where the flat map is, or at a spot (looking its way, with its popup). */
+  async function open(options = {}) {
     if (view) return;
+    const spot = options.spot || null;
     const exag = el('select', { id: 'map3d-exag', 'aria-label': 'Überhöhung' },
       [[1, 'Gelände 1×'], [1.5, 'Gelände 1,5×'], [2, 'Gelände 2×'], [3, 'Gelände 3×']].map(([v, t]) => el('option', { value: String(v), text: t })));
     exag.value = String(prefs.exaggeration);
@@ -179,12 +200,13 @@
     }
     if (!view || view.root !== root) return;
     const c = map.getCenter();
+    const camera = spot
+      // Behind the spot, looking where its photos look (north without a direction).
+      ? { center: [spot.lon, spot.lat], zoom: 16, pitch: 70, bearing: Number.isFinite(spot.heading) ? spot.heading : 0 }
+      : { center: [c.lng, c.lat], zoom: Math.max(3, map.getZoom() - 0.5), pitch: 62, bearing: -15 };
     let m;
     try {
-      m = new maplibregl.Map({
-        container, style: style(), center: [c.lng, c.lat],
-        zoom: Math.max(3, map.getZoom() - 0.5), pitch: 62, bearing: -15, maxPitch: 80, attributionControl: { compact: true },
-      });
+      m = new maplibregl.Map({ container, style: style(), ...camera, maxPitch: 80, attributionControl: { compact: true } });
     } catch {
       status.textContent = 'Dieses Gerät kann keine 3D-Karte zeigen (WebGL fehlt).';
       return;
@@ -192,7 +214,11 @@
     view.map = m;
     m.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
     m.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
-    m.on('load', () => { status.hidden = true; loadGlaciers(m); });
+    m.on('load', () => {
+      status.hidden = true;
+      loadGlaciers(m);
+      if (spot) popupFor(maplibregl, m, spot.id, [spot.lon, spot.lat]);
+    });
     m.on('moveend', () => loadGlaciers(m));
     m.on('error', (e) => {
       console.warn('3D-Karte:', e?.error?.message || e);
@@ -221,12 +247,18 @@
 
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && view) close(); });
   const btn = $('map3d-toggle');
-  btn.addEventListener('click', open);
+  btn.addEventListener('click', () => open());
+  // In a spot: its surroundings in 3D.
+  $('spot-3d').addEventListener('click', () => {
+    const s = state.spot && (state.spots || []).find((x) => x.id === state.spot.id);
+    if (s) open({ spot: s });
+  });
   // Shown once the server says it has terrain (api/config).
   const waitConfig = setInterval(() => {
     if (!('terrain' in state.config)) return;
     clearInterval(waitConfig);
     btn.hidden = !state.config.terrain;
+    $('spot-3d').hidden = !state.config.terrain;
   }, 300);
 
   window.Map3D = { open, close, showSpot, map: null };
