@@ -99,6 +99,8 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 
 ### Durchgehen und Startseite
 
+- Explorer aufgeräumt (eine Leiste für Filter und Kartenmodi, schmale Explorer-Karte mit Bildkacheln) und Spots
+  als eigene Detailseite: grosses Foto, Tabs, Minikarte und Blättern durch die Spots
 - Durchgehen wie Street View: Pfeile entlang der Aufnahme und zu Spots in der Nähe, Blickrichtung bleibt beim Schritt
 - Startseite mit wechselnden Landschaften (Wald, Gletscher, Gebirge, Wüste)
 - Weiche Übergänge im Durchgehen: zum Weg drehen, Zoom in Gehrichtung mit Überblendung

@@ -380,7 +380,7 @@ async function loadSpots({ fit = false } = {}) {
     map.fitBounds(L.latLngBounds(state.spots.map((s) => [s.lat, s.lon])), {
       maxZoom: 16,
       paddingTopLeft: [40, 150],
-      paddingBottomRight: [wide ? $('panel').offsetWidth + 60 : 40, 50],
+      paddingBottomRight: [wide ? $('welcome').offsetWidth + 60 : 40, 50],
     });
   }
 }
@@ -418,7 +418,7 @@ function renderStats(updateHero = true) {
   const photos = state.spots.reduce((n, s) => n + s.photoCount, 0);
   const damaged = state.spots.filter((s) => s.tags.some((t) => DAMAGE_TAGS.includes(t) || t === 'neophyt')).length;
   const stat = (value, label) => el('div', { class: 'stat' }, [el('b', { text: String(value) }), el('span', { text: label })]);
-  $('stats').replaceChildren(stat(state.spots.length, 'Spots'), stat(photos, 'Fotos'), stat(damaged, 'mit Befund'));
+  $('stats').replaceChildren(stat(state.spots.length, state.spots.length === 1 ? 'Spot' : 'Spots'), stat(photos, photos === 1 ? 'Foto' : 'Fotos'), stat(damaged, 'mit Befund'));
 
   if (updateHero) {
     const years = state.spots.length
@@ -442,10 +442,8 @@ function renderStats(updateHero = true) {
   $('recent').replaceChildren(...(recent.length
     ? recent.map((s) => el('button', { type: 'button', onclick: () => openSpot(s.id) }, [
       el('img', { src: s.latestThumbUrl || s.latestUrl, alt: '', loading: 'lazy' }),
-      el('div', {}, [
-        el('strong', { text: `Spot ${s.id}` }),
-        el('span', { text: `${s.photoCount} Foto${s.photoCount === 1 ? '' : 's'} · zuletzt ${fmtDate(s.lastTaken)}` }),
-      ]),
+      el('strong', { text: `Spot ${s.id}` }),
+      el('span', { text: `${s.photoCount} Foto${s.photoCount === 1 ? '' : 's'} · ${fmtDate(s.lastTaken)}` }),
     ]))
     : [el('p', { class: 'empty', text: 'Noch keine Fotos – sei die erste Person, die hier etwas festhält.' })]));
 }
@@ -470,21 +468,27 @@ async function openSpot(id, photoId) {
   state.index = wanted >= 0 ? wanted : photos.length - 1;
 
   highlightPin(id);
+  const sameSpot = !$('spot').hidden && $('spot').dataset.id === String(id);
+  $('spot').dataset.id = String(id);
   $('welcome').hidden = true;
   $('spot').hidden = false;
-  if (window.matchMedia('(max-width: 860px)').matches) {
-    $('panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  } else {
+  $('explore').classList.add('spot-open');
+  if (!sameSpot) {
+    selectSpotTab('beobachtung');
+    // The detail page fills the map section: bring it into view and start at its top.
+    const top = $('explore').getBoundingClientRect().top;
+    if (Math.abs(top) > 8) $('explore').scrollIntoView({ behavior: 'smooth', block: 'start' });
     $('panel').scrollTop = 0;
   }
-  $('compare').hidden = true;
   $('spot-title').textContent = `Spot ${state.spot.id}`;
   const years = new Set(photos.map((p) => new Date(p.takenAt).getFullYear()));
-  $('spot-meta').textContent =
-    `${state.spot.lat.toFixed(5)}, ${state.spot.lon.toFixed(5)} · ${photos.length} Foto${photos.length === 1 ? '' : 's'} · ` +
-    `${fmtDate(photos[0].takenAt)} – ${fmtDate(photos[photos.length - 1].takenAt)} (${years.size} Jahr${years.size === 1 ? '' : 'e'})` +
-    (hasHeading(state.spot) ? ` · ${headingText(state.spot.heading)}` : '') +
-    (hiding ? ` · ${drive} Fahrtbild${drive === 1 ? '' : 'er'} ausgeblendet` : '');
+  const fact = (label, value) => el('div', {}, [el('dt', { text: label }), el('dd', { text: value })]);
+  $('spot-meta').replaceChildren(
+    fact('Fotos', `${photos.length}${hiding ? ` (${drive} Fahrtbild${drive === 1 ? '' : 'er'} ausgeblendet)` : ''}`),
+    fact('Zeitraum', `${fmtDate(photos[0].takenAt)} – ${fmtDate(photos[photos.length - 1].takenAt)} (${years.size} Jahr${years.size === 1 ? '' : 'e'})`),
+    ...(hasHeading(state.spot) ? [fact('Blick', headingText(state.spot.heading).replace(/^Blick /, ''))] : []),
+    fact('Lage', `${state.spot.lat.toFixed(5)}, ${state.spot.lon.toFixed(5)}`),
+  );
   renderSiblings(state.spot);
   renderSplit(state.spot);
   const allTags = [...new Set(photos.flatMap((p) => p.tags))].sort();
@@ -509,8 +513,110 @@ async function openSpot(id, photoId) {
   loadSpotStorms(state.spot);
   renderSpecies(state.spot);
   renderElevation(state.spot);
+  renderSpotStep(state.spot);
+  renderMinimap(state.spot);
   map.setView([state.spot.lat, state.spot.lon], Math.max(map.getZoom(), 15));
 }
+
+/* ---------- Spot detail page: tabs, stepping through spots, mini map ---------- */
+
+function selectSpotTab(name) {
+  for (const tab of document.querySelectorAll('.spot-tabs [role="tab"]')) {
+    const on = tab.dataset.tab === name;
+    tab.setAttribute('aria-selected', String(on));
+    tab.tabIndex = on ? 0 : -1;
+    $(tab.getAttribute('aria-controls')).hidden = !on;
+  }
+  // The comparison computes its alignment only while it is shown.
+  $('compare').hidden = name !== 'vergleich';
+}
+
+document.querySelector('.spot-tabs').addEventListener('click', (e) => {
+  const tab = e.target.closest('[role="tab"]');
+  if (tab) selectSpotTab(tab.dataset.tab);
+});
+document.querySelector('.spot-tabs').addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+  const tabs = [...document.querySelectorAll('.spot-tabs [role="tab"]:not([hidden])')];
+  const i = tabs.indexOf(document.activeElement);
+  if (i < 0) return;
+  const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+  selectSpotTab(next.dataset.tab);
+  next.focus();
+});
+
+// "Verlauf" gathers the chronicle, the glacier and the vegetation series: shown once one of them has content.
+const historyParts = ['chronicle-wrap', 'glacier-wrap', 'vegetation-wrap'].map($);
+function syncHistoryTab() {
+  const empty = historyParts.every((part) => part.hidden);
+  $('tab-verlauf').hidden = empty;
+  if (empty && $('tab-verlauf').getAttribute('aria-selected') === 'true') selectSpotTab('beobachtung');
+}
+for (const part of historyParts) new MutationObserver(syncHistoryTab).observe(part, { attributes: true, attributeFilter: ['hidden'] });
+
+/** The spots of the map (with its filter) in a fixed order, to page through them in the detail view. */
+function spotOrder() {
+  return [...state.spots].sort((a, b) => a.id - b.id);
+}
+
+function renderSpotStep(spot) {
+  const order = spotOrder();
+  const i = order.findIndex((s) => s.id === spot.id);
+  $('spot-pos').textContent = i >= 0 ? `${i + 1} / ${order.length}` : '';
+  $('spot-prev').disabled = i < 0 || order.length < 2;
+  $('spot-next').disabled = i < 0 || order.length < 2;
+}
+
+function stepSpot(delta) {
+  const order = spotOrder();
+  const i = order.findIndex((s) => s.id === state.spot?.id);
+  if (i < 0 || order.length < 2) return;
+  openSpot(order[(i + delta + order.length) % order.length].id);
+}
+$('spot-prev').addEventListener('click', () => stepSpot(-1));
+$('spot-next').addEventListener('click', () => stepSpot(1));
+
+let minimap = null;
+let minimapLayer = null;
+function renderMinimap(spot) {
+  if (!minimap) {
+    minimap = L.map('spot-minimap', { zoomControl: false, attributionControl: false, scrollWheelZoom: false, keyboard: false });
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(minimap);
+    minimapLayer = L.layerGroup().addTo(minimap);
+  }
+  minimap.invalidateSize();
+  minimap.setView([spot.lat, spot.lon], 16, { animate: false });
+  // Neighbouring spots as small dots: a click opens them; the open one has a ring.
+  const near = state.spots.filter((s) => s.id !== spot.id && minimap.getBounds().pad(0.5).contains([s.lat, s.lon]));
+  minimapLayer.clearLayers();
+  for (const s of near) {
+    const damage = s.tags.some((t) => DAMAGE_TAGS.includes(t));
+    const kind = s.tags.includes('neophyt') ? 'neo' : damage ? 'damage' : 'ok';
+    L.circleMarker([s.lat, s.lon], { radius: 6, className: `mini-dot ${kind}`, weight: 2 })
+      .bindTooltip(`Spot ${s.id}`, { direction: 'top', offset: [0, -6] })
+      .on('click', () => openSpot(s.id))
+      .addTo(minimapLayer);
+  }
+  L.circleMarker([spot.lat, spot.lon], { radius: 9, className: 'mini-dot current', weight: 3, interactive: false }).addTo(minimapLayer);
+}
+
+function closeSpot() {
+  $('spot').hidden = true;
+  $('welcome').hidden = false;
+  $('explore').classList.remove('spot-open');
+  state.spot = null;
+  highlightPin(null);
+}
+$('spot-on-map').addEventListener('click', () => {
+  const { lat, lon } = state.spot;
+  closeSpot();
+  map.setView([lat, lon], Math.max(map.getZoom(), 17));
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || $('spot').hidden || document.querySelector('dialog[open]') || !$('camera').hidden) return;
+  if (e.target !== document.body && !e.target.closest?.('#explore')) return; // e.g. the account menu has its own
+  closeSpot();
+});
 
 /** Links to spots at the same place that look in another direction. */
 function renderSiblings(spot) {
@@ -794,12 +900,7 @@ $('species-add').addEventListener('click', async () => {
 });
 
 $('time-slider').addEventListener('input', (e) => showPhoto(Number(e.target.value)));
-$('close-spot').addEventListener('click', () => {
-  $('spot').hidden = true;
-  $('welcome').hidden = false;
-  state.spot = null;
-  highlightPin(null);
-});
+$('close-spot').addEventListener('click', closeSpot);
 
 $('save-photo').addEventListener('click', async () => {
   const p = state.spot.photos[state.index];
@@ -1113,8 +1214,8 @@ function updateSwipe() {
 }
 
 $('open-compare').addEventListener('click', () => {
-  $('compare').hidden = !$('compare').hidden;
-  if (!$('compare').hidden) $('compare').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  selectSpotTab('vergleich');
+  $('tab-vergleich').scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 $('cmp-a').addEventListener('change', updateCompare);
 $('cmp-b').addEventListener('change', updateCompare);
@@ -1136,7 +1237,7 @@ $('realign').addEventListener('click', async (e) => {
     await openSpot(id, current);
     $('cmp-a').value = a;
     $('cmp-b').value = b;
-    $('compare').hidden = false;
+    selectSpotTab('vergleich');
     await updateCompare();
   } catch (err) {
     alert(err.message);

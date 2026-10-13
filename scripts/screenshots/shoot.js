@@ -88,12 +88,16 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     const page = await explore(ctx);
     await pin(page, 2).click();
     await settle(page, 3000);
+    await page.click('#tab-verlauf');
     await page.evaluate(() => document.querySelector('#vegetation-title')?.scrollIntoView({ block: 'start' }));
+    await page.evaluate(() => { document.querySelector('#panel').scrollTop -= 90; });
     await settle(page, 2500);
     await page.locator('#panel').screenshot({ path: out('satellite.jpg'), ...jpg });
     await page.evaluate(() => document.querySelector('.leaflet-marker-icon[title="Spot 6"]').click());
     await settle(page, 3500);
+    await page.click('#tab-kontext');
     await page.evaluate(() => document.querySelector('#context-title')?.scrollIntoView({ block: 'start' }));
+    await page.evaluate(() => { document.querySelector('#panel').scrollTop -= 90; });
     await settle(page, 2500);
     await page.locator('#panel').screenshot({ path: out('wetter-kontext.jpg'), ...jpg });
     await page.close();
@@ -169,6 +173,8 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
 
   if (want('compare')) {
     const page = await explore(ctx);
+    await page.setViewportSize({ width: 1440, height: 1500 }); // the comparison is as wide as the detail page
+    await page.evaluate(() => document.querySelector('#explore').scrollIntoView());
     await pin(page, 1).click();
     await settle(page, 2500);
     await page.click('#open-compare');
@@ -177,6 +183,7 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.selectOption('#cmp-b', { index: 5 });
     await settle(page, 6000);
     await page.evaluate(() => document.querySelector('#compare').scrollIntoView({ block: 'start' }));
+    await page.evaluate(() => { document.querySelector('#panel').scrollTop -= 90; }); // below the sticky head
     await settle(page, 1500);
     const clip = await page.evaluate(() => {
       const a = document.querySelector('#compare').getBoundingClientRect();
@@ -346,6 +353,7 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await settle(page, 3000);
     await page.screenshot({ path: out('gletscher-spot.jpg'), ...jpg });
     await page.setViewportSize({ width: 1440, height: 1100 });
+    await page.click('#tab-verlauf');
     await page.evaluate(() => document.querySelector('#glacier-title')?.scrollIntoView({ block: 'start' }));
     await page.evaluate(() => { document.querySelector('#panel').scrollTop -= 80; });
     await settle(page, 2000);
@@ -357,6 +365,8 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await settle(page, 1500);
     await page.locator('#panel').screenshot({ path: out('gletscher-archiv.jpg'), ...jpg });
     // Before/after: the postcard of 1928 against 2025.
+    await page.setViewportSize({ width: 1440, height: 1500 });
+    await page.evaluate(() => document.querySelector('#explore').scrollIntoView());
     await page.evaluate(() => { document.querySelector('#panel').scrollTop = 0; });
     await page.click('#open-compare');
     await settle(page, 1500);
@@ -366,6 +376,7 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.uncheck('#cmp-heat');
     await page.evaluate(() => { const r = document.querySelector('#swipe-range'); r.value = 50; r.dispatchEvent(new Event('input', { bubbles: true })); });
     await page.evaluate(() => document.querySelector('#compare').scrollIntoView({ block: 'start' }));
+    await page.evaluate(() => { document.querySelector('#panel').scrollTop -= 90; }); // below the sticky head
     await settle(page, 1500);
     const clip = await page.evaluate(() => {
       const a = document.querySelector('#compare').getBoundingClientRect();
@@ -377,6 +388,7 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     const pasture = await page.evaluate(() => state.spots.find((s) => s.landscape === 'gebirge')?.id);
     await page.evaluate((id) => openSpot(id), pasture);
     await settle(page, 3500);
+    await page.click('#tab-verlauf');
     await page.evaluate(() => document.querySelector('#glacier-title')?.scrollIntoView({ block: 'start' }));
     await page.evaluate(() => { document.querySelector('#panel').scrollTop -= 80; });
     await settle(page, 2000);
