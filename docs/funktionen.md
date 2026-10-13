@@ -936,10 +936,13 @@ der gewählten Zeit über die ganze Karte, nicht nur über den Spot:
 
 Gerechnet wird im Browser (`public/shade.js`): Für jede Zelle des Höhenmodells läuft ein Strahl Richtung
 Sonne, bis er höher ist als alles Gelände ringsum. Die Höhen kommen als Kacheln der
-[Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (AWS Open Data, in Europa EU-DEM mit ~25 m),
-eine Kachel Rand rund um den Ausschnitt; Berge weiter weg werfen keinen Schatten auf die Karte (bei sehr
-tiefer Sonne fehlt so ein Teil der langen Schatten). Bäume und Gebäude sind nicht im Höhenmodell; den Schatten
-eines einzelnen Baums zeigt weiterhin die Linie am Spot.
+[Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (AWS Open Data, in Europa EU-DEM mit ~25 m):
+fein für den Ausschnitt und eine Kachel Rand, dazu viermal gröber für die weitere Umgebung. So werfen auch
+ferne Grate und Berge ihre langen Schatten, wenn die Sonne tief steht: bei Zoomstufe 13 Gelände bis etwa
+50 km ausserhalb des Ausschnitts, bei 15 etwa 13 km; das Panel nennt die Reichweite. Weit entferntes Gelände
+sinkt mit der Erdkrümmung (samt Lichtbrechung) ab. Der Rand eines Schattens ist weich: Er verläuft über die
+Breite der Sonnenscheibe (0,53°), der Halbschatten ist bei fernen Bergen breiter als bei nahen. Bäume und
+Gebäude sind nicht im Höhenmodell; den Schatten eines einzelnen Baums zeigt weiterhin die Linie am Spot.
 
 ### DWD-Karten einblenden
 
