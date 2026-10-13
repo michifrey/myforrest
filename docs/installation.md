@@ -131,6 +131,8 @@ Die feste Adresse lässt sich als Variable `APP_URL` in die Android-App bauen, d
 | `METADATA_CITY`, `METADATA_COUNTRY` | –, `CH` | Ort und Land des Kontakts |
 | `METADATA_URL`     | App-Adresse | Website der Organisation |
 | `METADATA_UUID`    | aus der Adresse abgeleitet | Feste Kennung des Metadatensatzes |
+| `OWS_UPSTREAM` | – | Interne Adresse von QGIS Server mit eigenem HTTP (z. B. `http://karten:80`): MyForrest reicht dann `/ows/` dorthin weiter und nennt `https://<PUBLIC_URL>/ows/` in den Metadaten. Für Plattformen ohne eigenes nginx davor, z. B. Render |
+| `ROUTER_HOSTPORT`, `OWS_HOSTPORT` | – | Nur `host:port` der privaten Dienste (Render setzt sie aus `render.yaml`); daraus werden `ROUTER_URL` (`http://…/brouter`) und `OWS_UPSTREAM`, wenn diese nicht gesetzt sind |
 | `METADATA_OWS_URL` | –        | Adresse von QGIS Server (z. B. `https://…/ows/`): WMS, WMTS und WFS in den Metadaten |
 | `METADATA_OPENDATA_TERMS` | – | Nutzungsbedingung von opendata.swiss (`terms_by` usw.): markiert den Eintrag für opendata.swiss |
 | `FFMPEG_PATH`      | `ffmpeg` | ffmpeg für die Bilder aus Videos               |

@@ -162,7 +162,7 @@ Alles andere bleibt intern.
 |------|--------|-----------|
 | 3000 | MyForrest (HTTP) | `PORT`; nur für den Reverse Proxy |
 | 80 (Host: 8080) | nginx der Compose-Vorlage | davor gehört der TLS-Proxy |
-| 5555 | QGIS Server (FastCGI) | nur für nginx |
+| 9993 | QGIS Server (FastCGI) | nur für nginx |
 | 17777 | BRouter (HTTP) | nur für MyForrest (`ROUTER_URL`) |
 | 30080 | nginx als NodePort (Kubernetes) | nur lokal/zum Testen |
 

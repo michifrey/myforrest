@@ -6,6 +6,14 @@ set -eu
 
 dir=${SEGMENTS_DIR:-/segments}
 
+# Started as root (e.g. on Render, whose disks belong to root): take the segment folder over for the brouter user
+# and go on as that user. Started as user 1000 (Docker Compose, Kubernetes with fsGroup): nothing to do.
+if [ "$(id -u)" = 0 ]; then
+  mkdir -p "$dir"
+  chown -R 1000:1000 "$dir" /customprofiles
+  exec setpriv --reuid=1000 --regid=1000 --clear-groups "$0" "$@"
+fi
+
 # Tiles of 5°×5°, named after their south-west corner (E5_N45 = 5–10° E, 45–50° N).
 tiles() {
   if [ -n "${SEGMENTS:-}" ]; then

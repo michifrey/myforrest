@@ -65,7 +65,7 @@ mit echten Dateien und Diensten; das steht jeweils als offener Punkt dabei.
 - **Licht, Schatten und Wetterkarten**: die DWD-Ebenen gegen den echten Dienst prüfen (Namen, Zeiten des Radars;
   bisher mit Testdaten im Format der Capabilities); ein Radar für die ganze Schweiz (MeteoSchweiz, sobald als
   offener Dienst verfügbar); Schatten von Wald und Gebäuden aus einem Oberflächenmodell (swissSURFACE3D) statt
-  nur vom Gelände; ferne Berge bei sehr tiefer Sonne mitrechnen.
+  nur vom Gelände; die Rechnung in einen Web Worker verlegen, damit das Abspielen auch im Gebirge flüssig bleibt.
 - **Vegetationsdichte verfeinern**: Himmel und Vegetation mit einem Segmentierungsmodell statt Farbregeln
   trennen (Schnee, helle Felsen und Mauern gelten heute teils als Himmel); Kennzahlen nur im Bildteil
   vergleichen, den alle Fotos eines Spots abdecken.
@@ -76,6 +76,8 @@ mit echten Dateien und Diensten; das steht jeweils als offener Punkt dabei.
 
 - **Kubernetes**: Das Startskript gegen einen echten podman-Cluster (kind/minikube) testen; Ingress mit
   HTTPS und ein Helm-Chart für den Betrieb ausserhalb des eigenen Rechners.
+- **Render**: die privaten Dienste (Routing- und Kartenserver) auf Render selbst prüfen (hier nur die Images und
+  der Weg über `/ows/` lokal mit podman getestet).
 - **Metadaten**: Collection-Einträge und Objektkatalog gegen die Schemas und Schematron-Regeln von geocat.ch
   prüfen; den Weg zu opendata.swiss einmal mit einem echten Konto durchspielen.
 - **Doku-Website**: die eigene Domain docs.myforrest.xyz einrichten (CNAME und `DOCS_URL`), sobald es die
@@ -104,6 +106,8 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 
 - 3D-Karte: Spots mit Blickrichtung, Route und Gletscherumrisse auf dem Gelände (MapLibre, Terrain Tiles über
   den Server), Karte oder Luftbild, Überhöhung wählbar; aus einem Spot direkt in die 3D-Ansicht seiner Umgebung; Route abfliegen
+- Explorer aufgeräumt (eine Leiste für Filter und Kartenmodi, schmale Explorer-Karte mit Bildkacheln) und Spots
+  als eigene Detailseite: grosses Foto, Tabs, Minikarte und Blättern durch die Spots
 - Durchgehen wie Street View: Pfeile entlang der Aufnahme und zu Spots in der Nähe, Blickrichtung bleibt beim Schritt
 - Startseite mit wechselnden Landschaften (Wald, Gletscher, Gebirge, Wüste)
 - Weiche Übergänge im Durchgehen: zum Weg drehen, Zoom in Gehrichtung mit Überblendung
@@ -132,8 +136,9 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
   Kreuzvalidierung nach Spots, getrennt für Laub- und Nadelwald
 - Frühwarnung als Push-Nachricht an Leute, die den Spot regelmässig besuchen oder ihm folgen
 - Angleichung von Landsat an Sentinel-2 aus den Überlappungsjahren
-- Licht und Schatten auf der Karte: Geländeschatten zur gewählten Zeit, steil besonnte Hänge, Tag, Nacht und
-  Dämmerung; Niederschlagsradar und Warnungen des DWD einblendbar
+- Licht und Schatten auf der Karte: Geländeschatten zur gewählten Zeit, auch von fernen Bergen bei tiefer Sonne,
+  mit weichem Halbschatten; steil besonnte Hänge, Tag, Nacht und Dämmerung; Niederschlagsradar und Warnungen
+  des DWD einblendbar
 
 ### Arten und geschützte Funde
 
@@ -167,6 +172,8 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
   Vektorkarten, QGIS Server, Metadaten für geocat.ch (GM03)
 - Metadaten pro Collection (Teil des Datensatzes) und Objektkatalog nach ISO 19110
 - Betrieb mit Docker Compose und Kubernetes (podman-Startskript)
+- Render mit eigenem Routing-Server (BRouter) und Kartenserver (QGIS Server unter `/ows/`) als private Dienste,
+  Wildruhezonen und Wegnetz eingeschaltet
 
 ### App und Konten
 
