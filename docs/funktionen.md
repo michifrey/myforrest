@@ -183,6 +183,32 @@ gibt den Platz frei. Die App bittet den Browser, die Daten dauerhaft zu behalten
 Fotos, die innerhalb von 25 m aufgenommen wurden, werden automatisch zu
 einem *Spot* zusammengefasst. Die Farbe zeigt Schäden (orange) oder Neophyten (violett).
 
+Über der Karte liegt oben links eine Leiste mit dem Filter und den Kartenmodi (*Sonne & Wetter*, *Arten &
+Neophyten*, *Touren & Aufträge*, je nach Daten *Gletscher* und *Mapillary*); auf dem Handy scrollt sie
+seitwärts. Rechts steht der **Explorer**, eine schmale Karte mit Spots, Fotos und Spots mit Befund, den vier
+zuletzt fotografierten Spots als Bildkacheln, der Legende und *Foto beitragen*.
+
+### Detailseite eines Spots
+
+![Detailseite eines Spots: grosses Foto mit Zeitleiste, Minikarte und Fakten rechts](screenshots/spot.jpg)
+
+Ein Spot öffnet sich als eigene Seite über der Karte (auf dem Handy statt der Karte):
+
+- **Kopfzeile**: *Karte* (oder Esc) führt zurück, die Pfeile rechts blättern durch alle Spots der Karte in der
+  Reihenfolge ihrer Nummer, mit dem gewählten Filter („3 / 24“).
+- **Foto und Zeitreise**: das Foto in voller Breite, Zeitregler, Vorschaubilder und *Stabilisiert*; darunter
+  *Wiederholungsfoto aufnehmen*, *Vorher / Nachher*, *Durchgehen* und *Neues Foto anfragen*.
+- **Seitenspalte** (bleibt beim Scrollen stehen): eine **Minikarte** mit dem Spot (gold) und den Spots in der
+  Nähe in ihrer Befundfarbe; ein Klick auf einen Punkt öffnet diesen Spot, *Auf der grossen Karte zeigen*
+  schliesst die Seite und zoomt hin. Darunter Fotos, Zeitraum, Blickrichtung und Lage, Landschaft, Höhe und
+  Gelände, Veränderung, Beobachtungen und Baumarten.
+- **Tabs** unter dem Foto: *Beobachtungen* (Tags, Notiz, Art bestimmen), *Vergleich* (Vorher/Nachher),
+  *Auswertung* (automatische Auswertung des Fotos), *Wetter & Kontext* und *Verlauf* (Auffälligkeiten-Chronik,
+  Vegetation im Zeitverlauf, Gletscher); *Verlauf* erscheint nur, wenn es dazu etwas gibt. Die Pfeiltasten
+  wechseln zwischen den Tabs.
+
+Auf dem Handy stehen Foto, Knöpfe, Seitenspalte und Tabs untereinander.
+
 ### Eigener Standort
 
 ![Karte am eigenen Standort mit blauem Punkt und dem Knopf «Mein Standort» unten links](screenshots/standort.jpg)
@@ -214,11 +240,11 @@ Die Richtung eines Spots ist das zirkuläre Mittel seiner Fotos (350° und 10° 
 Fotos eines Spots in sehr verschiedene Richtungen, hat der Spot keine Richtung. Bestehende Spots werden
 beim Start nur um ihre Richtung ergänzt und nie von selbst aufgeteilt. Auf der Karte zeigt ein goldener Sichtkegel
 die Richtung. Liegen mehrere Spots am selben Ort, rücken ihre Marker in Blickrichtung auseinander, damit
-jeder anklickbar bleibt. Im Kopf des Spots stehen die Richtung („Blick nach NO (45°)“) und Links zu den
+jeder anklickbar bleibt. In der Seitenspalte des Spots stehen die Richtung („Blick nach NO (45°)“) und Links zu den
 anderen Spots am selben Ort.
 
 **Spots aufteilen**: Blicken die Fotos eines Spots in verschiedene Richtungen (Spots von vor der
-Richtungstrennung, oder Fotos ohne Kompass kamen zuerst), sagt der Spot das in seinem Kopf, z. B.
+Richtungstrennung, oder Fotos ohne Kompass kamen zuerst), sagt der Spot das in der Seitenspalte, z. B.
 „3 Fotos nach O, 2 Fotos nach W“, und bietet zwei Wege an:
 - *In N Spots aufteilen*: Die Fotos werden in Aufnahmereihenfolge so gruppiert, wie neue Fotos zugeordnet
   werden (±45° um das Mittel der Gruppe). Die grösste Gruppe behält den Spot, jede weitere wird ein neuer
@@ -236,11 +262,11 @@ Mit dem Zeitregler und der Thumbnail-Leiste durch alle Aufnahmen blättern.
 
 ### Vorher/Nachher-Vergleich
 
-Zwei beliebige Aufnahmen mit einem Wischregler überlagern.
+Zwei beliebige Aufnahmen mit einem Wischregler überlagern (Knopf *Vorher / Nachher* oder Tab *Vergleich*).
 
 ### Durchgehen wie Street View
 
-*Durchgehen wie Street View* im Spot öffnet das aktuelle Bild bildschirmfüllend. 360°-Panoramen dreht man
+*Durchgehen* im Spot öffnet das aktuelle Bild bildschirmfüllend. 360°-Panoramen dreht man
 mit Finger oder Maus, flache Fotos zeigen ihre Blickrichtung. Pfeile auf einem Ring unten führen weiter.
 Jeder Pfeil steht in der Richtung, in der sein Ziel liegt, relativ zur aktuellen Blickrichtung, mit der
 Distanz darunter:
@@ -1205,7 +1231,7 @@ wird.
     oder vom Detektor erkannt): 80 m um den Spot, 6 Wochen ab dem Aufnahmetag (`HOLZSCHLAG_SPERRE_TAGE`).
     Geschützte Funde sperren nie etwas, sonst würde ihr Ort sichtbar;
   - **von Hand** durch verifizierte PRO-Mitglieder (Forstdienst) und die Moderation: *Holzerei: Wege hier
-    vorübergehend sperren* im Spot-Panel, mit Enddatum (höchstens ein Jahr) und Grund, 100 m um den Spot.
+    vorübergehend sperren* auf der Spot-Seite, mit Enddatum (höchstens ein Jahr) und Grund, 100 m um den Spot.
     Wer sie gesetzt hat, oder die Moderation hebt sie auf der Karte wieder auf. Eine Sperrung von Hand
     ersetzt die automatische am selben Spot.
 
@@ -1278,7 +1304,7 @@ Uhrkorrektur); *Fotos zuordnen* in *Meine Touren* öffnet den Dialog mit der Tou
 
 Ein **Fotoauftrag** bittet um ein Foto von einem Ort: *Neuer Fotoauftrag* im Tab *Aufträge*, dann den Ort
 auf der Karte wählen, beschreiben, was zu sehen sein soll, und optional die Blickrichtung angeben. Im
-Spot-Panel bittet *Neues Foto von diesem Spot anfragen* um ein Wiederholungsfoto in der Blickrichtung des
+Spot bittet *Neues Foto anfragen* um ein Wiederholungsfoto in der Blickrichtung des
 Spots. Aufträge erscheinen für alle als gelbe Kamera-Pins auf der Karte, mit einem Kegel in die gewünschte
 Richtung.
 

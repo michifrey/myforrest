@@ -75,19 +75,24 @@ jederzeit wieder. Der Standort bleibt im Browser.
 Ältere Spots (oder Fotos ohne Kompass) können Fotos in verschiedene Richtungen mischen. Dann bietet der
 Spot an, sich **aufzuteilen**: ein Spot pro Blickrichtung, jeder für sich ausgerichtet und verglichen,
 oder nur das gezeigte Foto abzutrennen.
-Oben links lässt sich die Karte nach Beobachtungen und Meldungen filtern,
-daneben schalten *Sonne & Wetter*, *Arten & Neophyten* und *Touren & Aufträge* die Kartenmodi ein
-(Abschnitte 7, 8 und 10), mit Gletscherinventaren auch *Gletscher* (Abschnitt 14). Gelbe Kamera-Pins sind Fotoaufträge.
-Rechts stehen Kennzahlen und die zuletzt fotografierten Spots.
+Die Leiste oben links filtert die Karte nach Beobachtungen und Meldungen und schaltet *Sonne & Wetter*,
+*Arten & Neophyten* und *Touren & Aufträge* ein (Abschnitte 7, 8 und 10), mit Gletscherinventaren auch
+*Gletscher* (Abschnitt 14). Gelbe Kamera-Pins sind Fotoaufträge. Rechts fasst eine schmale Explorer-Karte
+Kennzahlen, die zuletzt fotografierten Spots als Bilder und die Legende zusammen.
 
 ### 2. Zeitreise an einem Spot
 
 ![Spot mit Gelände, Baumarten und Zeitleiste](docs/screenshots/spot.jpg)
 
-Ein Klick auf einen Spot öffnet seine Geschichte: Koordinaten, Zeitraum und Blickrichtung, dazu Höhe,
-Hangneigung, Exposition und Geländeform aus dem Höhenmodell und die erwartete Herbstfärbung an diesem Ort.
-Darunter folgen der Anteil der Ansicht, der sich seit dem ersten Foto verändert hat, alle Beobachtungen
-und die Baumarten am Spot. Mit dem Zeitregler oder den Vorschaubildern blättert man durch die Aufnahmen.
+Ein Klick auf einen Spot öffnet seine **Detailseite** über der ganzen Karte. Links steht gross das Foto mit
+Zeitregler und Vorschaubildern, darunter die Knöpfe *Wiederholungsfoto aufnehmen*, *Vorher / Nachher* und
+*Durchgehen*. Rechts zeigt eine **Minikarte** die Lage und die Spots in der Nähe (ein Klick öffnet sie), daneben
+Fotos, Zeitraum, Blickrichtung und Koordinaten, Höhe, Hangneigung, Exposition und Geländeform aus dem
+Höhenmodell, die erwartete Herbstfärbung, der Anteil der Ansicht, der sich seit dem ersten Foto verändert hat,
+alle Beobachtungen und die Baumarten. Weiteres steht in **Tabs** unter dem Foto: *Beobachtungen*, *Vergleich*,
+*Auswertung*, *Wetter & Kontext* und, wo vorhanden, *Verlauf* (Chronik, Vegetation, Gletscher). Oben blättern
+die Pfeile durch alle Spots der Karte (mit ihrem Filter); *Karte* oder Esc führt zurück.
+Mit dem Zeitregler oder den Vorschaubildern blättert man durch die Aufnahmen.
 Ist *Stabilisiert* aktiv, liegen alle Fotos deckungsgleich übereinander, auch wenn sie bei jedem Besuch
 etwas anders aufgenommen wurden. Das Ergebnis wirkt wie ein Zeitraffer:
 
@@ -107,7 +112,7 @@ auf dem Foto und erkennt invasive Neophyten.
   <img src="docs/screenshots/compare-swipe.jpg" width="49%" alt="Vorher/Nachher-Vergleich mit Wischregler">
 </p>
 
-*Vorher / Nachher vergleichen* legt zwei beliebige Aufnahmen übereinander. Mit dem Wischregler
+*Vorher / Nachher* (Tab *Vergleich*) legt zwei beliebige Aufnahmen übereinander. Mit dem Wischregler
 schiebt man die Grenze zwischen den beiden Bildern hin und her. *Automatisch ausrichten* korrigiert
 Unterschiede in Standort, Zoom und Neigung. *Veränderungen hervorheben* blendet eine Heatmap ein
 (gelb = wenig, rot = stark) und nennt den Anteil der veränderten Bildfläche. Unterschiede im Licht werden
@@ -191,13 +196,13 @@ Eine **Sturmwarnung** aus der Prognose (ICON-D2) meldet Leuten, die einem Spot f
 fotografieren, Böen ab 75 km/h per Push; kam der Sturm, bittet eine zweite Nachricht danach um ein Foto, sobald es
 sicher ist.
 
-*Kontext zur Aufnahme* vergleicht die 90 Tage vor jedem Foto mit dem Mittel 1991–2020: Niederschlag,
+*Kontext zur Aufnahme* (Tab *Wetter & Kontext*) vergleicht die 90 Tage vor jedem Foto mit dem Mittel 1991–2020: Niederschlag,
 Temperatur, Hitzetage, längste Trockenphase und die Niederschläge der letzten zwölf Monate. Daraus
 entstehen Hinweise wie *Ausgeprägte Trockenheit*, *Frühe Laubverfärbung*, *Erhöhtes Borkenkäfer-Risiko*
 oder *Windwurf nach Sturm*, abgestimmt auf die Baumarten am Spot. Im Beispiel links färben die Buchen
 schon Ende August, nach einem Sommer mit 29 % des üblichen Regens.
 
-*Vegetation im Zeitverlauf* (rechts) zeigt den Grünanteil aus den Fotos und den NDVI und Feuchteindex
+*Vegetation im Zeitverlauf* (rechts, Tab *Verlauf*) zeigt den Grünanteil aus den Fotos und den NDVI und Feuchteindex
 NDMI aus Sentinel-2, vor 2017 aus Landsat, an Sentinel-2 angeglichen. Fällt ein Index an einem Spot ohne neues Foto deutlich unter
 die Werte derselben Jahreszeit in den Vorjahren, meldet die **Frühwarnung**, dass sich ein Besuch lohnt;
 fällt er zwischen zwei Fotos, markiert das Diagramm den Zeitraum. Die Schwellen für beides eichen sich an
@@ -345,7 +350,7 @@ zeigen, wo und wann sie regelmässig unterwegs ist.
 
 <p align="center"><img src="docs/screenshots/durchgehen.jpg" width="720" alt="360°-Panorama auf einem Waldweg mit Pfeilen vor und zurück und kleiner Karte"></p>
 
-*Durchgehen wie Street View* im Spot öffnet ein Bild bildschirmfüllend: 360°-Panoramen dreht man mit Finger
+*Durchgehen* im Spot öffnet ein Bild bildschirmfüllend: 360°-Panoramen dreht man mit Finger
 oder Maus, Pfeile unten führen weiter. Weisse Pfeile folgen der Aufnahme, also den Bildern eines 360°-Videos,
 einer Fahrt oder eines Uploads mit mehreren Fotos. Goldene Pfeile führen zu anderen Spots in der Nähe. Die
 Blickrichtung bleibt beim Schritt erhalten, *Zeit* wechselt zu einem anderen Jahr am selben Ort, und die
