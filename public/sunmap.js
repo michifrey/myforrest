@@ -299,7 +299,7 @@
   let shadeOverlay = null;
   let shadeToken = 0;
   let shadeFrame = 0;
-  let dem = null; // { key, z, tx0, ty0, gw, gh, elev, missing }
+  let dem = null; // fine grid of the view ({ z, tx0, ty0, gw, gh, elev }) with `far`, the coarse surroundings
   const demTiles = new Map();
   const shadeOn = () => sm.open && $('shade-toggle').checked;
 
@@ -328,20 +328,15 @@
     return demTiles.get(key);
   }
 
-  /**
-   * Elevation grid for the view at DEM zoom map zoom − 2 (≤ 13), with one tile
-   * of margin all round, so hills just outside the view still cast shadows.
-   */
-  async function loadDem() {
+  /** Elevations at DEM zoom `z` for the view plus `margin` tiles all round: `{ key, z, tx0, ty0, gw, gh, elev, missing, total }`. */
+  async function loadGrid(z, margin) {
     const zoom = map.getZoom();
-    const z = Math.min(13, Math.round(zoom) - 2);
     const s = 2 ** (z - zoom);
     const b = map.getPixelBounds();
     const n = 2 ** z;
-    const tx0 = Math.floor((b.min.x * s) / 256) - 1; const tx1 = Math.floor((b.max.x * s) / 256) + 1;
-    const ty0 = Math.max(0, Math.floor((b.min.y * s) / 256) - 1); const ty1 = Math.min(n - 1, Math.floor((b.max.y * s) / 256) + 1);
+    const tx0 = Math.floor((b.min.x * s) / 256) - margin; const tx1 = Math.floor((b.max.x * s) / 256) + margin;
+    const ty0 = Math.max(0, Math.floor((b.min.y * s) / 256) - margin); const ty1 = Math.min(n - 1, Math.floor((b.max.y * s) / 256) + margin);
     const key = `${z}/${tx0}/${ty0}/${tx1}/${ty1}`;
-    if (dem?.key === key) return dem;
     const cols = tx1 - tx0 + 1; const rows = ty1 - ty0 + 1;
     const tiles = await Promise.all(Array.from({ length: cols * rows }, (_, k) => demTile(z, (((tx0 + (k % cols)) % n) + n) % n, ty0 + Math.floor(k / cols))));
     const gw = cols * 256; const gh = rows * 256;
@@ -355,7 +350,29 @@
         else elev.fill(-500, (oy + y) * gw + ox, (oy + y) * gw + ox + 256); // no data: low, casts no shadow
       }
     });
-    dem = { key, z, tx0, ty0, gw, gh, elev, missing, total: tiles.length };
+    return { key, z, tx0, ty0, gw, gh, elev, missing, total: tiles.length };
+  }
+
+  /**
+   * Elevations for the shading: the view at DEM zoom map zoom − 2 (≤ 13) with
+   * one tile of margin, and the wider surroundings 4× coarser (one tile of
+   * margin there reaches ~13 km at map zoom 15, ~50 km at 13), so distant ridges and
+   * mountains cast their long shadows when the sun is low.
+   */
+  async function loadDem() {
+    const z = Math.min(13, Math.round(map.getZoom()) - 2);
+    const zc = Math.max(3, z - 2);
+    const key = `${map.getPixelBounds().min}:${map.getZoom()}`;
+    if (dem?.key === key) return dem;
+    const [fine, coarse] = await Promise.all([loadGrid(z, 1), loadGrid(zc, 1)]);
+    const scale = 2 ** (z - zc);
+    dem = {
+      ...fine,
+      key,
+      far: { elev: coarse.elev, gw: coarse.gw, gh: coarse.gh, scale, ox: (fine.tx0 * 256) / scale - coarse.tx0 * 256, oy: (fine.ty0 * 256) / scale - coarse.ty0 * 256 },
+      missing: fine.missing + coarse.missing,
+      total: fine.total + coarse.total,
+    };
     return dem;
   }
 
@@ -414,7 +431,7 @@
       lit = Shade.light({
         elev: grid.elev, gw: grid.gw, gh: grid.gh, cellM: Shade.metresPerPixel(centre.lat, z),
         altitude: sun.altitude, azimuth: sun.azimuth,
-        x0: x0 - grid.tx0 * 256, y0: y0 - grid.ty0 * 256, w, h,
+        x0: x0 - grid.tx0 * 256, y0: y0 - grid.ty0 * 256, w, h, far: grid.far,
       });
     }
     const canvas = document.createElement('canvas');
@@ -430,8 +447,9 @@
         let r = 12; let g = 20; let bl = 40;
         if (lit) {
           const v = lit[k];
-          if (v === 0) { shaded++; a = Math.max(a, 0.42); r = 20; g = 32; bl = 58; } else if (v < 1) {
-            a = Math.max(a, 0.34 * (1 - v)); r = 20; g = 32; bl = 58;
+          if (v < 0.05) shaded++;
+          if (v < 1) {
+            a = Math.max(a, 0.42 * (1 - v)); r = 20; g = 32; bl = 58; // shadow, half shadow, slopes turned away
           } else if (v > 1.05 && a === 0) {
             a = Math.min(0.2, (v - 1) * 0.16); r = 255; g = 196; bl = 80; // steep in the sun: warm light
           }
@@ -452,7 +470,8 @@
     else if (!grid) text = zoom < SHADE_MIN_ZOOM ? 'Tag und Nacht; Schatten von Hügeln und Bergen ab näherem Zoom.' : 'Höhendaten nicht verfügbar, nur Tag und Nacht.';
     else {
       text = ` Schatten von Hügeln und Bergen bei Sonne ${deg(sun.altitude)} aus ${Sun.compass(sun.azimuth)}: ${Math.round((100 * shaded) / (w * h))} % der Karte im Schatten.`
-        + ' Steil besonnte Hänge golden. Höhenmodell ~25 m, ohne Bäume und Gebäude.'
+        + ' Steil besonnte Hänge golden. Höhenmodell ~25 m, ohne Bäume und Gebäude;'
+        + ` Berge bis ~${fmtNum((Shade.metresPerPixel(centre.lat, grid.z) * grid.far.scale * 256) / 1000, 0)} km ausserhalb des Ausschnitts zählen mit.`
         + (grid.missing ? ` ${grid.missing} von ${grid.total} Höhenkacheln fehlen.` : '');
     }
     status.hidden = false;
