@@ -59,3 +59,32 @@ test('night and twilight darkening', () => {
   assert.ok(civil > 0.4 && civil < 0.6, `end of civil twilight ${civil}`);
   assert.ok(Shade.night(-3) < civil && Shade.night(-9) > civil);
 });
+
+test('distant mountains in the coarse grid shade the view when the sun is low', () => {
+  const gw = 20; const gh = 20;
+  const fine = { elev: new Float32Array(gw * gh).fill(400), gw, gh, cellM: 10 };
+  // Coarse grid of 100-m cells; the fine grid covers coarse cells 10–12. A 1500-m ridge 1.8–2.1 km to the east.
+  const fw = 40; const fh = 40;
+  const coarse = new Float32Array(fw * fh).fill(400);
+  for (let y = 0; y < fh; y++) for (let x = 30; x < 33; x++) coarse[y * fw + x] = 1500;
+  const far = { elev: coarse, gw: fw, gh: fh, scale: 10, ox: 10, oy: 10 };
+  const low = { altitude: 20, azimuth: 90 };
+  assert.ok(Shade.light({ ...fine, ...low }).every((v) => v > 0), 'without the surroundings all in sun');
+  assert.ok(Shade.light({ ...fine, ...low, far }).every((v) => v === 0), 'the ridge shades everything');
+  assert.ok(Shade.light({ ...fine, altitude: 40, azimuth: 90, far }).every((v) => v > 0), 'a higher sun clears the ridge');
+  assert.ok(Shade.light({ ...fine, altitude: 20, azimuth: 270, far }).every((v) => v > 0), 'sun from the other side');
+  // A small hill in the fine grid does not stop the search for the ridge behind it.
+  const hill = Float32Array.from(fine.elev);
+  hill[10 * gw + 18] = 420;
+  const r = Shade.light({ ...fine, elev: hill, ...low, far });
+  assert.equal(r[10 * gw + 5], 0);
+});
+
+test('shadow edges fade over the sun disc instead of jumping', () => {
+  const g = wall();
+  const r = Array.from(Shade.light({ ...g, altitude: 45, azimuth: 270 }).slice(10 * g.gw + 12, 11 * g.gw));
+  for (let i = 1; i < r.length; i++) assert.ok(r[i] >= r[i - 1] - 1e-6, `light grows away from the wall: ${r.map((v) => v.toFixed(2))}`);
+  assert.ok(r.some((v) => v > 0.05 && v < 0.95), 'a half shadow at the edge');
+  assert.equal(r[0], 0);
+  assert.ok(Math.abs(r[r.length - 1] - 1) < 1e-6);
+});
