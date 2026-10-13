@@ -65,8 +65,8 @@ Baumarten und Blickrichtung. Schraffierte Quadrate stehen für geschützte Funde
 
 Der Knopf **3D** zeigt die Spots auf einem **Geländemodell**, schräg von oben: an welchem Hang, in welchem Tobel
 ein Spot liegt. Kippen und drehen mit rechter Maustaste oder zwei Fingern, Hintergrund Karte oder Luftbild
-(Schweiz), Überhöhung bis 3×; Route und Gletscherumrisse liegen auf dem Gelände, ein Klick auf einen Spot
-öffnet ihn ([Details](docs/funktionen.md#3d-karte)).
+(Schweiz), Überhöhung bis 3×; Route und Gletscherumrisse liegen auf dem Gelände, die Route lässt sich
+abfliegen, und ein Klick auf einen Spot öffnet ihn ([Details](docs/funktionen.md#3d-karte)).
 
 <p align="center"><img src="docs/screenshots/standort.jpg" width="640" alt="Karte am eigenen Standort mit blauem Punkt und dem Knopf Mein Standort"></p>
 

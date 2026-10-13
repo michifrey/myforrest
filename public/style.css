@@ -1698,6 +1698,8 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
   background: var(--glass); backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 999px;
   padding: 0.45rem 0.8rem; box-shadow: var(--shadow); font: inherit; font-size: 0.9rem;
 }
+.map3d-fly { border-radius: 999px; padding: 0.45rem 0.9rem; box-shadow: var(--shadow); font-size: 0.9rem; }
+.map3d-fly[hidden] { display: none; }
 .map3d-hint { font-size: 0.8rem; color: var(--muted); background: var(--glass); border-radius: 999px; padding: 0.3rem 0.7rem; }
 .map3d-close {
   position: fixed; top: 0.8rem; right: 0.8rem; width: 2.6rem; height: 2.6rem; border-radius: 50%;

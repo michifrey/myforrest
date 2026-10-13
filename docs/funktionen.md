@@ -936,6 +936,9 @@ verlaufen. Die Ansicht beginnt dort, wo die flache Karte gerade steht, gekippt u
   sichtbar. Hintergrund und Überhöhung merkt sich das Gerät.
 - Die **Route** aus *Touren & Aufträge* (gezeichnet, aufgezeichnet oder importiert) liegt golden auf dem Gelände,
   ebenso die **Gletscherumrisse** (das jüngste Inventar), wenn Inventare geladen sind.
+- **Route abfliegen** (erscheint, wenn eine Route da ist): die Kamera fliegt die Route ab, schräg von oben und
+  rund 300 m vorausschauend, in 20 bis 90 Sekunden je nach Länge. Ein zweiter Klick oder ein Griff in die
+  Karte hält an.
 - *Schliessen* (oder Esc) führt zurück auf die flache Karte, an den Ort, an dem man in 3D zuletzt war.
 
 Das Gelände kommt als Kacheln der [Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (AWS Open Data,

@@ -142,6 +142,69 @@
     new maplibregl.Popup({ offset: 14, maxWidth: '240px' }).setLngLat(lngLat).setDOMContent(box).addTo(m);
   }
 
+  /* ---------- Flight along the route ---------- */
+
+  const toRad = (d) => (d * Math.PI) / 180;
+  const metres = (a, b) => Math.hypot(toRad(b.lon - a.lon) * Math.cos(toRad((a.lat + b.lat) / 2)), toRad(b.lat - a.lat)) * 6371000;
+  const bearingOf = (a, b) => {
+    const y = Math.sin(toRad(b.lon - a.lon)) * Math.cos(toRad(b.lat));
+    const x = Math.cos(toRad(a.lat)) * Math.sin(toRad(b.lat)) - Math.sin(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.cos(toRad(b.lon - a.lon));
+    return (Math.atan2(y, x) * 180) / Math.PI;
+  };
+
+  /**
+   * Flies along the current route: the camera follows the line at walking-speed-like pace, looking ahead
+   * (about 300 m), smoothed so it does not jerk at every bend. A second click, or touching the map, stops.
+   */
+  function fly() {
+    if (!view?.map) return;
+    if (view.flight) return stopFlight();
+    const pts = (window.Tours?.points?.() || []).filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
+    if (pts.length < 2) return;
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + metres(pts[i - 1], pts[i]));
+    const total = cum.at(-1);
+    if (!total) return;
+    // 20 s for short routes, at most 90 s for long ones.
+    const duration = Math.min(90000, Math.max(20000, total * 4));
+    const at = (d) => {
+      const dd = Math.max(0, Math.min(total, d));
+      let i = 1;
+      while (i < cum.length - 1 && cum[i] < dd) i++;
+      const t = cum[i] === cum[i - 1] ? 0 : (dd - cum[i - 1]) / (cum[i] - cum[i - 1]);
+      return { lat: pts[i - 1].lat + (pts[i].lat - pts[i - 1].lat) * t, lon: pts[i - 1].lon + (pts[i].lon - pts[i - 1].lon) * t };
+    };
+    const m = view.map;
+    const start = performance.now();
+    let bearing = bearingOf(at(0), at(300));
+    const flight = { frame: 0 };
+    const step = (now) => {
+      if (view?.flight !== flight) return;
+      const f = Math.min(1, (now - start) / duration);
+      const d = f * total;
+      const here = at(d);
+      const target = bearingOf(here, at(d + 300));
+      // Turn by the shorter way, a little per frame.
+      bearing += ((((target - bearing) % 360) + 540) % 360 - 180) * 0.04;
+      m.jumpTo({ center: [here.lon, here.lat], bearing, pitch: 68, zoom: 15.6 });
+      if (f < 1) flight.frame = requestAnimationFrame(step);
+      else stopFlight();
+    };
+    view.flight = flight;
+    view.root.querySelector('.map3d-fly').textContent = 'Flug anhalten';
+    m.once('mousedown', stopFlight);
+    m.once('touchstart', stopFlight);
+    flight.frame = requestAnimationFrame(step);
+  }
+
+  function stopFlight() {
+    if (!view?.flight) return;
+    cancelAnimationFrame(view.flight.frame);
+    view.flight = null;
+    const b = view.root.querySelector('.map3d-fly');
+    if (b) b.textContent = 'Route abfliegen';
+  }
+
   /** Shows a spot: the view turns to it, and its popup opens. */
   function showSpot(id) {
     const s = (state.spots || []).find((x) => x.id === id);
@@ -175,6 +238,7 @@
       el('div', { class: 'map3d-bar' }, [
         el('strong', { text: '3D-Karte' }),
         base, exag,
+        el('button', { type: 'button', class: 'btn secondary map3d-fly', hidden: '', text: 'Route abfliegen' }),
         el('span', { class: 'map3d-hint', text: 'Rechte Maustaste oder zwei Finger: kippen und drehen' }),
         el('button', { type: 'button', class: 'icon map3d-close', 'aria-label': 'Schliessen', text: '×' }),
       ]),
@@ -184,6 +248,9 @@
     document.body.style.overflow = 'hidden';
     view = { root, map: null };
     root.querySelector('.map3d-close').addEventListener('click', close);
+    const flyBtn = root.querySelector('.map3d-fly');
+    flyBtn.hidden = (window.Tours?.points?.() || []).length < 2;
+    flyBtn.addEventListener('click', fly);
     base.addEventListener('change', () => setBase(base.value));
     exag.addEventListener('change', () => {
       prefs.exaggeration = Number(exag.value);
@@ -232,6 +299,7 @@
 
   function close() {
     if (!view) return;
+    stopFlight();
     const m = view.map;
     if (m) {
       // Back on the flat map where the 3D view was left.
@@ -261,5 +329,5 @@
     $('spot-3d').hidden = !state.config.terrain;
   }, 300);
 
-  window.Map3D = { open, close, showSpot, map: null };
+  window.Map3D = { open, close, showSpot, fly, map: null };
 }());
