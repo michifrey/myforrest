@@ -108,7 +108,8 @@ ausserhalb von `docs/` zeigen auf GitHub (`https://github.com/michifrey/myforres
 | [BRouter](https://brouter.de) (Standard, `ROUTER_URL`) | Wege-Magnet: gezeichnete Touren folgen den Wegen; der Server schickt nur die Wegpunkte, ohne Konto oder IP der Person. Mit dem [eigenen BRouter](https://github.com/michifrey/myforrest/blob/main/deploy/brouter/README.md) bleibt das im eigenen Netz; dieser lädt nur seine Routing-Daten (OpenStreetMap, ODbL) | `brouter.de` (öffentlicher Dienst bzw. Download der Segmente) oder Host aus `ROUTER_URL` |
 | Push-Dienste der Browser (Google, Mozilla, Apple, Microsoft) | Push-Nachrichten der Frühwarnung und der Sturmwarnung | `fcm.googleapis.com`, `updates.push.services.mozilla.com`, `web.push.apple.com`, `*.notify.windows.com` |
 | OpenStreetMap | Kartenkacheln (im Browser) | – |
-| [Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (AWS Open Data) | Höhenkacheln für Licht und Schatten auf der Karte (im Browser) | – |
+| [Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (AWS Open Data) | Höhenkacheln für Licht und Schatten auf der Karte (im Browser) und für die 3D-Karte (über den Server, `TERRAIN_URL`, unter `data/terrain` gehalten) | `s3.amazonaws.com` |
+| swisstopo SWISSIMAGE (geo.admin.ch) | Luftbild in der 3D-Karte, wenn gewählt (im Browser, nur Schweiz; © swisstopo, frei nutzbar mit Quellenangabe) | – |
 | swisstopo (geo.admin.ch) | Landeskarte und Luftbild der Vektorkarte LV95 (im Browser) | – |
 | swisstopo (geo.admin.ch), swissBOUNDARIES3D | Kanton eines Spots für die kantonalen Schutzlisten (einmal pro Spot) | `api3.geo.admin.ch` |
 | BAFU, Wildruhezonen über geo.admin.ch (optional, `WILDRUHE_LAYER`) | Sperrflächen für den Wege-Magnet und die Karte; pro Feld gespeichert, wöchentlich neu angefragt | `api3.geo.admin.ch` |
@@ -119,7 +120,7 @@ ausserhalb von `docs/` zeigen auf GitHub (`https://github.com/michifrey/myforres
 | Gletscherinventare, z. B. [GLAMOS](https://www.glamos.ch) (Swiss Glacier Inventory) | Gletscher-Spots, Umrisse pro Jahr (`GLETSCHER_GEOJSON`, lokale Dateien; Quellenangabe und Nutzungsbedingungen des Inventars beachten) | – |
 
 Im Browser laufen [Leaflet](https://leafletjs.com) (BSD-2-Clause) für die App-Karte und
-[MapLibre GL JS](https://maplibre.org) (BSD-3-Clause) für die Vektorkarte sowie
+[MapLibre GL JS](https://maplibre.org) (BSD-3-Clause) für die Vektorkarte und die 3D-Karte sowie
 [OpenLayers](https://openlayers.org) (BSD-2-Clause) für die Vektorkarte in LV95; alle liefert der Server aus
 `node_modules` aus, ohne CDN. Die LV95-Karte lädt ihre Hintergrundkarten im Browser von
 `wmts.geo.admin.ch` (© swisstopo, frei nutzbar mit Quellenangabe). Die Vektorkacheln erzeugen [geojson-vt](https://github.com/mapbox/geojson-vt)

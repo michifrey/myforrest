@@ -61,6 +61,13 @@ Marker melden:
 Beim Überfahren eines Markers fasst ein Tooltip alles zusammen: Veränderung, Wetter, Sturm, Satellit,
 Baumarten und Blickrichtung. Schraffierte Quadrate stehen für geschützte Funde (Abschnitt 11).
 
+![3D-Karte: Spots auf dem Gelände mit dem Popup eines Spots](docs/screenshots/karte-3d.jpg)
+
+Der Knopf **3D** zeigt die Spots auf einem **Geländemodell**, schräg von oben: an welchem Hang, in welchem Tobel
+ein Spot liegt. Kippen und drehen mit rechter Maustaste oder zwei Fingern, Hintergrund Karte oder Luftbild
+(Schweiz), Überhöhung bis 3×; Route und Gletscherumrisse liegen auf dem Gelände, ein Klick auf einen Spot
+öffnet ihn ([Details](docs/funktionen.md#3d-karte)).
+
 <p align="center"><img src="docs/screenshots/standort.jpg" width="640" alt="Karte am eigenen Standort mit blauem Punkt und dem Knopf Mein Standort"></p>
 
 Beim Öffnen fragt der Browser bzw. die Android-App nach dem **Standort**. Mit ihm beginnt die Karte dort, wo
@@ -453,7 +460,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   und Schneeschmelze aus Sentinel-2, Längenänderung der Zunge aus GLAMOS, Archivfotos mit Datum von Hand und
   Vorschläge aus offenen Bildarchiven; im Trockengebiet Ausrichtung am Horizont.
 - **[Kartenmodi](docs/funktionen.md#kartenmodi)**: Sonnenstand, Schatten und Einstrahlung inklusive
-  Geländehorizont sowie Hotspots und Ausbreitungsfronten von Neophyten.
+  Geländehorizont sowie Hotspots und Ausbreitungsfronten von Neophyten; **[3D-Karte](docs/funktionen.md#3d-karte)**
+  mit den Spots auf dem Gelände.
 - **[Pflanzen und Baumarten](docs/funktionen.md#pflanzen-und-baumarten)**: Pflanzenbestimmung mit Pl@ntNet,
   Erkennung invasiver Neophyten, Artenbestand pro Spot, Prüfung der Bestimmungen durch Fachleute, Export
   (auf Wunsch nur geprüfter Funde) zu Info Flora, GBIF und iNaturalist und Hotspots pro 100 Fotos gegen

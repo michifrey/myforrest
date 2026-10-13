@@ -1679,3 +1679,37 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 .archive-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
 .archive-list li { display: grid; gap: 0.1rem; }
 .archive-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+
+/* ---------- 3D map (map3d.js) ---------- */
+.map3d-btn svg { stroke: var(--accent); fill: none; stroke-width: 1.7; stroke-linejoin: round; }
+.map3d-btn svg path:first-child { fill: color-mix(in srgb, var(--accent) 18%, transparent); }
+.map3d { position: fixed; inset: 0; z-index: 2000; background: #e8eee4; }
+.map3d .map3d-canvas { position: absolute; inset: 0; }
+.map3d-bar {
+  position: absolute; top: 0.8rem; left: 0.8rem; right: 3.6rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem;
+  pointer-events: none;
+}
+.map3d-bar > * { pointer-events: auto; }
+.map3d-bar strong {
+  font-family: var(--font-display); font-size: 1.15rem; background: var(--glass); backdrop-filter: blur(12px);
+  border: 1px solid var(--border); border-radius: 999px; padding: 0.4rem 0.9rem; box-shadow: var(--shadow);
+}
+.map3d-bar select {
+  background: var(--glass); backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 999px;
+  padding: 0.45rem 0.8rem; box-shadow: var(--shadow); font: inherit; font-size: 0.9rem;
+}
+.map3d-hint { font-size: 0.8rem; color: var(--muted); background: var(--glass); border-radius: 999px; padding: 0.3rem 0.7rem; }
+.map3d-close {
+  position: fixed; top: 0.8rem; right: 0.8rem; width: 2.6rem; height: 2.6rem; border-radius: 50%;
+  background: var(--glass); border: 1px solid var(--border); box-shadow: var(--shadow); font-size: 1.5rem; line-height: 1;
+}
+.map3d .maplibregl-ctrl-top-right { top: 3.6rem; }
+.map3d-status {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0;
+  background: var(--glass); border-radius: var(--radius-lg); padding: 0.8rem 1.2rem; box-shadow: var(--shadow);
+}
+.map3d-status[hidden] { display: none; }
+.map3d-popup { display: grid; gap: 0.25rem; font-size: 0.85rem; }
+.map3d-popup img { width: 100%; border-radius: 8px; aspect-ratio: 4 / 3; object-fit: cover; }
+.map3d-popup .btn { margin-top: 0.35rem; padding: 0.4rem 0.7rem; font-size: 0.85rem; }
+@media (max-width: 640px) { .map3d-hint { display: none; } }

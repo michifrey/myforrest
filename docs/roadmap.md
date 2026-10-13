@@ -13,6 +13,9 @@ mit echten Dateien und Diensten; das steht jeweils als offener Punkt dabei.
   Dateien verschiedener Modelle prüfen (bisher nach den bekannten Formaten mit Testdaten) und weitere Formate
   (z. B. GPS-Spur von Garmin- und Nextbase-Kameras, verschlüsselte Viofo-Daten).
 
+- **3D-Karte ausbauen**: das Höhenmodell swissALTI3D von swisstopo (2 m) für die Schweiz statt der weltweiten
+  Kacheln; Blickrichtung der Spots als Kegel auf dem Gelände; aus einem Spot direkt in die 3D-Ansicht seiner
+  Umgebung; Touren als Höhenprofil-Flug abspielen.
 - **Durchgehen ausbauen**: eigene Reihen zu Mapillary hochladen (OAuth bei Mapillary, ohne geschützte Funde);
   Schritte mit echter Parallaxe (Tiefenschätzung statt einer Ebene); das Wegnetz mit einer echten Overpass-Instanz
   im Betrieb prüfen.
@@ -99,6 +102,8 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 
 ### Durchgehen und Startseite
 
+- 3D-Karte: Spots, Route und Gletscherumrisse auf dem Gelände (MapLibre, Terrain Tiles über den Server),
+  Karte oder Luftbild, Überhöhung wählbar
 - Durchgehen wie Street View: Pfeile entlang der Aufnahme und zu Spots in der Nähe, Blickrichtung bleibt beim Schritt
 - Startseite mit wechselnden Landschaften (Wald, Gletscher, Gebirge, Wüste)
 - Weiche Übergänge im Durchgehen: zum Weg drehen, Zoom in Gehrichtung mit Überblendung

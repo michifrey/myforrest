@@ -23,7 +23,7 @@
 
 importScripts('offline-queue.js');
 
-const SHELL_VERSION = 'v15';
+const SHELL_VERSION = 'v16';
 const DATA_VERSION = 'v1';
 const CACHE = {
   shell: `myforrest-shell-${SHELL_VERSION}`,
@@ -34,7 +34,7 @@ const CACHE = {
 };
 const LIMIT = { api: 200, uploads: 400, tiles: 800 };
 const API_TIMEOUT_MS = 6000;
-const TILE_HOST = /(^|\.)tile\.openstreetmap\.org$/;
+const TILE_HOST = /(^|\.)(tile\.openstreetmap\.org|wmts\.geo\.admin\.ch)$/;
 // API answers the app needs to start; fetched once on activation because the
 // very first page load happens before the worker controls the page.
 const WARM_API = ['api/config', 'api/trees', 'api/spots'];
@@ -64,6 +64,7 @@ const PRECACHE = [
   'native.js',
   'drive-select.js',
   'drive.js',
+  'map3d.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',
@@ -214,6 +215,9 @@ self.addEventListener('fetch', (event) => {
   // Mapillary pictures (served by this server) never change: kept like own photos, for walking offline.
   if (/^api\/mapillary\/images\/\d+\/file$/.test(path)) {
     event.respondWith(cacheFirst(event, CACHE.uploads, { max: LIMIT.uploads }));
+  } else if (path.startsWith('api/terrain/')) {
+    // Terrain of the 3D map never changes: kept like map tiles.
+    event.respondWith(cacheFirst(event, CACHE.tiles, { max: LIMIT.tiles }));
   } else if (path.startsWith('api/')) {
     event.respondWith(networkFirst(event, CACHE.api, { max: LIMIT.api, timeoutMs: API_TIMEOUT_MS }));
   } else if (path.startsWith('uploads/')) {
