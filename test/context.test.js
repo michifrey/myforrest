@@ -240,6 +240,9 @@ test('a single day: archive in the past, forecast soon, nothing far ahead', asyn
         shortwave_radiation: time.map((_, h) => (h >= 6 && h <= 20 ? 400 : 0)),
         cloud_cover: time.map(() => 50),
         temperature_2m: time.map((_, h) => 10 + h / 2),
+        rain: time.map((_, h) => (h >= 14 && h < 17 ? 2.5 : 0)),
+        snowfall: time.map(() => 0),
+        snow_depth: time.map(() => 0.12),
       },
     }));
   };
@@ -248,7 +251,9 @@ test('a single day: archive in the past, forecast soon, nothing far ahead', asyn
   assert.equal(past.source, 'archive');
   assert.match(urls[0], /archive-api\.open-meteo\.com.*hourly=precipitation,shortwave_radiation/);
   assert.equal(past.hourly[0].t, Date.UTC(2026, 6, 11, 22), 'local midnight CEST = 22:00 UTC the day before');
-  assert.deepEqual(past.totals, { precip: 7.5, radiationKwh: 6, cloudMean: 50, tmin: 10, tmax: 21.5 });
+  assert.deepEqual(past.totals, { precip: 7.5, radiationKwh: 6, cloudMean: 50, tmin: 10, tmax: 21.5, snowfall: 0, snowDepthMax: 12 });
+  assert.match(urls[0], /hourly=[^&]*rain,snowfall,snow_depth/);
+  assert.deepEqual([past.hourly[15].rain, past.hourly[15].snowfall, past.hourly[15].snowDepth], [2.5, 0, 12], 'snow depth in cm');
 
   const soon = await weather.day(47.36, 8.58, '2026-10-12');
   assert.equal(soon.source, 'forecast');

@@ -93,7 +93,8 @@ Kennzahlen, die zuletzt fotografierten Spots als Bilder und die Legende zusammen
 
 Ein Klick auf einen Spot öffnet seine **Detailseite** über der ganzen Karte. Links steht gross das Foto mit
 Zeitregler und Vorschaubildern, darunter die Knöpfe *Wiederholungsfoto aufnehmen*, *Vorher / Nachher* und
-*Durchgehen*. Rechts zeigt eine **Minikarte** die Lage und die Spots in der Nähe (ein Klick öffnet sie), daneben
+*Durchgehen*. Rechts zeigt **Licht & Wald** den Horizont des Spots mit dem Lauf der Sonne und den Baumarten in
+ihrer Jahreszeit (siehe unten), daneben im Tab *Karte* eine **Minikarte** mit der Lage und den Spots in der Nähe (ein Klick öffnet sie). Darunter stehen
 Fotos, Zeitraum, Blickrichtung und Koordinaten, Höhe, Hangneigung, Exposition und Geländeform aus dem
 Höhenmodell, die erwartete Herbstfärbung, der Anteil der Ansicht, der sich seit dem ersten Foto verändert hat,
 alle Beobachtungen und die Baumarten. Weiteres steht in **Tabs** unter dem Foto: *Beobachtungen*, *Vergleich*,
@@ -107,6 +108,22 @@ etwas anders aufgenommen wurden. Das Ergebnis wirkt wie ein Zeitraffer:
 
 Im Beispiel: Sommer 2021 noch intakt, im Februar 2022 wirft ein Sturm drei Buchen um, ab 2023 wachsen
 in der Lücke junge Bäume nach, und im Frühling 2026 schliesst der Jungwuchs die Lücke.
+
+<p align="center"><img src="docs/screenshots/licht-wald.jpg" width="360" alt="Licht und Wald: Horizont des Spots mit Sonnenbogen und Buchen in Herbstfärbung"></p>
+
+**Licht & Wald** zeichnet den Horizont rund um den Spot von Ost nach West im Stil der Startseite: den Grat aus
+dem Höhenmodell, den Bogen der Sonne am Tag des gezeigten Fotos und die Sonne zur Aufnahmezeit. Wo der Bogen
+hinter dem Grat verschwindet, liegt der Spot im Schatten; darunter stehen die Sonnenzeit des Tages und der
+Sonnenstand beim Foto. Im Vordergrund stehen die Baumarten des Spots in ihrer Jahreszeit (Austrieb, belaubt,
+Herbstfärbung, Laubfall, kahl), mit dem Beginn der Färbung, der für diesen Ort erwartet wird. Mit *Heute* und
+dem Zeitregler lässt sich jeder Moment des Tages ansehen.
+
+<p align="center"><img src="docs/screenshots/licht-wald-wetter.jpg" width="100%" alt="Licht und Wald bei Regen im Herbst, Regen im November und Schneefall mit Schneedecke im Februar"></p>
+
+Auch das **Wetter** der Stunde ist eingezeichnet (Open-Meteo, Messung oder für heute die Vorhersage): Wolken
+grauen den Himmel und verdecken die Sonne, Regen fällt schräg, Schnee in Flocken, eine Schneedecke färbt den
+Boden weiss und bepudert die Nadelbäume. Bei **Glätte** glänzt der Boden eisig, und die Zeile darunter nennt
+sie: Glatteis (Regen bei Frost), Schneeglätte oder überfrierende Nässe nach Niederschlag.
 
 Unter dem Bild lassen sich pro Foto Beobachtungen taggen und eine Notiz erfassen. Jedes Foto nennt
 Urheber und Lizenz und lässt sich melden. Mit einem Pl@ntNet-Key bestimmt *Art bestimmen* die Pflanzen

@@ -9,7 +9,8 @@
 
 const ARCHIVE = 'https://archive-api.open-meteo.com/v1/archive';
 const FORECAST = 'https://api.open-meteo.com/v1/forecast';
-const HOURLY = 'precipitation,shortwave_radiation,cloud_cover,temperature_2m';
+// Rain, snowfall (cm) and snow depth (m) for the weather drawn in a spot's "Licht & Wald".
+const HOURLY = 'precipitation,shortwave_radiation,cloud_cover,temperature_2m,rain,snowfall,snow_depth';
 const FORECAST_DAYS = 15;
 const DAILY = 'precipitation_sum,temperature_2m_mean,temperature_2m_max,temperature_2m_min';
 // Leaf-out to early summer (~15 April to ~14 June): fresh leaves are frost-tender.
@@ -157,7 +158,7 @@ function createWeather({ db, fetchImpl = fetch, now = () => Date.now() }) {
     const offset = Math.round((Date.parse(`${date}T12:00:00Z`) - now()) / DAY);
     const source = offset <= -ARCHIVE_DELAY_DAYS ? 'archive' : offset <= FORECAST_DAYS ? 'forecast' : null;
     if (!source || offset < -365 * 85) return { date, source: null, hourly: [], totals: null };
-    const key = `day:${source}:${place(lat, lon, elevation)}:${date}`;
+    const key = `day2:${source}:${place(lat, lon, elevation)}:${date}`;
     return cached(key, source === 'archive' ? Infinity : 3600000, async () => {
       const base = source === 'archive' ? ARCHIVE : FORECAST;
       const url = `${base}?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}` +
@@ -175,6 +176,9 @@ function createWeather({ db, fetchImpl = fetch, now = () => Date.now() }) {
         radiation: h.shortwave_radiation?.[i] ?? null,
         cloud: h.cloud_cover?.[i] ?? null,
         temp: h.temperature_2m?.[i] ?? null,
+        rain: h.rain?.[i] ?? null,
+        snowfall: h.snowfall?.[i] ?? null, // cm
+        snowDepth: Number.isFinite(h.snow_depth?.[i]) ? Math.round(h.snow_depth[i] * 1000) / 10 : null, // m → cm
       }));
       const vals = (k) => hourly.map((x) => x[k]).filter(Number.isFinite);
       const sum = (k) => vals(k).reduce((a, b) => a + b, 0);
@@ -190,6 +194,8 @@ function createWeather({ db, fetchImpl = fetch, now = () => Date.now() }) {
           cloudMean: vals('cloud').length ? Math.round(sum('cloud') / vals('cloud').length) : null,
           tmin: vals('temp').length ? r1(Math.min(...vals('temp'))) : null,
           tmax: vals('temp').length ? r1(Math.max(...vals('temp'))) : null,
+          snowfall: vals('snowfall').length ? r1(sum('snowfall')) : null,
+          snowDepthMax: vals('snowDepth').length ? r1(Math.max(...vals('snowDepth'))) : null,
         },
       };
     });

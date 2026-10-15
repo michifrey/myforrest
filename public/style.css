@@ -539,8 +539,28 @@ input[type="checkbox"] { accent-color: var(--accent); width: 1.05rem; height: 1.
   display: grid; gap: 0.2rem; align-content: start;
 }
 .spot-side > .chips { margin-top: 0.4rem; }
-.minimap-wrap { isolation: isolate; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: var(--surface); margin-bottom: 0.5rem; }
-.minimap { height: 190px; background: var(--bg-deep); }
+.side-card { isolation: isolate; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: var(--surface); margin-bottom: 0.5rem; }
+.side-tabs { display: flex; border-bottom: 1px solid var(--border); }
+.side-tabs button {
+  flex: 1; border: none; border-radius: 0; background: none; padding: 0.5rem; font-size: 0.8rem;
+  color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.side-tabs button:hover { color: var(--text); }
+.side-tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+/* "Licht & Wald": horizon, sun and the spot's trees (spotprofile.js) */
+.profile { position: relative; height: 180px; background: #dfe7dc; }
+.profile canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.profile-ctl { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.7rem 0.2rem; }
+.profile-day { display: inline-flex; gap: 0.1rem; padding: 0.15rem; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); flex: none; }
+.profile-day button { border: none; background: transparent; padding: 0.25rem 0.6rem; font-size: 0.74rem; color: var(--muted); }
+.profile-day button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgb(0 0 0 / 0.12); }
+.profile-ctl input[type="range"] { flex: 1; min-width: 0; accent-color: var(--sun); }
+.profile-ctl output { font: 500 1rem/1 var(--font-display); font-variant-numeric: tabular-nums; min-width: 2.9rem; text-align: right; }
+.panel .profile-cap { margin: 0; padding: 0.2rem 0.75rem 0.5rem; font-size: 0.78rem; line-height: 1.45; }
+.panel .profile-cap + .profile-cap { padding-top: 0; margin-top: -0.25rem; }
+.profile-cap:empty { display: none; }
+.panel .profile-cap.ice { color: var(--wet); font-weight: 600; }
+.minimap { height: 180px; background: var(--bg-deep); }
 .minimap-btn { width: 100%; border: none; border-top: 1px solid var(--border); border-radius: 0; background: var(--surface); font-size: 0.8rem; padding: 0.5rem; color: var(--accent); }
 .minimap-btn:hover { background: var(--surface-2); }
 .mini-dot { fill: var(--ok); fill-opacity: 0.9; stroke: #fbf8f0; }

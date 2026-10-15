@@ -29,7 +29,7 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/mapillary/images?bbox=` | Mapillary-Bilder in einem Ausschnitt (höchstens 0,01° pro Seite) für die Karte; 404 ohne Token, 502 wenn Mapillary nicht erreichbar ist |
 | `GET`    | `/api/mapillary/images/:id/file` | Das Mapillary-Bild selbst (2048 px, 360°-Bilder 2:1), vom Server geladen und zwischengespeichert |
 | `GET`    | `/api/photos/:id/aligned.jpg?frame=` | 360°-Panorama in die Blickrichtung eines anderen Panoramas desselben Spots gedreht (JPEG 2048 × 1024, mit ETag) |
-| `GET`    | `/api/weather/day?lat=&lon=&date=` | Stundenwerte eines Tages (Einstrahlung, Regen, Bewölkung, Temperatur): Messung oder Prognose |
+| `GET`    | `/api/weather/day?lat=&lon=&date=` | Stundenwerte eines Tages (Einstrahlung, Niederschlag, Regen, Schneefall in cm, Schneehöhe in cm, Bewölkung, Temperatur): Messung oder Prognose |
 | `GET`    | `/api/weather/day/spots?date=` | Tagesniederschlag an allen Spots                       |
 | `GET`    | `/api/horizon?lat=&lon=`       | Geländehorizont (36 Richtungen) und Himmelssicht       |
 | `GET`    | `/api/dwd/layers`              | Karten des DWD zum Einblenden (WMS-Adresse, Ebenen, Zeiten des Radars) |

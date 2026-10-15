@@ -108,6 +108,8 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
   den Server), Karte oder Luftbild, Überhöhung wählbar; aus einem Spot direkt in die 3D-Ansicht seiner Umgebung; Route abfliegen
 - Explorer aufgeräumt (eine Leiste für Filter und Kartenmodi, schmale Explorer-Karte mit Bildkacheln) und Spots
   als eigene Detailseite: grosses Foto, Tabs, Minikarte und Blättern durch die Spots
+- Licht & Wald auf der Spot-Seite: Horizont aus dem Höhenmodell, Sonnenbogen und Sonnenstand, Baumarten in ihrer
+  Jahreszeit, Wetter der Stunde (Wolken, Regen, Schneefall, Schneedecke, Glätte), im Stil der Startseite
 - Durchgehen wie Street View: Pfeile entlang der Aufnahme und zu Spots in der Nähe, Blickrichtung bleibt beim Schritt
 - Startseite mit wechselnden Landschaften (Wald, Gletscher, Gebirge, Wüste)
 - Weiche Übergänge im Durchgehen: zum Weg drehen, Zoom in Gehrichtung mit Überblendung
