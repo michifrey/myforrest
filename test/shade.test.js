@@ -88,3 +88,48 @@ test('shadow edges fade over the sun disc instead of jumping', () => {
   assert.equal(r[0], 0);
   assert.ok(Math.abs(r[r.length - 1] - 1) < 1e-6);
 });
+
+test('trees and buildings throw short, soft shadows on a fine grid', () => {
+  const gw = 60; const gh = 20; const cellM = 2;
+  const top = new Float32Array(gw * gh).fill(500);
+  // A 20-m house, 3 cells (6 m) wide, in columns 20–22.
+  for (let y = 0; y < gh; y++) for (let x = 20; x < 23; x++) top[y * gw + x] = 520;
+  const sun = Shade.objects({ top, gw, gh, cellM, altitude: 45, azimuth: 270, objectTop: 20 });
+  const row = Array.from(sun.slice(10 * gw, 11 * gw));
+  assert.ok(row.slice(0, 20).every((v) => v === 1), 'sun side');
+  assert.ok(row.slice(20, 23).every((v) => v === 1), 'the roof is in the sun');
+  assert.ok(row.slice(23, 30).every((v) => v === 0), 'shadow behind the house');
+  assert.ok(row.slice(36).every((v) => v === 1), 'about 20 m long: sun again');
+  assert.ok(row.slice(30, 36).some((v) => v > 0 && v < 1), 'soft edge');
+  // Low sun: longer; no objects: no work, all in sun; sun down: dark.
+  const low = Shade.objects({ top, gw, gh, cellM, altitude: 15, azimuth: 270, objectTop: 20 });
+  assert.equal(low[10 * gw + 45], 0);
+  assert.ok(Shade.objects({ top, gw, gh, cellM, altitude: 45, azimuth: 270, objectTop: 0 }).every((v) => v === 1));
+  assert.ok(Shade.objects({ top, gw, gh, cellM, altitude: -2, azimuth: 270, objectTop: 20 }).every((v) => v === 0));
+  // A window of the grid.
+  const part = Shade.objects({ top, gw, gh, cellM, altitude: 45, azimuth: 270, objectTop: 20, x0: 23, y0: 5, w: 3, h: 2 });
+  assert.deepEqual(Array.from(part), [0, 0, 0, 0, 0, 0]);
+});
+
+test('one frame: terrain alone, or trees and buildings times the terrain light', () => {
+  const g = wall();
+  const dem = { elev: g.elev, gw: g.gw, gh: g.gh };
+  const sun = { altitude: 45, azimuth: 270 };
+  const terrain = { x0: 0, y0: 0, w: g.gw, h: g.gh, cellM: g.cellM };
+  assert.deepEqual(Shade.frame({ dem, ...sun, terrain }), Shade.light({ ...g, ...sun }));
+  // Surface grid twice as fine as the DEM, flat but for a 10-m tree west of the wall's shadow.
+  const sw = g.gw * 2; const sh = g.gh * 2;
+  const top = new Float32Array(sw * sh);
+  for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) top[y * sw + x] = g.elev[(y >> 1) * g.gw + (x >> 1)];
+  for (let y = 0; y < sh; y++) top[y * sw + 6] += 10;
+  const surf = { top, gw: sw, gh: sh };
+  const objects = { x0: 0, y0: 0, w: sw, h: sh, cellM: 5, objectTop: 10, f: 0.5, gx: 0, gy: 0, dx0: 0, dy0: 0 };
+  const lit = Shade.frame({ dem, surf, ...sun, terrain, objects });
+  assert.equal(lit.length, sw * sh);
+  const row = 20 * sw;
+  assert.ok(lit[row + 2] > 0.9, 'sun before the tree');
+  assert.equal(lit[row + 7], 0, 'shadow of the tree');
+  assert.ok(lit[row + 8] > 0 && lit[row + 8] < 1, 'its soft tip 10 m away');
+  assert.equal(lit[row + 26], 0, 'shadow of the wall (terrain)');
+  assert.ok(lit[row + 56] > 0.9, 'sun beyond');
+});

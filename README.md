@@ -257,7 +257,8 @@ Sonnenstand, den Schatten eines 25-m-Baums und die Richtung von Auf- und Unterga
 dem Höhenmodell blockiert die Sonne hinter Hügeln (*Sonne ab 05:29*, *Sonne bis 20:36*). Das Panel nennt
 Sonnenhöhe, Einstrahlung bei klarem Himmel und gemessen, Himmelssicht, Sonnenstunden und Regen. An jedem
 Spot steht die Regenmenge des Tages. *Licht und Schatten auf der Karte* dunkelt ab, was zur gewählten Zeit im
-Schatten von Hügeln und Bergen liegt, färbt steil besonnte Hänge golden und zeigt Nacht und Dämmerung; dazu
+Schatten von Hügeln und Bergen liegt, in der Schweiz nah herangezoomt auch im Schatten von Bäumen und Häusern
+(swissSURFACE3D), färbt steil besonnte Hänge golden und zeigt Nacht und Dämmerung; dazu
 lässt sich eine Karte des Deutschen Wetterdienstes einblenden (Niederschlagsradar, Warnungen).
 
 ![Licht und Schatten am Abend, mit dem Niederschlagsradar des DWD](docs/screenshots/licht-schatten.jpg)

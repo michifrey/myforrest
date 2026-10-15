@@ -136,7 +136,7 @@ Prüfen lässt sich das jederzeit mit `npx license-checker-rseidelsohn --product
 | Quelle | Lizenz / Bedingung |
 |--------|--------------------|
 | OpenStreetMap (Kartenkacheln, Routing-Daten) | ODbL, Quellenangabe „© OpenStreetMap-Mitwirkende“; [Tile Usage Policy](https://operations.osmfoundation.org/policies/tiles/) beachten, bei viel Verkehr eigener Kachelanbieter |
-| swisstopo (Landeskarte, Luftbild, Kantone) | frei nutzbar mit Quellenangabe © swisstopo |
+| swisstopo (Landeskarte, Luftbild, Kantone, swissSURFACE3D, swissALTI3D) | frei nutzbar mit Quellenangabe © swisstopo |
 | Open-Meteo (ERA5) | CC BY 4.0; nicht-kommerziell kostenlos, für kommerziellen Betrieb ein [API-Abo](https://open-meteo.com/en/pricing) |
 | Copernicus Sentinel-2, Landsat (USGS) | frei, mit Quellenangabe |
 | DWD-Phänologie, Radar und Warnungen (WMS) | frei (GeoNutzV), mit Quellenangabe |

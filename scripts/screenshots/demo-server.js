@@ -190,9 +190,48 @@ async function dwdFetch() {
     <Layer><Name>dwd:Warnungen_Gemeinden</Name><Title>Warnungen</Title></Layer></Layer></Capability></WMS_Capabilities>`);
 }
 
+/**
+ * geo.admin.ch for the heights of trees and buildings (src/surface.js): a STAC item per km tile and
+ * GeoTIFFs at 2 m drawn from the demo forest and village; the terrain model is flat, so the surface
+ * model carries just the heights above ground.
+ */
+const { lv95ToWgs84, wgs84ToLv95 } = require('../../src/lv95');
+const surfaceFiles = new Map();
+async function surfaceFetch(url, opts = {}) {
+  const u = new URL(url);
+  if (u.pathname.endsWith('/items')) {
+    const [w, sth, e, nth] = u.searchParams.get('bbox').split(',').map(Number);
+    const [E, N] = wgs84ToLv95((sth + nth) / 2, (w + e) / 2).map((v) => Math.floor(v / 1000));
+    const kind = u.pathname.includes('swisssurface3d') ? 'surface' : 'terrain';
+    return Response.json({ features: [{ id: `${kind}_2021_${E}-${N}`, assets: { tif: { href: `https://data.geo.admin.ch/demo/${kind}-${E}-${N}_0.5_2056_5728.tif` } } }] });
+  }
+  const [, kind, E, N] = /(surface|terrain)-(\d+)-(\d+)_/.exec(u.pathname);
+  const key = `${kind}-${E}-${N}`;
+  if (!surfaceFiles.has(key)) {
+    const { writeArrayBuffer } = await import('geotiff');
+    const n = 500; const res = 2;
+    const v = new Float32Array(n * n);
+    if (kind === 'surface') {
+      for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) v[r * n + c] = tiles.objectHeight(...lv95ToWgs84(E * 1000 + (c + 0.5) * res, (Number(N) + 1) * 1000 - (r + 0.5) * res));
+      }
+    }
+    surfaceFiles.set(key, Buffer.from(writeArrayBuffer(v, {
+      width: n, height: n, ModelPixelScale: [res, res, 0], ModelTiepoint: [0, 0, 0, E * 1000, (Number(N) + 1) * 1000, 0],
+      ProjectedCSTypeGeoKey: 2056, GTModelTypeGeoKey: 1, BitsPerSample: [32], SampleFormat: [3],
+    })));
+  }
+  const buf = surfaceFiles.get(key);
+  const r = /bytes=(\d+)-(\d+)/.exec(opts.headers?.Range || '');
+  if (!r) return new Response(buf);
+  const end = Math.min(Number(r[2]), buf.length - 1);
+  return new Response(buf.subarray(Number(r[1]), end + 1), { status: 206, headers: { 'content-range': `bytes ${r[1]}-${end}/${buf.length}` } });
+}
+
 const app = createApp({
   dataDir: path.join(work, 'data'),
   dwdFetch,
+  surfaceFetch,
   // DEMO_GLETSCHER=1: the glacier inventories of the demo glacier (written by seed-gletscher.js).
   ...(process.env.DEMO_MAPILLARY === '1' ? { mapillaryToken: 'MLY|demo', mapillaryFetch } : {}),
   glacierFiles: process.env.DEMO_GLETSCHER === '1' ? Object.keys(glacier.inventories()).map((f) => path.join(work, 'gletscher', f)).join(',') : '',

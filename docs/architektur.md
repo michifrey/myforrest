@@ -43,6 +43,7 @@ src/nightcool.js     Nächtliche Abkühlung in Senken aus Wind und Bewölkung
 src/openmeteo.js     Zeitreihen aus Archiv und Prognose von Open-Meteo zusammensetzen
 src/routes/climate.js  Routen und Analyse-Hooks für Stürme, Phänologie-Referenz und Frostnächte
 src/elevation.js     Geländehöhe, Hangneigung, Exposition und Geländeform (Copernicus-DEM über Open-Meteo)
+src/surface.js       Höhe von Bäumen und Gebäuden (swissSURFACE3D − swissALTI3D) als Kacheln für die Schatten auf der Karte
 src/exif.js          Aufnahmezeit, GPS und Blickrichtung aus den Bilddaten
 src/closures.js      Sperrungen bei Holzerei (aus Holzschlag-Fotos und von Hand) als Sperrkreise für BRouter
 src/wildlife.js      Wildruhezonen (Datei oder pro Feld von geo.admin.ch, gespeichert und wöchentlich neu; WGS84/LV95, Schutzzeit) als Sperrflächen für BRouter
@@ -113,7 +114,8 @@ render.yaml          Blueprint für Render: Docker-Dienst mit Disk, Deploy bei j
 docs/                Dokumentation; docs/screenshots/ enthält die Bilder für das README
 mkdocs.yml           Doku-Website aus docs/ (MkDocs Material), gebaut und veröffentlicht von .github/workflows/docs.yml
 public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet die Landschaften der Startseite (Wald, Gletscher, Gebirge, Wüste) und wechselt sie,
-                     sun.js berechnet Sonnenstand und Einstrahlung, shade.js Gelände- und Nachtschatten,
+                     sun.js berechnet Sonnenstand und Einstrahlung, shade.js Gelände-, Baum- und Nachtschatten
+                     (in shade-worker.js neben der Seite gerechnet),
                      sunmap.js den Kartenmodus „Sonne & Wetter“ (mit Licht und Schatten und DWD-Karten),
                      hotspots.js den Kartenmodus „Arten & Neophyten“,
                      tours.js den Kartenmodus „Touren & Aufträge“ (Route zeichnen, aufzeichnen, importieren, Fotoaufträge),

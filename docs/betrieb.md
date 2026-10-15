@@ -102,6 +102,7 @@ ausserhalb von `docs/` zeigen auf GitHub (`https://github.com/michifrey/myforres
 | Copernicus Sentinel-2 über [Earth Search](https://earth-search.aws.element84.com/v1) (Element 84, AWS Open Data) | Satellitenkontext NDVI/NDMI ab 2017, Frühwarnung | `earth-search.aws.element84.com`, `sentinel-cogs.s3.us-west-2.amazonaws.com` |
 | Landsat Collection 2 (USGS) über [Microsoft Planetary Computer](https://planetarycomputer.microsoft.com) | Satellitenkontext vor 2017 und Überlappung 2017–2018 | `planetarycomputer.microsoft.com`, `landsateuwest.blob.core.windows.net` |
 | Deutscher Wetterdienst, Open Data | Phänologie-Referenzdaten, Jahres- und Sofortmelder ([laden](installation.md#phänologie-referenzdaten-laden)) | `opendata.dwd.de` |
+| swisstopo, swissSURFACE3D Raster und swissALTI3D (OGD, [STAC von geo.admin.ch](https://data.geo.admin.ch/api/stac/v1)) | Höhe von Bäumen und Gebäuden für die Schatten auf der Karte (nur Schweiz; Teile der COGs per Range-Request) | `data.geo.admin.ch` |
 | Deutscher Wetterdienst, [GeoServer](https://maps.dwd.de) (WMS) | Niederschlagsradar und Warnungen über der Karte; der Server liest nur die Capabilities, die Bilder lädt der Browser | `maps.dwd.de` |
 | MeteoSchweiz, Open Government Data | Phänologie-Referenzdaten Schweiz ([laden](installation.md#phänologie-referenzdaten-laden)) | `data.geo.admin.ch` |
 | [Pl@ntNet](https://my.plantnet.org) (optional, API-Key) | Pflanzenbestimmung | `my-api.plantnet.org` |
