@@ -81,6 +81,12 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.evaluate(() => { document.querySelector('#panel').scrollTop = 0; });
     await settle(page, 2500);
     await page.screenshot({ path: out('spot.jpg'), ...jpg });
+    // "Licht & Wald" on an autumn photo: the beeches colouring, the sun low in the afternoon.
+    const autumn = await page.evaluate(() => state.spot.photos.findIndex((p) => new Date(p.takenAt).getMonth() === 9));
+    if (autumn >= 0) await page.evaluate((i) => { const s = document.querySelector('#time-slider'); s.value = i; s.dispatchEvent(new Event('input', { bubbles: true })); }, autumn);
+    await page.click('#side-tab-light');
+    await settle(page, 2500);
+    await page.locator('.side-card').screenshot({ path: out('licht-wald.jpg'), ...jpg });
     await page.close();
   }
 

@@ -514,7 +514,7 @@ async function openSpot(id, photoId) {
   renderSpecies(state.spot);
   renderElevation(state.spot);
   renderSpotStep(state.spot);
-  renderMinimap(state.spot);
+  if (!$('side-pane-map').hidden) renderMinimap(state.spot);
   map.setView([state.spot.lat, state.spot.lon], Math.max(map.getZoom(), 15));
 }
 
@@ -599,6 +599,31 @@ function renderMinimap(spot) {
   }
   L.circleMarker([spot.lat, spot.lon], { radius: 9, className: 'mini-dot current', weight: 3, interactive: false }).addTo(minimapLayer);
 }
+
+// Side column: "Licht & Wald" (spotprofile.js) or the mini map; the choice is remembered.
+const SIDE_TAB_KEY = 'myforrest-side-tab';
+function selectSideTab(id) {
+  for (const tab of document.querySelectorAll('.side-tabs [role="tab"]')) {
+    const on = tab.id === id;
+    tab.setAttribute('aria-selected', String(on));
+    tab.tabIndex = on ? 0 : -1;
+    $(tab.dataset.pane).hidden = !on;
+  }
+  try { localStorage.setItem(SIDE_TAB_KEY, id); } catch { /* private mode */ }
+  if (id === 'side-tab-map' && state.spot) renderMinimap(state.spot); // Leaflet measures only while shown
+  if (id === 'side-tab-light') window.SpotProfile?.render?.();
+}
+document.querySelector('.side-tabs').addEventListener('click', (e) => {
+  const tab = e.target.closest('[role="tab"]');
+  if (tab) selectSideTab(tab.id);
+});
+document.querySelector('.side-tabs').addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+  const next = document.activeElement.id === 'side-tab-light' ? 'side-tab-map' : 'side-tab-light';
+  selectSideTab(next);
+  $(next).focus();
+});
+try { if (localStorage.getItem(SIDE_TAB_KEY) === 'side-tab-map') selectSideTab('side-tab-map'); } catch { /* private mode */ }
 
 function closeSpot() {
   $('spot').hidden = true;

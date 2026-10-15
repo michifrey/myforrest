@@ -198,9 +198,10 @@ Ein Spot öffnet sich als eigene Seite über der Karte (auf dem Handy statt der 
   Reihenfolge ihrer Nummer, mit dem gewählten Filter („3 / 24“).
 - **Foto und Zeitreise**: das Foto in voller Breite, Zeitregler, Vorschaubilder und *Stabilisiert*; darunter
   *Wiederholungsfoto aufnehmen*, *Vorher / Nachher*, *Durchgehen* und *Neues Foto anfragen*.
-- **Seitenspalte** (bleibt beim Scrollen stehen): eine **Minikarte** mit dem Spot (gold) und den Spots in der
-  Nähe in ihrer Befundfarbe; ein Klick auf einen Punkt öffnet diesen Spot, *Auf der grossen Karte zeigen*
-  schliesst die Seite und zoomt hin. Darunter Fotos, Zeitraum, Blickrichtung und Lage, Landschaft, Höhe und
+- **Seitenspalte** (bleibt beim Scrollen stehen): oben zwei Tabs, *Licht & Wald* (siehe unten) und *Karte*, eine
+  **Minikarte** mit dem Spot (gold) und den Spots in der Nähe in ihrer Befundfarbe; ein Klick auf einen Punkt
+  öffnet diesen Spot, *Auf der grossen Karte zeigen* schliesst die Seite und zoomt hin. Der zuletzt gewählte Tab
+  bleibt im Browser gespeichert. Darunter Fotos, Zeitraum, Blickrichtung und Lage, Landschaft, Höhe und
   Gelände, Veränderung, Beobachtungen und Baumarten.
 - **Tabs** unter dem Foto: *Beobachtungen* (Tags, Notiz, Art bestimmen), *Vergleich* (Vorher/Nachher),
   *Auswertung* (automatische Auswertung des Fotos), *Wetter & Kontext* und *Verlauf* (Auffälligkeiten-Chronik,
@@ -208,6 +209,31 @@ Ein Spot öffnet sich als eigene Seite über der Karte (auf dem Handy statt der 
   wechseln zwischen den Tabs.
 
 Auf dem Handy stehen Foto, Knöpfe, Seitenspalte und Tabs untereinander.
+
+### Licht & Wald
+
+![Licht und Wald: Horizont des Spots mit Sonnenbogen und Buchen in Herbstfärbung](screenshots/licht-wald.jpg)
+
+Eine kleine Grafik im Stil der Startseite zeigt, wie Licht und Wald am Spot zusammenkommen. Die waagrechte Achse
+ist die Himmelsrichtung von Nordost über Süd bis Nordwest, die senkrechte die Höhe über dem Horizont.
+
+- **Horizont**: der Grat aus dem Höhenmodell (`/api/horizon`, 36 Richtungen wie bei *Sonne & Wetter*), mit einem
+  Saum kleiner Bäume. Fehlt das Höhenmodell, wird mit offenem Horizont gerechnet, und die Zeile darunter sagt es.
+- **Sonne**: der Bogen des Tages gepunktet, die Sonne an der gewählten Uhrzeit (`sun.js`). Der Grat wird nach dem
+  Bogen gezeichnet und verdeckt, was dahinter liegt; Himmel und Licht folgen dem Sonnenstand bis zur Nacht mit
+  Sternen. Steht die Sonne über dem Grat, sind die Bäume von ihrer Seite warm beleuchtet, sonst kühl im Schatten.
+- **Gelände**: Der Boden im Vordergrund fällt zur Exposition des Spots ab, steiler mit grösserer Hangneigung, mit
+  einer Kuppe oder Senke in der Mitte, wenn das die Geländeform ist. Gebirge, Gletscher und Trockengebiet haben
+  eigene Bodenfarben.
+- **Baumarten**: Die erfassten Arten stehen im Vordergrund und im mittleren Band: Fichten, Tannen (Weisstanne,
+  Douglasie, Eibe), Lärchen und Laubbäume mit eigenen Formen. Die Farbe folgt dem Tag des Jahres: *Austrieb* ab
+  etwa dem 18. April (2,5 Tage später je 100 m über 400 m, Robinie zwölf Tage später), *belaubt*, *Herbstfärbung*
+  ab dem für den Spot erwarteten Tag (Höhe, Exposition und Kaltluft, wie unter den Baumarten angezeigt),
+  *Laubfall* zwei Wochen später, danach *kahl*. Lärchen werden golden und verlieren dann die Nadeln. Ohne
+  erfasste Arten steht im Wald ein Mischwald als Platzhalter, und die Zeile darunter sagt es.
+- **Zeit**: *Fototag* nimmt Tag und Uhrzeit des gezeigten Fotos und folgt dem Zeitregler der Zeitreise; *Heute*
+  den heutigen Tag und die aktuelle Uhrzeit. Der Regler darunter verschiebt die Uhrzeit. Die Zeile unter der
+  Grafik nennt, von wann bis wann die Sonne über dem Grat steht, und den Sonnenstand zur gewählten Zeit.
 
 ### Eigener Standort
 
