@@ -114,7 +114,7 @@ docs/                Dokumentation; docs/screenshots/ enthält die Bilder für d
 mkdocs.yml           Doku-Website aus docs/ (MkDocs Material), gebaut und veröffentlicht von .github/workflows/docs.yml
 public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet die Landschaften der Startseite (Wald, Gletscher, Gebirge, Wüste) und wechselt sie,
                      sun.js berechnet Sonnenstand und Einstrahlung, shade.js Gelände- und Nachtschatten,
-                     sunmap.js den Kartenmodus „Sonne & Wetter“ (mit Licht und Schatten und DWD-Karten),
+                     sunmap.js den Kartenmodus „Sonne & Wetter“ (mit Licht und Schatten, Radar der MeteoSchweiz und DWD-Karten),
                      hotspots.js den Kartenmodus „Arten & Neophyten“,
                      tours.js den Kartenmodus „Touren & Aufträge“ (Route zeichnen, aufzeichnen, importieren, Fotoaufträge),
                      video.js den Video-Upload und die 360°-Ansicht,

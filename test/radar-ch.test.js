@@ -112,6 +112,10 @@ test('route: frames of the last two hours, pictures fetched once and kept', asyn
     assert.ok(times.every((t, i) => i === 0 || t - times[i - 1] === 300000), 'every 5 minutes, oldest first');
     assert.ok(Date.now() - times[0] <= 2 * 3600000 + 300000);
     assert.match(asked[0], /\/items\?datetime=\d{4}-\d{2}-\d{2}T00:00:00Z\/\.\.&limit=100$/);
+    // The big map asks for more of the last day (here the stand-in has three hours).
+    const day = await (await fetch(`${base}/api/radar/ch?hours=24`)).json();
+    assert.ok(day.frames.length >= 34 && day.frames.length <= 37, `${day.frames.length} frames over 24 h`);
+    assert.equal((await (await fetch(`${base}/api/radar/ch?hours=99`)).json()).frames.length, day.frames.length, 'at most 24 h');
 
     const newest = list.frames[list.frames.length - 1].url;
     const [a, b] = await Promise.all([fetch(`${base}${newest}`), fetch(`${base}${newest}`)]);

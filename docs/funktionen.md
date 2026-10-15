@@ -1050,15 +1050,24 @@ funktioniert die 3D-Karte wie im Browser.
 
 ![Die Umgebung eines Spots in 3D, in seine Blickrichtung](screenshots/karte-3d-spot.jpg)
 
-### DWD-Karten einblenden
+### Wetterkarten einblenden
 
-Unter *DWD-Karte* lässt sich eine Karte des Deutschen Wetterdienstes über die Karte legen (WMS von
-`maps.dwd.de`, frei mit Quellenangabe):
+Unter *Wetterkarte* lässt sich das Radar der MeteoSchweiz oder eine Karte des Deutschen Wetterdienstes über die
+Karte legen:
 
-- **Niederschlagsradar**: das Radarbild zur gewählten Zeit (5-Minuten-Schritte), solange der DWD es noch
+![Niederschlagsradar der MeteoSchweiz über der grossen Karte](screenshots/radar-karte.jpg)
+
+- **Radar MeteoSchweiz**: das Niederschlagsradar für die ganze Schweiz mit Rand (siehe
+  [Wetter am Spot](#wetter-am-spot)), das Bild zur gewählten Zeit, solange es eines gibt (die letzten 24 Stunden
+  in 5-Minuten-Schritten, `GET /api/radar/ch?hours=24`), sonst das neueste; das Panel sagt, welches gezeigt
+  wird. Beim Verschieben der Uhrzeit bleibt das alte Bild stehen, bis das neue geladen ist.
+
+Die Karten des DWD (WMS von `maps.dwd.de`, frei mit Quellenangabe):
+
+- **Niederschlagsradar (DWD)**: das Radarbild zur gewählten Zeit (5-Minuten-Schritte), solange der DWD es noch
   vorhält, sonst das neueste; das Panel sagt, welches gezeigt wird.
-- **Wetterwarnungen**: die aktuellen Warnungen nach Gemeinden.
-- **Waldbrandgefahr**, sobald der DWD eine solche Ebene anbietet.
+- **Wetterwarnungen (DWD)**: die aktuellen Warnungen nach Gemeinden.
+- **Waldbrandgefahr (DWD)**, sobald der DWD eine solche Ebene anbietet.
 
 Welche Ebenen es gibt und für welche Zeiten das Radar Bilder hat, liest der Server einmal pro Stunde aus den
 Capabilities des DWD (`GET /api/dwd/layers`); ist der DWD nicht erreichbar, bietet er Radar und Warnungen

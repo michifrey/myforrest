@@ -484,10 +484,13 @@
   try { $('shade-toggle').checked = localStorage.getItem('myforrest.shade') !== '0'; } catch { /* private mode */ }
   map.on('moveend', () => shadeOn() && drawShade());
 
-  /* ---------- Maps of the Deutscher Wetterdienst ---------- */
+  /* ---------- Weather maps: MeteoSwiss radar, maps of the Deutscher Wetterdienst ---------- */
 
   let dwdInfo = null;
   let dwdLayer = null;
+  let chRadar = null; // /api/radar/ch?hours=24, refreshed every two minutes
+  let chLayer = null;
+  let chToken = 0;
   async function loadDwd() {
     if (dwdInfo) return;
     try {
@@ -498,13 +501,64 @@
     const select = $('dwd-layer');
     let saved = '';
     try { saved = localStorage.getItem('myforrest.dwd') || ''; } catch { /* private mode */ }
-    select.replaceChildren(el('option', { value: '', text: 'keine' }), ...dwdInfo.layers.map((l) => el('option', { value: l.id, text: l.title })));
-    if (dwdInfo.layers.some((l) => l.id === saved)) select.value = saved;
+    select.replaceChildren(
+      el('option', { value: '', text: 'keine' }),
+      ...(state.config.radarCh ? [el('option', { value: 'radar-ch', text: 'Radar MeteoSchweiz' })] : []),
+      ...dwdInfo.layers.map((l) => el('option', { value: l.id, text: `${l.title} (DWD)` })),
+    );
+    if ([...select.options].some((o) => o.value === saved)) select.value = saved;
     drawDwd();
+  }
+
+  /**
+   * The MeteoSwiss radar over the map: the picture at the chosen time while there is one (the last
+   * 24 hours, every 5 minutes), otherwise the newest.
+   */
+  async function drawCh() {
+    const status = $('dwd-status');
+    const token = ++chToken;
+    if (!chRadar || Date.now() - chRadar.at > 120000) {
+      chRadar = { at: Date.now(), ...(await api('/api/radar/ch?hours=24').catch((err) => ({ frames: [], error: err.message }))) };
+    }
+    if (token !== chToken || $('dwd-layer').value !== 'radar-ch' || !sm.open) return;
+    const frames = chRadar.frames || [];
+    if (!frames.length) {
+      chLayer?.remove();
+      chLayer = null;
+      status.hidden = false;
+      status.textContent = `Radar der MeteoSchweiz nicht verfügbar${chRadar.error ? ` (${chRadar.error})` : ''}.`;
+      return;
+    }
+    const t = dayStart(sm.date) + sm.minute * 60000;
+    const at = frames.filter((f) => Date.parse(f.time) <= t + 150000 && Date.parse(f.time) > t - 600000).pop();
+    const frame = at || frames[frames.length - 1];
+    if (chLayer?._url !== frame.url) {
+      const next = L.imageOverlay(frame.url, chRadar.bounds, {
+        opacity: 0.7, pane: 'dwd', interactive: false, className: 'radar-img',
+        attribution: '&copy; <a href="https://www.meteoschweiz.admin.ch/">MeteoSchweiz</a>',
+      }).addTo(map);
+      // Swap once the new picture is there, so moving the clock does not flicker.
+      const old = chLayer;
+      next.once('load', () => old?.remove());
+      setTimeout(() => old?.remove(), 3000);
+      chLayer = next;
+    }
+    status.hidden = false;
+    status.textContent = `${at ? `Radarbild von ${clock(Date.parse(frame.time))}.`
+      : `Neuestes Radarbild von ${clock(Date.parse(frame.time))} – Bilder gibt es für die letzten 24 Stunden.`} Schweiz mit Rand · Quelle: MeteoSchweiz`;
   }
 
   function drawDwd() {
     const status = $('dwd-status');
+    if ($('dwd-layer').value === 'radar-ch' && sm.open && sm.date) {
+      dwdLayer?.remove();
+      dwdLayer = null;
+      drawCh();
+      return;
+    }
+    chToken += 1;
+    chLayer?.remove();
+    chLayer = null;
     const layer = dwdInfo?.layers.find((l) => l.id === $('dwd-layer').value);
     if (!sm.open || !layer || !sm.date) {
       dwdLayer?.remove();
