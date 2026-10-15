@@ -244,7 +244,9 @@ async function surfaceFetch(url, opts = {}) {
     const kind = u.pathname.includes('swisssurface3d') ? 'surface' : 'terrain';
     return Response.json({ features: [{ id: `${kind}_2021_${E}-${N}`, assets: { tif: { href: `https://data.geo.admin.ch/demo/${kind}-${E}-${N}_0.5_2056_5728.tif` } } }] });
   }
-  const [, kind, E, N] = /(surface|terrain)-(\d+)-(\d+)_/.exec(u.pathname);
+  const m = /(surface|terrain)-(\d+)-(\d+)_/.exec(u.pathname);
+  if (!m) return new Response('not found', { status: 404 }); // e.g. Meta's canopy heights outside the demo area
+  const [, kind, E, N] = m;
   const key = `${kind}-${E}-${N}`;
   if (!surfaceFiles.has(key)) {
     const { writeArrayBuffer } = await import('geotiff');

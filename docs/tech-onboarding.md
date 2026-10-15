@@ -137,6 +137,7 @@ Prüfen lässt sich das jederzeit mit `npx license-checker-rseidelsohn --product
 |--------|--------------------|
 | OpenStreetMap (Kartenkacheln, Routing-Daten) | ODbL, Quellenangabe „© OpenStreetMap-Mitwirkende“; [Tile Usage Policy](https://operations.osmfoundation.org/policies/tiles/) beachten, bei viel Verkehr eigener Kachelanbieter |
 | swisstopo (Landeskarte, Luftbild, Kantone, swissSURFACE3D, swissALTI3D) | frei nutzbar mit Quellenangabe © swisstopo |
+| Meta Kronenhöhenkarte CHM v2 | CC BY 4.0, Quellenangabe Meta (Data for Good) |
 | Open-Meteo (ERA5) | CC BY 4.0; nicht-kommerziell kostenlos, für kommerziellen Betrieb ein [API-Abo](https://open-meteo.com/en/pricing) |
 | Copernicus Sentinel-2, Landsat (USGS) | frei, mit Quellenangabe |
 | DWD-Phänologie, Radar und Warnungen (WMS) | frei (GeoNutzV), mit Quellenangabe |
@@ -236,6 +237,7 @@ ohne die jeweilige Funktion weiter.
 | SMTP-Server aus `SMTP_URL` | E-Mails | Registrierung, Passwort vergessen | Port **465** (`smtps://`) oder **587** (`smtp://` + STARTTLS) |
 | `DETECTOR_URL` | externer Objektdetektor | beim ersten Abruf der Erkennungen eines Fotos | nur wenn gesetzt |
 | `WEGNETZ_URL`, z. B. `overpass-api.de` | Wegnetz im Durchgehen (OpenStreetMap) | pro Feld von rund 1 km², alle 30 Tage | nur wenn gesetzt; eigene Overpass-Instanz möglich |
+| `GEBAEUDE_URL` (sonst `WEGNETZ_URL`) | Gebäude für die Schatten auf der Karte ausserhalb der Schweiz (OpenStreetMap) | pro Kachel von rund 1,6 km, alle 30 Tage | nur wenn eine der beiden gesetzt ist |
 | `graph.mapillary.com` und die Bild-Hosts von Mapillary | Mapillary-Bilder im Durchgehen | pro Feld, eine Woche zwischengespeichert | nur mit `MAPILLARY_TOKEN` |
 | Hosts der Bild-Adressen in `ARCHIV_KATALOG` | Archivbild übernehmen | auf Knopfdruck | nur wenn gesetzt |
 

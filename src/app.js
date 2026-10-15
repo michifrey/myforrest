@@ -38,6 +38,7 @@ const { TREES, treeInfo, treeJson } = require('./trees');
 const { createElevation } = require('./elevation');
 const { createDwd } = require('./dwd');
 const { createSurface, MIN_Z: SURFACE_MIN_Z, MAX_Z: SURFACE_MAX_Z } = require('./surface');
+const { createBuildings } = require('./buildings');
 const registerAccounts = require('./routes/accounts');
 const { createOAuth, providersFromEnv } = require('./oauth');
 const { createMailer } = require('./mail');
@@ -118,6 +119,9 @@ function createApp({
   dwdFetch = fetch,
   // Heights of trees and buildings for the shadows on the map (src/surface.js): fetch for geo.admin.ch.
   surfaceFetch = fetch,
+  // Buildings from OpenStreetMap for those shadows outside Switzerland (src/buildings.js): an Overpass API, by default
+  // the path network's; GEBAEUDE_URL= (empty) turns it off.
+  buildingsUrl = (process.env.GEBAEUDE_URL ?? process.env.WEGNETZ_URL) || '', buildingsFetch = fetch,
   // Terrain tiles for the 3D map (routes/terrain.js); TERRAIN_URL= (empty) turns the 3D map off.
   terrainUrl = (process.env.TERRAIN_URL ?? require('./routes/terrain').DEFAULT_URL) || null, terrainFetch = fetch,
   // MeteoSwiss precipitation radar for the weather tab (src/routes/radar-ch.js); empty = off.
@@ -136,7 +140,8 @@ function createApp({
   const weather = createWeather({ db, fetchImpl: weatherFetch });
   const elevationService = createElevation({ db, fetchImpl: weatherFetch });
   const dwd = createDwd({ fetchImpl: dwdFetch });
-  const surface = createSurface({ fetchImpl: surfaceFetch });
+  const buildings = createBuildings({ db, url: buildingsUrl, fetchImpl: buildingsFetch });
+  const surface = createSurface({ fetchImpl: surfaceFetch, buildings });
 
   const upload = multer({
     dest: tmpDir,
@@ -1056,17 +1061,18 @@ function createApp({
     res.json(await dwd.layers());
   });
 
-  /** Heights of trees and buildings (swissSURFACE3D − swissALTI3D) as a Terrarium-encoded PNG tile; 204 outside Switzerland. */
+  /** Heights of trees and buildings (swissSURFACE3D − swissALTI3D; elsewhere Meta's canopy heights) as a Terrarium-encoded PNG tile; 204 without data. */
   app.get('/api/surface/:z/:x/:y.png', async (req, res) => {
     const [z, x, y] = ['z', 'x', 'y'].map((k) => Number(req.params[k]));
     if (![z, x, y].every(Number.isInteger) || z < SURFACE_MIN_Z || z > SURFACE_MAX_Z || x < 0 || y < 0 || x >= 2 ** z || y >= 2 ** z) {
       return res.status(400).json({ error: `Zoomstufe ${SURFACE_MIN_Z}–${SURFACE_MAX_Z} und gültige Kachel angeben` });
     }
     try {
-      const png = await surface.tile(z, x, y);
-      if (!png) return res.status(204).end();
+      const t = await surface.tile(z, x, y);
+      if (!t) return res.status(204).end();
       res.set('Cache-Control', 'public, max-age=604800');
-      res.type('png').send(png);
+      res.set('X-Surface-Source', t.source);
+      res.type('png').send(t.png);
     } catch (err) {
       res.status(502).json({ error: err.message });
     }

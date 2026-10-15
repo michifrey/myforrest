@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const sharp = require('sharp');
-const { createSurface } = require('../src/surface');
+const { createSurface, quadkey } = require('../src/surface');
 const { createApp } = require('../src/app');
 const { lv95ToWgs84 } = require('../src/lv95');
 
@@ -32,6 +32,18 @@ async function cogBuffer(kind) {
   }));
 }
 
+// Meta's canopy heights for the zoom-10 tile around a point in the Black Forest: one 256×256 image for the
+// whole file (the real ones are 32768 px with overviews), 28-m crowns in the western half, nothing in the east.
+const BLACK_FOREST = [47.9, 8.1];
+const tileAt10 = tileAt(...BLACK_FOREST, 10);
+const META_Q = quadkey(tileAt10.x, tileAt10.y, 10);
+async function metaBuffer() {
+  const { writeArrayBuffer } = await import('geotiff');
+  const v = new Uint8Array(256 * 256);
+  for (let r = 0; r < 256; r++) for (let c = 0; c < 128; c++) v[r * 256 + c] = 28;
+  return Buffer.from(writeArrayBuffer(v, { width: 256, height: 256, BitsPerSample: [8], SampleFormat: [1], ProjectedCSTypeGeoKey: 3857, GTModelTypeGeoKey: 1 }));
+}
+
 function fakeGeoAdmin(log = []) {
   const files = {};
   return async (url, opts = {}) => {
@@ -48,9 +60,11 @@ function fakeGeoAdmin(log = []) {
         { id: `x_2021_${E + 1}-${N}`, assets: {} },
       ] });
     }
-    const name = /x\/(\w+?)_/.exec(u.pathname)[1];
-    if (!['surface', 'terrain'].includes(name)) return new Response('wrong file', { status: 404 });
-    const buf = files[name] ??= await cogBuffer(name);
+    let name = /x\/(\w+?)_/.exec(u.pathname)?.[1];
+    const q = /dinov3_global_chm_v2_ml3\/chm\/(\d+)\.tif$/.exec(u.pathname)?.[1];
+    if (q) name = q === META_Q ? 'meta' : null;
+    if (!['surface', 'terrain', 'meta'].includes(name)) return new Response('not found', { status: 404 });
+    const buf = files[name] ??= name === 'meta' ? await metaBuffer() : await cogBuffer(name);
     const r = /bytes=(\d+)-(\d+)/.exec(opts.headers?.Range || '');
     if (!r) return new Response(buf);
     const end = Math.min(Number(r[2]), buf.length - 1);
@@ -87,18 +101,40 @@ test('surface tiles in Web Mercator, empty outside Switzerland', async () => {
   const s = createSurface({ fetchImpl: fakeGeoAdmin(log) });
   const [lat, lon] = lv95ToWgs84(2645350, 1249650);
   const t = tileAt(lat, lon, 16);
-  const png = await s.tile(16, t.x, t.y);
+  const { png, source } = await s.tile(16, t.x, t.y);
+  assert.equal(source, 'swisstopo');
   assert.ok(Math.abs((await heightAt(png, t.i, t.j)) - 20) < 0.5, 'the house');
   const [la2, lo2] = lv95ToWgs84(2645150, 1249150);
   const t2 = tileAt(la2, lo2, 16);
   if (t2.x === t.x && t2.y === t.y) assert.equal(await heightAt(png, t2.i, t2.j), 0);
   assert.ok(log.some((u) => u.includes('/x/surface_0.5_')) && log.some((u) => u.includes('/x/terrain_0.5_')), 'newest files, 0.5 m');
   assert.ok(!log.some((u) => u.includes('old-')));
-  // Paris: no request at all.
+  // Paris: nothing at swisstopo, and Meta has no file there either.
   const n = log.length;
   const p = tileAt(48.85, 2.35, 15);
   assert.equal(await s.tile(15, p.x, p.y), null);
-  assert.equal(log.length, n);
+  assert.ok(!log.slice(n).some((u) => u.includes('geo.admin.ch')), 'no requests to swisstopo outside Switzerland');
+  assert.ok(log.slice(n).some((u) => u.includes('dinov3_global_chm_v2_ml3')));
+});
+
+test('outside Switzerland: crown heights from Meta, a window of the zoom-10 file', async () => {
+  assert.equal(quadkey(0, 0, 1), '0');
+  assert.equal(quadkey(1, 1, 1), '3');
+  assert.equal(quadkey(3, 5, 3), '213');
+  const s = createSurface({ fetchImpl: fakeGeoAdmin() });
+  const lon0 = (tileAt10.x / 1024) * 360 - 180; // west edge of the file; it is 0.35° wide
+  const west = tileAt(BLACK_FOREST[0], lon0 + 0.05, 16);
+  const east = tileAt(BLACK_FOREST[0], lon0 + 0.3, 16);
+  for (const [t, h] of [[west, 28], [east, 0]]) {
+    assert.equal(quadkey(t.x >> 6, t.y >> 6, 10), META_Q, 'same Meta file');
+    const r = await s.tile(16, t.x, t.y);
+    if (h) {
+      assert.equal(r.source, 'meta');
+      assert.equal(await heightAt(r.png, 100, 100), h);
+    } else {
+      assert.equal(await heightAt(r.png, 100, 100), 0);
+    }
+  }
 });
 
 test('surface endpoint', async () => {
@@ -113,6 +149,7 @@ test('surface endpoint', async () => {
     const res = await fetch(`${base}/api/surface/16/${t.x}/${t.y}.png`);
     assert.equal(res.status, 200);
     assert.equal(res.headers.get('content-type'), 'image/png');
+    assert.equal(res.headers.get('x-surface-source'), 'swisstopo');
     assert.ok(Math.abs((await heightAt(Buffer.from(await res.arrayBuffer()), t.i, t.j)) - 20) < 0.5);
     const p = tileAt(48.85, 2.35, 15);
     assert.equal((await fetch(`${base}/api/surface/15/${p.x}/${p.y}.png`)).status, 204);
@@ -123,4 +160,11 @@ test('surface endpoint', async () => {
     app.locals.db.close();
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
+});
+
+test('geo.admin.ch down: the tile fails with the reason (502 at the endpoint)', async () => {
+  const s = createSurface({ fetchImpl: async () => new Response('', { status: 503 }) });
+  const [lat, lon] = lv95ToWgs84(2645350, 1249650);
+  const t = tileAt(lat, lon, 16);
+  await assert.rejects(s.tile(16, t.x, t.y), /HTTP 503/);
 });

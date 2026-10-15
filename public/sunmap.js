@@ -379,14 +379,16 @@
     return dem;
   }
 
-  /* Trees and buildings (Switzerland, from map zoom 16): heights above ground from /api/surface (src/surface.js). */
+  /*
+   * Trees and buildings (from map zoom 16): heights above ground from /api/surface (src/surface.js), in
+   * Switzerland from swisstopo (trees and buildings), elsewhere Meta's canopy heights (trees only).
+   */
   const SURFACE_MIN_ZOOM = 16;
   const SURFACE_REACH = 300; // m around the view, for the shadows of trees and houses just outside
-  const inSwitzerland = (ll) => ll.lat > 45.8 && ll.lat < 47.85 && ll.lng > 5.9 && ll.lng < 10.55;
   const surfaceTiles = new Map();
   let surface = null; // { key, z, gx0, gy0, gw, gh, obj, top, missing, total } or a pending { key, pending }
 
-  /** Heights above ground of one surface tile (256×256), or null outside Switzerland or when unavailable. */
+  /** `{ heights, source }` of one surface tile (256×256), null where there is no data, undefined when it failed. */
   function surfaceTile(z, x, y) {
     const key = `${z}/${x}/${y}`;
     if (!surfaceTiles.has(key)) {
@@ -403,7 +405,7 @@
         const px = ctx.getImageData(0, 0, 256, 256).data;
         const out = new Float32Array(65536);
         for (let i = 0; i < 65536; i++) out[i] = Shade.terrarium(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]);
-        return out;
+        return { heights: out, source: res.headers.get('X-Surface-Source') || '' };
       })().catch(() => { surfaceTiles.delete(key); return undefined; }));
     }
     return surfaceTiles.get(key);
@@ -435,10 +437,13 @@
       const gw = gx1 - gx0; const gh = gy1 - gy0;
       const obj = new Float32Array(gw * gh);
       let found = 0; let missing = 0; let objectTop = 0;
-      tiles.forEach((tile, k) => {
-        if (tile === undefined) missing++;
-        if (!tile) return;
+      const sources = new Set();
+      tiles.forEach((t, k) => {
+        if (t === undefined) missing++;
+        if (!t) return;
         found++;
+        t.source.split('+').forEach((v) => v && sources.add(v));
+        const tile = t.heights;
         const [tx, ty] = list[k];
         for (let y = Math.max(0, ty * 256 - gy0); y < Math.min(gh, (ty + 1) * 256 - gy0); y++) {
           for (let x = Math.max(0, tx * 256 - gx0); x < Math.min(gw, (tx + 1) * 256 - gx0); x++) {
@@ -459,7 +464,7 @@
           top[y * gw + x] = Shade.bilinear(grid.elev, grid.gw, grid.gh, dx, dy) + obj[y * gw + x];
         }
       }
-      surface = { key, z, gx0, gy0, gw, gh, top, objectTop, missing, total: tiles.length, shared: { top, gw, gh } };
+      surface = { key, z, gx0, gy0, gw, gh, top, objectTop, sources, missing, total: tiles.length, shared: { top, gw, gh } };
       scheduleShade();
     });
     return null;
@@ -565,7 +570,7 @@
       if (token !== shadeToken || !shadeOn()) return;
     }
     // Trees and buildings: from map zoom 16 in Switzerland, once their heights are loaded.
-    const wantSurface = Boolean(grid) && zoom >= SURFACE_MIN_ZOOM && inSwitzerland(centre);
+    const wantSurface = Boolean(grid) && zoom >= SURFACE_MIN_ZOOM;
     const surf = wantSurface ? surfaceFor(grid) : null;
     const objects = surf && !surf.none ? surf : null;
     // Output cells: surface cells, DEM pixels of the view, or 8 screen pixels for night only.
@@ -643,11 +648,17 @@
         + ` Berge bis ~${fmtNum((Shade.metresPerPixel(centre.lat, grid.z) * grid.far.scale * 256) / 1000, 0)} km ausserhalb des Ausschnitts zählen mit.`
         + (grid.missing ? ` ${grid.missing} von ${grid.total} Höhenkacheln fehlen.` : '');
       if (objects) {
-        text += ' Dazu Bäume und Gebäude aus swissSURFACE3D (swisstopo), bis 80 m hoch.'
+        const from = [];
+        if (objects.sources.has('swisstopo')) from.push('Bäume und Gebäude aus swissSURFACE3D (swisstopo)');
+        const outside = [];
+        if (objects.sources.has('meta')) outside.push('Baumkronen aus der Kronenhöhenkarte von Meta (1,2 m)');
+        if (objects.sources.has('osm')) outside.push('Gebäude aus OpenStreetMap');
+        if (outside.length) from.push(outside.join(' und ') + (objects.sources.has('osm') ? '' : ', ohne Gebäude'));
+        text += ` Dazu ${from.join(', ausserhalb der Schweiz ') || 'Bäume und Gebäude'}.`
           + (objects.missing ? ` ${objects.missing} von ${objects.total} Kacheln fehlen.` : '');
       } else if (wantSurface && !surf) text += ' Bäume und Gebäude werden geladen …';
       else if (wantSurface) text += ' Bäume und Gebäude nicht verfügbar.';
-      else if (zoom < SURFACE_MIN_ZOOM && inSwitzerland(centre)) text += ' Bäume und Gebäude ab näherem Zoom.';
+      else text += ' Bäume und Gebäude ab näherem Zoom.';
     }
     status.hidden = false;
     status.replaceChildren(...(grid && sun.altitude > 0 ? [el('span', { class: 'shade-ramp', 'aria-hidden': 'true' })] : []), text);
@@ -762,7 +773,7 @@
     const when = (v) => new Date(v).toLocaleString('de-CH', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
     let text;
     if (layer.id === 'radar') {
-      text = time ? `Radarbild von ${clock(Date.parse(time))}.`
+      text = time ? `${Date.parse(time) > Date.now() ? 'Radarprognose für' : 'Radarbild von'} ${clock(Date.parse(time))}.`
         : `Neuestes Radarbild – für die gewählte Zeit hat der DWD keines${layer.from ? ` (vorhanden ${when(layer.from)} bis ${when(layer.to)})` : ''}.`;
     } else if (layer.id === 'warnungen') text = 'Aktuelle Warnungen, unabhängig von der gewählten Zeit.';
     else text = 'Aktuelle Karte des DWD.';

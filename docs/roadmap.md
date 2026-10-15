@@ -66,11 +66,10 @@ mit echten Dateien und Diensten; das steht jeweils als offener Punkt dabei.
   des laufenden Jahres aus den Sofortmeldern.
 - **Stürme genauer**: auch die vergangenen Stürme aus feiner aufgelösten Daten (Stationsmessungen von
   MeteoSchweiz statt ERA5), Gewitterböen (lokal, im Modell kaum sichtbar) aus Warnungen der Wetterdienste.
-- **Licht, Schatten und Wetterkarten**: die DWD-Ebenen gegen den echten Dienst prüfen (Namen, Zeiten des Radars;
-  bisher mit Testdaten im Format der Capabilities); ein Radar für die ganze Schweiz (MeteoSchweiz, sobald als
-  offener Dienst verfügbar); die Schatten von Bäumen und Gebäuden gegen die echten Dateien von geo.admin.ch prüfen
-  (bisher mit Testdaten im Format des STAC-Katalogs und der COGs) und ausserhalb der Schweiz aus einem
-  Kronenhöhenmodell (z. B. Meta/WRI, 1 m).
+- **Licht, Schatten und Wetterkarten**: die DWD-Karten einmal im Betrieb ansehen (Namen und Zeitformat sind
+  mit den veröffentlichten Capabilities abgeglichen, aber noch nicht live abgerufen); die Schatten von Bäumen und Gebäuden gegen die echten Dateien von geo.admin.ch prüfen
+  (bisher mit Testdaten im Format des STAC-Katalogs und der COGs); die Gebäude aus OpenStreetMap mit einer echten
+  Overpass-Instanz im Betrieb prüfen (bisher mit Testdaten im Format der Overpass-Antwort).
 - **Vegetationsdichte verfeinern**: Himmel und Vegetation mit einem Segmentierungsmodell statt Farbregeln
   trennen (Schnee, helle Felsen und Mauern gelten heute teils als Himmel); Kennzahlen nur im Bildteil
   vergleichen, den alle Fotos eines Spots abdecken.
@@ -149,7 +148,8 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 - Frühwarnung als Push-Nachricht an Leute, die den Spot regelmässig besuchen oder ihm folgen
 - Angleichung von Landsat an Sentinel-2 aus den Überlappungsjahren
 - Licht und Schatten auf der Karte: Geländeschatten zur gewählten Zeit, auch von fernen Bergen bei tiefer Sonne,
-  mit weichem Halbschatten; in der Schweiz auch von Bäumen und Gebäuden (swissSURFACE3D − swissALTI3D); steil
+  mit weichem Halbschatten; von Bäumen und Gebäuden (Schweiz: swissSURFACE3D − swissALTI3D, sonst Baumkronen aus
+  Metas Kronenhöhenkarte und Gebäude aus OpenStreetMap); steil
   besonnte Hänge, Tag, Nacht und Dämmerung; Niederschlagsradar und Warnungen des DWD einblendbar; gerechnet in
   einem Web Worker, damit die Karte beim Abspielen flüssig bleibt
 
