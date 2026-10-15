@@ -293,7 +293,7 @@ Der Tab *Wetter* in der Seitenspalte des Spots:
     können die HDF5-Dateien nicht lesen: Der Server (`/api/radar/ch`) holt jede Datei einmal, liest sie (ODIM
     HDF5, 1-km-Raster in LV95, Rohwert × `gain` + `offset` = mm/h), färbt den Regen (ab 0,1 mm/h hellblau über
     Blau, Grün, Gelb, Orange und Rot bis Violett ab 40 mm/h), glättet zwischen den Zellen und rechnet das Bild in
-    Web Mercator um. Die Bilder bleiben sechs Stunden auf dem Server, die Liste der Dateien zwei Minuten.
+    Web Mercator um. Die Bilder bleiben 26 Stunden auf dem Server, die Liste der Dateien zwei Minuten.
   - **Deutscher Wetterdienst** sonst (`dwd:Niederschlagsradar`, WMS wie bei *Sonne & Wetter*): Deutschland und
     das Grenzgebiet. Die Bilder lädt der Browser direkt beim DWD. Liefert die MeteoSchweiz gerade keine Bilder,
     springt der DWD ein.
