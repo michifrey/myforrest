@@ -460,11 +460,17 @@
         <h2>Fotos aus dem Wald</h2>
       </div>
       <label class="dropzone">
-        <input type="file" name="photos" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,video/mp4,video/quicktime,.mp4,.mov,.insv,.360" multiple required>
+        <input type="file" name="photos" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,video/mp4,video/quicktime,.mp4,.mov,.insv,.360,.json,application/json" multiple required>
         <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="10" width="36" height="28" rx="5"/><path d="M6 32l10-10 8 8 6-6 12 12"/><circle cx="32" cy="19" r="3"/></svg>
         <strong data-empty="Fotos oder Videos hierher ziehen oder auswählen">Fotos oder Videos hierher ziehen oder auswählen</strong>
-        <span class="muted small">JPEG, PNG, WebP, HEIC oder Video (GoPro, Dashcam, 360°-MP4) · Ort und Zeit werden aus den Bild- und Telemetriedaten gelesen</span>
+        <span class="muted small">JPEG, PNG, WebP, HEIC oder Video (GoPro, Dashcam, 360°-MP4) · Ort und Zeit werden aus den Bild- und Telemetriedaten gelesen
+          oder aus einer mitgewählten Beschreibung (JSON)</span>
       </label>
+      <div class="row folder-row">
+        <label class="btn secondary small folder-pick">Ganzen Ordner wählen
+          <input type="file" id="upload-folder" webkitdirectory multiple hidden></label>
+        <span id="upload-meta" class="muted small">Mit Unterordnern; eine <code>myforrest.json</code> darin liefert Ort, Blickrichtung und Zeit pro Foto.</span>
+      </div>
       <label class="dropzone compact">
         <input type="file" name="gpx" accept=".gpx,.nmea,.log,.fit,application/gpx+xml">
         <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 38c5-10 12-4 16-12s10-10 16-14"/><circle cx="8" cy="38" r="3"/><circle cx="40" cy="12" r="3"/></svg>

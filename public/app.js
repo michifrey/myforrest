@@ -1318,6 +1318,8 @@ $('open-upload').addEventListener('click', () => {
   $('upload-landscape').dispatchEvent(new Event('change'));
   form.utcOffsetMinutes.value = String(-new Date().getTimezoneOffset());
   $('upload-result').replaceChildren();
+  state.uploadMeta = null;
+  $('upload-meta').innerHTML = uploadMetaHint;
   refreshDropzones();
   setPicked(null);
   if (pickMarker) { pickMarker.remove(); pickMarker = null; }
@@ -1345,6 +1347,34 @@ for (const zone of form.querySelectorAll('.dropzone')) {
   for (const ev of ['dragleave', 'drop']) input.addEventListener(ev, () => zone.classList.remove('dragging'));
 }
 
+// Folder upload and the description (JSON): the photos and videos of a folder and its subfolders go into the
+// photo field in the order of their paths; a JSON file (myforrest.json first) is sent along with every batch
+// and gives place, view direction and time per file name.
+const MEDIA_FILE = /\.(jpe?g|png|webp|heic|heif|mp4|mov|m4v|insv|360)$/i;
+function takeUploadFiles(list) {
+  const all = [...list].filter((f) => !f.name.startsWith('.')); // .DS_Store, ._IMG_0001.jpg of macOS
+  const json = all.filter((f) => /\.json$/i.test(f.name));
+  const depth = (f) => (f.webkitRelativePath || f.name).split('/').length;
+  json.sort((a, b) => (b.name.toLowerCase() === 'myforrest.json') - (a.name.toLowerCase() === 'myforrest.json') || depth(a) - depth(b));
+  state.uploadMeta = json[0] || null;
+  const path = (f) => f.webkitRelativePath || f.name;
+  const media = all.filter((f) => MEDIA_FILE.test(f.name) || f.type.startsWith('image/') || f.type.startsWith('video/'))
+    .sort((a, b) => path(a).localeCompare(path(b), 'de', { numeric: true }));
+  const dt = new DataTransfer();
+  media.forEach((f) => dt.items.add(f));
+  form.photos.files = dt.files;
+  form.photos.dispatchEvent(new Event('change'));
+  $('upload-meta').textContent = state.uploadMeta
+    ? `${media.length} Dateien · Beschreibung: ${state.uploadMeta.name}`
+    : `${media.length} Dateien · ohne Beschreibung – Ort aus den Bilddaten`;
+}
+const uploadMetaHint = $('upload-meta').innerHTML;
+$('upload-folder').addEventListener('change', (e) => takeUploadFiles(e.target.files));
+// A JSON picked together with the photos is the description, not a photo.
+form.photos.addEventListener('change', () => {
+  if ([...form.photos.files].some((f) => /\.json$/i.test(f.name))) takeUploadFiles(form.photos.files);
+});
+
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   const files = [...form.photos.files];
@@ -1364,6 +1394,7 @@ form.addEventListener('submit', async (e) => {
       submit.textContent = `Lade hoch … ${Math.min(i + BATCH, files.length)}/${files.length}`;
       const fd = new FormData();
       files.slice(i, i + BATCH).forEach((f) => fd.append('photos', f));
+      if (state.uploadMeta) fd.append('meta', state.uploadMeta);
       if (form.gpx.files[0]) fd.append('gpx', form.gpx.files[0]);
       if (state.picked) {
         fd.append('lat', String(state.picked.lat));

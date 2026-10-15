@@ -72,6 +72,16 @@ const SCHEMA = `
     expires_at INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS email_tokens_user ON email_tokens (user_id, purpose);
+
+  CREATE TABLE IF NOT EXISTS api_tokens (
+    id           INTEGER PRIMARY KEY,
+    user_id      INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    name         TEXT NOT NULL,
+    token_hash   TEXT NOT NULL UNIQUE,
+    created_at   INTEGER NOT NULL,
+    last_used_at INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS api_tokens_user ON api_tokens (user_id);
 `;
 
 async function hashPassword(password) {
@@ -591,10 +601,40 @@ function createAuth(db, { adminEmail = null } = {}) {
 
   const destroySession = (tokenHash) => db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(tokenHash);
 
+  /* ---------- API keys (scripts, other programs) ---------- */
+
+  const API_PREFIX = 'mf_';
+  const MAX_API_TOKENS = 20;
+
+  /** A new API key for scripts: shown once, only its hash is kept. */
+  function createApiToken(userId, name) {
+    const count = db.prepare('SELECT COUNT(*) AS n FROM api_tokens WHERE user_id = ?').get(userId).n;
+    if (count >= MAX_API_TOKENS) throw new Error(`Höchstens ${MAX_API_TOKENS} API-Schlüssel pro Konto`);
+    const token = API_PREFIX + randomToken();
+    const id = Number(db.prepare('INSERT INTO api_tokens (user_id, name, token_hash, created_at) VALUES (?, ?, ?, ?)')
+      .run(userId, String(name || 'API-Schlüssel').trim().slice(0, 80) || 'API-Schlüssel', sha256(token), Date.now()).lastInsertRowid);
+    return { id, token };
+  }
+
+  const apiTokenRow = db.prepare('SELECT t.id AS token_id, u.* FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ?');
+  /** The account of an API key (`Authorization: Bearer mf_…`), or null. */
+  function apiTokenUser(token) {
+    if (!token || !token.startsWith(API_PREFIX) || token.length > 100) return null;
+    const row = apiTokenRow.get(sha256(token));
+    if (!row) return null;
+    const { token_id: tokenId, ...user } = row;
+    db.prepare('UPDATE api_tokens SET last_used_at = ? WHERE id = ?').run(Date.now(), tokenId);
+    return { tokenId, user: withOrgPro(db, user) };
+  }
+
+  const apiTokens = (userId) => db.prepare('SELECT id, name, created_at, last_used_at FROM api_tokens WHERE user_id = ? ORDER BY id').all(userId)
+    .map((t) => ({ id: t.id, name: t.name, createdAt: new Date(t.created_at).toISOString(), lastUsedAt: t.last_used_at ? new Date(t.last_used_at).toISOString() : null }));
+  const deleteApiToken = (userId, id) => db.prepare('DELETE FROM api_tokens WHERE id = ? AND user_id = ?').run(id, userId).changes > 0;
+
   return {
     register, authenticate, createSession, session, destroySession, identityLogin, identitiesOf, unlinkIdentity,
     createEmailToken, confirmEmail, checkResetToken, resetPassword, changePassword, userByEmail,
-    confirmOwner, deleteBlocker, deleteUser, rename, orgs,
+    confirmOwner, deleteBlocker, deleteUser, rename, orgs, createApiToken, apiTokenUser, apiTokens, deleteApiToken,
     requestEmailChange, pendingEmail, cancelEmailChange, confirmEmailChange,
     userById: (id) => userById.get(id),
   };

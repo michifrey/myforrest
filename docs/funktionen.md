@@ -26,6 +26,32 @@ Einen kürzeren Überblick mit Screenshots gibt das [README](https://github.com/
    Aufnahmezeit auf der Strecke verortet. Zeitzone und Abweichung der Kamera-Uhr lassen sich
    korrigieren.
 3. **Manuell**: Standort auf der Karte anklicken oder den aktuellen Standort verwenden.
+4. **Aus einer Beschreibung (JSON)**: pro Dateiname Ort, Blickrichtung, Zeit, Tags und Notiz, z. B. aus
+   einer Kartierung, einem GIS oder einer Fotofalle. Ein Eintrag geht dem EXIF vor; was er offen lässt,
+   kommt weiter aus dem Foto.
+
+### Ganze Ordner hochladen
+
+<p align="center"><img src="screenshots/upload-ordner.png" width="480" alt="Upload-Dialog mit einem gewählten Ordner und seiner Beschreibung"></p>
+
+*Ganzen Ordner wählen* im Upload-Dialog nimmt alle Fotos und Videos eines Ordners samt Unterordnern, in der
+Reihenfolge ihrer Pfade (IMG_2 vor IMG_10). Liegt darin eine `myforrest.json`, geht sie als Beschreibung
+mit; Dateien wie `.DS_Store` oder `._IMG_0001.jpg` vom Mac bleiben draussen. Eine JSON-Datei lässt sich
+auch zusammen mit einzelnen Fotos auswählen. Hochgeladen wird in Paketen zu zehn Fotos, mit Fortschritt;
+ohne Empfang landen sie in der Warteschlange. Das Format der Beschreibung steht in der
+[REST-API](api.md#ganze-ordner-hochladen).
+
+Für sehr grosse Ordner, einen NAS oder wiederkehrende Importe gibt es das Skript
+[`scripts/upload-folder.js`](https://github.com/michifrey/myforrest/blob/main/scripts/upload-folder.js):
+Es lädt über die API mit einem **API-Schlüssel** hoch, jeden Unterordner als eigene Bilderreihe, wiederholt
+bei Netzfehlern und macht nach einem Abbruch dort weiter, wo es aufgehört hat.
+
+<p align="center"><img src="screenshots/api-schluessel.png" width="560" alt="API-Schlüssel im Profil: Liste, neuer Schlüssel wird einmal angezeigt"></p>
+
+API-Schlüssel entstehen unter *Profil → API-Schlüssel* und werden nur einmal angezeigt; der Server
+speichert nur ihren Hash. Ein Schlüssel darf hochladen und Fotos bearbeiten, aber weder Passwort, E-Mail
+noch Schlüssel ändern oder das Konto löschen. Die Liste zeigt, wann ein Schlüssel zuletzt benutzt wurde;
+*Löschen* sperrt ihn sofort.
 
 ### Wiederholungsfotos mit Overlay
 

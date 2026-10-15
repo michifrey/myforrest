@@ -181,6 +181,14 @@ bestimmt, welche Beobachtungen zur Wahl stehen), Beobachtungen, eine Notiz und d
 CC BY-SA 4.0). Als installierte App landen Uploads ohne Empfang in einer Warteschlange und gehen später raus;
 lehnt der Server einen davon ab, während die App zu ist, meldet das eine Benachrichtigung.
 
+<p align="center"><img src="docs/screenshots/upload-ordner.png" width="420" alt="Ganzer Ordner mit Beschreibung (myforrest.json) gewählt"></p>
+
+**Ganze Ordner** gehen mit *Ganzen Ordner wählen* auf einmal hoch, samt Unterordnern. Ort und Zeit kommen aus
+den Fotos oder aus einer Beschreibung `myforrest.json` im Ordner, die pro Dateiname Koordinaten, Blickrichtung
+und Zeit angibt (auch als GeoJSON). Für Skripte gibt es **API-Schlüssel** (*Profil → API-Schlüssel*) und
+[`scripts/upload-folder.js`](scripts/upload-folder.js), das grosse Ordner in Paketen hochlädt und nach einem
+Abbruch weitermacht – Format und Beispiele in der [REST-API](docs/api.md#ganze-ordner-hochladen).
+
 <p align="center"><img src="docs/screenshots/offline-route.jpg" width="400" alt="Karte entlang einer Route offline gespeichert"></p>
 
 <p align="center"><img src="docs/screenshots/fahrtmodus.jpg" width="300" alt="Fahrtmodus: Bilder gemacht, behalten, Strecke und gesparter Speicher"></p>
@@ -460,7 +468,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
 
 - **[Fotos erfassen](docs/funktionen.md#fotos-erfassen-und-verorten)**: Handyfotos (auch HEIC vom iPhone),
   Action-Cam-Serien mit GPX-Track und Videos von GoPro oder 360°-Kameras. Verortung über GPS, GPX oder von
-  Hand. Als installierbare App funktioniert der Upload auch ohne Empfang im Wald und wird später gesendet.
+  Hand oder aus einer JSON-Beschreibung; ganze Ordner im Browser oder per Skript mit API-Schlüssel.
+  Als installierbare App funktioniert der Upload auch ohne Empfang im Wald und wird später gesendet.
 - **[Spots und Zeitreise](docs/funktionen.md#spots-und-zeitreise)**: Fotos am selben Ort und mit derselben
   Blickrichtung werden automatisch zu Spots zusammengefasst und lassen sich als Zeitreihe durchblättern;
   360°-Aufnahmen und Bilderreihen lassen sich [wie Street View durchgehen](docs/funktionen.md#durchgehen-wie-street-view),
