@@ -58,7 +58,10 @@ const DRIVE_REPEAT_MS = 12 * 3600 * 1000;
 const PANORAMA_MIN_WIDTH = 3000;
 const isPanoramaSize = (w, h) => w >= PANORAMA_MIN_WIDTH && Math.abs(w / h - 2) < 0.02;
 const NEOPHYTE_MIN_SCORE = 0.3;
-const TREE_MIN_SCORE = 0.25;
+// A recognised tree joins the spot's species by itself only when the result is clear: the best candidate at
+// least this sure and this far ahead of the next one. Otherwise it stays a suggestion one can take over.
+const TREE_AUTO_SCORE = 0.5;
+const TREE_AUTO_MARGIN = 0.15;
 
 /**
  * TRUST_PROXY as Express takes it: a number of proxy hops ("1"), "true" for all, or addresses and
@@ -1116,7 +1119,12 @@ function createApp({
     if (!db.prepare('SELECT 1 FROM spots WHERE id = ?').get(id)) return res.status(404).json({ error: 'Spot nicht gefunden' });
     const tree = treeInfo(req.body?.scientificName);
     if (!tree) return res.status(400).json({ error: 'Unbekannte Baumart' });
-    addSpecies.run(id, tree.sci, 'manual', null, null, Date.now());
+    // A suggestion of Pl@ntNet on a photo of this spot, confirmed by hand: kept with its photo and score.
+    const photoId = Number(req.body?.photoId);
+    const suggested = Number.isSafeInteger(photoId) && db.prepare(`SELECT i.score FROM identifications i JOIN photos p ON p.id = i.photo_id
+      WHERE i.photo_id = ? AND p.spot_id = ? AND i.scientific_name = ?`).get(photoId, id, tree.sci);
+    if (suggested) addSpecies.run(id, tree.sci, 'plantnet', photoId, suggested.score, Date.now());
+    else addSpecies.run(id, tree.sci, 'manual', null, null, Date.now());
     reassessSpot(id);
     res.status(201).json(spotSpecies(id));
   });
@@ -1293,10 +1301,12 @@ function createApp({
         if (results.some((r) => sensitiveLists.isSensitive(r.scientificName, canton) && r.score >= NEOPHYTE_MIN_SCORE)) {
           db.prepare("UPDATE photos SET protected = 1, protected_reason = 'art' WHERE id = ? AND protected = 0 AND protected_reason IS NULL").run(id);
         }
-        // Confidently recognised trees join the spot's species inventory.
-        for (const r of results) {
-          const tree = treeInfo(r.scientificName);
-          if (tree && r.score >= TREE_MIN_SCORE) addSpecies.run(photo.spot_id, tree.sci, 'plantnet', id, r.score, Date.now());
+        // A clearly recognised tree joins the spot's species inventory; a doubtful one (a whole tree in the rain,
+        // two similar species) stays a suggestion on the photo.
+        const [best, next] = [...results].sort((a, b) => b.score - a.score);
+        const tree = best && treeInfo(best.scientificName);
+        if (tree && best.score >= TREE_AUTO_SCORE && best.score - (next?.score ?? 0) >= TREE_AUTO_MARGIN) {
+          addSpecies.run(photo.spot_id, tree.sci, 'plantnet', id, best.score, Date.now());
         }
       });
       reassessSpot(photo.spot_id);

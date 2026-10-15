@@ -312,6 +312,38 @@ test('tree species are recorded per spot, manually or from plant identification'
   });
 });
 
+test('an unclear tree result stays a suggestion; confirmed by hand it joins the spot with its score', async () => {
+  // A whole tree in the rain: Robinia barely ahead of two oaks.
+  const plantnet = async () => new Response(JSON.stringify({ results: [
+    { score: 0.31, species: { scientificNameWithoutAuthor: 'Robinia pseudoacacia', commonNames: ['Robinie'] } },
+    { score: 0.27, species: { scientificNameWithoutAuthor: 'Quercus robur', commonNames: ['Stieleiche'] } },
+    { score: 0.12, species: { scientificNameWithoutAuthor: 'Quercus petraea', commonNames: [] } },
+  ] }));
+  await withServer({ plantnetKey: 'test', fetchImpl: plantnet }, async (base) => {
+    const p = (await (await upload(base, [['gps.jpg', fixture('gps.jpg')]])).json()).created[0];
+    const identified = await (await fetch(`${base}/api/photos/${p.id}/identify`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ organ: 'habit' }),
+    })).json();
+    assert.deepEqual(identified.identifications.map((r) => r.tree?.name), ['Robinie', 'Stieleiche', 'Traubeneiche']);
+    let spot = await (await fetch(`${base}/api/spots/${p.spotId}`)).json();
+    assert.deepEqual(spot.species, [], 'nothing taken over by itself');
+
+    // The oak is the right one: taken over from the suggestion, kept as Pl@ntNet with its score.
+    const res = await fetch(`${base}/api/spots/${p.spotId}/species`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scientificName: 'Quercus robur', photoId: p.id }),
+    });
+    assert.equal(res.status, 201);
+    spot = await (await fetch(`${base}/api/spots/${p.spotId}`)).json();
+    assert.deepEqual(spot.species.map((s) => [s.name, s.sources.join(), s.score]), [['Stieleiche', 'plantnet', 0.27]]);
+    // A species the photo did not suggest counts as chosen by hand.
+    await fetch(`${base}/api/spots/${p.spotId}/species`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scientificName: 'Fagus sylvatica', photoId: p.id }),
+    });
+    spot = await (await fetch(`${base}/api/spots/${p.spotId}`)).json();
+    assert.deepEqual(spot.species.map((s) => [s.name, s.sources.join()]), [['Stieleiche', 'plantnet'], ['Rotbuche', 'manual']]);
+  });
+});
+
 test('spot elevation comes from the terrain model, GPS altitude or by hand', async () => {
   const blob = (name) => new Blob([fs.readFileSync(path.join(__dirname, 'fixtures', name))], { type: 'image/jpeg' });
   const calls = [];

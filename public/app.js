@@ -748,6 +748,32 @@ function showPhoto(i) {
 function renderIdentifications(p) {
   const box = $('identify-results');
   if (!p.identifications.length) return box.replaceChildren();
+  // Trees join the spot by themselves only when the result is clear (server: ≥ 50 %, well ahead of the next);
+  // any other tree candidate can be taken over by hand when it is the right one.
+  const known = new Set((state.spot?.species || []).map((t) => t.scientificName));
+  const accept = async (r, button) => {
+    button.disabled = true;
+    try {
+      await api(`/api/spots/${state.spot.id}/species`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scientificName: r.tree.scientificName, photoId: p.id }),
+      });
+      await refreshAfterSpecies();
+    } catch (err) {
+      button.disabled = false;
+      alert(err.message);
+    }
+  };
+  const treeNote = (r) => {
+    if (!r.tree) return '';
+    if (known.has(r.tree.scientificName)) return el('span', { class: 'tree-note', text: ` · Baum: ${r.tree.name}, beim Spot erfasst` });
+    const button = el('button', { type: 'button', class: 'link', text: `${r.tree.name} übernehmen`, title: 'Diese Baumart beim Spot erfassen' });
+    button.addEventListener('click', () => accept(r, button));
+    return el('span', { class: 'tree-note' }, [' · ', button]);
+  };
+  const best = p.identifications[0];
+  const unsure = best && best.score < 0.5;
   box.replaceChildren(el('div', { class: 'ident' }, [
     el('strong', { text: 'Pflanzenerkennung (Pl@ntNet)' }),
     el('ul', {}, p.identifications.map((r) => el('li', {}, [
@@ -755,8 +781,9 @@ function renderIdentifications(p) {
       r.commonName ? ` – ${r.commonName}` : '',
       ` (${Math.round(r.score * 100)} %)`,
       r.neophyte ? el('span', { class: 'neo', text: ` · Neophyt: ${r.neophyte}` }) : '',
-      r.tree && r.score >= 0.25 ? el('span', { class: 'tree-note', text: ` · Baum: ${r.tree.name}, beim Spot erfasst` }) : '',
+      treeNote(r),
     ]))),
+    unsure ? el('p', { class: 'muted small', text: 'Unsicher: Für Bäume erkennt Pl@ntNet Blätter, Nadeln, Früchte oder Rinde aus der Nähe viel besser als den ganzen Baum. Ein solches Foto dazu nehmen und bei «Was zeigt das Foto?» angeben.' }) : '',
   ]));
 }
 
