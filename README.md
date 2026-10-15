@@ -267,7 +267,7 @@ dem Höhenmodell blockiert die Sonne hinter Hügeln (*Sonne ab 05:29*, *Sonne bi
 Sonnenhöhe, Einstrahlung bei klarem Himmel und gemessen, Himmelssicht, Sonnenstunden und Regen. An jedem
 Spot steht die Regenmenge des Tages. *Licht und Schatten auf der Karte* dunkelt ab, was zur gewählten Zeit im
 Schatten von Hügeln und Bergen liegt, nah herangezoomt auch im Schatten von Bäumen und Häusern
-(swissSURFACE3D; ausserhalb der Schweiz Baumkronen aus Metas Kronenhöhenkarte), färbt steil besonnte Hänge golden und zeigt Nacht und Dämmerung; dazu
+(swissSURFACE3D; ausserhalb der Schweiz Baumkronen aus Metas Kronenhöhenkarte und Gebäude aus OpenStreetMap), färbt steil besonnte Hänge golden und zeigt Nacht und Dämmerung; dazu
 lässt sich eine Karte des Deutschen Wetterdienstes einblenden (Niederschlagsradar, Warnungen).
 
 ![Licht und Schatten am Abend, mit dem Niederschlagsradar des DWD](docs/screenshots/licht-schatten.jpg)
@@ -579,7 +579,7 @@ Kartendaten © OpenStreetMap-Mitwirkende, Landeskarte und Luftbild © swisstopo.
 [Open-Meteo.com](https://open-meteo.com) (ERA5, CC BY 4.0). Enthält modifizierte Copernicus-Sentinel-Daten;
 Landsat-Daten mit freundlicher Genehmigung des U.S. Geological Survey. Phänologie-Daten, Niederschlagsradar und Warnungen:
 Deutscher Wetterdienst; Phänologie auch MeteoSchweiz. Höhenkacheln: Terrain Tiles (AWS Open Data, u. a. EU-DEM). Höhe von Bäumen und Gebäuden:
-swissSURFACE3D und swissALTI3D © swisstopo; Kronenhöhen ausserhalb der Schweiz: Meta (Data for Good), CHM v2, CC BY 4.0. Pflanzenbestimmung mit Pl@ntNet. Bilder von Mapillary (CC BY-SA 4.0) mit Urheber im Bild. Wegnetz © OpenStreetMap-Mitwirkende (ODbL). Gletscherumrisse aus den geladenen Inventaren, z. B.
+swissSURFACE3D und swissALTI3D © swisstopo; Kronenhöhen ausserhalb der Schweiz: Meta (Data for Good), CHM v2, CC BY 4.0. Pflanzenbestimmung mit Pl@ntNet. Bilder von Mapillary (CC BY-SA 4.0) mit Urheber im Bild. Wegnetz und Gebäude ausserhalb der Schweiz © OpenStreetMap-Mitwirkende (ODbL). Gletscherumrisse aus den geladenen Inventaren, z. B.
 GLAMOS. Details unter [Datenquellen](docs/betrieb.md#externe-datenquellen-und-netzzugang).
 
 Der Code steht unter der [Apache-Lizenz 2.0](LICENSE).

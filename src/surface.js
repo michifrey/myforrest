@@ -14,12 +14,14 @@
  * heights of tree crowns come from Meta's global canopy height map CHM v2
  * (DINOv3, 1.2 m, CC BY 4.0, AWS Open Data): one COG per Web Mercator tile
  * of zoom 10, named by its quadkey, with overviews; full resolution matches
- * the map's zoom 17, so a map tile is a window of one file. Trees only, no
- * buildings.
+ * the map's zoom 17, so a map tile is a window of one file. Trees only;
+ * buildings there come from OpenStreetMap (src/buildings.js), when an
+ * Overpass API is configured.
  */
 
 const sharp = require('sharp');
 const { wgs84ToLv95, lv95ToWgs84, inLv95Area } = require('./lv95');
+const { rasterize } = require('./buildings');
 
 const STAC = 'https://data.geo.admin.ch/api/stac/v1';
 const SURFACE = 'ch.swisstopo.swisssurface3d-raster';
@@ -80,7 +82,7 @@ function terrarium(h, out, o) {
   out[o] = Math.floor(v / 256); out[o + 1] = Math.floor(v) % 256; out[o + 2] = Math.floor((v % 1) * 256);
 }
 
-function createSurface({ fetchImpl = fetch, timeoutMs = 30000, cacheTiles = 24 } = {}) {
+function createSurface({ fetchImpl = fetch, timeoutMs = 30000, cacheTiles = 24, buildings = null } = {}) {
   const kmTiles = new Map(); // "e-n" → Promise<Float32Array | null>
   const pngs = new Map(); // "z/x/y" → Promise<{ png, source } | null>
   const metaFiles = new Map(); // quadkey → Promise<GeoTIFF | null>
@@ -211,13 +213,18 @@ function createSurface({ fetchImpl = fetch, timeoutMs = 30000, cacheTiles = 24 }
         if (!swiss || [...need.values()].some((g) => !g)) {
           try { meta = await metaWindow(z, x, y); } catch (err) { failure = err; }
         }
+        // Buildings from OpenStreetMap, likewise only where swisstopo has nothing.
+        let houses = [];
+        if (buildings?.enabled && (!swiss || [...need.values()].some((g) => !g))) {
+          try { houses = await buildings.forTile(z, x, y); } catch { houses = []; } // trees alone are still worth it
+        }
         const usedSwiss = [...need.values()].some(Boolean);
-        if (!usedSwiss && !meta) {
+        if (!usedSwiss && !meta && !houses.length) {
           if (failure) throw failure;
           return null;
         }
         let usedMeta = false;
-        const rgb = Buffer.alloc(TILE * TILE * 3);
+        const heights = new Float32Array(TILE * TILE);
         for (let p = 0; p < TILE * TILE; p++) {
           const grid = gridAt(p);
           let h = 0;
@@ -230,10 +237,14 @@ function createSurface({ fetchImpl = fetch, timeoutMs = 30000, cacheTiles = 24 }
             h = Math.min(MAX_HEIGHT, meta[p]);
             usedMeta = true;
           }
-          terrarium(Math.round(h * 4) / 4, rgb, p * 3);
+          heights[p] = h;
         }
+        const usedOsm = houses.length > 0 && rasterize(heights, houses, z, x, y, (p) => !gridAt(p)) > 0;
+        if (!usedSwiss && !usedMeta && !usedOsm) return null;
+        const rgb = Buffer.alloc(TILE * TILE * 3);
+        for (let p = 0; p < TILE * TILE; p++) terrarium(Math.round(heights[p] * 4) / 4, rgb, p * 3);
         const png = await sharp(rgb, { raw: { width: TILE, height: TILE, channels: 3 } }).png().toBuffer();
-        return { png, source: [usedSwiss && 'swisstopo', usedMeta && 'meta'].filter(Boolean).join('+') };
+        return { png, source: [usedSwiss && 'swisstopo', usedMeta && 'meta', usedOsm && 'osm'].filter(Boolean).join('+') };
       })();
       p.catch(() => pngs.delete(key));
       pngs.set(key, p);

@@ -650,7 +650,10 @@
       if (objects) {
         const from = [];
         if (objects.sources.has('swisstopo')) from.push('Bäume und Gebäude aus swissSURFACE3D (swisstopo)');
-        if (objects.sources.has('meta')) from.push('Baumkronen aus der Kronenhöhenkarte von Meta (1,2 m, ohne Gebäude)');
+        const outside = [];
+        if (objects.sources.has('meta')) outside.push('Baumkronen aus der Kronenhöhenkarte von Meta (1,2 m)');
+        if (objects.sources.has('osm')) outside.push('Gebäude aus OpenStreetMap');
+        if (outside.length) from.push(outside.join(' und ') + (objects.sources.has('osm') ? '' : ', ohne Gebäude'));
         text += ` Dazu ${from.join(', ausserhalb der Schweiz ') || 'Bäume und Gebäude'}.`
           + (objects.missing ? ` ${objects.missing} von ${objects.total} Kacheln fehlen.` : '');
       } else if (wantSurface && !surf) text += ' Bäume und Gebäude werden geladen …';

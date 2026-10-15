@@ -161,3 +161,10 @@ test('surface endpoint', async () => {
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
 });
+
+test('geo.admin.ch down: the tile fails with the reason (502 at the endpoint)', async () => {
+  const s = createSurface({ fetchImpl: async () => new Response('', { status: 503 }) });
+  const [lat, lon] = lv95ToWgs84(2645350, 1249650);
+  const t = tileAt(lat, lon, 16);
+  await assert.rejects(s.tile(16, t.x, t.y), /HTTP 503/);
+});

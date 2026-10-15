@@ -1060,8 +1060,16 @@ Ausserhalb der Schweiz (und wo swisstopo keine Daten hat) nimmt der Server die H
 Satellitenbildern geschätzt, 1,2 m, weltweit, CC BY 4.0, AWS Open Data). Sie liegt als Cloud Optimized GeoTIFF
 in Kacheln vor, je eine pro Web-Mercator-Kachel der Zoomstufe 10 (nach ihrem Quadkey benannt), mit Übersichten;
 die volle Auflösung entspricht der Zoomstufe 17 der Karte, also ist jede Kartenkachel ein Fenster einer Datei.
-Gebäude fehlen darin, und die Höhen sind geschätzt (Meta nennt einige Meter Fehler); das Panel nennt die Quelle.
-An der Landesgrenze mischt der Server beide pro Pixel.
+Die Höhen sind geschätzt (Meta nennt einige Meter Fehler); das Panel nennt die Quelle. An der Landesgrenze mischt
+der Server beide pro Pixel.
+
+Gebäude fehlen in Metas Karte. Sie kommen dort aus OpenStreetMap, über eine Overpass-API (`GEBAEUDE_URL`,
+ohne eigene Angabe dieselbe wie für das Wegnetz, `WEGNETZ_URL`): pro Web-Mercator-Kachel der Zoomstufe 14
+(rund 1,6 km) eine Abfrage aller Gebäude, 30 Tage in der Datenbank zwischengespeichert. Die Höhe nimmt der
+Server aus `height`, sonst aus den Stockwerken (`building:levels` × 3 m plus 2 m Dach bzw. `roof:levels`), sonst
+eine typische Höhe für die Art (Garage 3 m, Wohnhaus 8 m, Mehrfamilienhaus 14 m, Kirche 20 m, unbekannt 8 m).
+Unterirdische Gebäude zählen nicht. Wo ein Gebäude steht, ersetzt seine Höhe die der Bäume. Ist die
+Overpass-API nicht erreichbar, bleibt es bei den Bäumen.
 
 Die Rechnung läuft in einem Web Worker (`public/shade-worker.js`) neben der Seite: Die Karte bleibt beim
 Verschieben und beim *Abspielen* flüssig, auch im Gebirge und nah herangezoomt mit Bäumen und Häusern. Die

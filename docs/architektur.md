@@ -44,6 +44,7 @@ src/openmeteo.js     Zeitreihen aus Archiv und Prognose von Open-Meteo zusammens
 src/routes/climate.js  Routen und Analyse-Hooks für Stürme, Phänologie-Referenz und Frostnächte
 src/elevation.js     Geländehöhe, Hangneigung, Exposition und Geländeform (Copernicus-DEM über Open-Meteo)
 src/surface.js       Höhe von Bäumen und Gebäuden (swissSURFACE3D − swissALTI3D, sonst Metas Kronenhöhen) als Kacheln für die Schatten auf der Karte
+src/buildings.js     Gebäude aus OpenStreetMap (Overpass) mit Höhe, für dieselben Kacheln ausserhalb der Schweiz
 src/exif.js          Aufnahmezeit, GPS und Blickrichtung aus den Bilddaten
 src/closures.js      Sperrungen bei Holzerei (aus Holzschlag-Fotos und von Hand) als Sperrkreise für BRouter
 src/wildlife.js      Wildruhezonen (Datei oder pro Feld von geo.admin.ch, gespeichert und wöchentlich neu; WGS84/LV95, Schutzzeit) als Sperrflächen für BRouter

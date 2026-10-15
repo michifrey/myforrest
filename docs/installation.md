@@ -167,6 +167,7 @@ Die feste Adresse lässt sich als Variable `APP_URL` in die Android-App bauen, d
 | `WILDRUHE_REFRESH_DAYS` | `7` | Nach so vielen Tagen fragt die App ein Feld wieder an; schlägt das fehl, bleiben die gespeicherten Zonen |
 | `HOLZSCHLAG_SPERRE_TAGE` | `42` | So lange sperrt ein Foto mit *Holzschlag / Rodung* die Wege 80 m darum herum für den Wege-Magnet |
 | `WILDRUHE_SEASON`  | `12-20/04-30` | Schutzzeit (Monat-Tag/Monat-Tag) für Zonen ohne eigene Angabe; `immer` = ganzjährig |
+| `GEBAEUDE_URL` | wie `WEGNETZ_URL` | Overpass-API für die Gebäude aus OpenStreetMap, die ausserhalb der Schweiz Schatten auf die Karte werfen ([Details](funktionen.md#licht-und-schatten-auf-der-karte)); leer gesetzt schaltet das ab |
 | `WEGNETZ_URL` | – | Overpass-API für das Wegnetz aus OpenStreetMap (z. B. `https://overpass-api.de/api/interpreter` oder eine eigene Instanz); im Durchgehen führen Pfeile dann entlang der Wege ([Details](funktionen.md#durchgehen-wie-street-view)) |
 | `MCH_RADAR_URL` | STAC-Sammlung `ch.meteoschweiz.ogd-radar-precip` bei geo.admin.ch | Niederschlagsradar der MeteoSchweiz im Tab *Wetter* eines Spots ([Details](funktionen.md#wetter-am-spot)); leer = nur das DWD-Radar |
 | `TERRAIN_URL` | Terrain Tiles auf AWS | Geländekacheln für die [3D-Karte](funktionen.md#3d-karte), Vorlage mit `{z}`, `{x}`, `{y}` (Terrarium-PNG, z. B. ein eigener Spiegel); leer = keine 3D-Karte |

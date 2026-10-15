@@ -38,6 +38,7 @@ const { TREES, treeInfo, treeJson } = require('./trees');
 const { createElevation } = require('./elevation');
 const { createDwd } = require('./dwd');
 const { createSurface, MIN_Z: SURFACE_MIN_Z, MAX_Z: SURFACE_MAX_Z } = require('./surface');
+const { createBuildings } = require('./buildings');
 const registerAccounts = require('./routes/accounts');
 const { createOAuth, providersFromEnv } = require('./oauth');
 const { createMailer } = require('./mail');
@@ -118,6 +119,9 @@ function createApp({
   dwdFetch = fetch,
   // Heights of trees and buildings for the shadows on the map (src/surface.js): fetch for geo.admin.ch.
   surfaceFetch = fetch,
+  // Buildings from OpenStreetMap for those shadows outside Switzerland (src/buildings.js): an Overpass API, by default
+  // the path network's; GEBAEUDE_URL= (empty) turns it off.
+  buildingsUrl = (process.env.GEBAEUDE_URL ?? process.env.WEGNETZ_URL) || '', buildingsFetch = fetch,
   // Terrain tiles for the 3D map (routes/terrain.js); TERRAIN_URL= (empty) turns the 3D map off.
   terrainUrl = (process.env.TERRAIN_URL ?? require('./routes/terrain').DEFAULT_URL) || null, terrainFetch = fetch,
   // MeteoSwiss precipitation radar for the weather tab (src/routes/radar-ch.js); empty = off.
@@ -136,7 +140,8 @@ function createApp({
   const weather = createWeather({ db, fetchImpl: weatherFetch });
   const elevationService = createElevation({ db, fetchImpl: weatherFetch });
   const dwd = createDwd({ fetchImpl: dwdFetch });
-  const surface = createSurface({ fetchImpl: surfaceFetch });
+  const buildings = createBuildings({ db, url: buildingsUrl, fetchImpl: buildingsFetch });
+  const surface = createSurface({ fetchImpl: surfaceFetch, buildings });
 
   const upload = multer({
     dest: tmpDir,
