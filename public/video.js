@@ -172,6 +172,7 @@
         showProgress(`Fotos werden hochgeladen … ${Math.min(i + 10, images.length)}/${images.length}`, (i + 10) / images.length);
         const fd = commonFields(new FormData());
         images.slice(i, i + 10).forEach((f) => fd.append('photos', f));
+        if (state.uploadMeta) fd.append('meta', state.uploadMeta);
         try {
           const r = await api('/api/photos', { method: 'POST', body: fd });
           created.push(...r.created);

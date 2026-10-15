@@ -771,6 +771,18 @@ profileDialog.innerHTML = `
       <a class="btn secondary small" href="/api/profile/export?fotos=0" download>Nur Daten</a>
     </span>
   </div>
+  <details class="profile-keys" id="profile-keys">
+    <summary><b>API-Schlüssel</b> – für Skripte, z.&nbsp;B. ganze Ordner hochladen (<code>scripts/upload-folder.js</code>)</summary>
+    <p class="muted small">Ein Schlüssel kann in deinem Namen Fotos hochladen und bearbeiten, aber weder Passwort, E-Mail
+      noch Schlüssel ändern. Er wird nur einmal angezeigt – gut aufbewahren, nicht weitergeben.</p>
+    <ul id="key-list" class="key-list"></ul>
+    <form id="key-form" class="row" novalidate>
+      <input name="name" maxlength="80" placeholder="Name, z. B. Laptop" aria-label="Name des Schlüssels">
+      <button type="submit" class="btn secondary small">Neuer Schlüssel</button>
+    </form>
+    <p id="key-new" class="key-new" hidden></p>
+    <p id="key-error" class="auth-error" role="alert" hidden></p>
+  </details>
   <div class="tabs profile-tabs" role="tablist" id="profile-tabs"></div>
   <div id="profile-grid" class="profile-grid" aria-live="polite"></div>
   <div class="row center"><button type="button" class="secondary" id="profile-next" hidden>Weitere Fotos laden</button></div>`;
@@ -855,6 +867,58 @@ renameForm.addEventListener('submit', async (e) => {
     $('rename-error').hidden = false;
   }
 });
+/* ---------- API keys ---------- */
+
+function keyError(msg) {
+  $('key-error').textContent = msg || '';
+  $('key-error').hidden = !msg;
+}
+async function loadKeys() {
+  try {
+    const { tokens } = await api('/api/auth/tokens');
+    $('key-list').replaceChildren(...tokens.map((t) => el('li', {}, [
+      el('b', { text: t.name }),
+      el('span', { class: 'muted small', text: ` erstellt ${fmtDate(t.createdAt)} · ${t.lastUsedAt ? `zuletzt benutzt ${fmtDateTime(t.lastUsedAt)}` : 'noch nie benutzt'} ` }),
+      el('button', {
+        type: 'button', class: 'link small', text: 'Löschen',
+        onclick: async () => {
+          if (!confirm(`Schlüssel «${t.name}» löschen? Skripte damit funktionieren dann nicht mehr.`)) return;
+          try {
+            await api(`/api/auth/tokens/${t.id}`, { method: 'DELETE' });
+            loadKeys();
+          } catch (err) {
+            keyError(err.message);
+          }
+        },
+      }),
+    ])));
+    if (!tokens.length) $('key-list').replaceChildren(el('li', { class: 'muted small', text: 'Noch keine Schlüssel.' }));
+  } catch (err) {
+    keyError(err.message);
+  }
+}
+$('profile-keys').addEventListener('toggle', () => {
+  if (!$('profile-keys').open) return;
+  $('key-new').hidden = true;
+  keyError('');
+  loadKeys();
+});
+$('key-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  keyError('');
+  try {
+    const r = await jsonPost('/api/auth/tokens', { name: e.target.name.value });
+    e.target.reset();
+    const code = el('code', { text: r.token });
+    $('key-new').replaceChildren('Neuer Schlüssel (nur jetzt sichtbar): ', code, ' ',
+      el('button', { type: 'button', class: 'link small', text: 'Kopieren', onclick: () => navigator.clipboard?.writeText(r.token) }));
+    $('key-new').hidden = false;
+    loadKeys();
+  } catch (err) {
+    keyError(err.message);
+  }
+});
+
 let profileFilter = 'alle';
 let profileOffset = 0;
 
@@ -873,6 +937,7 @@ async function openProfile() {
   showRename(false);
   showEmailForm(false);
   renderEmail();
+  $('profile-keys').open = false;
   const span = p.firstAt ? ` · Fotos von ${new Date(p.firstAt).getFullYear()} bis ${new Date(p.lastAt).getFullYear()}` : '';
   $('profile-since').textContent = `Dabei seit ${fmtDate(p.memberSince)}${span}`;
   $('profile-stats').replaceChildren(

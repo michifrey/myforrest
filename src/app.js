@@ -19,6 +19,7 @@ const { createWaynet } = require('./waynet');
 const { LANDSCAPES, ICE_LANDSCAPES, MOUNTAIN_MIN_M, FOREST_ONLY_TAGS, isLandscape, landscapeOf } = require('./landscapes');
 const { parseTrackPoints } = require('./gpx');
 const { readPhotoMeta, imageExtension } = require('./exif');
+const { parseMeta, baseName } = require('./photo-meta');
 const { assignSpot, refreshSpot, backfillSpotHeadings, planSplit, splitSpot, HEADING_TOLERANCE_DEG } = require('./spots');
 const { isHeic, heicExif, heicToJpeg } = require('./heic');
 const { createThumbnails } = require('./thumbs');
@@ -130,8 +131,8 @@ function createApp({
 
   const upload = multer({
     dest: tmpDir,
-    limits: { fileSize: 40 * 1024 * 1024, files: 201 },
-  }).fields([{ name: 'photos', maxCount: 200 }, { name: 'gpx', maxCount: 1 }]);
+    limits: { fileSize: 40 * 1024 * 1024, files: 202 },
+  }).fields([{ name: 'photos', maxCount: 200 }, { name: 'gpx', maxCount: 1 }, { name: 'meta', maxCount: 1 }]);
 
   const app = express();
   if (trustProxy !== false) app.set('trust proxy', trustProxy);
@@ -698,13 +699,24 @@ function createApp({
   async function handleUpload(req, res) {
     const files = req.files?.photos || [];
     const gpxFile = req.files?.gpx?.[0];
+    const metaFile = req.files?.meta?.[0];
     let status;
     let body;
     try {
-      [status, body] = await processUpload(files, gpxFile, req.body || {}, req);
+      // The description of the photos (myforrest.json): as a file or as a text field.
+      let meta = null;
+      const metaText = metaFile ? await fsp.readFile(metaFile.path, 'utf8') : req.body?.meta;
+      if (metaText) {
+        try {
+          meta = parseMeta(metaText);
+        } catch (err) {
+          return res.status(400).json({ error: err.message });
+        }
+      }
+      [status, body] = await processUpload(files, gpxFile, req.body || {}, req, meta);
     } finally {
-      // Temp files of skipped photos (and the GPX) are removed before answering.
-      await Promise.all([...files, ...(gpxFile ? [gpxFile] : [])].map((f) => fsp.rm(f.path, { force: true })));
+      // Temp files of skipped photos (and the GPX and description) are removed before answering.
+      await Promise.all([...files, gpxFile, metaFile].filter(Boolean).map((f) => fsp.rm(f.path, { force: true })));
     }
     res.status(status).json(body);
   }
@@ -755,7 +767,11 @@ function createApp({
       .get(userId, pos.lat - dLat, pos.lat + dLat, pos.lon - dLon, pos.lon + dLon, takenAt - DRIVE_REPEAT_MS, takenAt + DRIVE_REPEAT_MS));
   }
 
-  async function processUpload(files, gpxFile, b, req) {
+  /**
+   * Stores uploaded photos. `described`: the description of the photos (src/photo-meta.js), per file name the
+   * place, view direction, time, tags, note, activity and landscape; it comes before the EXIF of the photo.
+   */
+  async function processUpload(files, gpxFile, b, req, described = null) {
     if (!files.length) return [400, { error: 'Keine Fotos übermittelt' }];
     const owner = accounts.uploadOwner(req); // uploader and licence
     if (owner.error) return [400, { error: owner.error }];
@@ -802,6 +818,11 @@ function createApp({
     const touchedSpots = new Set();
     const requestsDone = new Set();
     for (const f of files) {
+      const entry = described?.get(baseName(f.originalname)) || null;
+      if (entry?.error) {
+        skipped.push({ name: f.originalname, reason: `Beschreibung: ${entry.error}` });
+        continue;
+      }
       const buf = await fsp.readFile(f.path);
       // iPhone photos (HEIC) are stored as JPEG; their EXIF is read from the original.
       const heic = isHeic(buf);
@@ -811,7 +832,7 @@ function createApp({
         continue;
       }
       const meta = await readPhotoMeta(heic ? heicExif(buf) || buf : buf, offsetMin);
-      let takenAt = meta.takenAt !== null ? meta.takenAt + clockShiftMs : null;
+      let takenAt = entry?.takenAt ?? (meta.takenAt !== null ? meta.takenAt + clockShiftMs : null);
       // An archive picture (a scan of an old photo): its EXIF date is the scan's, the given date counts.
       if (archive) takenAt = fallbackTime;
       if (takenAt === null) takenAt = Number.isFinite(fallbackTime) ? fallbackTime : Date.now();
@@ -819,12 +840,18 @@ function createApp({
       let pos = null;
       let source = null;
       const exifPos = isValidCoord(meta.lat, meta.lon) ? { lat: meta.lat, lon: meta.lon } : null;
+      const given = entry?.lat !== undefined ? { lat: entry.lat, lon: entry.lon } : null;
       if (targetSpot) {
         // Keep the device position when it is plausible, otherwise use the spot centre.
         if (archive) [pos, source] = [{ lat: targetSpot.lat, lon: targetSpot.lon }, 'spot'];
+        else if (given && nearSpot(given)) [pos, source] = [given, 'manual'];
         else if (exifPos && nearSpot(exifPos)) [pos, source] = [exifPos, 'exif'];
         else if (manual && nearSpot(manual)) [pos, source] = [manual, 'spot'];
         else [pos, source] = [{ lat: targetSpot.lat, lon: targetSpot.lon }, 'spot'];
+      } else if (given) {
+        // Described in the upload: comes before the EXIF (it may correct a wrong GPS).
+        pos = given;
+        source = 'manual';
       } else if (exifPos) {
         pos = exifPos;
         source = 'exif';
@@ -857,10 +884,14 @@ function createApp({
       const dims = await sharp(jpeg || buf).metadata().catch(() => ({}));
       const panorama = meta.projection ? meta.projection === 'equirectangular' : isPanoramaSize(dims.width, dims.height);
       // A panorama looks everywhere: its heading (centre of the image) says nothing about which spot it belongs to.
-      const heading = panorama ? (meta.poseHeading ?? meta.heading) : (meta.heading ?? sentHeading);
+      const heading = entry?.heading ?? (panorama ? (meta.poseHeading ?? meta.heading) : (meta.heading ?? sentHeading));
+      const photoActivity = ACTIVITIES.includes(entry?.activity) ? entry.activity : activity;
+      const photoNote = entry?.note ?? note;
+      const photoTags = entry?.tags ? [...new Set([...tags, ...parseTags(entry.tags)])] : tags;
+      const photoLandscape = isLandscape(entry?.landscape) ? entry.landscape : landscape;
       // Drive mode picks its pictures on the device; this catches what still repeats
       // (a second device, a resent queue): one picture per account, place and half day.
-      if (activity === 'fahren' && owner.userId && driveRepeat(owner.userId, pos, takenAt)) {
+      if (photoActivity === 'fahren' && owner.userId && driveRepeat(owner.userId, pos, takenAt)) {
         skipped.push({ name: f.originalname, reason: 'Fahrt: hier gibt es von dir schon ein Bild aus den letzten Stunden' });
         continue;
       }
@@ -875,13 +906,13 @@ function createApp({
                               location_source, activity, note, created_at, panorama, sequence_id)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(spotId, file, f.originalname.slice(0, 255), takenAt, pos.lat, pos.lon, heading, meta.altitude,
-          source, activity, note, Date.now(), panorama ? 1 : 0, sequenceId).lastInsertRowid);
-        setTags(id, tags);
+          source, photoActivity, photoNote, Date.now(), panorama ? 1 : 0, sequenceId).lastInsertRowid);
+        setTags(id, photoTags);
         accounts.stampPhoto(id, owner);
         if (protect) db.prepare("UPDATE photos SET protected = 1, protected_reason = 'upload' WHERE id = ?").run(id);
         if (archive) db.prepare('UPDATE photos SET archive = 1 WHERE id = ?').run(id);
         refreshSpot(db, spotId);
-        classifySpot(spotId, landscape, 'upload');
+        classifySpot(spotId, photoLandscape, 'upload');
         touchedSpots.add(spotId);
         return id;
       });
