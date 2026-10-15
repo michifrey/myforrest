@@ -94,7 +94,7 @@ Kennzahlen, die zuletzt fotografierten Spots als Bilder und die Legende zusammen
 Ein Klick auf einen Spot öffnet seine **Detailseite** über der ganzen Karte. Links steht gross das Foto mit
 Zeitregler und Vorschaubildern, darunter die Knöpfe *Wiederholungsfoto aufnehmen*, *Vorher / Nachher* und
 *Durchgehen*. Rechts zeigt **Licht & Wald** den Horizont des Spots mit dem Lauf der Sonne und den Baumarten in
-ihrer Jahreszeit (siehe unten), daneben im Tab *Karte* eine **Minikarte** mit der Lage und den Spots in der Nähe (ein Klick öffnet sie). Darunter stehen
+ihrer Jahreszeit (siehe unten), im Tab *Wetter* Radar und Vorhersage, im Tab *Karte* eine **Minikarte** mit der Lage und den Spots in der Nähe (ein Klick öffnet sie). Darunter stehen
 Fotos, Zeitraum, Blickrichtung und Koordinaten, Höhe, Hangneigung, Exposition und Geländeform aus dem
 Höhenmodell, die erwartete Herbstfärbung, der Anteil der Ansicht, der sich seit dem ersten Foto verändert hat,
 alle Beobachtungen und die Baumarten. Weiteres steht in **Tabs** unter dem Foto: *Beobachtungen*, *Vergleich*,
@@ -124,6 +124,13 @@ Auch das **Wetter** der Stunde ist eingezeichnet (Open-Meteo, Messung oder für 
 grauen den Himmel und verdecken die Sonne, Regen fällt schräg, Schnee in Flocken, eine Schneedecke färbt den
 Boden weiss und bepudert die Nadelbäume. Bei **Glätte** glänzt der Boden eisig, und die Zeile darunter nennt
 sie: Glatteis (Regen bei Frost), Schneeglätte oder überfrierende Nässe nach Niederschlag.
+
+<p align="center"><img src="docs/screenshots/wetter-spot.jpg" width="360" alt="Wetter am Spot: Niederschlagsradar, Vorhersage für die nächsten Stunden und sieben Tage"></p>
+
+Der Tab **Wetter** daneben zeigt das **Niederschlagsradar** des Deutschen Wetterdienstes rund um den Spot
+(Deutschland und Grenzgebiet, also auch die Nordschweiz), mit ▶ als Film der letzten zwei Stunden, und die
+**Vorhersage** wie in einer Wetter-App: die nächsten 24 Stunden zum Wischen (Symbol, Temperatur, Niederschlag
+und Wahrscheinlichkeit, Wind; starke Böen orange) und darunter sieben Tage mit Tiefst- und Höchstwert.
 
 Unter dem Bild lassen sich pro Foto Beobachtungen taggen und eine Notiz erfassen. Jedes Foto nennt
 Urheber und Lizenz und lässt sich melden. Mit einem Pl@ntNet-Key bestimmt *Art bestimmen* die Pflanzen

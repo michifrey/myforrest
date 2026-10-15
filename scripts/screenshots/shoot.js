@@ -100,6 +100,11 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await sharp({ create: { width: metas.reduce((w, m) => w + m.width, 0) + 2 * 16, height, channels: 3, background: '#f4f0e4' } })
       .composite(cards.map((input, i) => ({ input, left: metas.slice(0, i).reduce((w, m) => w + m.width + 16, 0), top: 0 })))
       .jpeg({ quality: 82 }).toFile(out('licht-wald-wetter.jpg'));
+    // The weather tab: DWD radar (the demo's rain front) and the forecast.
+    await page.click('#side-tab-weather');
+    await settle(page, 5000);
+    await page.locator('.side-card').screenshot({ path: out('wetter-spot.jpg'), ...jpg });
+    await page.click('#side-tab-light');
     await page.close();
   }
 

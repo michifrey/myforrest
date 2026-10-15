@@ -89,9 +89,13 @@ async function weatherFetch(url) {
   if (u.hostname.includes('open-meteo')) {
     const lat = Number(q.get('latitude'));
     const days = [];
-    for (let t = Date.parse(`${q.get('start_date')}T00:00:00Z`); t <= Date.parse(`${q.get('end_date')}T00:00:00Z`); t += DAY) {
-      days.push(new Date(t).toISOString().slice(0, 10));
-    }
+    // A date range, or for a forecast the days from today (forecast_days).
+    const from = q.get('start_date') ? Date.parse(`${q.get('start_date')}T00:00:00Z`) : Math.floor(Date.now() / DAY) * DAY;
+    const to = q.get('end_date') ? Date.parse(`${q.get('end_date')}T00:00:00Z`) : from + (Number(q.get('forecast_days') || 7) - 1) * DAY;
+    for (let t = from; t <= to; t += DAY) days.push(new Date(t).toISOString().slice(0, 10));
+    const kmh = q.get('wind_speed_unit') === 'kmh' ? 3.6 : 1;
+    const code = (precip, temp, cloud) => (precip >= 0.1 ? (temp <= 0.5 ? (precip > 1 ? 73 : 71) : precip > 2 ? 65 : precip > 0.5 ? 63 : 61) : cloud > 85 ? 3 : cloud > 45 ? 2 : cloud > 15 ? 1 : 0);
+    let dailyOut = null;
     if (q.get('daily')) {
       const vars = q.get('daily').split(',');
       const out = { time: days };
@@ -106,11 +110,16 @@ async function weatherFetch(url) {
             case 'wind_gusts_10m_max': return STORMS[d]?.[0] ?? Math.round(22 + hash(`g${d}`) * 30);
             case 'wind_speed_10m_max': return Math.round(10 + hash(`w${d}`) * 15);
             case 'wind_direction_10m_dominant': return STORMS[d]?.[1] ?? Math.round(hash(`d${d}`) * 360);
+            case 'weather_code': return code(w.p / 5, w.tm, hash(`c${d}`) * 100);
+            case 'precipitation_probability_max': return w.p ? Math.round(60 + hash(`q${d}`) * 35) : Math.round(hash(`q${d}`) * 20);
+            case 'snowfall_sum': return w.tm <= 0.5 ? Math.round(w.p * 0.7 * 10) / 10 : 0;
+            case 'sunshine_duration': return Math.round((1 - hash(`c${d}`)) * 9 * 3600);
             default: return null;
           }
         });
       }
-      return json({ utc_offset_seconds: 0, timezone: 'UTC', daily: out });
+      if (!q.get('hourly')) return json({ utc_offset_seconds: 0, timezone: 'UTC', daily: out });
+      dailyOut = out;
     }
     if (q.get('hourly')) {
       const utc = q.get('timezone') === 'UTC';
@@ -143,12 +152,18 @@ async function weatherFetch(url) {
             rain: temp > 0.5 ? precip : 0,
             snowfall: temp <= 0.5 ? Math.round(precip * 0.7 * 100) / 100 : 0,
             snow_depth: special ? special.depth : winter && w.tm < 2 ? 0.06 : 0,
+            weather_code: code(precip, temp, cover),
+            precipitation_probability: precip >= 0.1 ? Math.round(65 + hash(`r${d}${h}`) * 30) : Math.round(hash(`r${d}${h}`) * 15),
+            wind_direction_10m: Math.round(220 + hash(`dir${d}`) * 60),
+            wind_gusts_10m: Math.round((14 + hash(`v${d}${h}`) * 25) * 10) / 10,
+            is_day: solar > 0 ? 1 : 0,
           });
+          rows[rows.length - 1].wind_speed_10m = Math.round(rows[rows.length - 1].wind_speed_10m * kmh * 10) / 10;
         }
       }
       const out = { time };
       for (const v of vars) out[v] = rows.map((r) => r[v] ?? null);
-      return json({ utc_offset_seconds: offset, timezone: 'Europe/Zurich', hourly: out });
+      return json({ utc_offset_seconds: offset, timezone: 'Europe/Zurich', hourly: out, ...(dailyOut ? { daily: dailyOut } : {}) });
     }
   }
   return new Response('offline', { status: 503 });
@@ -183,10 +198,11 @@ if (process.env.DEMO_GLETSCHER === '1') {
   fs.writeFileSync(path.join(glacierDir, 'archiv-katalog.csv'), glacier.archiveCsv());
 }
 const archiveFetch = async () => new Response(await sharp({ create: { width: 1200, height: 800, channels: 3, background: '#8a7d68' } }).jpeg().toBuffer(), { headers: { 'content-type': 'image/jpeg' } });
-/** DWD capabilities: radar pictures every 5 minutes on 8 and 9 October 2026 (the day of the screenshot), warnings. */
+/** DWD capabilities: radar pictures every 5 minutes from 8 October 2026 (the light-and-shadow screenshot) until now, warnings. */
 async function dwdFetch() {
+  const newest = new Date(Math.floor((Date.now() - 4 * 60000) / 300000) * 300000).toISOString().replace('.000Z', 'Z');
   return new Response(`<WMS_Capabilities version="1.3.0"><Capability><Layer><Title>DWD</Title>
-    <Layer><Name>dwd:Niederschlagsradar</Name><Title>Radar</Title><Dimension name="time" units="ISO8601">2026-10-08T00:00:00Z/2026-10-09T23:55:00Z/PT5M</Dimension></Layer>
+    <Layer><Name>dwd:Niederschlagsradar</Name><Title>Radar</Title><Dimension name="time" units="ISO8601">2026-10-08T00:00:00Z/${newest}/PT5M</Dimension></Layer>
     <Layer><Name>dwd:Warnungen_Gemeinden</Name><Title>Warnungen</Title></Layer></Layer></Capability></WMS_Capabilities>`);
 }
 

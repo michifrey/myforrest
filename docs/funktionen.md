@@ -198,7 +198,7 @@ Ein Spot öffnet sich als eigene Seite über der Karte (auf dem Handy statt der 
   Reihenfolge ihrer Nummer, mit dem gewählten Filter („3 / 24“).
 - **Foto und Zeitreise**: das Foto in voller Breite, Zeitregler, Vorschaubilder und *Stabilisiert*; darunter
   *Wiederholungsfoto aufnehmen*, *Vorher / Nachher*, *Durchgehen* und *Neues Foto anfragen*.
-- **Seitenspalte** (bleibt beim Scrollen stehen): oben zwei Tabs, *Licht & Wald* (siehe unten) und *Karte*, eine
+- **Seitenspalte** (bleibt beim Scrollen stehen): oben drei Tabs, *Licht & Wald* und *Wetter* (siehe unten) und *Karte*, eine
   **Minikarte** mit dem Spot (gold) und den Spots in der Nähe in ihrer Befundfarbe; ein Klick auf einen Punkt
   öffnet diesen Spot, *Auf der grossen Karte zeigen* schliesst die Seite und zoomt hin. Der zuletzt gewählte Tab
   bleibt im Browser gespeichert. Darunter Fotos, Zeitraum, Blickrichtung und Lage, Landschaft, Höhe und
@@ -249,6 +249,28 @@ ist die Himmelsrichtung von Nordost über Süd bis Nordwest, die senkrechte die 
 - **Zeit**: *Fototag* nimmt Tag und Uhrzeit des gezeigten Fotos und folgt dem Zeitregler der Zeitreise; *Heute*
   den heutigen Tag und die aktuelle Uhrzeit. Der Regler darunter verschiebt die Uhrzeit. Die Zeile unter der
   Grafik nennt, von wann bis wann die Sonne über dem Grat steht, und den Sonnenstand zur gewählten Zeit.
+
+
+### Wetter am Spot
+
+![Wetter am Spot: Niederschlagsradar, Vorhersage für die nächsten Stunden und sieben Tage](screenshots/wetter-spot.jpg)
+
+Der Tab *Wetter* in der Seitenspalte des Spots:
+
+- **Niederschlagsradar**: eine kleine Karte (Zoom 9, rund 70 km breit) mit dem Spot (gold) und dem Radar des
+  Deutschen Wetterdienstes (`dwd:Niederschlagsradar`, WMS wie bei *Sonne & Wetter*). Es deckt Deutschland und
+  das Grenzgebiet ab, in der Schweiz etwa den Norden bis ins Mittelland. Der Regler wählt eines der Bilder der
+  letzten zwei Stunden im Abstand von 15 Minuten, ▶ spielt sie als Film ab. Die Zeile darunter nennt die Zeit
+  des Bildes und wie alt das neueste ist; ist es älter als drei Stunden, steht das Datum dabei. Die Bilder
+  lädt der Browser direkt beim DWD; der Server liest nur einmal pro Stunde, welche Zeiten es gibt.
+- **Vorhersage** (`/api/weather/forecast`, Open-Meteo mit den Modellen der Wetterdienste, in der Schweiz u. a.
+  MeteoSchweiz, für die Höhe des Spots): die nächsten 24 Stunden zum Wischen, je mit Symbol (Tag oder Nacht),
+  Temperatur, Niederschlag als Balken und in mm, Wahrscheinlichkeit ab 10 %, Windrichtung (der Pfeil zeigt,
+  wohin der Wind weht) und -stärke in km/h; Böen ab 60 km/h orange. Darunter sieben Tage mit Symbol,
+  Niederschlag (und Schnee ab 0,5 cm) und dem Bereich von Tiefst- bis Höchsttemperatur auf einer gemeinsamen
+  Skala der Woche. Die Vorhersage wird pro ~10-km-Zelle eine halbe Stunde zwischengespeichert.
+- Die Symbole folgen den WMO-Wettercodes: klar, teils bewölkt, bedeckt, Nebel, Niesel, Regen und Schauer,
+  gefrierender Regen, Schnee und Schneeschauer, Gewitter.
 
 ### Eigener Standort
 

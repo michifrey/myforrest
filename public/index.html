@@ -329,6 +329,7 @@
             <div class="side-card">
               <div class="side-tabs" role="tablist" aria-label="Lage des Spots">
                 <button type="button" role="tab" id="side-tab-light" data-pane="side-pane-light" aria-controls="side-pane-light" aria-selected="true">Licht &amp; Wald</button>
+                <button type="button" role="tab" id="side-tab-weather" data-pane="side-pane-weather" aria-controls="side-pane-weather" aria-selected="false" tabindex="-1">Wetter</button>
                 <button type="button" role="tab" id="side-tab-map" data-pane="side-pane-map" aria-controls="side-pane-map" aria-selected="false" tabindex="-1">Karte</button>
               </div>
               <div id="side-pane-light" role="tabpanel" aria-labelledby="side-tab-light">
@@ -345,6 +346,19 @@
                 <p id="profile-caption" class="profile-cap"></p>
                 <p id="profile-weather" class="profile-cap"></p>
                 <p id="profile-trees" class="profile-cap muted"></p>
+              </div>
+              <div id="side-pane-weather" role="tabpanel" aria-labelledby="side-tab-weather" hidden>
+                <div id="spot-radar" class="radar" role="img" aria-label="Niederschlagsradar um den Spot"></div>
+                <div id="radar-bar" class="profile-ctl radar-bar">
+                  <button type="button" id="radar-play" class="radar-play" aria-label="Radar der letzten zwei Stunden abspielen">▶</button>
+                  <label class="sr-only" for="radar-time">Radarzeit</label>
+                  <input type="range" id="radar-time" min="0" max="8" step="1" value="8">
+                  <output id="radar-clock" for="radar-time"></output>
+                </div>
+                <p id="radar-note" class="profile-cap muted"></p>
+                <div id="forecast-hours" class="fc-hours" role="list" aria-label="Vorhersage der nächsten 24 Stunden"></div>
+                <ol id="forecast-days" class="fc-days" aria-label="Vorhersage für sieben Tage"></ol>
+                <p id="forecast-note" class="profile-cap muted"></p>
               </div>
               <div id="side-pane-map" role="tabpanel" aria-labelledby="side-tab-map" hidden>
                 <div id="spot-minimap" class="minimap" role="img" aria-label="Lage des Spots"></div>
@@ -568,6 +582,7 @@
   <script src="walk.js"></script>
   <script src="map3d.js"></script>
   <script src="spotprofile.js"></script>
+  <script src="forecast.js"></script>
   <script src="offline-queue.js"></script>
   <script src="drive-select.js"></script>
   <script src="drive.js"></script>

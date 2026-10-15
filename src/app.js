@@ -957,6 +957,19 @@ function createApp({
     }
   });
 
+  /** Forecast for a place: the next 36 hours and seven days (src/weather.js). */
+  app.get('/api/weather/forecast', async (req, res) => {
+    const lat = Number(req.query.lat);
+    const lon = Number(req.query.lon);
+    if (!isValidCoord(lat, lon)) return res.status(400).json({ error: 'lat und lon angeben' });
+    const elevation = req.query.elevation !== undefined && req.query.elevation !== '' ? Number(req.query.elevation) : null;
+    try {
+      res.json(await weather.outlook(lat, lon, { elevation: Number.isFinite(elevation) ? elevation : null }));
+    } catch (err) {
+      res.json({ hourly: [], daily: [], error: err.message });
+    }
+  });
+
   /** Daily precipitation at every spot for a date; spots in one ~10 km cell share a lookup. */
   app.get('/api/weather/day/spots', async (req, res) => {
     const date = parseDate(req.query.date);

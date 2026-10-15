@@ -262,3 +262,58 @@ test('a single day: archive in the past, forecast soon, nothing far ahead', asyn
   await weather.day(47.36, 8.58, '2026-07-12');
   assert.equal(urls.length, 2, 'archive days are cached');
 });
+
+test('forecast: the next 36 hours from the current hour and seven days, cached half an hour', async () => {
+  const urls = [];
+  const start = Date.UTC(2026, 9, 14, 22); // local midnight in Zurich (CEST)
+  const fetchImpl = async (url) => {
+    urls.push(url);
+    const time = Array.from({ length: 168 }, (_, i) => new Date(start + 2 * 3600e3 + i * 3600e3).toISOString().slice(0, 16));
+    const days = Array.from({ length: 7 }, (_, i) => `2026-10-${15 + i}`);
+    return new Response(JSON.stringify({
+      timezone: 'Europe/Zurich',
+      utc_offset_seconds: 7200,
+      hourly: {
+        time,
+        temperature_2m: time.map((_, i) => 8 + (i % 24) / 4),
+        precipitation: time.map((_, i) => (i % 24 === 15 ? 1.2 : 0)),
+        precipitation_probability: time.map(() => 40),
+        snowfall: time.map(() => 0),
+        weather_code: time.map((_, i) => (i % 24 === 15 ? 61 : 2)),
+        wind_speed_10m: time.map(() => 12),
+        wind_direction_10m: time.map(() => 250),
+        wind_gusts_10m: time.map(() => 30),
+        is_day: time.map((_, i) => (i % 24 >= 7 && i % 24 < 19 ? 1 : 0)),
+      },
+      daily: {
+        time: days,
+        weather_code: days.map(() => 61),
+        temperature_2m_max: days.map(() => 14),
+        temperature_2m_min: days.map(() => 6),
+        precipitation_sum: days.map(() => 3.4),
+        precipitation_probability_max: days.map(() => 70),
+        snowfall_sum: days.map(() => 0),
+        wind_gusts_10m_max: days.map(() => 45),
+        sunshine_duration: days.map(() => 14400),
+      },
+    }));
+  };
+  let clock = Date.UTC(2026, 9, 15, 10, 25);
+  const weather = createWeather({ db: new DatabaseSync(':memory:'), fetchImpl, now: () => clock });
+  const f = await weather.outlook(47.39, 8.05, { elevation: 400 });
+  assert.match(urls[0], /api\.open-meteo\.com\/v1\/forecast.*hourly=temperature_2m,precipitation,precipitation_probability,snowfall,weather_code.*daily=weather_code.*forecast_days=7.*timezone=auto/);
+  assert.match(urls[0], /elevation=400/);
+  assert.equal(f.hourly.length, 36);
+  assert.equal(f.hourly[0].t, Date.UTC(2026, 9, 15, 10), 'starts with the current hour (12:00 CEST)');
+  assert.deepEqual(Object.keys(f.hourly[0]), ['t', 'temp', 'precip', 'prob', 'snowfall', 'code', 'wind', 'dir', 'gust', 'day']);
+  assert.equal(f.hourly[3].code, 61, '15:00 local is rainy');
+  assert.equal(f.hourly[3].day, true);
+  assert.equal(f.daily.length, 7);
+  assert.deepEqual(f.daily[0], { date: '2026-10-15', code: 61, tmax: 14, tmin: 6, precip: 3.4, prob: 70, snowfall: 0, gust: 45, sunHours: 4 });
+  clock += 10 * 60000;
+  await weather.outlook(47.39, 8.05, { elevation: 400 });
+  assert.equal(urls.length, 1, 'cached within the half hour');
+  clock += 30 * 60000;
+  await weather.outlook(47.39, 8.05, { elevation: 400 });
+  assert.equal(urls.length, 2, 'fetched again after half an hour');
+});
