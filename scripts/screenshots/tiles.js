@@ -253,4 +253,40 @@ function radarImage(bbox, width, height, time) {
   return sharp(buf, { raw: { width, height, channels: 4 } }).png().toBuffer();
 }
 
-module.exports = { mercatorTile, lv95Tile, terrariumTile, radarImage };
+/**
+ * Height of trees and buildings above the ground (m) in the demo forest: crowns of 18–32 m with gaps along
+ * tracks and in clearings, houses of 7–13 m in the village, a few single trees on the meadows.
+ */
+function objectHeight(lat, lon) {
+  if (lat < 46.9) return 0;
+  const x = lon * M_LON;
+  const y = lat * M_LAT;
+  const dc = Math.hypot((lat - 47.3722) * M_LAT, (lon - 8.5735) * M_LON * 0.8);
+  let forest = dc < 1250 + (fbm(x / 400, y / 400) - 0.5) * 700;
+  if (fbm(x / 160 + 50, y / 160 + 20) > 0.74) forest = false;
+  const road = Math.min(...['main', 'track', 'stream'].map((k) => dist(SEG[k], x, y)));
+  const pond = Math.hypot((lat - 47.3749) * M_LAT, (lon - 8.5755) * M_LON * 0.7) < 40;
+  if (forest) {
+    if (road < 5 || pond) return 0;
+    // Uneven canopy: stands of different height, single crowns and a few gaps.
+    const crowns = vnoise(x / 7, y / 7);
+    if (crowns < 0.06) return 0;
+    return Math.max(0, 16 + fbm(x / 70, y / 70) * 18 + crowns * 5);
+  }
+  const village = lon < 8.5585 + (fbm(x / 500, y / 500) - 0.5) * 0.004;
+  if (village) {
+    const bx = Math.floor(x / 38), by = Math.floor(y / 30);
+    const fx = x / 38 - bx, fy = y / 30 - by;
+    if (hash2(bx, by) < 0.6 && fx > 0.2 && fx < 0.75 && fy > 0.25 && fy < 0.75) return 7 + hash2(by, bx) * 6;
+    return 0;
+  }
+  // Single trees on the meadows.
+  const tx = Math.floor(x / 60), ty = Math.floor(y / 60);
+  if (hash2(tx + 7, ty + 3) < 0.12) {
+    const d = Math.hypot(x / 60 - tx - 0.5, y / 60 - ty - 0.5) * 60;
+    if (d < 5) return 16 - d;
+  }
+  return 0;
+}
+
+module.exports = { mercatorTile, lv95Tile, terrariumTile, radarImage, objectHeight };

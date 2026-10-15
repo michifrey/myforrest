@@ -156,6 +156,22 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.close();
   }
 
+  if (want('baumschatten')) {
+    // Zoomed in on the village and the forest edge: houses and trees throw their shadows (heights from swissSURFACE3D).
+    const page = await explore(ctx);
+    await page.click('#sun-toggle');
+    await settle(page, 1500);
+    await page.fill('#sun-date', '2026-10-09');
+    await page.dispatchEvent('#sun-date', 'change');
+    await page.evaluate(() => map.setView([47.3705, 8.5585], 16));
+    await page.evaluate(() => { const s = document.querySelector('#sun-slider'); s.value = 16 * 60 + 40; s.dispatchEvent(new Event('input', { bubbles: true })); });
+    await page.waitForFunction(() => /swissSURFACE3D/.test(document.querySelector('#shade-status').textContent), null, { timeout: 90000 });
+    await settle(page, 2000);
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.screenshot({ path: out('baumschatten.jpg'), ...jpg });
+    await page.close();
+  }
+
   if (want('species')) {
     const page = await explore(ctx);
     await page.click('#species-toggle');
@@ -250,6 +266,18 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.click('#open-upload');
     await settle(page, 1500);
     await page.locator('#upload-dialog').screenshot({ path: out('upload.png') });
+    // A whole folder with its description (myforrest.json): the photos land in the photo field.
+    const folder = path.join(WORK, 'Waldrand-2026-10');
+    fs.rmSync(folder, { recursive: true, force: true });
+    fs.mkdirSync(folder, { recursive: true });
+    for (let i = 0; i < 48; i++) fs.copyFileSync(path.join(__dirname, '..', '..', 'test', 'fixtures', 'nogps.jpg'), path.join(folder, `IMG_${4101 + i}.jpg`));
+    fs.writeFileSync(path.join(folder, 'myforrest.json'), '[]');
+    await page.setInputFiles('#upload-folder', folder);
+    await settle(page, 800);
+    const a = await page.locator('#upload-form .dropzone').first().boundingBox();
+    const b = await page.locator('.folder-row').boundingBox();
+    const d = await page.locator('#upload-dialog').boundingBox();
+    await page.screenshot({ path: out('upload-ordner.png'), clip: { x: d.x, y: a.y - 12, width: d.width, height: b.y + b.height - a.y + 28 } });
     await page.close();
   }
 
@@ -535,6 +563,19 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.reload();
     await settle(page, 3500);
     await page.locator('#profile-dialog').screenshot({ path: out('profil.jpg'), ...jpg });
+    // API keys for scripts: two existing keys and a new one, shown once.
+    await page.route('**/api/auth/tokens', (r) => r.fulfill(r.request().method() === 'POST'
+      ? { status: 201, json: { id: 3, name: 'NAS-Import', token: 'mf_Q2xhdWRlIGRlbW8ga2V5IGZvciB0aGUgc2NyZWVuc2hvdA', createdAt: '2026-10-15T08:00:00.000Z', lastUsedAt: null } }
+      : { json: { tokens: [
+        { id: 1, name: 'Laptop', createdAt: '2026-03-02T08:00:00.000Z', lastUsedAt: '2026-10-12T17:41:00.000Z' },
+        { id: 2, name: 'Wildkamera-Skript', createdAt: '2026-06-20T08:00:00.000Z', lastUsedAt: '2026-10-15T06:05:00.000Z' },
+        { id: 3, name: 'NAS-Import', createdAt: '2026-10-15T08:00:00.000Z', lastUsedAt: null },
+      ] } }));
+    await page.click('#profile-keys summary');
+    await page.fill('#key-form input[name=name]', 'NAS-Import');
+    await page.click('#key-form button');
+    await settle(page, 800);
+    await page.locator('#profile-keys').screenshot({ path: out('api-schluessel.png') });
     await pctx.close();
   }
 

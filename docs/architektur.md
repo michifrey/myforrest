@@ -43,6 +43,7 @@ src/nightcool.js     Nächtliche Abkühlung in Senken aus Wind und Bewölkung
 src/openmeteo.js     Zeitreihen aus Archiv und Prognose von Open-Meteo zusammensetzen
 src/routes/climate.js  Routen und Analyse-Hooks für Stürme, Phänologie-Referenz und Frostnächte
 src/elevation.js     Geländehöhe, Hangneigung, Exposition und Geländeform (Copernicus-DEM über Open-Meteo)
+src/surface.js       Höhe von Bäumen und Gebäuden (swissSURFACE3D − swissALTI3D) als Kacheln für die Schatten auf der Karte
 src/exif.js          Aufnahmezeit, GPS und Blickrichtung aus den Bilddaten
 src/closures.js      Sperrungen bei Holzerei (aus Holzschlag-Fotos und von Hand) als Sperrkreise für BRouter
 src/wildlife.js      Wildruhezonen (Datei oder pro Feld von geo.admin.ch, gespeichert und wöchentlich neu; WGS84/LV95, Schutzzeit) als Sperrflächen für BRouter
@@ -86,12 +87,13 @@ src/pmtiles.js       PMTiles-v3-Schreiber (Hilbert-Kachel-IDs, Verzeichnisse mit
 src/mbtiles.js       MBTiles-1.3-Schreiber (SQLite)
 src/metadata.js      Metadatensatz nach ISO 19139 und GM03 (ISO19139.che) für geocat.ch, viersprachig
 src/routes/ogc-tiles.js  OGC API – Tiles (WebMercatorQuad und SwissLV95) und MapLibre-Stil
-src/auth.js          Konten, Passwort-Hashing (scrypt), Sitzungen, Rate-Limits (dauerhaft in SQLite)
+src/auth.js          Konten, Passwort-Hashing (scrypt), Sitzungen, API-Schlüssel (nur als Hash), Rate-Limits (dauerhaft in SQLite)
+src/photo-meta.js    Beschreibung eines Uploads (JSON, GeoJSON): Ort, Blickrichtung, Zeit, Tags pro Dateiname
 src/orgs.js          Organisationen mit Leitung und Mitgliedern; gelten, solange eine Person der Leitung verifiziert ist
 src/oauth.js         Anmelden mit Google, GitHub, Microsoft, SWITCH edu-ID, AGOV und weiteren OpenID-Connect-Diensten (OAuth 2.0 mit PKCE, Discovery, private_key_jwt), ohne Abhängigkeiten
 src/mail.js          E-Mail-Versand über SMTP (TLS/STARTTLS, AUTH PLAIN) für Bestätigungs- und Reset-Links
 src/moderation.js    Lizenzen, Meldungen, Ausblenden und Protokoll
-src/routes/accounts.js  Routen für Konten und Moderation, CSRF-Schutz, Rechte auf Fotos
+src/routes/accounts.js  Routen für Konten, API-Schlüssel und Moderation, CSRF-Schutz, Anmeldung per `Authorization: Bearer`, Rechte auf Fotos
 src/routes/organizations.js  Mitglieder einer Organisation aufnehmen, Einladungen per E-Mail, Rollen, austreten
 src/routes/profile.js   Eigene Profilseite: Zahlen, eigene Fotos und Export als ZIP (nur für das eigene Konto)
 src/zip.js           ZIP-Archive als Stream schreiben (ohne Kompression, ZIP64 ab 4 GB), ohne Abhängigkeiten
@@ -113,7 +115,8 @@ render.yaml          Blueprint für Render: Docker-Dienst mit Disk, Deploy bei j
 docs/                Dokumentation; docs/screenshots/ enthält die Bilder für das README
 mkdocs.yml           Doku-Website aus docs/ (MkDocs Material), gebaut und veröffentlicht von .github/workflows/docs.yml
 public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet die Landschaften der Startseite (Wald, Gletscher, Gebirge, Wüste) und wechselt sie,
-                     sun.js berechnet Sonnenstand und Einstrahlung, shade.js Gelände- und Nachtschatten,
+                     sun.js berechnet Sonnenstand und Einstrahlung, shade.js Gelände-, Baum- und Nachtschatten
+                     (in shade-worker.js neben der Seite gerechnet),
                      sunmap.js den Kartenmodus „Sonne & Wetter“ (mit Licht und Schatten und DWD-Karten),
                      hotspots.js den Kartenmodus „Arten & Neophyten“,
                      tours.js den Kartenmodus „Touren & Aufträge“ (Route zeichnen, aufzeichnen, importieren, Fotoaufträge),
@@ -140,4 +143,5 @@ public/manifest.webmanifest, public/icons/  Web-App-Manifest und App-Icons
 test/                Tests (`npm test`, Node-Testrunner)
 scripts/generate-icons.js  Erzeugt die App-Icons aus dem Logo (`node scripts/generate-icons.js`)
 scripts/build-tiles.js     Rechnet alle Vektorkacheln vor und schreibt PMTiles/MBTiles (`npm run tiles`)
+scripts/upload-folder.js   Lädt einen ganzen Ordner über die API hoch (API-Schlüssel, Pakete, Wiederaufnahme)
 ```

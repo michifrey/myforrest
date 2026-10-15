@@ -34,6 +34,9 @@ services:
       - key: WEGNETZ_URL
         value: https://overpass-api.de/api/interpreter
       # Asked for when the Blueprint is created (optional, can stay empty).
+      # Plant identification ("Art bestimmen"): free API key from https://my.plantnet.org.
+      - key: PLANTNET_API_KEY
+        sync: false
       - key: ADMIN_EMAIL
         sync: false
       - key: SMTP_URL

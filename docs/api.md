@@ -9,7 +9,7 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/spots?tag=…`           | Alle Spots mit Anzahl Fotos, Zeitraum, Tags, Blickrichtung (`heading`), Landschaft (`landscape`) und Vorschaubild (`latestThumbUrl`) |
 | `GET`    | `/api/spots/:id`             | Ein Spot mit Blickrichtung, Landschaft (`landscape`, `landscapeSource`: `upload`, `auto`, `manual` oder `null`) und allen Fotos chronologisch (jedes Foto mit `url`, `thumbUrl` und `largeUrl`, `archive` für Archivfotos, `panorama` für 360°-Bilder und `alignment`: bei Fotos die Homographie `h`, bei Panoramen `kind: 'rotation'` mit der Drehung `r`, `yaw` und `tilt`) |
 | `GET`    | `/thumbs/:datei`             | Vorschaubilder (WebP)                                    |
-| `POST`   | `/api/photos`                | Upload (multipart: `photos[]` als JPEG, PNG, WebP oder HEIC, optional `spotId` und `refPhotoId` für Wiederholungsfotos, `requestId` für einen Fotoauftrag, `sequenceId` für Bilder einer Aufnahme (Fahrt, Upload mit mehreren Fotos), `landscape` (`wald`, `gletscher`, `gebirge`, `trocken`) für das Landschaftsprofil eines neuen Spots, `archive=1` mit `spotId` und `takenAt` für ein Archivfoto (Datum von Hand, am Spot verortet), `protected=1` für einen geschützten Fund, `license`, `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity` (`joggen`, `wandern`, `biken`, `fahren`, `sonstiges`), `heading` (Blickrichtung in Grad, wenn das Foto keine im EXIF hat), `note`, `utcOffsetMinutes`, `clockShiftSeconds`). Mit `activity=fahren` (Fahrtmodus) wird pro Konto und Ort innerhalb von 12 Stunden nur ein Bild gespeichert, weitere stehen in `skipped` |
+| `POST`   | `/api/photos`                | Upload (multipart: `photos[]` als JPEG, PNG, WebP oder HEIC, optional `spotId` und `refPhotoId` für Wiederholungsfotos, `requestId` für einen Fotoauftrag, `sequenceId` für Bilder einer Aufnahme (Fahrt, Upload mit mehreren Fotos), `landscape` (`wald`, `gletscher`, `gebirge`, `trocken`) für das Landschaftsprofil eines neuen Spots, `archive=1` mit `spotId` und `takenAt` für ein Archivfoto (Datum von Hand, am Spot verortet), `protected=1` für einen geschützten Fund, `license`, `gpx`, `lat`/`lon`, `takenAt`, `tags`, `activity` (`joggen`, `wandern`, `biken`, `fahren`, `sonstiges`), `heading` (Blickrichtung in Grad, wenn das Foto keine im EXIF hat), `note`, `utcOffsetMinutes`, `clockShiftSeconds`, `meta` = Beschreibung der Fotos als JSON-Datei oder -Text, siehe [Ganze Ordner hochladen](#ganze-ordner-hochladen)). Mit `activity=fahren` (Fahrtmodus) wird pro Konto und Ort innerhalb von 12 Stunden nur ein Bild gespeichert, weitere stehen in `skipped` |
 | `POST`   | `/api/videos`                | Video-Upload (GPS aus GoPro-Telemetrie oder der Dashcam: NMEA bzw. Novatek `freeGPS`, sonst `gpx`; `video.track` im Ergebnis: `gpmf`, `nmea`, `novatek`, `gpx` oder `manual`) (multipart: `video`, optional `gpx` (GPX oder NMEA), `lat`/`lon`, `takenAt`, `tags`, `activity`, `note`, `clockShiftSeconds`, `frameDistanceM`, `frameIntervalS`, `panorama` = `auto`/`1`/`0`, `landscape`, `async=1` für Hintergrundverarbeitung) |
 | `GET`    | `/api/videos/jobs/:id`       | Fortschritt und Ergebnis eines Video-Uploads mit `async=1` |
 | `GET`    | `/api/videos/config`         | ffmpeg verfügbar? Standardabstand und -intervall         |
@@ -36,6 +36,7 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/weather/forecast?lat=&lon=&elevation=` | Vorhersage: 36 Stunden ab der aktuellen (Temperatur, Niederschlag, Wahrscheinlichkeit, Schnee, Wettercode, Wind, Böen, Tag/Nacht) und 7 Tage |
 | `GET`    | `/api/horizon?lat=&lon=`       | Geländehorizont (36 Richtungen) und Himmelssicht       |
 | `GET`    | `/api/dwd/layers`              | Karten des DWD zum Einblenden (WMS-Adresse, Ebenen, Zeiten des Radars) |
+| `GET`    | `/api/surface/{z}/{x}/{y}.png` | Höhe von Bäumen und Gebäuden über dem Boden (z 15–17, Terrarium-codiert); `204` ausserhalb der Schweiz |
 | `GET`    | `/ogc`                         | OGC API – Features: Landing Page, `/ogc/conformance`, `/ogc/api` (OpenAPI) |
 | `GET`    | `/ogc/collections[/:id]`       | Collections `spots`, `photos`, `findings`, `spread_fronts` mit Ausdehnung und Koordinatensystemen |
 | `GET`    | `/ogc/collections/:id/items[/:fid]` | GeoJSON; `crs` (CRS84 oder `http://www.opengis.net/def/crs/EPSG/0/2056`), `bbox`, `bbox-crs`, `datetime`, `limit`, `offset` |
@@ -96,6 +97,9 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/auth/jwks.json`        | Öffentliche Schlüssel der App für `private_key_jwt` (JWKS), zum Hinterlegen bei AGOV o. Ä. |
 | `GET`    | `/api/auth/oauth/:provider`  | Anmelden mit `google`, `github`, `microsoft`, `eduid`, `agov` oder `oidc`: leitet zum Anbieter weiter |
 | `GET`    | `/api/auth/oauth/:provider/callback` | Rückkehr vom Anbieter: meldet an, legt ein Konto an oder verknüpft (mit Sitzung); leitet nach `/?auth=ok\|created\|linked` bzw. `/?auth_error=…` |
+| `GET`    | `/api/auth/tokens`           | Angemeldet: eigene API-Schlüssel (`id`, `name`, `createdAt`, `lastUsedAt`), ohne den Schlüssel selbst |
+| `POST`   | `/api/auth/tokens`           | Im Browser angemeldet: neuer API-Schlüssel (`{ name }`); `token` (`mf_…`) steht nur in dieser Antwort; höchstens 20 pro Konto |
+| `DELETE` | `/api/auth/tokens/:id`       | API-Schlüssel löschen; Skripte damit bekommen danach 401 |
 | `DELETE` | `/api/auth/identities/:provider` | Anmeldung über einen Anbieter vom eigenen Konto trennen (nicht die einzige) |
 | `POST`   | `/api/tracks/parse`          | GPX, TCX, KML, GeoJSON oder NMEA (`{ text, filename }`) bzw. FIT (`{ base64, filename }`) lesen, ohne zu speichern: Punkte, Name, Format, Länge; Punkte mit Sensorwerten tragen `hr`, `power`, `cadence` bzw. `steps`, `temp`; dazu `sensors` (`[{ key, label, unit, avg, min, max, n }]`, bei FIT auch Developer-Felder als `dev:<Name>`) |
 | `POST`   | `/api/route-profile`         | Höhenprofil einer Route (`{ points: [[lat, lon, ele?], …] }`): `samples` (`d`, `ele`), `ascent`, `descent`, `min`, `max`, `source` (`route` = eigene Höhen, `modell` = Höhenmodell) |
@@ -170,3 +174,64 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 
 Fotos enthalten im JSON zusätzlich `uploader` (`{ id, name }` oder `null`), `license` (`{ id, label, url }`)
 und `hidden`. Schreibende Anfragen mit Sitzungs-Cookie brauchen den Header `X-CSRF-Token`.
+
+## API-Schlüssel für Skripte
+
+Skripte und andere Programme melden sich mit einem API-Schlüssel statt mit dem Sitzungs-Cookie an: im
+Browser unter *Profil → API-Schlüssel* erstellen (er wird nur einmal angezeigt) und bei jeder Anfrage
+mitschicken:
+
+```bash
+curl -H "Authorization: Bearer mf_…" https://myforrest.example/api/auth/me
+```
+
+Mit Schlüssel braucht es kein `X-CSRF-Token`. Er darf alles, was das Konto darf – hochladen, Fotos
+bearbeiten und löschen, Aufträge –, aber nichts unter `/api/auth/` ändern (Passwort, E-Mail, Schlüssel,
+Konto löschen: 403). Ein falscher oder gelöschter Schlüssel ergibt 401, nie eine anonyme Anfrage.
+Wer einen Schlüssel verloren hat, löscht ihn im Profil.
+
+## Ganze Ordner hochladen
+
+`POST /api/photos` nimmt bis zu 200 Fotos pro Anfrage. Ort, Blickrichtung und Zeit kommen aus den
+EXIF-Daten der Fotos oder aus einer **Beschreibung** im Feld `meta` (JSON-Datei oder Text), die pro
+Dateiname festlegt, was gilt. Ein Eintrag in der Beschreibung geht dem EXIF vor; was er nicht angibt,
+kommt weiter aus dem Foto (z. B. die Zeit), dann aus `gpx`, `lat`/`lon` und `takenAt` des Uploads.
+Fotos mit einem fehlerhaften Eintrag stehen in `skipped` (`Beschreibung: ungültige Koordinaten`).
+Verglichen wird der Dateiname ohne Ordner, Gross-/Kleinschreibung egal.
+
+```json
+[
+  { "file": "IMG_4101.jpg", "lat": 47.3712, "lon": 8.5651, "heading": 120, "takenAt": "2026-10-03T09:12:00+02:00" },
+  { "file": "IMG_4102.jpg", "lat": 47.3714, "lon": 8.5655, "tags": ["totholz"], "note": "Bachufer" }
+]
+```
+
+Ebenfalls gelesen werden `{ "photos": [ … ] }`, ein Objekt pro Dateiname
+(`{ "IMG_4101.jpg": { "lat": …, "lon": … } }`) und GeoJSON (`FeatureCollection` mit Punkten,
+Dateiname in `properties.file` oder `properties.name`). Felder:
+
+| Feld | Auch | Bedeutung |
+|------|------|-----------|
+| `file` | `filename`, `name` | Dateiname des Fotos |
+| `lat`, `lon` | `latitude`, `lng`, `long`, `longitude` | Ort in WGS84 (gespeichert als Ortsquelle `manual`) |
+| `heading` | `direction`, `bearing`, `azimuth` | Blickrichtung in Grad (0 = Nord) |
+| `takenAt` | `taken_at`, `time`, `date`, `datetime` | Aufnahmezeit (ISO 8601 oder Millisekunden) |
+| `tags` | | Liste oder Komma-Text; ergänzt die Tags des Uploads |
+| `note` | `description`, `notiz` | Notiz |
+| `activity`, `landscape` | | wie die Felder des Uploads, pro Foto |
+
+Im Browser: im Upload-Dialog *Ganzen Ordner wählen* (mit Unterordnern; eine `myforrest.json` darin wird
+als Beschreibung mitgeschickt) oder die JSON-Datei zusammen mit den Fotos auswählen. Für grosse Ordner
+gibt es das Skript
+[`scripts/upload-folder.js`](https://github.com/michifrey/myforrest/blob/main/scripts/upload-folder.js)
+(Node.js ≥ 20, ohne weitere Pakete):
+
+```bash
+export MYFORREST_TOKEN=mf_…
+node scripts/upload-folder.js ~/Bilder/Waldrand --server https://myforrest.example --activity wandern
+```
+
+Es lädt die Fotos in Paketen zu 20 hoch (`--batch`), jeden Unterordner als eigene Sequenz, wiederholt bei
+Netzfehlern, 429 und 5xx, und merkt sich Erledigtes in `<ordner>/.myforrest-upload.log`: ein zweiter Lauf
+macht dort weiter. Videos überspringt es (im Browser hochladen). `--help` zeigt alle Optionen
+(`--meta`, `--tags`, `--landscape`, `--license`, `--protected`, `--dry-run`, …).

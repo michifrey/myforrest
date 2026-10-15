@@ -26,6 +26,32 @@ Einen kürzeren Überblick mit Screenshots gibt das [README](https://github.com/
    Aufnahmezeit auf der Strecke verortet. Zeitzone und Abweichung der Kamera-Uhr lassen sich
    korrigieren.
 3. **Manuell**: Standort auf der Karte anklicken oder den aktuellen Standort verwenden.
+4. **Aus einer Beschreibung (JSON)**: pro Dateiname Ort, Blickrichtung, Zeit, Tags und Notiz, z. B. aus
+   einer Kartierung, einem GIS oder einer Fotofalle. Ein Eintrag geht dem EXIF vor; was er offen lässt,
+   kommt weiter aus dem Foto.
+
+### Ganze Ordner hochladen
+
+<p align="center"><img src="screenshots/upload-ordner.png" width="480" alt="Upload-Dialog mit einem gewählten Ordner und seiner Beschreibung"></p>
+
+*Ganzen Ordner wählen* im Upload-Dialog nimmt alle Fotos und Videos eines Ordners samt Unterordnern, in der
+Reihenfolge ihrer Pfade (IMG_2 vor IMG_10). Liegt darin eine `myforrest.json`, geht sie als Beschreibung
+mit; Dateien wie `.DS_Store` oder `._IMG_0001.jpg` vom Mac bleiben draussen. Eine JSON-Datei lässt sich
+auch zusammen mit einzelnen Fotos auswählen. Hochgeladen wird in Paketen zu zehn Fotos, mit Fortschritt;
+ohne Empfang landen sie in der Warteschlange. Das Format der Beschreibung steht in der
+[REST-API](api.md#ganze-ordner-hochladen).
+
+Für sehr grosse Ordner, einen NAS oder wiederkehrende Importe gibt es das Skript
+[`scripts/upload-folder.js`](https://github.com/michifrey/myforrest/blob/main/scripts/upload-folder.js):
+Es lädt über die API mit einem **API-Schlüssel** hoch, jeden Unterordner als eigene Bilderreihe, wiederholt
+bei Netzfehlern und macht nach einem Abbruch dort weiter, wo es aufgehört hat.
+
+<p align="center"><img src="screenshots/api-schluessel.png" width="560" alt="API-Schlüssel im Profil: Liste, neuer Schlüssel wird einmal angezeigt"></p>
+
+API-Schlüssel entstehen unter *Profil → API-Schlüssel* und werden nur einmal angezeigt; der Server
+speichert nur ihren Hash. Ein Schlüssel darf hochladen und Fotos bearbeiten, aber weder Passwort, E-Mail
+noch Schlüssel ändern oder das Konto löschen. Die Liste zeigt, wann ein Schlüssel zuletzt benutzt wurde;
+*Löschen* sperrt ihn sofort.
 
 ### Wiederholungsfotos mit Overlay
 
@@ -1001,6 +1027,10 @@ der gewählten Zeit über die ganze Karte, nicht nur über den Spot:
   ebenso Hänge, die von der Sonne abgewandt sind; Hänge, auf die die Sonne steil fällt, leuchten leicht golden.
   Das Panel nennt Sonnenhöhe, Richtung und den Anteil der Karte im Schatten. Mit *Abspielen* wandern die
   Schatten durch den Tag.
+- **Bäume und Gebäude** (ab Zoomstufe 16, in der Schweiz): Waldränder, einzelne Bäume und Häuser werfen ihre
+  Schatten, auf die Wiese, die Strasse oder in die Lichtung. Kronen und Dächer selbst liegen in der Sonne, solange
+  nichts Höheres davor steht. Beim ersten Mal an einem Ort dauert das Laden einige Sekunden, das Panel sagt
+  *Bäume und Gebäude werden geladen …*.
 - **Tag und Nacht**: wo die Sonne unter dem Horizont steht, wird die Karte dunkelblau, mit weichem Übergang
   durch die bürgerliche und nautische Dämmerung (bis −12°). Weit herausgezoomt sieht man so die
   Tag-Nacht-Grenze über Europa wandern.
@@ -1012,8 +1042,27 @@ fein für den Ausschnitt und eine Kachel Rand, dazu viermal gröber für die wei
 ferne Grate und Berge ihre langen Schatten, wenn die Sonne tief steht: bei Zoomstufe 13 Gelände bis etwa
 50 km ausserhalb des Ausschnitts, bei 15 etwa 13 km; das Panel nennt die Reichweite. Weit entferntes Gelände
 sinkt mit der Erdkrümmung (samt Lichtbrechung) ab. Der Rand eines Schattens ist weich: Er verläuft über die
-Breite der Sonnenscheibe (0,53°), der Halbschatten ist bei fernen Bergen breiter als bei nahen. Bäume und
-Gebäude sind nicht im Höhenmodell; den Schatten eines einzelnen Baums zeigt weiterhin die Linie am Spot.
+Breite der Sonnenscheibe (0,53°), der Halbschatten ist bei fernen Bergen breiter als bei nahen.
+
+Für Bäume und Gebäude zieht der Server das Geländemodell
+[swissALTI3D](https://www.swisstopo.admin.ch/de/hoehenmodell-swissalti3d) vom Oberflächenmodell
+[swissSURFACE3D Raster](https://www.swisstopo.admin.ch/de/hoehenmodell-swisssurface3d-raster) ab (swisstopo,
+frei, 0,5 m): Was übrig bleibt, ist die Höhe von Kronen und Dächern über dem Boden (bis 80 m; höher sind Krane
+und Masten). Die Dateien liegen als Cloud Optimized GeoTIFF in km-Kacheln im STAC-Katalog von geo.admin.ch;
+der Server liest nur den nötigen Teil, hält die Höhen pro km-Kachel auf 1 m im Speicher und gibt sie der Karte
+als Kacheln (`GET /api/surface/{z}/{x}/{y}.png`, wie die Höhenkacheln codiert). Im Browser läuft für jede Zelle
+von ~3 m (Zoomstufe 16) bzw. ~1,6 m (17) ein zweiter, kurzer Strahl über Gelände plus Bäume und Häuser, so weit
+der höchste Baum bei dieser Sonne einen Schatten werfen kann (höchstens 400 m); 300 m um den Ausschnitt zählen
+mit. Ausserhalb der Schweiz gibt es kein solches Modell; dort bleibt es beim Geländeschatten und der Linie des
+25-m-Baums am Spot.
+
+Die Rechnung läuft in einem Web Worker (`public/shade-worker.js`) neben der Seite: Die Karte bleibt beim
+Verschieben und beim *Abspielen* flüssig, auch im Gebirge und nah herangezoomt mit Bäumen und Häusern. Die
+Höhenraster gehen pro Ausschnitt einmal an den Worker, danach pro Bild nur Sonnenstand und Ausschnitt. Ist
+die Rechnung langsamer als das Abspielen, zeigt die Karte jeweils das neueste fertige Bild und lässt
+dazwischen liegende aus. Kann der Browser keinen Worker starten, rechnet die Seite selbst.
+
+![Bäume und Häuser werfen ihre Schatten: Dorfrand, Waldrand und Lichtung am Nachmittag](screenshots/baumschatten.jpg)
 
 ### 3D-Karte
 
@@ -1447,16 +1496,25 @@ speichert nichts davon.
 
 ### Pflanzenbestimmung (optional)
 
-Mit einem kostenlosen [Pl@ntNet](https://my.plantnet.org)-API-Key
-werden Pflanzen auf einem Foto bestimmt. Bekannte invasive Neophyten wie Drüsiges Springkraut,
+Mit einem kostenlosen [Pl@ntNet](https://my.plantnet.org)-API-Key (`PLANTNET_API_KEY`; ohne ihn fehlt der
+Knopf *Art bestimmen*) werden Pflanzen auf einem Foto bestimmt. Bekannte invasive Neophyten wie Drüsiges Springkraut,
 Japanischer Staudenknöterich, Goldruten oder Götterbaum werden erkannt, und das Foto erhält
 automatisch den Tag *Neophyt*.
 
 ### Baumarten
 
-Jeder Spot führt einen Artenbestand. Arten kommen automatisch aus der Pl@ntNet-Bestimmung
-(Organ wählbar: Blatt/Nadeln, Rinde, ganzer Baum, Blüte, Frucht) oder werden von Hand aus einer
-Liste von gut 30 mitteleuropäischen Waldbaumarten gewählt. Zu jeder Art gibt es einen Steckbrief: Nadel/Laub,
+Jeder Spot führt einen Artenbestand. Arten kommen aus der Pl@ntNet-Bestimmung (Organ wählbar: Blatt/Nadeln,
+Rinde, ganzer Baum, Blüte, Frucht) oder werden von Hand aus einer Liste von gut 30 mitteleuropäischen
+Waldbaumarten gewählt.
+
+Von selbst übernimmt der Spot einen Baum nur bei einem **eindeutigen** Ergebnis: Der beste Vorschlag von
+Pl@ntNet ist ein Baum, mindestens 50 % sicher und mindestens 15 Prozentpunkte vor dem nächsten. Sonst bleiben
+die Bäume Vorschläge am Foto, jeder mit dem Knopf *… übernehmen*; so erfasst man die richtige Art, auch wenn sie
+nicht an erster Stelle steht. Die Art steht dann mit dem Score von Pl@ntNet beim Spot, falsch erfasste Arten
+lassen sich unter *Baumarten* entfernen. Ein ganzer Baum aus der Ferne ist für Pl@ntNet schwierig (eine Eiche
+im Regen kommt leicht als Robinie heraus); Blätter, Nadeln, Früchte oder Rinde aus der Nähe, mit dem passenden
+Organ bei *Was zeigt das Foto?*, ergeben viel sicherere Bestimmungen. Bei einem unsicheren Ergebnis (unter 50 %)
+sagt die App das unter den Vorschlägen. Zu jeder Art gibt es einen Steckbrief: Nadel/Laub,
 typischer Beginn der Herbstfärbung, Trockenheitsempfindlichkeit, worauf zu achten ist. Die Arten machen die
 Auffälligkeiten genauer:
 

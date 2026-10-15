@@ -68,8 +68,9 @@ mit echten Dateien und Diensten; das steht jeweils als offener Punkt dabei.
   MeteoSchweiz statt ERA5), Gewitterböen (lokal, im Modell kaum sichtbar) aus Warnungen der Wetterdienste.
 - **Licht, Schatten und Wetterkarten**: die DWD-Ebenen gegen den echten Dienst prüfen (Namen, Zeiten des Radars;
   bisher mit Testdaten im Format der Capabilities); ein Radar für die ganze Schweiz (MeteoSchweiz, sobald als
-  offener Dienst verfügbar); Schatten von Wald und Gebäuden aus einem Oberflächenmodell (swissSURFACE3D) statt
-  nur vom Gelände; die Rechnung in einen Web Worker verlegen, damit das Abspielen auch im Gebirge flüssig bleibt.
+  offener Dienst verfügbar); die Schatten von Bäumen und Gebäuden gegen die echten Dateien von geo.admin.ch prüfen
+  (bisher mit Testdaten im Format des STAC-Katalogs und der COGs) und ausserhalb der Schweiz aus einem
+  Kronenhöhenmodell (z. B. Meta/WRI, 1 m).
 - **Vegetationsdichte verfeinern**: Himmel und Vegetation mit einem Segmentierungsmodell statt Farbregeln
   trennen (Schnee, helle Felsen und Mauern gelten heute teils als Himmel); Kennzahlen nur im Bildteil
   vergleichen, den alle Fotos eines Spots abdecken.
@@ -101,6 +102,8 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
   und ausblendbar
 - Video statt Einzelbilder (GoPro mit GPMF, 360°-MP4, GPX), unscharfe Bilder werden ersetzt oder verworfen
 - 360°-Fotos beim Upload erkennen, Panoramen über eine Drehung der Kugel ausrichten und vergleichen
+- Ganze Ordner hochladen (Browser und `scripts/upload-folder.js`), Ort, Blickrichtung und Zeit aus dem Foto oder
+  einer JSON-Beschreibung; API-Schlüssel für Skripte
 - Spots mit gemischten Blickrichtungen auf Wunsch aufteilen
 - Eigener Standort: Browser und App fragen beim Öffnen danach, die Karte beginnt dort; Knopf «Mein Standort»
 - Karte und Spots entlang einer Route offline speichern; Benachrichtigung, wenn ein Upload im Hintergrund
@@ -145,8 +148,9 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 - Frühwarnung als Push-Nachricht an Leute, die den Spot regelmässig besuchen oder ihm folgen
 - Angleichung von Landsat an Sentinel-2 aus den Überlappungsjahren
 - Licht und Schatten auf der Karte: Geländeschatten zur gewählten Zeit, auch von fernen Bergen bei tiefer Sonne,
-  mit weichem Halbschatten; steil besonnte Hänge, Tag, Nacht und Dämmerung; Niederschlagsradar und Warnungen
-  des DWD einblendbar
+  mit weichem Halbschatten; in der Schweiz auch von Bäumen und Gebäuden (swissSURFACE3D − swissALTI3D); steil
+  besonnte Hänge, Tag, Nacht und Dämmerung; Niederschlagsradar und Warnungen des DWD einblendbar; gerechnet in
+  einem Web Worker, damit die Karte beim Abspielen flüssig bleibt
 
 ### Arten und geschützte Funde
 

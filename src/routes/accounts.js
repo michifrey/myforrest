@@ -38,6 +38,11 @@
  * Logged in, POST /api/auth/password/change takes the current and a new
  * password; the account gets a notice by e-mail.
  *
+ * API keys: scripts send `Authorization: Bearer mf_…` instead of the cookie (no CSRF token needed,
+ * a wrong key is a 401). Created in the browser with POST /api/auth/tokens (shown once), listed with
+ * GET and removed with DELETE /api/auth/tokens/:id. A key may do what its account may, except
+ * writes under /api/auth/ (password, address, keys, deleting the account).
+ *
  * Deleting the account: DELETE /api/auth/account with the password (or,
  * without one, the account name) and `photos: 'delete' | 'anonymize'`.
  * GET /api/auth/account tells the dialog what would be affected.
@@ -101,6 +106,17 @@ module.exports = function registerAccounts(app, ctx) {
   /* ---------- Session from the cookie ---------- */
 
   app.use(['/api', '/uploads', '/thumbs'], (req, res, next) => {
+    // Scripts and other programs: an API key in `Authorization: Bearer mf_…` instead of the cookie. Browsers
+    // never send it by themselves, so it needs no CSRF token; a wrong key is an error, not "anonymous".
+    const bearer = /^Bearer\s+(\S+)$/i.exec(req.get('authorization') || '')?.[1];
+    if (bearer) {
+      const key = auth.apiTokenUser(bearer);
+      if (!key) return fail(res, 401, 'API-Schlüssel ungültig oder gelöscht');
+      req.session = null;
+      req.apiTokenId = key.tokenId;
+      req.user = key.user;
+      return next();
+    }
     const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
     req.session = token ? auth.session(token) : null;
     req.user = req.session?.user ?? null;
@@ -131,6 +147,8 @@ module.exports = function registerAccounts(app, ctx) {
     if (SAFE_METHODS.has(req.method)) return next();
     const authRoute = /^\/auth\/(login|register|password\/forgot|password\/reset)$/.test(req.path);
     if ((req.session || authRoute) && crossOrigin(req)) return fail(res, 403, 'Anfrage von fremder Herkunft abgelehnt');
+    // An API key may upload and edit, but not change the account itself (password, address, keys, deleting it).
+    if (req.apiTokenId && /^\/auth\//.test(req.path)) return fail(res, 403, 'Mit einem API-Schlüssel nicht erlaubt – bitte im Browser anmelden');
     if (req.session && !sameString(req.get('x-csrf-token') || '', req.session.csrf)) {
       return fail(res, 403, 'Sicherheitstoken fehlt oder ist abgelaufen – bitte Seite neu laden');
     }
@@ -264,6 +282,32 @@ module.exports = function registerAccounts(app, ctx) {
       defaultLicense: DEFAULT_LICENSE,
       reportReasons: REPORT_REASONS,
     });
+  });
+
+  /* ---------- API keys for scripts (Authorization: Bearer mf_…) ---------- */
+
+  app.get('/api/auth/tokens', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    if (!req.user) return fail(res, 401, 'Bitte zuerst anmelden');
+    res.json({ tokens: auth.apiTokens(req.user.id) });
+  });
+
+  // The key itself is only in this answer; the server keeps its hash.
+  app.post('/api/auth/tokens', (req, res) => {
+    if (!jsonOnly(req, res)) return;
+    if (!req.session) return fail(res, 401, 'Bitte zuerst anmelden');
+    try {
+      const { id, token } = auth.createApiToken(req.user.id, req.body?.name);
+      res.status(201).json({ token, ...auth.apiTokens(req.user.id).find((t) => t.id === id) });
+    } catch (err) {
+      fail(res, 400, err.message);
+    }
+  });
+
+  app.delete('/api/auth/tokens/:id', (req, res) => {
+    if (!req.session) return fail(res, 401, 'Bitte zuerst anmelden');
+    if (!auth.deleteApiToken(req.user.id, Number(req.params.id))) return fail(res, 404, 'API-Schlüssel nicht gefunden');
+    res.status(204).end();
   });
 
   app.post('/api/auth/register', async (req, res, next) => {

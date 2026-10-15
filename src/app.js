@@ -19,6 +19,7 @@ const { createWaynet } = require('./waynet');
 const { LANDSCAPES, ICE_LANDSCAPES, MOUNTAIN_MIN_M, FOREST_ONLY_TAGS, isLandscape, landscapeOf } = require('./landscapes');
 const { parseTrackPoints } = require('./gpx');
 const { readPhotoMeta, imageExtension } = require('./exif');
+const { parseMeta, baseName } = require('./photo-meta');
 const { assignSpot, refreshSpot, backfillSpotHeadings, planSplit, splitSpot, HEADING_TOLERANCE_DEG } = require('./spots');
 const { isHeic, heicExif, heicToJpeg } = require('./heic');
 const { createThumbnails } = require('./thumbs');
@@ -36,6 +37,7 @@ const { assess } = require('./irregularities');
 const { TREES, treeInfo, treeJson } = require('./trees');
 const { createElevation } = require('./elevation');
 const { createDwd } = require('./dwd');
+const { createSurface, MIN_Z: SURFACE_MIN_Z, MAX_Z: SURFACE_MAX_Z } = require('./surface');
 const registerAccounts = require('./routes/accounts');
 const { createOAuth, providersFromEnv } = require('./oauth');
 const { createMailer } = require('./mail');
@@ -56,7 +58,10 @@ const DRIVE_REPEAT_MS = 12 * 3600 * 1000;
 const PANORAMA_MIN_WIDTH = 3000;
 const isPanoramaSize = (w, h) => w >= PANORAMA_MIN_WIDTH && Math.abs(w / h - 2) < 0.02;
 const NEOPHYTE_MIN_SCORE = 0.3;
-const TREE_MIN_SCORE = 0.25;
+// A recognised tree joins the spot's species by itself only when the result is clear: the best candidate at
+// least this sure and this far ahead of the next one. Otherwise it stays a suggestion one can take over.
+const TREE_AUTO_SCORE = 0.5;
+const TREE_AUTO_MARGIN = 0.15;
 
 /**
  * TRUST_PROXY as Express takes it: a number of proxy hops ("1"), "true" for all, or addresses and
@@ -111,6 +116,8 @@ function createApp({
   wildlifeLayer = undefined, wildlifeFetch = fetch,
   // Maps of the Deutscher Wetterdienst over the sun mode (src/dwd.js): fetch for the capabilities.
   dwdFetch = fetch,
+  // Heights of trees and buildings for the shadows on the map (src/surface.js): fetch for geo.admin.ch.
+  surfaceFetch = fetch,
   // Terrain tiles for the 3D map (routes/terrain.js); TERRAIN_URL= (empty) turns the 3D map off.
   terrainUrl = (process.env.TERRAIN_URL ?? require('./routes/terrain').DEFAULT_URL) || null, terrainFetch = fetch,
   // MeteoSwiss precipitation radar for the weather tab (src/routes/radar-ch.js); empty = off.
@@ -129,11 +136,12 @@ function createApp({
   const weather = createWeather({ db, fetchImpl: weatherFetch });
   const elevationService = createElevation({ db, fetchImpl: weatherFetch });
   const dwd = createDwd({ fetchImpl: dwdFetch });
+  const surface = createSurface({ fetchImpl: surfaceFetch });
 
   const upload = multer({
     dest: tmpDir,
-    limits: { fileSize: 40 * 1024 * 1024, files: 201 },
-  }).fields([{ name: 'photos', maxCount: 200 }, { name: 'gpx', maxCount: 1 }]);
+    limits: { fileSize: 40 * 1024 * 1024, files: 202 },
+  }).fields([{ name: 'photos', maxCount: 200 }, { name: 'gpx', maxCount: 1 }, { name: 'meta', maxCount: 1 }]);
 
   const app = express();
   if (trustProxy !== false) app.set('trust proxy', trustProxy);
@@ -701,13 +709,24 @@ function createApp({
   async function handleUpload(req, res) {
     const files = req.files?.photos || [];
     const gpxFile = req.files?.gpx?.[0];
+    const metaFile = req.files?.meta?.[0];
     let status;
     let body;
     try {
-      [status, body] = await processUpload(files, gpxFile, req.body || {}, req);
+      // The description of the photos (myforrest.json): as a file or as a text field.
+      let meta = null;
+      const metaText = metaFile ? await fsp.readFile(metaFile.path, 'utf8') : req.body?.meta;
+      if (metaText) {
+        try {
+          meta = parseMeta(metaText);
+        } catch (err) {
+          return res.status(400).json({ error: err.message });
+        }
+      }
+      [status, body] = await processUpload(files, gpxFile, req.body || {}, req, meta);
     } finally {
-      // Temp files of skipped photos (and the GPX) are removed before answering.
-      await Promise.all([...files, ...(gpxFile ? [gpxFile] : [])].map((f) => fsp.rm(f.path, { force: true })));
+      // Temp files of skipped photos (and the GPX and description) are removed before answering.
+      await Promise.all([...files, gpxFile, metaFile].filter(Boolean).map((f) => fsp.rm(f.path, { force: true })));
     }
     res.status(status).json(body);
   }
@@ -758,7 +777,11 @@ function createApp({
       .get(userId, pos.lat - dLat, pos.lat + dLat, pos.lon - dLon, pos.lon + dLon, takenAt - DRIVE_REPEAT_MS, takenAt + DRIVE_REPEAT_MS));
   }
 
-  async function processUpload(files, gpxFile, b, req) {
+  /**
+   * Stores uploaded photos. `described`: the description of the photos (src/photo-meta.js), per file name the
+   * place, view direction, time, tags, note, activity and landscape; it comes before the EXIF of the photo.
+   */
+  async function processUpload(files, gpxFile, b, req, described = null) {
     if (!files.length) return [400, { error: 'Keine Fotos übermittelt' }];
     const owner = accounts.uploadOwner(req); // uploader and licence
     if (owner.error) return [400, { error: owner.error }];
@@ -805,6 +828,11 @@ function createApp({
     const touchedSpots = new Set();
     const requestsDone = new Set();
     for (const f of files) {
+      const entry = described?.get(baseName(f.originalname)) || null;
+      if (entry?.error) {
+        skipped.push({ name: f.originalname, reason: `Beschreibung: ${entry.error}` });
+        continue;
+      }
       const buf = await fsp.readFile(f.path);
       // iPhone photos (HEIC) are stored as JPEG; their EXIF is read from the original.
       const heic = isHeic(buf);
@@ -814,7 +842,7 @@ function createApp({
         continue;
       }
       const meta = await readPhotoMeta(heic ? heicExif(buf) || buf : buf, offsetMin);
-      let takenAt = meta.takenAt !== null ? meta.takenAt + clockShiftMs : null;
+      let takenAt = entry?.takenAt ?? (meta.takenAt !== null ? meta.takenAt + clockShiftMs : null);
       // An archive picture (a scan of an old photo): its EXIF date is the scan's, the given date counts.
       if (archive) takenAt = fallbackTime;
       if (takenAt === null) takenAt = Number.isFinite(fallbackTime) ? fallbackTime : Date.now();
@@ -822,12 +850,18 @@ function createApp({
       let pos = null;
       let source = null;
       const exifPos = isValidCoord(meta.lat, meta.lon) ? { lat: meta.lat, lon: meta.lon } : null;
+      const given = entry?.lat !== undefined ? { lat: entry.lat, lon: entry.lon } : null;
       if (targetSpot) {
         // Keep the device position when it is plausible, otherwise use the spot centre.
         if (archive) [pos, source] = [{ lat: targetSpot.lat, lon: targetSpot.lon }, 'spot'];
+        else if (given && nearSpot(given)) [pos, source] = [given, 'manual'];
         else if (exifPos && nearSpot(exifPos)) [pos, source] = [exifPos, 'exif'];
         else if (manual && nearSpot(manual)) [pos, source] = [manual, 'spot'];
         else [pos, source] = [{ lat: targetSpot.lat, lon: targetSpot.lon }, 'spot'];
+      } else if (given) {
+        // Described in the upload: comes before the EXIF (it may correct a wrong GPS).
+        pos = given;
+        source = 'manual';
       } else if (exifPos) {
         pos = exifPos;
         source = 'exif';
@@ -860,10 +894,14 @@ function createApp({
       const dims = await sharp(jpeg || buf).metadata().catch(() => ({}));
       const panorama = meta.projection ? meta.projection === 'equirectangular' : isPanoramaSize(dims.width, dims.height);
       // A panorama looks everywhere: its heading (centre of the image) says nothing about which spot it belongs to.
-      const heading = panorama ? (meta.poseHeading ?? meta.heading) : (meta.heading ?? sentHeading);
+      const heading = entry?.heading ?? (panorama ? (meta.poseHeading ?? meta.heading) : (meta.heading ?? sentHeading));
+      const photoActivity = ACTIVITIES.includes(entry?.activity) ? entry.activity : activity;
+      const photoNote = entry?.note ?? note;
+      const photoTags = entry?.tags ? [...new Set([...tags, ...parseTags(entry.tags)])] : tags;
+      const photoLandscape = isLandscape(entry?.landscape) ? entry.landscape : landscape;
       // Drive mode picks its pictures on the device; this catches what still repeats
       // (a second device, a resent queue): one picture per account, place and half day.
-      if (activity === 'fahren' && owner.userId && driveRepeat(owner.userId, pos, takenAt)) {
+      if (photoActivity === 'fahren' && owner.userId && driveRepeat(owner.userId, pos, takenAt)) {
         skipped.push({ name: f.originalname, reason: 'Fahrt: hier gibt es von dir schon ein Bild aus den letzten Stunden' });
         continue;
       }
@@ -878,13 +916,13 @@ function createApp({
                               location_source, activity, note, created_at, panorama, sequence_id)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(spotId, file, f.originalname.slice(0, 255), takenAt, pos.lat, pos.lon, heading, meta.altitude,
-          source, activity, note, Date.now(), panorama ? 1 : 0, sequenceId).lastInsertRowid);
-        setTags(id, tags);
+          source, photoActivity, photoNote, Date.now(), panorama ? 1 : 0, sequenceId).lastInsertRowid);
+        setTags(id, photoTags);
         accounts.stampPhoto(id, owner);
         if (protect) db.prepare("UPDATE photos SET protected = 1, protected_reason = 'upload' WHERE id = ?").run(id);
         if (archive) db.prepare('UPDATE photos SET archive = 1 WHERE id = ?').run(id);
         refreshSpot(db, spotId);
-        classifySpot(spotId, landscape, 'upload');
+        classifySpot(spotId, photoLandscape, 'upload');
         touchedSpots.add(spotId);
         return id;
       });
@@ -1018,6 +1056,22 @@ function createApp({
     res.json(await dwd.layers());
   });
 
+  /** Heights of trees and buildings (swissSURFACE3D − swissALTI3D) as a Terrarium-encoded PNG tile; 204 outside Switzerland. */
+  app.get('/api/surface/:z/:x/:y.png', async (req, res) => {
+    const [z, x, y] = ['z', 'x', 'y'].map((k) => Number(req.params[k]));
+    if (![z, x, y].every(Number.isInteger) || z < SURFACE_MIN_Z || z > SURFACE_MAX_Z || x < 0 || y < 0 || x >= 2 ** z || y >= 2 ** z) {
+      return res.status(400).json({ error: `Zoomstufe ${SURFACE_MIN_Z}–${SURFACE_MAX_Z} und gültige Kachel angeben` });
+    }
+    try {
+      const png = await surface.tile(z, x, y);
+      if (!png) return res.status(204).end();
+      res.set('Cache-Control', 'public, max-age=604800');
+      res.type('png').send(png);
+    } catch (err) {
+      res.status(502).json({ error: err.message });
+    }
+  });
+
   app.get('/api/trees', (req, res) => {
     res.json(TREES.map(treeJson).sort((a, b) => a.name.localeCompare(b.name, 'de')));
   });
@@ -1081,7 +1135,12 @@ function createApp({
     if (!db.prepare('SELECT 1 FROM spots WHERE id = ?').get(id)) return res.status(404).json({ error: 'Spot nicht gefunden' });
     const tree = treeInfo(req.body?.scientificName);
     if (!tree) return res.status(400).json({ error: 'Unbekannte Baumart' });
-    addSpecies.run(id, tree.sci, 'manual', null, null, Date.now());
+    // A suggestion of Pl@ntNet on a photo of this spot, confirmed by hand: kept with its photo and score.
+    const photoId = Number(req.body?.photoId);
+    const suggested = Number.isSafeInteger(photoId) && db.prepare(`SELECT i.score FROM identifications i JOIN photos p ON p.id = i.photo_id
+      WHERE i.photo_id = ? AND p.spot_id = ? AND i.scientific_name = ?`).get(photoId, id, tree.sci);
+    if (suggested) addSpecies.run(id, tree.sci, 'plantnet', photoId, suggested.score, Date.now());
+    else addSpecies.run(id, tree.sci, 'manual', null, null, Date.now());
     reassessSpot(id);
     res.status(201).json(spotSpecies(id));
   });
@@ -1258,10 +1317,12 @@ function createApp({
         if (results.some((r) => sensitiveLists.isSensitive(r.scientificName, canton) && r.score >= NEOPHYTE_MIN_SCORE)) {
           db.prepare("UPDATE photos SET protected = 1, protected_reason = 'art' WHERE id = ? AND protected = 0 AND protected_reason IS NULL").run(id);
         }
-        // Confidently recognised trees join the spot's species inventory.
-        for (const r of results) {
-          const tree = treeInfo(r.scientificName);
-          if (tree && r.score >= TREE_MIN_SCORE) addSpecies.run(photo.spot_id, tree.sci, 'plantnet', id, r.score, Date.now());
+        // A clearly recognised tree joins the spot's species inventory; a doubtful one (a whole tree in the rain,
+        // two similar species) stays a suggestion on the photo.
+        const [best, next] = [...results].sort((a, b) => b.score - a.score);
+        const tree = best && treeInfo(best.scientificName);
+        if (tree && best.score >= TREE_AUTO_SCORE && best.score - (next?.score ?? 0) >= TREE_AUTO_MARGIN) {
+          addSpecies.run(photo.spot_id, tree.sci, 'plantnet', id, best.score, Date.now());
         }
       });
       reassessSpot(photo.spot_id);
