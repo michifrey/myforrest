@@ -11,8 +11,11 @@
  * map as an image between the composite's corners. MCH_RADAR_URL= (empty) turns it off; then
  * the weather tab shows the DWD radar.
  *
- *   GET /api/radar/ch                    { frames: [{ time, url }], bounds, attribution } of the last 2 hours
+ *   GET /api/radar/ch[?hours=1–24]       { frames: [{ time, url }], bounds, attribution } of the last 2 (or given) hours
  *   GET /api/radar/ch/{YYYYMMDDHHMM}.png  the picture of one time (UTC)
+ *
+ * The weather tab plays the last two hours; the sun & weather mode of the big map follows its
+ * clock back over the last day.
  */
 
 const fs = require('node:fs');
@@ -23,8 +26,9 @@ const { wgs84ToLv95, lv95ToWgs84 } = require('../lv95');
 
 const DEFAULT_URL = 'https://data.geo.admin.ch/api/stac/v1/collections/ch.meteoschweiz.ogd-radar-precip';
 const LIST_TTL = 2 * 60000;
-const WINDOW = 2 * 3600000; // frames offered: the last two hours
-const KEEP = 6 * 3600000; // pictures kept on disk
+const WINDOW = 2 * 3600000; // frames offered by default: the last two hours
+const MAX_WINDOW = 24 * 3600000; // at most, for the big map's clock
+const KEEP = 26 * 3600000; // pictures kept on disk
 const MAX_BYTES = 20 * 1024 * 1024;
 const WIDTH = 1400; // px of a picture, ~0.5 km per pixel over Switzerland
 // The composite's grid when a file does not say (MeteoSwiss Cartesian grid, LV95).
@@ -157,7 +161,7 @@ function registerMchRadar(app, { dataDir, url = DEFAULT_URL, fetchImpl = fetch, 
   /** Radar files of the last hours from the STAC collection: time → href. */
   async function files() {
     if (listing && now() - listing.at < LIST_TTL) return listing;
-    const since = new Date(now() - WINDOW - 3600000);
+    const since = new Date(now() - MAX_WINDOW - 3600000);
     // Daily items (and items per file alike): everything from the start of that day on.
     let next = `${url}/items?datetime=${since.toISOString().slice(0, 10)}T00:00:00Z/..&limit=100`;
     const found = new Map();
@@ -172,7 +176,7 @@ function registerMchRadar(app, { dataDir, url = DEFAULT_URL, fetchImpl = fetch, 
             if (t === null || !asset.href) continue;
             const href = new URL(asset.href, next);
             if (href.host !== host || href.protocol !== 'https:') continue; // only files of the open data service
-            if (t > now() - WINDOW - 600000) found.set(t, href.href);
+            if (t > now() - MAX_WINDOW - 600000) found.set(t, href.href);
           }
         }
         next = (body.links || []).find((l) => l.rel === 'next')?.href || null;
@@ -210,7 +214,8 @@ function registerMchRadar(app, { dataDir, url = DEFAULT_URL, fetchImpl = fetch, 
   app.get('/api/radar/ch', async (req, res) => {
     if (!url) return res.status(404).json({ error: 'Kein Radar der MeteoSchweiz eingerichtet' });
     const l = await files();
-    const times = [...l.files.keys()].filter((t) => t >= now() - WINDOW).sort((a, b) => a - b);
+    const hours = Math.max(1, Math.min(24, Number(req.query.hours) || WINDOW / 3600000));
+    const times = [...l.files.keys()].filter((t) => t >= now() - hours * 3600000).sort((a, b) => a - b);
     res.set('Cache-Control', 'no-cache');
     res.json({
       frames: times.map((t) => ({ time: new Date(t).toISOString(), url: `/api/radar/ch/${stamp(t)}.png` })),

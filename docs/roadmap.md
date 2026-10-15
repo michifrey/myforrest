@@ -46,7 +46,7 @@ mit echten Dateien und Diensten; das steht jeweils als offener Punkt dabei.
   nur mit Beispieldateien im selben Format geprüft).
 
 - **Wetter am Spot ausbauen**: das Radar der MeteoSchweiz mit echten Dateien prüfen (gebaut nach der
-  Dokumentation und mit einer nachgebauten Datei im ODIM-Aufbau) und es auch über die grosse Karte legen;
+  Dokumentation und mit einer nachgebauten Datei im ODIM-Aufbau);
   Unwetterwarnungen der MeteoSchweiz; Vorhersage und DWD-Radar mit echten Abfragen im Betrieb prüfen.
 
 ## Phase 3: Automatische Auswertung
@@ -118,7 +118,8 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 - Licht & Wald auf der Spot-Seite: Horizont aus dem Höhenmodell, Sonnenbogen und Sonnenstand, Baumarten in ihrer
   Jahreszeit, Wetter der Stunde (Wolken, Regen, Schneefall, Schneedecke, Glätte), im Stil der Startseite
 - Wetter am Spot: Niederschlagsradar der MeteoSchweiz für die ganze Schweiz (sonst DWD) als Film der letzten zwei
-  Stunden, Vorhersage für 24 Stunden und sieben Tage
+  Stunden, Vorhersage für 24 Stunden und sieben Tage; das Radar der MeteoSchweiz auch über der grossen Karte
+  (*Sonne & Wetter*, folgt der Uhrzeit über die letzten 24 Stunden)
 - Durchgehen wie Street View: Pfeile entlang der Aufnahme und zu Spots in der Nähe, Blickrichtung bleibt beim Schritt
 - Startseite mit wechselnden Landschaften (Wald, Gletscher, Gebirge, Wüste)
 - Weiche Übergänge im Durchgehen: zum Weg drehen, Zoom in Gehrichtung mit Überblendung
