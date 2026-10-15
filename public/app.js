@@ -612,6 +612,7 @@ function selectSideTab(id) {
   try { localStorage.setItem(SIDE_TAB_KEY, id); } catch { /* private mode */ }
   if (id === 'side-tab-map' && state.spot) renderMinimap(state.spot); // Leaflet measures only while shown
   if (id === 'side-tab-light') window.SpotProfile?.render?.();
+  if (id === 'side-tab-weather') window.Forecast?.show?.();
 }
 document.querySelector('.side-tabs').addEventListener('click', (e) => {
   const tab = e.target.closest('[role="tab"]');
@@ -619,11 +620,17 @@ document.querySelector('.side-tabs').addEventListener('click', (e) => {
 });
 document.querySelector('.side-tabs').addEventListener('keydown', (e) => {
   if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
-  const next = document.activeElement.id === 'side-tab-light' ? 'side-tab-map' : 'side-tab-light';
+  const tabs = [...document.querySelectorAll('.side-tabs [role="tab"]')].map((t) => t.id);
+  const i = tabs.indexOf(document.activeElement.id);
+  if (i < 0) return;
+  const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
   selectSideTab(next);
   $(next).focus();
 });
-try { if (localStorage.getItem(SIDE_TAB_KEY) === 'side-tab-map') selectSideTab('side-tab-map'); } catch { /* private mode */ }
+try {
+  const saved = localStorage.getItem(SIDE_TAB_KEY);
+  if (saved && saved !== 'side-tab-light' && $(saved)) selectSideTab(saved);
+} catch { /* private mode */ }
 
 function closeSpot() {
   $('spot').hidden = true;

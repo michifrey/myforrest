@@ -224,7 +224,7 @@ Ein Spot öffnet sich als eigene Seite über der Karte (auf dem Handy statt der 
   Reihenfolge ihrer Nummer, mit dem gewählten Filter („3 / 24“).
 - **Foto und Zeitreise**: das Foto in voller Breite, Zeitregler, Vorschaubilder und *Stabilisiert*; darunter
   *Wiederholungsfoto aufnehmen*, *Vorher / Nachher*, *Durchgehen* und *Neues Foto anfragen*.
-- **Seitenspalte** (bleibt beim Scrollen stehen): oben zwei Tabs, *Licht & Wald* (siehe unten) und *Karte*, eine
+- **Seitenspalte** (bleibt beim Scrollen stehen): oben drei Tabs, *Licht & Wald* und *Wetter* (siehe unten) und *Karte*, eine
   **Minikarte** mit dem Spot (gold) und den Spots in der Nähe in ihrer Befundfarbe; ein Klick auf einen Punkt
   öffnet diesen Spot, *Auf der grossen Karte zeigen* schliesst die Seite und zoomt hin. Der zuletzt gewählte Tab
   bleibt im Browser gespeichert. Darunter Fotos, Zeitraum, Blickrichtung und Lage, Landschaft, Höhe und
@@ -275,6 +275,36 @@ ist die Himmelsrichtung von Nordost über Süd bis Nordwest, die senkrechte die 
 - **Zeit**: *Fototag* nimmt Tag und Uhrzeit des gezeigten Fotos und folgt dem Zeitregler der Zeitreise; *Heute*
   den heutigen Tag und die aktuelle Uhrzeit. Der Regler darunter verschiebt die Uhrzeit. Die Zeile unter der
   Grafik nennt, von wann bis wann die Sonne über dem Grat steht, und den Sonnenstand zur gewählten Zeit.
+
+
+### Wetter am Spot
+
+![Wetter am Spot: Niederschlagsradar, Vorhersage für die nächsten Stunden und sieben Tage](screenshots/wetter-spot.jpg)
+
+Der Tab *Wetter* in der Seitenspalte des Spots:
+
+- **Niederschlagsradar**: eine kleine Karte (Zoom 9, rund 70 km breit) mit dem Spot (gold) und dem Radar. Der
+  Regler wählt eines der Bilder der letzten zwei Stunden im Abstand von 15 Minuten, ▶ spielt sie als Film ab.
+  Die Zeile darunter nennt die Quelle, die Zeit des Bildes und wie alt das neueste ist; ist es älter als drei
+  Stunden, steht das Datum dabei.
+  - **MeteoSchweiz** für Spots in ihrem Radarverbund (die Schweiz mit Rand, 710 × 640 km): die Niederschlagsrate
+    aus den fünf Radaren (Produkt RZC/PRECIP), alle 5 Minuten, aus den offenen Daten der MeteoSchweiz
+    (STAC-Sammlung `ch.meteoschweiz.ogd-radar-precip` bei geo.admin.ch, „Quelle: MeteoSchweiz“). Browser
+    können die HDF5-Dateien nicht lesen: Der Server (`/api/radar/ch`) holt jede Datei einmal, liest sie (ODIM
+    HDF5, 1-km-Raster in LV95, Rohwert × `gain` + `offset` = mm/h), färbt den Regen (ab 0,1 mm/h hellblau über
+    Blau, Grün, Gelb, Orange und Rot bis Violett ab 40 mm/h), glättet zwischen den Zellen und rechnet das Bild in
+    Web Mercator um. Die Bilder bleiben 26 Stunden auf dem Server, die Liste der Dateien zwei Minuten.
+  - **Deutscher Wetterdienst** sonst (`dwd:Niederschlagsradar`, WMS wie bei *Sonne & Wetter*): Deutschland und
+    das Grenzgebiet. Die Bilder lädt der Browser direkt beim DWD. Liefert die MeteoSchweiz gerade keine Bilder,
+    springt der DWD ein.
+- **Vorhersage** (`/api/weather/forecast`, Open-Meteo mit den Modellen der Wetterdienste, in der Schweiz u. a.
+  MeteoSchweiz, für die Höhe des Spots): die nächsten 24 Stunden zum Wischen, je mit Symbol (Tag oder Nacht),
+  Temperatur, Niederschlag als Balken und in mm, Wahrscheinlichkeit ab 10 %, Windrichtung (der Pfeil zeigt,
+  wohin der Wind weht) und -stärke in km/h; Böen ab 60 km/h orange. Darunter sieben Tage mit Symbol,
+  Niederschlag (und Schnee ab 0,5 cm) und dem Bereich von Tiefst- bis Höchsttemperatur auf einer gemeinsamen
+  Skala der Woche. Die Vorhersage wird pro ~10-km-Zelle eine halbe Stunde zwischengespeichert.
+- Die Symbole folgen den WMO-Wettercodes: klar, teils bewölkt, bedeckt, Nebel, Niesel, Regen und Schauer,
+  gefrierender Regen, Schnee und Schneeschauer, Gewitter.
 
 ### Eigener Standort
 
@@ -1069,15 +1099,24 @@ funktioniert die 3D-Karte wie im Browser.
 
 ![Die Umgebung eines Spots in 3D, in seine Blickrichtung](screenshots/karte-3d-spot.jpg)
 
-### DWD-Karten einblenden
+### Wetterkarten einblenden
 
-Unter *DWD-Karte* lässt sich eine Karte des Deutschen Wetterdienstes über die Karte legen (WMS von
-`maps.dwd.de`, frei mit Quellenangabe):
+Unter *Wetterkarte* lässt sich das Radar der MeteoSchweiz oder eine Karte des Deutschen Wetterdienstes über die
+Karte legen:
 
-- **Niederschlagsradar**: das Radarbild zur gewählten Zeit (5-Minuten-Schritte), solange der DWD es noch
+![Niederschlagsradar der MeteoSchweiz über der grossen Karte](screenshots/radar-karte.jpg)
+
+- **Radar MeteoSchweiz**: das Niederschlagsradar für die ganze Schweiz mit Rand (siehe
+  [Wetter am Spot](#wetter-am-spot)), das Bild zur gewählten Zeit, solange es eines gibt (die letzten 24 Stunden
+  in 5-Minuten-Schritten, `GET /api/radar/ch?hours=24`), sonst das neueste; das Panel sagt, welches gezeigt
+  wird. Beim Verschieben der Uhrzeit bleibt das alte Bild stehen, bis das neue geladen ist.
+
+Die Karten des DWD (WMS von `maps.dwd.de`, frei mit Quellenangabe):
+
+- **Niederschlagsradar (DWD)**: das Radarbild zur gewählten Zeit (5-Minuten-Schritte), solange der DWD es noch
   vorhält, sonst das neueste; das Panel sagt, welches gezeigt wird.
-- **Wetterwarnungen**: die aktuellen Warnungen nach Gemeinden.
-- **Waldbrandgefahr**, sobald der DWD eine solche Ebene anbietet.
+- **Wetterwarnungen (DWD)**: die aktuellen Warnungen nach Gemeinden.
+- **Waldbrandgefahr (DWD)**, sobald der DWD eine solche Ebene anbietet.
 
 Welche Ebenen es gibt und für welche Zeiten das Radar Bilder hat, liest der Server einmal pro Stunde aus den
 Capabilities des DWD (`GET /api/dwd/layers`); ist der DWD nicht erreichbar, bietet er Radar und Warnungen

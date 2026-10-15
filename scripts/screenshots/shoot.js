@@ -100,6 +100,11 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await sharp({ create: { width: metas.reduce((w, m) => w + m.width, 0) + 2 * 16, height, channels: 3, background: '#f4f0e4' } })
       .composite(cards.map((input, i) => ({ input, left: metas.slice(0, i).reduce((w, m) => w + m.width + 16, 0), top: 0 })))
       .jpeg({ quality: 82 }).toFile(out('licht-wald-wetter.jpg'));
+    // The weather tab: DWD radar (the demo's rain front) and the forecast.
+    await page.click('#side-tab-weather');
+    await settle(page, 5000);
+    await page.locator('.side-card').screenshot({ path: out('wetter-spot.jpg'), ...jpg });
+    await page.click('#side-tab-light');
     await page.close();
   }
 
@@ -148,6 +153,17 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.evaluate(() => document.activeElement?.blur());
     await page.screenshot({ path: out('licht-schatten.jpg'), ...jpg });
     await page.selectOption('#dwd-layer', '');
+    // The MeteoSwiss radar over the big map, now: the demo's rain front over the forest.
+    await page.click('#sun-today');
+    await page.evaluate(() => { const s = document.querySelector('#sun-slider'); s.value = new Date().getHours() * 60 + new Date().getMinutes(); s.dispatchEvent(new Event('input', { bubbles: true })); });
+    await page.uncheck('#shade-toggle');
+    await page.selectOption('#dwd-layer', 'radar-ch');
+    await page.evaluate(() => map.setView([47.25, 8.45], 9, { animate: false }));
+    await settle(page, 5000);
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.screenshot({ path: out('radar-karte.jpg'), ...jpg });
+    await page.selectOption('#dwd-layer', '');
+    await page.check('#shade-toggle');
     await page.close();
   }
 

@@ -12,6 +12,11 @@ const FORECAST = 'https://api.open-meteo.com/v1/forecast';
 // Rain, snowfall (cm) and snow depth (m) for the weather drawn in a spot's "Licht & Wald".
 const HOURLY = 'precipitation,shortwave_radiation,cloud_cover,temperature_2m,rain,snowfall,snow_depth';
 const FORECAST_DAYS = 15;
+// The spot's weather tab: the next hours and seven days, like a weather app.
+const OUTLOOK_HOURLY = 'temperature_2m,precipitation,precipitation_probability,snowfall,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,is_day';
+const OUTLOOK_DAILY = 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,snowfall_sum,wind_gusts_10m_max,sunshine_duration';
+const OUTLOOK_HOURS = 36;
+const OUTLOOK_TTL = 30 * 60000;
 const DAILY = 'precipitation_sum,temperature_2m_mean,temperature_2m_max,temperature_2m_min';
 // Leaf-out to early summer (~15 April to ~14 June): fresh leaves are frost-tender.
 const LEAF_OUT_FROM = 104;
@@ -201,7 +206,55 @@ function createWeather({ db, fetchImpl = fetch, now = () => Date.now() }) {
     });
   }
 
-  return { context, day };
+  /**
+   * Forecast for a place: the next 36 hours (from the current hour) and the
+   * next seven days, in the place's time zone. Weather codes are WMO codes
+   * as Open-Meteo gives them. Cached for half an hour per ~10 km cell.
+   */
+  async function outlook(lat, lon, { elevation = null } = {}) {
+    const all = await cached(`outlook:${place(lat, lon, elevation)}`, OUTLOOK_TTL, async () => {
+      const url = `${FORECAST}?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}` +
+        (Number.isFinite(elevation) ? `&elevation=${Math.round(elevation)}` : '') +
+        `&hourly=${OUTLOOK_HOURLY}&daily=${OUTLOOK_DAILY}&forecast_days=7&timezone=auto&wind_speed_unit=kmh`;
+      const res = await fetchImpl(url, { signal: AbortSignal.timeout(30000) });
+      if (!res.ok) throw new Error(`Open-Meteo antwortete mit HTTP ${res.status}`);
+      const body = await res.json();
+      const h = body.hourly;
+      const d = body.daily;
+      if (!h?.time || !d?.time) throw new Error('Open-Meteo lieferte keine Vorhersage');
+      const shift = (body.utc_offset_seconds || 0) * 1000;
+      const at = (arr, i) => (Number.isFinite(arr?.[i]) ? arr[i] : null);
+      const hourly = h.time.map((t, i) => ({
+        t: Date.parse(`${t}:00Z`) - shift,
+        temp: at(h.temperature_2m, i),
+        precip: at(h.precipitation, i),
+        prob: at(h.precipitation_probability, i),
+        snowfall: at(h.snowfall, i),
+        code: at(h.weather_code, i),
+        wind: at(h.wind_speed_10m, i),
+        dir: at(h.wind_direction_10m, i),
+        gust: at(h.wind_gusts_10m, i),
+        day: h.is_day ? h.is_day[i] === 1 : null,
+      }));
+      const daily = d.time.map((date, i) => ({
+        date,
+        code: at(d.weather_code, i),
+        tmax: at(d.temperature_2m_max, i),
+        tmin: at(d.temperature_2m_min, i),
+        precip: at(d.precipitation_sum, i),
+        prob: at(d.precipitation_probability_max, i),
+        snowfall: at(d.snowfall_sum, i),
+        gust: at(d.wind_gusts_10m_max, i),
+        sunHours: Number.isFinite(d.sunshine_duration?.[i]) ? Math.round(d.sunshine_duration[i] / 360) / 10 : null,
+      }));
+      return { timezone: body.timezone || null, issued: now(), hourly, daily, source: 'Open-Meteo.com (Wettermodelle der Wetterdienste, u. a. MeteoSchweiz und DWD)' };
+    });
+    // From the current hour on, also when the cached forecast is up to half an hour old.
+    const hour = Math.floor(now() / 3600000) * 3600000;
+    return { ...all, hourly: all.hourly.filter((r) => r.t >= hour).slice(0, OUTLOOK_HOURS) };
+  }
+
+  return { context, day, outlook };
 }
 
 module.exports = { createWeather, doy, climatology };
