@@ -376,6 +376,92 @@
     return dem;
   }
 
+  /* Trees and buildings (Switzerland, from map zoom 16): heights above ground from /api/surface (src/surface.js). */
+  const SURFACE_MIN_ZOOM = 16;
+  const SURFACE_REACH = 300; // m around the view, for the shadows of trees and houses just outside
+  const inSwitzerland = (ll) => ll.lat > 45.8 && ll.lat < 47.85 && ll.lng > 5.9 && ll.lng < 10.55;
+  const surfaceTiles = new Map();
+  let surface = null; // { key, z, gx0, gy0, gw, gh, obj, top, missing, total } or a pending { key, pending }
+
+  /** Heights above ground of one surface tile (256×256), or null outside Switzerland or when unavailable. */
+  function surfaceTile(z, x, y) {
+    const key = `${z}/${x}/${y}`;
+    if (!surfaceTiles.has(key)) {
+      if (surfaceTiles.size > 300) surfaceTiles.delete(surfaceTiles.keys().next().value);
+      surfaceTiles.set(key, (async () => {
+        const res = await fetch(`api/surface/${key}.png`);
+        if (res.status === 204) return null;
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const bmp = await createImageBitmap(await res.blob());
+        const c = document.createElement('canvas');
+        c.width = 256; c.height = 256;
+        const ctx = c.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(bmp, 0, 0);
+        const px = ctx.getImageData(0, 0, 256, 256).data;
+        const out = new Float32Array(65536);
+        for (let i = 0; i < 65536; i++) out[i] = Shade.terrarium(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]);
+        return out;
+      })().catch(() => { surfaceTiles.delete(key); return undefined; }));
+    }
+    return surfaceTiles.get(key);
+  }
+
+  /**
+   * Surface heights (terrain + trees and buildings) for the view and
+   * SURFACE_REACH around it at zoom map zoom − 1, built on the elevation grid
+   * `grid`. Returns the finished grid, or null while it is still loading (a
+   * redraw follows) or when there is none.
+   */
+  function surfaceFor(grid) {
+    const zoom = map.getZoom();
+    const z = Math.min(17, Math.round(zoom) - 1);
+    const s = 2 ** (z - zoom);
+    const b = map.getPixelBounds();
+    const pad = Math.ceil(SURFACE_REACH / Shade.metresPerPixel(map.getCenter().lat, z));
+    const gx0 = Math.floor(b.min.x * s) - pad; const gy0 = Math.floor(b.min.y * s) - pad;
+    const gx1 = Math.ceil(b.max.x * s) + pad; const gy1 = Math.ceil(b.max.y * s) + pad;
+    const key = `${z}/${gx0}/${gy0}/${grid.key}`;
+    if (surface?.key === key) return surface.pending ? null : surface;
+    const tx0 = Math.floor(gx0 / 256); const tx1 = Math.floor((gx1 - 1) / 256);
+    const ty0 = Math.floor(gy0 / 256); const ty1 = Math.floor((gy1 - 1) / 256);
+    const list = [];
+    for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) list.push([tx, ty]);
+    surface = { key, pending: true };
+    Promise.all(list.map(([tx, ty]) => surfaceTile(z, tx, ty))).then((tiles) => {
+      if (surface?.key !== key) return;
+      const gw = gx1 - gx0; const gh = gy1 - gy0;
+      const obj = new Float32Array(gw * gh);
+      let found = 0; let missing = 0; let objectTop = 0;
+      tiles.forEach((tile, k) => {
+        if (tile === undefined) missing++;
+        if (!tile) return;
+        found++;
+        const [tx, ty] = list[k];
+        for (let y = Math.max(0, ty * 256 - gy0); y < Math.min(gh, (ty + 1) * 256 - gy0); y++) {
+          for (let x = Math.max(0, tx * 256 - gx0); x < Math.min(gw, (tx + 1) * 256 - gx0); x++) {
+            const v = tile[(y + gy0 - ty * 256) * 256 + (x + gx0 - tx * 256)];
+            obj[y * gw + x] = v;
+            if (v > objectTop) objectTop = v;
+          }
+        }
+      });
+      if (!found) { surface = { key, none: true, missing, total: tiles.length }; scheduleShade(); return; }
+      // Terrain from the elevation grid (bilinear) plus the objects on it.
+      const f = 2 ** (grid.z - z);
+      const top = new Float32Array(gw * gh);
+      for (let y = 0; y < gh; y++) {
+        const dy = (gy0 + y + 0.5) * f - grid.ty0 * 256 + 0.5;
+        for (let x = 0; x < gw; x++) {
+          const dx = (gx0 + x + 0.5) * f - grid.tx0 * 256 + 0.5;
+          top[y * gw + x] = Shade.bilinear(grid.elev, grid.gw, grid.gh, dx, dy) + obj[y * gw + x];
+        }
+      }
+      surface = { key, z, gx0, gy0, gw, gh, top, objectTop, missing, total: tiles.length };
+      scheduleShade();
+    });
+    return null;
+  }
+
   /** Sun altitude across a w×h grid, computed every `step` cells and interpolated in between. */
   function altitudeGrid(t, w, h, step, latLngAt) {
     const cw = Math.ceil(w / step) + 1; const ch = Math.ceil(h / step) + 1;
@@ -418,8 +504,12 @@
       try { grid = await loadDem(); } catch { grid = null; }
       if (token !== shadeToken || !shadeOn()) return;
     }
-    // Output cells: DEM pixels of the view, or 8 screen pixels for night only.
-    const z = grid ? grid.z : zoom - 3;
+    // Trees and buildings: from map zoom 16 in Switzerland, once their heights are loaded.
+    const wantSurface = Boolean(grid) && zoom >= SURFACE_MIN_ZOOM && inSwitzerland(centre);
+    const surf = wantSurface ? surfaceFor(grid) : null;
+    const objects = surf && !surf.none ? surf : null;
+    // Output cells: surface cells, DEM pixels of the view, or 8 screen pixels for night only.
+    const z = objects ? objects.z : grid ? grid.z : zoom - 3;
     const s = 2 ** (z - zoom);
     const b = map.getPixelBounds();
     const x0 = Math.floor(b.min.x * s); const y0 = Math.floor(b.min.y * s);
@@ -428,11 +518,32 @@
     const altAt = altitudeGrid(t, w, h, grid ? 32 : 8, latLngAt);
     let lit = null;
     if (grid) {
-      lit = Shade.light({
-        elev: grid.elev, gw: grid.gw, gh: grid.gh, cellM: Shade.metresPerPixel(centre.lat, z),
+      // Terrain: on the DEM cells of the view.
+      const sd = 2 ** (grid.z - zoom);
+      const dx0 = Math.floor(b.min.x * sd); const dy0 = Math.floor(b.min.y * sd);
+      const dw = Math.max(1, Math.ceil(b.max.x * sd) - dx0); const dh = Math.max(1, Math.ceil(b.max.y * sd) - dy0);
+      const terrain = Shade.light({
+        elev: grid.elev, gw: grid.gw, gh: grid.gh, cellM: Shade.metresPerPixel(centre.lat, grid.z),
         altitude: sun.altitude, azimuth: sun.azimuth,
-        x0: x0 - grid.tx0 * 256, y0: y0 - grid.ty0 * 256, w, h, far: grid.far,
+        x0: dx0 - grid.tx0 * 256, y0: dy0 - grid.ty0 * 256, w: dw, h: dh, far: grid.far,
       });
+      if (!objects) lit = terrain;
+      else {
+        // Trees and buildings on the finer grid, times the terrain's light there.
+        const sun2 = Shade.objects({
+          top: objects.top, gw: objects.gw, gh: objects.gh, cellM: Shade.metresPerPixel(centre.lat, z),
+          altitude: sun.altitude, azimuth: sun.azimuth, objectTop: objects.objectTop,
+          x0: x0 - objects.gx0, y0: y0 - objects.gy0, w, h,
+        });
+        const f = 2 ** (grid.z - z);
+        lit = new Float32Array(w * h);
+        for (let y = 0; y < h; y++) {
+          const qy = (y0 + y + 0.5) * f - dy0 + 0.5;
+          for (let x = 0; x < w; x++) {
+            lit[y * w + x] = sun2[y * w + x] * Shade.bilinear(terrain, dw, dh, (x0 + x + 0.5) * f - dx0 + 0.5, qy);
+          }
+        }
+      }
     }
     const canvas = document.createElement('canvas');
     canvas.width = w; canvas.height = h;
@@ -470,9 +581,15 @@
     else if (!grid) text = zoom < SHADE_MIN_ZOOM ? 'Tag und Nacht; Schatten von Hügeln und Bergen ab näherem Zoom.' : 'Höhendaten nicht verfügbar, nur Tag und Nacht.';
     else {
       text = ` Schatten von Hügeln und Bergen bei Sonne ${deg(sun.altitude)} aus ${Sun.compass(sun.azimuth)}: ${Math.round((100 * shaded) / (w * h))} % der Karte im Schatten.`
-        + ' Steil besonnte Hänge golden. Höhenmodell ~25 m, ohne Bäume und Gebäude;'
+        + ' Steil besonnte Hänge golden. Gelände aus dem Höhenmodell (~25 m);'
         + ` Berge bis ~${fmtNum((Shade.metresPerPixel(centre.lat, grid.z) * grid.far.scale * 256) / 1000, 0)} km ausserhalb des Ausschnitts zählen mit.`
         + (grid.missing ? ` ${grid.missing} von ${grid.total} Höhenkacheln fehlen.` : '');
+      if (objects) {
+        text += ' Dazu Bäume und Gebäude aus swissSURFACE3D (swisstopo), bis 80 m hoch.'
+          + (objects.missing ? ` ${objects.missing} von ${objects.total} Kacheln fehlen.` : '');
+      } else if (wantSurface && !surf) text += ' Bäume und Gebäude werden geladen …';
+      else if (wantSurface) text += ' Bäume und Gebäude nicht verfügbar.';
+      else if (zoom < SURFACE_MIN_ZOOM && inSwitzerland(centre)) text += ' Bäume und Gebäude ab näherem Zoom.';
     }
     status.hidden = false;
     status.replaceChildren(...(grid && sun.altitude > 0 ? [el('span', { class: 'shade-ramp', 'aria-hidden': 'true' })] : []), text);

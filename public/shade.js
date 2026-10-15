@@ -14,7 +14,8 @@
  * sun is low. The ray stops when it is higher than the highest point of the
  * grids or leaves them. Distant ground sinks with the Earth's curvature
  * (with standard refraction). Slopes facing away from the sun lie in their
- * own shadow.
+ * own shadow. Trees and buildings throw their shadows in a second pass on a
+ * finer grid of the surface (`objects`).
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -29,6 +30,13 @@
   /** How much the ground at distance d (m) sinks below the tangent plane, as seen through the air. */
   const drop = (d) => ((d * d) / (2 * EARTH_R)) * (1 - REFRACTION_K);
   const maxOf = (a) => { let m = -Infinity; for (let i = 0; i < a.length; i++) if (a[i] > m) m = a[i]; return m; };
+
+  /** Value of a grid between the cell centres (bilinear), so shadows follow the terrain instead of the grid; x, y in cells. */
+  function bilinear(e, ew, eh, qx, qy) {
+    const fx = Math.max(0, Math.min(ew - 1.001, qx - 0.5)); const fy = Math.max(0, Math.min(eh - 1.001, qy - 0.5));
+    const i = fx | 0; const j = fy | 0; const u = fx - i; const v = fy - j; const r = j * ew + i;
+    return (e[r] * (1 - u) + e[r + 1] * u) * (1 - v) + (e[r + ew] * (1 - u) + e[r + ew + 1] * u) * v;
+  }
 
   /** Elevation in metres from a Terrarium-encoded pixel. */
   const terrarium = (r, g, b) => r * 256 + g + b / 256 - 32768;
@@ -60,12 +68,6 @@
     const farTop = far ? maxOf(far.elev) : -Infinity;
     const rise = cellM * tanAlt; // the ray climbs this much per cell
     const farCellM = far ? cellM * far.scale : 0;
-    /** Ground between the cell centres (bilinear), so shadows follow the terrain instead of the grid. */
-    const bilinear = (e, ew, eh, qx, qy) => {
-      const fx = Math.max(0, Math.min(ew - 1.001, qx - 0.5)); const fy = Math.max(0, Math.min(eh - 1.001, qy - 0.5));
-      const i = fx | 0; const j = fy | 0; const u = fx - i; const v = fy - j; const r = j * ew + i;
-      return (e[r] * (1 - u) + e[r + 1] * u) * (1 - v) + (e[r + ew] * (1 - u) + e[r + ew + 1] * u) * v;
-    };
     const at = (x, y) => elev[Math.min(gh - 1, Math.max(0, y)) * gw + Math.min(gw - 1, Math.max(0, x))];
     // Half the height over which the ground at distance d hides the sun's disc gradually: sun radius plus half a cell.
     const half = (d, cell) => d * SUN_HALF_TAN + cell * tanAlt * 0.5;
@@ -123,6 +125,66 @@
   }
 
   /**
+   * Shadows of trees and buildings: the part of the sun's disc (0–1) seen
+   * from the top of each cell (canopy, roof or ground) of a fine grid of
+   * surface heights `top` (terrain + objects, m), for the cells
+   * x0 ≤ x < x0 + w, y0 ≤ y < y0 + h. Rays only run as far as the highest
+   * object (`objectTop`, m above the ground) can throw a shadow at this sun
+   * (at most `maxReach` m): the terrain's own shadows come from `light`.
+   */
+  function objects({ top, gw, gh, cellM, altitude, azimuth, objectTop, x0 = 0, y0 = 0, w = gw, h = gh, maxReach = 400 }) {
+    const out = new Float32Array(w * h);
+    if (altitude <= 0) return out;
+    out.fill(1);
+    if (!(objectTop > 0)) return out;
+    const tanAlt = Math.tan(altitude * RAD);
+    const sx = Math.sin(azimuth * RAD);
+    const sy = -Math.cos(azimuth * RAD);
+    const rise = cellM * tanAlt;
+    const steps = Math.min(Math.ceil(maxReach / cellM), Math.ceil(objectTop / rise) + 1);
+    const hwMax = steps * cellM * SUN_HALF_TAN + rise * 0.5;
+    // Highest surface in blocks of 16 cells, widened by the rays' reach: a ray needs no more steps than it
+    // takes to climb above everything around it.
+    const B = 16; const bw = Math.ceil(gw / B); const bh = Math.ceil(gh / B);
+    const blockMax = new Float32Array(bw * bh).fill(-Infinity);
+    for (let y = 0; y < gh; y++) {
+      for (let x = 0; x < gw; x++) {
+        const k = ((y / B) | 0) * bw + ((x / B) | 0);
+        if (top[y * gw + x] > blockMax[k]) blockMax[k] = top[y * gw + x];
+      }
+    }
+    const rb = Math.ceil(steps / B);
+    const near = new Float32Array(bw * bh).fill(-Infinity);
+    for (let by = 0; by < bh; by++) {
+      for (let bx = 0; bx < bw; bx++) {
+        let m = -Infinity;
+        for (let y = Math.max(0, by - rb); y <= Math.min(bh - 1, by + rb); y++) {
+          for (let x = Math.max(0, bx - rb); x <= Math.min(bw - 1, bx + rb); x++) if (blockMax[y * bw + x] > m) m = blockMax[y * bw + x];
+        }
+        near[by * bw + bx] = m;
+      }
+    }
+    for (let j = 0; j < h; j++) {
+      const y = y0 + j;
+      for (let i = 0; i < w; i++) {
+        const x = x0 + i;
+        let sun = 1;
+        let px = x + 0.5; let py = y + 0.5; let ray = top[y * gw + x];
+        const own = Math.min(steps, Math.ceil((near[((y / B) | 0) * bw + ((x / B) | 0)] - ray + hwMax) / rise));
+        for (let k = 1; k <= own; k++) {
+          px += sx; py += sy; ray += rise;
+          if (px < 0 || py < 0 || px >= gw || py >= gh) break;
+          const hw = k * cellM * SUN_HALF_TAN + rise * 0.5;
+          const f = 0.5 - (bilinear(top, gw, gh, px, py) - ray) / (2 * hw);
+          if (f < sun) { sun = f < 0 ? 0 : f; if (sun === 0) break; }
+        }
+        out[j * w + i] = sun;
+      }
+    }
+    return out;
+  }
+
+  /**
    * Darkening for the map (0 = clear … 1 = black) from the sun's altitude at
    * a place: none by day, growing through civil and nautical twilight, full
    * night below −12°.
@@ -134,5 +196,5 @@
     return x * x * (3 - 2 * x);
   }
 
-  return { terrarium, metresPerPixel, light, night };
+  return { terrarium, metresPerPixel, bilinear, light, objects, night };
 }));

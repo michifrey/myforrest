@@ -151,6 +151,22 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.close();
   }
 
+  if (want('baumschatten')) {
+    // Zoomed in on the village and the forest edge: houses and trees throw their shadows (heights from swissSURFACE3D).
+    const page = await explore(ctx);
+    await page.click('#sun-toggle');
+    await settle(page, 1500);
+    await page.fill('#sun-date', '2026-10-09');
+    await page.dispatchEvent('#sun-date', 'change');
+    await page.evaluate(() => map.setView([47.3705, 8.5585], 16));
+    await page.evaluate(() => { const s = document.querySelector('#sun-slider'); s.value = 16 * 60 + 40; s.dispatchEvent(new Event('input', { bubbles: true })); });
+    await page.waitForFunction(() => /swissSURFACE3D/.test(document.querySelector('#shade-status').textContent), null, { timeout: 90000 });
+    await settle(page, 2000);
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.screenshot({ path: out('baumschatten.jpg'), ...jpg });
+    await page.close();
+  }
+
   if (want('species')) {
     const page = await explore(ctx);
     await page.click('#species-toggle');

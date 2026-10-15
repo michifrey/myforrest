@@ -971,6 +971,10 @@ der gewählten Zeit über die ganze Karte, nicht nur über den Spot:
   ebenso Hänge, die von der Sonne abgewandt sind; Hänge, auf die die Sonne steil fällt, leuchten leicht golden.
   Das Panel nennt Sonnenhöhe, Richtung und den Anteil der Karte im Schatten. Mit *Abspielen* wandern die
   Schatten durch den Tag.
+- **Bäume und Gebäude** (ab Zoomstufe 16, in der Schweiz): Waldränder, einzelne Bäume und Häuser werfen ihre
+  Schatten, auf die Wiese, die Strasse oder in die Lichtung. Kronen und Dächer selbst liegen in der Sonne, solange
+  nichts Höheres davor steht. Beim ersten Mal an einem Ort dauert das Laden einige Sekunden, das Panel sagt
+  *Bäume und Gebäude werden geladen …*.
 - **Tag und Nacht**: wo die Sonne unter dem Horizont steht, wird die Karte dunkelblau, mit weichem Übergang
   durch die bürgerliche und nautische Dämmerung (bis −12°). Weit herausgezoomt sieht man so die
   Tag-Nacht-Grenze über Europa wandern.
@@ -982,8 +986,21 @@ fein für den Ausschnitt und eine Kachel Rand, dazu viermal gröber für die wei
 ferne Grate und Berge ihre langen Schatten, wenn die Sonne tief steht: bei Zoomstufe 13 Gelände bis etwa
 50 km ausserhalb des Ausschnitts, bei 15 etwa 13 km; das Panel nennt die Reichweite. Weit entferntes Gelände
 sinkt mit der Erdkrümmung (samt Lichtbrechung) ab. Der Rand eines Schattens ist weich: Er verläuft über die
-Breite der Sonnenscheibe (0,53°), der Halbschatten ist bei fernen Bergen breiter als bei nahen. Bäume und
-Gebäude sind nicht im Höhenmodell; den Schatten eines einzelnen Baums zeigt weiterhin die Linie am Spot.
+Breite der Sonnenscheibe (0,53°), der Halbschatten ist bei fernen Bergen breiter als bei nahen.
+
+Für Bäume und Gebäude zieht der Server das Geländemodell
+[swissALTI3D](https://www.swisstopo.admin.ch/de/hoehenmodell-swissalti3d) vom Oberflächenmodell
+[swissSURFACE3D Raster](https://www.swisstopo.admin.ch/de/hoehenmodell-swisssurface3d-raster) ab (swisstopo,
+frei, 0,5 m): Was übrig bleibt, ist die Höhe von Kronen und Dächern über dem Boden (bis 80 m; höher sind Krane
+und Masten). Die Dateien liegen als Cloud Optimized GeoTIFF in km-Kacheln im STAC-Katalog von geo.admin.ch;
+der Server liest nur den nötigen Teil, hält die Höhen pro km-Kachel auf 1 m im Speicher und gibt sie der Karte
+als Kacheln (`GET /api/surface/{z}/{x}/{y}.png`, wie die Höhenkacheln codiert). Im Browser läuft für jede Zelle
+von ~3 m (Zoomstufe 16) bzw. ~1,6 m (17) ein zweiter, kurzer Strahl über Gelände plus Bäume und Häuser, so weit
+der höchste Baum bei dieser Sonne einen Schatten werfen kann (höchstens 400 m); 300 m um den Ausschnitt zählen
+mit. Ausserhalb der Schweiz gibt es kein solches Modell; dort bleibt es beim Geländeschatten und der Linie des
+25-m-Baums am Spot.
+
+![Bäume und Häuser werfen ihre Schatten: Dorfrand, Waldrand und Lichtung am Nachmittag](screenshots/baumschatten.jpg)
 
 ### 3D-Karte
 

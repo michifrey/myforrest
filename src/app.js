@@ -36,6 +36,7 @@ const { assess } = require('./irregularities');
 const { TREES, treeInfo, treeJson } = require('./trees');
 const { createElevation } = require('./elevation');
 const { createDwd } = require('./dwd');
+const { createSurface, MIN_Z: SURFACE_MIN_Z, MAX_Z: SURFACE_MAX_Z } = require('./surface');
 const registerAccounts = require('./routes/accounts');
 const { createOAuth, providersFromEnv } = require('./oauth');
 const { createMailer } = require('./mail');
@@ -111,6 +112,8 @@ function createApp({
   wildlifeLayer = undefined, wildlifeFetch = fetch,
   // Maps of the Deutscher Wetterdienst over the sun mode (src/dwd.js): fetch for the capabilities.
   dwdFetch = fetch,
+  // Heights of trees and buildings for the shadows on the map (src/surface.js): fetch for geo.admin.ch.
+  surfaceFetch = fetch,
   // Terrain tiles for the 3D map (routes/terrain.js); TERRAIN_URL= (empty) turns the 3D map off.
   terrainUrl = (process.env.TERRAIN_URL ?? require('./routes/terrain').DEFAULT_URL) || null, terrainFetch = fetch,
   // Reverse proxies whose X-Forwarded-For counts (Express 'trust proxy'), so rate limits see the client's
@@ -127,6 +130,7 @@ function createApp({
   const weather = createWeather({ db, fetchImpl: weatherFetch });
   const elevationService = createElevation({ db, fetchImpl: weatherFetch });
   const dwd = createDwd({ fetchImpl: dwdFetch });
+  const surface = createSurface({ fetchImpl: surfaceFetch });
 
   const upload = multer({
     dest: tmpDir,
@@ -1000,6 +1004,22 @@ function createApp({
   app.get('/api/dwd/layers', async (req, res) => {
     res.set('Cache-Control', 'public, max-age=300');
     res.json(await dwd.layers());
+  });
+
+  /** Heights of trees and buildings (swissSURFACE3D − swissALTI3D) as a Terrarium-encoded PNG tile; 204 outside Switzerland. */
+  app.get('/api/surface/:z/:x/:y.png', async (req, res) => {
+    const [z, x, y] = ['z', 'x', 'y'].map((k) => Number(req.params[k]));
+    if (![z, x, y].every(Number.isInteger) || z < SURFACE_MIN_Z || z > SURFACE_MAX_Z || x < 0 || y < 0 || x >= 2 ** z || y >= 2 ** z) {
+      return res.status(400).json({ error: `Zoomstufe ${SURFACE_MIN_Z}–${SURFACE_MAX_Z} und gültige Kachel angeben` });
+    }
+    try {
+      const png = await surface.tile(z, x, y);
+      if (!png) return res.status(204).end();
+      res.set('Cache-Control', 'public, max-age=604800');
+      res.type('png').send(png);
+    } catch (err) {
+      res.status(502).json({ error: err.message });
+    }
   });
 
   app.get('/api/trees', (req, res) => {
