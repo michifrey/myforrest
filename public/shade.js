@@ -185,6 +185,28 @@
   }
 
   /**
+   * One picture's light (as `light`): the terrain on the DEM cells of the
+   * view (`terrain`: x0, y0, w, h, cellM in `dem`), and, with a surface grid
+   * (`surf`, `objects`: x0, y0, w, h, cellM, objectTop, f = DEM cells per
+   * surface cell, dx0/dy0 = the terrain window's corner in surface cells × f),
+   * trees and buildings on the finer grid times the terrain's light there.
+   * Runs in the worker (shade-worker.js) or, without one, on the page.
+   */
+  function frame({ dem, surf = null, altitude, azimuth, terrain, objects: o = null }) {
+    const t = light({ elev: dem.elev, gw: dem.gw, gh: dem.gh, far: dem.far, altitude, azimuth, ...terrain });
+    if (!surf || !o) return t;
+    const sun = objects({ top: surf.top, gw: surf.gw, gh: surf.gh, altitude, azimuth, cellM: o.cellM, objectTop: o.objectTop, x0: o.x0, y0: o.y0, w: o.w, h: o.h });
+    const out = new Float32Array(o.w * o.h);
+    for (let y = 0; y < o.h; y++) {
+      const qy = (o.gy + y + 0.5) * o.f - o.dy0 + 0.5;
+      for (let x = 0; x < o.w; x++) {
+        out[y * o.w + x] = sun[y * o.w + x] * bilinear(t, terrain.w, terrain.h, (o.gx + x + 0.5) * o.f - o.dx0 + 0.5, qy);
+      }
+    }
+    return out;
+  }
+
+  /**
    * Darkening for the map (0 = clear … 1 = black) from the sun's altitude at
    * a place: none by day, growing through civil and nautical twilight, full
    * night below −12°.
@@ -196,5 +218,5 @@
     return x * x * (3 - 2 * x);
   }
 
-  return { terrarium, metresPerPixel, bilinear, light, objects, night };
+  return { terrarium, metresPerPixel, bilinear, light, objects, frame, night };
 }));

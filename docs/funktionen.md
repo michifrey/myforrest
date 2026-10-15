@@ -1000,6 +1000,12 @@ der höchste Baum bei dieser Sonne einen Schatten werfen kann (höchstens 400 m)
 mit. Ausserhalb der Schweiz gibt es kein solches Modell; dort bleibt es beim Geländeschatten und der Linie des
 25-m-Baums am Spot.
 
+Die Rechnung läuft in einem Web Worker (`public/shade-worker.js`) neben der Seite: Die Karte bleibt beim
+Verschieben und beim *Abspielen* flüssig, auch im Gebirge und nah herangezoomt mit Bäumen und Häusern. Die
+Höhenraster gehen pro Ausschnitt einmal an den Worker, danach pro Bild nur Sonnenstand und Ausschnitt. Ist
+die Rechnung langsamer als das Abspielen, zeigt die Karte jeweils das neueste fertige Bild und lässt
+dazwischen liegende aus. Kann der Browser keinen Worker starten, rechnet die Seite selbst.
+
 ![Bäume und Häuser werfen ihre Schatten: Dorfrand, Waldrand und Lichtung am Nachmittag](screenshots/baumschatten.jpg)
 
 ### 3D-Karte

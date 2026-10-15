@@ -66,8 +66,7 @@ mit echten Dateien und Diensten; das steht jeweils als offener Punkt dabei.
   bisher mit Testdaten im Format der Capabilities); ein Radar für die ganze Schweiz (MeteoSchweiz, sobald als
   offener Dienst verfügbar); die Schatten von Bäumen und Gebäuden gegen die echten Dateien von geo.admin.ch prüfen
   (bisher mit Testdaten im Format des STAC-Katalogs und der COGs) und ausserhalb der Schweiz aus einem
-  Kronenhöhenmodell (z. B. Meta/WRI, 1 m); die Rechnung in einen Web Worker verlegen, damit das Abspielen auch im
-  Gebirge und nah herangezoomt flüssig bleibt.
+  Kronenhöhenmodell (z. B. Meta/WRI, 1 m).
 - **Vegetationsdichte verfeinern**: Himmel und Vegetation mit einem Segmentierungsmodell statt Farbregeln
   trennen (Schnee, helle Felsen und Mauern gelten heute teils als Himmel); Kennzahlen nur im Bildteil
   vergleichen, den alle Fotos eines Spots abdecken.
@@ -142,7 +141,8 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 - Angleichung von Landsat an Sentinel-2 aus den Überlappungsjahren
 - Licht und Schatten auf der Karte: Geländeschatten zur gewählten Zeit, auch von fernen Bergen bei tiefer Sonne,
   mit weichem Halbschatten; in der Schweiz auch von Bäumen und Gebäuden (swissSURFACE3D − swissALTI3D); steil
-  besonnte Hänge, Tag, Nacht und Dämmerung; Niederschlagsradar und Warnungen des DWD einblendbar
+  besonnte Hänge, Tag, Nacht und Dämmerung; Niederschlagsradar und Warnungen des DWD einblendbar; gerechnet in
+  einem Web Worker, damit die Karte beim Abspielen flüssig bleibt
 
 ### Arten und geschützte Funde
 

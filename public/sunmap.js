@@ -298,6 +298,8 @@
   map.createPane('dwd').style.zIndex = 250;
   let shadeOverlay = null;
   let shadeToken = 0;
+  let shadeUrl = null; // object URL of the picture shown
+  let shownToken = 0; // token of the picture shown
   let shadeFrame = 0;
   let dem = null; // fine grid of the view ({ z, tx0, ty0, gw, gh, elev }) with `far`, the coarse surroundings
   const demTiles = new Map();
@@ -363,16 +365,17 @@
     const z = Math.min(13, Math.round(map.getZoom()) - 2);
     const zc = Math.max(3, z - 2);
     const key = `${map.getPixelBounds().min}:${map.getZoom()}`;
-    if (dem?.key === key) return dem;
+    if (dem?.key === `dem:${key}`) return dem;
     const [fine, coarse] = await Promise.all([loadGrid(z, 1), loadGrid(zc, 1)]);
     const scale = 2 ** (z - zc);
     dem = {
       ...fine,
-      key,
+      key: `dem:${key}`,
       far: { elev: coarse.elev, gw: coarse.gw, gh: coarse.gh, scale, ox: (fine.tx0 * 256) / scale - coarse.tx0 * 256, oy: (fine.ty0 * 256) / scale - coarse.ty0 * 256 },
       missing: fine.missing + coarse.missing,
       total: fine.total + coarse.total,
     };
+    dem.shared = { elev: dem.elev, gw: dem.gw, gh: dem.gh, far: dem.far };
     return dem;
   }
 
@@ -456,7 +459,7 @@
           top[y * gw + x] = Shade.bilinear(grid.elev, grid.gw, grid.gh, dx, dy) + obj[y * gw + x];
         }
       }
-      surface = { key, z, gx0, gy0, gw, gh, top, objectTop, missing, total: tiles.length };
+      surface = { key, z, gx0, gy0, gw, gh, top, objectTop, missing, total: tiles.length, shared: { top, gw, gh } };
       scheduleShade();
     });
     return null;
@@ -481,6 +484,61 @@
     };
   }
 
+  /*
+   * The pictures are computed in a worker (shade-worker.js), one at a time: while one is running, only the
+   * newest request waits, older ones are dropped (the day keeps playing). Without workers, on the page.
+   */
+  let shadeWorker = null;
+  try { shadeWorker = new Worker('shade-worker.js'); } catch { shadeWorker = null; }
+  const sentGrids = new Set();
+  let frameId = 0;
+  const pendingFrames = new Map();
+  shadeWorker?.addEventListener('message', ({ data }) => {
+    const p = pendingFrames.get(data.id);
+    pendingFrames.delete(data.id);
+    if (p) (data.error ? p.reject(new Error(data.error)) : p.resolve(data.lit));
+  });
+  shadeWorker?.addEventListener('error', () => {
+    // E.g. blocked by the browser: compute on the page from now on.
+    shadeWorker = null;
+    for (const p of pendingFrames.values()) p.reject(new Error('Worker nicht verfügbar'));
+    pendingFrames.clear();
+  });
+  let running = null; // the frame in the worker
+  let waiting = null; // the newest frame asked for meanwhile
+  function computeFrame(dem, surf, job) {
+    if (!shadeWorker) return Promise.resolve(Shade.frame({ ...job, dem, surf }));
+    const send = (task) => {
+      if (!shadeWorker) { task.resolve(Shade.frame({ ...job, dem, surf })); return; }
+      for (const g of [dem, surf]) {
+        if (g && !sentGrids.has(g.key)) {
+          shadeWorker.postMessage({ type: 'grid', key: g.key, grid: g.shared });
+          sentGrids.add(g.key);
+          if (sentGrids.size > 4) sentGrids.delete(sentGrids.values().next().value);
+        }
+      }
+      const id = ++frameId;
+      pendingFrames.set(id, task);
+      shadeWorker.postMessage({ type: 'frame', id, dem: dem.key, surf: surf?.key, job });
+    };
+    return new Promise((resolve, reject) => {
+      const task = { resolve, reject };
+      const settle = (fn) => (v) => {
+        fn(v);
+        running = null;
+        if (waiting) { const next = waiting; waiting = null; running = next; next.start(); }
+      };
+      task.start = () => send({ resolve: settle(resolve), reject: settle(reject) });
+      if (running) {
+        waiting?.reject(new Error('überholt'));
+        waiting = task;
+      } else {
+        running = task;
+        task.start();
+      }
+    });
+  }
+
   const scheduleShade = () => {
     if (shadeFrame) return;
     shadeFrame = requestAnimationFrame(() => { shadeFrame = 0; drawShade(); });
@@ -491,6 +549,8 @@
     if (!shadeOn() || !sm.date) {
       shadeOverlay?.remove();
       shadeOverlay = null;
+      if (shadeUrl) URL.revokeObjectURL(shadeUrl);
+      shadeUrl = null;
       status.hidden = true;
       return;
     }
@@ -518,32 +578,25 @@
     const altAt = altitudeGrid(t, w, h, grid ? 32 : 8, latLngAt);
     let lit = null;
     if (grid) {
-      // Terrain: on the DEM cells of the view.
+      // Terrain on the DEM cells of the view; trees and buildings on the finer grid, times the terrain's light.
       const sd = 2 ** (grid.z - zoom);
       const dx0 = Math.floor(b.min.x * sd); const dy0 = Math.floor(b.min.y * sd);
       const dw = Math.max(1, Math.ceil(b.max.x * sd) - dx0); const dh = Math.max(1, Math.ceil(b.max.y * sd) - dy0);
-      const terrain = Shade.light({
-        elev: grid.elev, gw: grid.gw, gh: grid.gh, cellM: Shade.metresPerPixel(centre.lat, grid.z),
+      const job = {
         altitude: sun.altitude, azimuth: sun.azimuth,
-        x0: dx0 - grid.tx0 * 256, y0: dy0 - grid.ty0 * 256, w: dw, h: dh, far: grid.far,
-      });
-      if (!objects) lit = terrain;
-      else {
-        // Trees and buildings on the finer grid, times the terrain's light there.
-        const sun2 = Shade.objects({
-          top: objects.top, gw: objects.gw, gh: objects.gh, cellM: Shade.metresPerPixel(centre.lat, z),
-          altitude: sun.altitude, azimuth: sun.azimuth, objectTop: objects.objectTop,
-          x0: x0 - objects.gx0, y0: y0 - objects.gy0, w, h,
-        });
-        const f = 2 ** (grid.z - z);
-        lit = new Float32Array(w * h);
-        for (let y = 0; y < h; y++) {
-          const qy = (y0 + y + 0.5) * f - dy0 + 0.5;
-          for (let x = 0; x < w; x++) {
-            lit[y * w + x] = sun2[y * w + x] * Shade.bilinear(terrain, dw, dh, (x0 + x + 0.5) * f - dx0 + 0.5, qy);
-          }
-        }
+        terrain: { x0: dx0 - grid.tx0 * 256, y0: dy0 - grid.ty0 * 256, w: dw, h: dh, cellM: Shade.metresPerPixel(centre.lat, grid.z) },
+        objects: objects ? {
+          x0: x0 - objects.gx0, y0: y0 - objects.gy0, w, h, cellM: Shade.metresPerPixel(centre.lat, z), objectTop: objects.objectTop,
+          f: 2 ** (grid.z - z), gx: x0, gy: y0, dx0, dy0,
+        } : null,
+      };
+      try {
+        lit = await computeFrame(grid, objects, job);
+      } catch {
+        return; // overtaken by a newer picture
       }
+      // While the day plays, newer pictures are already asked for: show this one unless a newer one is on screen.
+      if (token < shownToken || !shadeOn()) return;
     }
     const canvas = document.createElement('canvas');
     canvas.width = w; canvas.height = h;
@@ -570,7 +623,12 @@
     }
     ctx.putImageData(img, 0, 0);
     const bounds = L.latLngBounds(latLngAt(0, 0), latLngAt(w, h));
-    const url = canvas.toDataURL();
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve));
+    if (token < shownToken || !shadeOn() || !blob) return;
+    shownToken = token;
+    const url = URL.createObjectURL(blob);
+    if (shadeUrl) URL.revokeObjectURL(shadeUrl);
+    shadeUrl = url;
     if (shadeOverlay) shadeOverlay.setUrl(url).setBounds(bounds);
     else shadeOverlay = L.imageOverlay(url, bounds, { pane: 'sunshade', interactive: false }).addTo(map);
 

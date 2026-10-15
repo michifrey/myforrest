@@ -113,7 +113,8 @@ render.yaml          Blueprint für Render: Docker-Dienst mit Disk, Deploy bei j
 docs/                Dokumentation; docs/screenshots/ enthält die Bilder für das README
 mkdocs.yml           Doku-Website aus docs/ (MkDocs Material), gebaut und veröffentlicht von .github/workflows/docs.yml
 public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet die Landschaften der Startseite (Wald, Gletscher, Gebirge, Wüste) und wechselt sie,
-                     sun.js berechnet Sonnenstand und Einstrahlung, shade.js Gelände- und Nachtschatten,
+                     sun.js berechnet Sonnenstand und Einstrahlung, shade.js Gelände-, Baum- und Nachtschatten
+                     (in shade-worker.js neben der Seite gerechnet),
                      sunmap.js den Kartenmodus „Sonne & Wetter“ (mit Licht und Schatten und DWD-Karten),
                      hotspots.js den Kartenmodus „Arten & Neophyten“,
                      tours.js den Kartenmodus „Touren & Aufträge“ (Route zeichnen, aufzeichnen, importieren, Fotoaufträge),
