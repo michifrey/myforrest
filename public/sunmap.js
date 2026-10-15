@@ -773,7 +773,7 @@
     const when = (v) => new Date(v).toLocaleString('de-CH', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
     let text;
     if (layer.id === 'radar') {
-      text = time ? `Radarbild von ${clock(Date.parse(time))}.`
+      text = time ? `${Date.parse(time) > Date.now() ? 'Radarprognose für' : 'Radarbild von'} ${clock(Date.parse(time))}.`
         : `Neuestes Radarbild – für die gewählte Zeit hat der DWD keines${layer.from ? ` (vorhanden ${when(layer.from)} bis ${when(layer.to)})` : ''}.`;
     } else if (layer.id === 'warnungen') text = 'Aktuelle Warnungen, unabhängig von der gewählten Zeit.';
     else text = 'Aktuelle Karte des DWD.';

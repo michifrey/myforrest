@@ -12,10 +12,16 @@
 const WMS = 'https://maps.dwd.de/geoserver/dwd/wms';
 const TTL = 3600000;
 
-/** Layers offered, in this order: exact name or a pattern for names DWD may change. */
+/**
+ * Layers offered, in this order: exact name or a pattern for names DWD may change. On the workspace endpoint
+ * (/geoserver/dwd/wms) GeoServer lists the names without the workspace (`Niederschlagsradar`), on the global one
+ * with it (`dwd:Niederschlagsradar`); both are accepted, and the map asks for the name as listed.
+ * `Niederschlagsradar` is DWD's alias for its current radar product (RV, 1 km, every 5 minutes, with a forecast of
+ * up to 2 hours); its time dimension reads like `2026-10-02T12:30:00.000Z/2026-10-03T12:30:00.000Z/PT5M`.
+ */
 const WANTED = [
-  { id: 'radar', match: /^dwd:Niederschlagsradar$/, title: 'Niederschlagsradar', fallback: 'dwd:Niederschlagsradar', timed: true },
-  { id: 'warnungen', match: /^dwd:Warnungen_Gemeinden$/, title: 'Wetterwarnungen', fallback: 'dwd:Warnungen_Gemeinden' },
+  { id: 'radar', match: /^(dwd:)?Niederschlagsradar$/, title: 'Niederschlagsradar', fallback: 'dwd:Niederschlagsradar', timed: true },
+  { id: 'warnungen', match: /^(dwd:)?Warnungen_Gemeinden$/, title: 'Wetterwarnungen', fallback: 'dwd:Warnungen_Gemeinden' },
   { id: 'waldbrand', match: /waldbrand/i, title: 'Waldbrandgefahr' },
 ];
 

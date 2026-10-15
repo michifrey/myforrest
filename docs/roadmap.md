@@ -66,9 +66,8 @@ mit echten Dateien und Diensten; das steht jeweils als offener Punkt dabei.
   des laufenden Jahres aus den Sofortmeldern.
 - **Stürme genauer**: auch die vergangenen Stürme aus feiner aufgelösten Daten (Stationsmessungen von
   MeteoSchweiz statt ERA5), Gewitterböen (lokal, im Modell kaum sichtbar) aus Warnungen der Wetterdienste.
-- **Licht, Schatten und Wetterkarten**: die DWD-Ebenen gegen den echten Dienst prüfen (Namen, Zeiten des Radars;
-  bisher mit Testdaten im Format der Capabilities); ein Radar für die ganze Schweiz (MeteoSchweiz, sobald als
-  offener Dienst verfügbar); die Schatten von Bäumen und Gebäuden gegen die echten Dateien von geo.admin.ch prüfen
+- **Licht, Schatten und Wetterkarten**: die DWD-Karten einmal im Betrieb ansehen (Namen und Zeitformat sind
+  mit den veröffentlichten Capabilities abgeglichen, aber noch nicht live abgerufen); die Schatten von Bäumen und Gebäuden gegen die echten Dateien von geo.admin.ch prüfen
   (bisher mit Testdaten im Format des STAC-Katalogs und der COGs); die Gebäude aus OpenStreetMap mit einer echten
   Overpass-Instanz im Betrieb prüfen (bisher mit Testdaten im Format der Overpass-Antwort).
 - **Vegetationsdichte verfeinern**: Himmel und Vegetation mit einem Segmentierungsmodell statt Farbregeln

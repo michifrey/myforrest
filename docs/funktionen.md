@@ -1129,13 +1129,17 @@ Karte legen:
 Die Karten des DWD (WMS von `maps.dwd.de`, frei mit Quellenangabe):
 
 - **Niederschlagsradar (DWD)**: das Radarbild zur gewählten Zeit (5-Minuten-Schritte), solange der DWD es noch
-  vorhält, sonst das neueste; das Panel sagt, welches gezeigt wird.
+  vorhält (rund 24 Stunden), sonst das neueste. Die Ebene `Niederschlagsradar` ist beim DWD ein Alias auf sein
+  jeweils aktuelles Radarprodukt (heute RV, 1 km) und reicht bis 2 Stunden in die Zukunft: dann zeigt die Karte
+  die Radarprognose, und das Panel sagt es.
 - **Wetterwarnungen (DWD)**: die aktuellen Warnungen nach Gemeinden.
-- **Waldbrandgefahr (DWD)**, sobald der DWD eine solche Ebene anbietet.
+- **Waldbrandgefahr (DWD)**, sobald der DWD eine solche Ebene im WMS anbietet (heute gibt er den
+  Waldbrandgefahrenindex nur als ArcGIS-Dienst heraus).
 
 Welche Ebenen es gibt und für welche Zeiten das Radar Bilder hat, liest der Server einmal pro Stunde aus den
-Capabilities des DWD (`GET /api/dwd/layers`); ist der DWD nicht erreichbar, bietet er Radar und Warnungen
-trotzdem an. Die Bilder lädt der Browser direkt vom DWD. Die Karten decken Deutschland und das Grenzgebiet
+Capabilities des DWD (`GET /api/dwd/layers`); die Namen nimmt er so, wie der DWD sie dort nennt (mit oder ohne
+`dwd:` davor). Ist der DWD nicht erreichbar, bietet er Radar und Warnungen trotzdem an, dann ohne Zeiten (immer
+das neueste Bild). Die Bilder lädt der Browser direkt vom DWD. Die Karten decken Deutschland und das Grenzgebiet
 ab, in der Nordschweiz also meist noch das Radar.
 
 ![Licht und Schatten am Abend: der Hügel wirft seinen Schatten nach Osten, darüber ein Regenband im Radar](screenshots/licht-schatten.jpg)

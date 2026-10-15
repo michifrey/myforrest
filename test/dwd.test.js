@@ -25,6 +25,22 @@ test('capabilities: layers, titles and time ranges', () => {
   assert.equal(timeRange('current'), null);
 });
 
+test('workspace endpoint: names without "dwd:", times with milliseconds and a forecast', async () => {
+  // As GeoServer lists them on /geoserver/dwd/wms (a virtual service): no workspace prefix.
+  const caps = `<WMS_Capabilities version="1.3.0"><Capability><Layer><Title>DWD</Title>
+    <Layer queryable="1" opaque="0"><Name>Niederschlagsradar</Name><Title>Niederschlagsradar</Title>
+      <Abstract>Niederschlagsradar und -vorhersage, Alias für RV-Produkt (Auflösung 1km), 5 minütig, mm/h</Abstract>
+      <Dimension name="time" default="current" units="ISO8601">2026-10-14T12:30:00.000Z/2026-10-15T14:30:00.000Z/PT5M</Dimension></Layer>
+    <Layer><Name>Warnungen_Gemeinden</Name><Title>Warnungen Gemeinden</Title></Layer>
+    <Layer><Name>Warnungen_Gemeinden_vereinigt</Name><Title>Warnungen vereinigt</Title></Layer>
+  </Layer></Capability></WMS_Capabilities>`;
+  const dwd = createDwd({ fetchImpl: async () => new Response(caps) });
+  const r = await dwd.layers();
+  assert.equal(r.error, undefined);
+  assert.deepEqual(r.layers.map((l) => [l.id, l.name]), [['radar', 'Niederschlagsradar'], ['warnungen', 'Warnungen_Gemeinden']]);
+  assert.deepEqual([r.layers[0].from, r.layers[0].to, r.layers[0].stepMin], [Date.UTC(2026, 9, 14, 12, 30), Date.UTC(2026, 9, 15, 14, 30), 5]);
+});
+
 test('offered layers, cached for an hour, with a fallback when DWD is down', async () => {
   let calls = 0; let t = 0;
   const dwd = createDwd({ fetchImpl: async () => { calls++; return new Response(CAPS); }, now: () => t });
