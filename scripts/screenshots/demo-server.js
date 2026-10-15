@@ -61,6 +61,12 @@ function daily(d, lat) {
   return { tm, tx: tm + 5 + hash(`x${d}`) * 3, tn: tm - 5 - hash(`n${d}`) * 2, p };
 }
 
+// Days with drawn weather for "Licht & Wald": a snowy winter morning and a rainy November day.
+const WEATHER_DAYS = {
+  '2026-02-10': { temp: (h) => -3 + h * 0.08, precip: (h) => (h >= 5 && h <= 17 ? 0.5 : 0), cloud: 96, depth: 0.28 },
+  '2025-11-21': { temp: (h) => 5 + Math.sin(((h - 6) / 18) * Math.PI) * 2, precip: (h) => (h >= 6 && h <= 20 ? 1.8 : 0), cloud: 100, depth: 0 },
+};
+
 const STORMS = { '2022-02-17': [118, 255], '2022-02-18': [92, 265], '2026-02-24': [101, 245], '2023-07-24': [84, 240], '2018-01-03': [129, 260] };
 
 function elevation(lat, lon) {
@@ -123,12 +129,20 @@ async function weatherFetch(url) {
           const solar = Math.max(0, Math.cos(((h - 13) / dayLen) * Math.PI));
           const cloud = Math.round(Math.min(100, Math.max(0, cloudy * 100 + Math.sin(h / 3 + cloudy * 9) * 25)));
           const calm = cloudy < 0.25;
+          const special = WEATHER_DAYS[d];
+          const temp = special ? Math.round(special.temp(h) * 10) / 10 : Math.round((w.tn + (w.tx - w.tn) * Math.max(0, Math.sin(((h - 6) / 18) * Math.PI))) * 10) / 10;
+          const precip = special ? special.precip(h) : w.p && h >= 14 && h <= 18 ? Math.round((w.p / 5) * 10) / 10 : 0;
+          const cover = special ? special.cloud : cloud;
+          const winter = /-(12|01|02)-/.test(d);
           rows.push({
-            temperature_2m: Math.round((w.tn + (w.tx - w.tn) * Math.max(0, Math.sin(((h - 6) / 18) * Math.PI))) * 10) / 10,
+            temperature_2m: temp,
             wind_speed_10m: calm && (h < 8 || h > 19) ? 0.7 : Math.round((2 + hash(`v${d}${h}`) * 5) * 10) / 10,
-            cloud_cover: cloud,
-            shortwave_radiation: Math.round(peak * solar * (1 - (cloud / 100) * 0.7)),
-            precipitation: w.p && h >= 14 && h <= 18 ? Math.round((w.p / 5) * 10) / 10 : 0,
+            cloud_cover: cover,
+            shortwave_radiation: Math.round(peak * solar * (1 - (cover / 100) * 0.7)),
+            precipitation: precip,
+            rain: temp > 0.5 ? precip : 0,
+            snowfall: temp <= 0.5 ? Math.round(precip * 0.7 * 100) / 100 : 0,
+            snow_depth: special ? special.depth : winter && w.tm < 2 ? 0.06 : 0,
           });
         }
       }

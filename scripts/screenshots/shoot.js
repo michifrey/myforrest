@@ -87,6 +87,19 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.click('#side-tab-light');
     await settle(page, 2500);
     await page.locator('.side-card').screenshot({ path: out('licht-wald.jpg'), ...jpg });
+    // Weather in "Licht & Wald": the demo's rainy November day and snowy February morning, beside the autumn photo.
+    const sharp = require('sharp');
+    const cards = [await page.locator('.side-card').screenshot()];
+    for (const iso of ['2025-11-21T11:00', '2026-02-10T09:30']) {
+      await page.evaluate((t) => SpotProfile.show(new Date(t).getTime()), iso);
+      await settle(page, 2500);
+      cards.push(await page.locator('.side-card').screenshot());
+    }
+    const metas = await Promise.all(cards.map((c) => sharp(c).metadata()));
+    const height = Math.max(...metas.map((m) => m.height));
+    await sharp({ create: { width: metas.reduce((w, m) => w + m.width, 0) + 2 * 16, height, channels: 3, background: '#f4f0e4' } })
+      .composite(cards.map((input, i) => ({ input, left: metas.slice(0, i).reduce((w, m) => w + m.width + 16, 0), top: 0 })))
+      .jpeg({ quality: 82 }).toFile(out('licht-wald-wetter.jpg'));
     await page.close();
   }
 

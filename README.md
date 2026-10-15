@@ -118,6 +118,13 @@ Sonnenstand beim Foto. Im Vordergrund stehen die Baumarten des Spots in ihrer Ja
 Herbstfärbung, Laubfall, kahl), mit dem Beginn der Färbung, der für diesen Ort erwartet wird. Mit *Heute* und
 dem Zeitregler lässt sich jeder Moment des Tages ansehen.
 
+<p align="center"><img src="docs/screenshots/licht-wald-wetter.jpg" width="100%" alt="Licht und Wald bei Regen im Herbst, Regen im November und Schneefall mit Schneedecke im Februar"></p>
+
+Auch das **Wetter** der Stunde ist eingezeichnet (Open-Meteo, Messung oder für heute die Vorhersage): Wolken
+grauen den Himmel und verdecken die Sonne, Regen fällt schräg, Schnee in Flocken, eine Schneedecke färbt den
+Boden weiss und bepudert die Nadelbäume. Bei **Glätte** glänzt der Boden eisig, und die Zeile darunter nennt
+sie: Glatteis (Regen bei Frost), Schneeglätte oder überfrierende Nässe nach Niederschlag.
+
 Unter dem Bild lassen sich pro Foto Beobachtungen taggen und eine Notiz erfassen. Jedes Foto nennt
 Urheber und Lizenz und lässt sich melden. Mit einem Pl@ntNet-Key bestimmt *Art bestimmen* die Pflanzen
 auf dem Foto und erkennt invasive Neophyten.

@@ -43,3 +43,39 @@ test('leaves come out later uphill, robinia late', () => {
   const out = Profile.leafOutDoy(buche, 400);
   assert.equal(Profile.season(buche, out + 2, 400).label, 'Austrieb');
 });
+
+/** An hourly day as /api/weather/day returns it, from 00:00 UTC. */
+const dayOf = (rows) => ({ source: 'archive', hourly: rows.map((r, h) => ({ t: Date.UTC(2026, 1, 10, h), precip: 0, cloud: 50, temp: 5, rain: 0, snowfall: 0, snowDepth: 0, ...r })) });
+const at = (h) => Date.UTC(2026, 1, 10, h, 30);
+
+test('weather at a moment: rain, snow, snow on the ground', () => {
+  const rainy = dayOf(Array.from({ length: 24 }, () => ({ precip: 1.8, rain: 1.8, cloud: 100 })));
+  assert.deepEqual(Profile.weatherAt(rainy, at(10)), { temp: 5, cloud: 100, rain: 1.8, snowfall: 0, snowDepth: 0, falling: 'regen', ice: null });
+
+  const snowy = dayOf(Array.from({ length: 24 }, () => ({ temp: -2, precip: 0.5, snowfall: 0.35, snowDepth: 28 })));
+  const w = Profile.weatherAt(snowy, at(9));
+  assert.equal(w.falling, 'schnee');
+  assert.equal(w.snowDepth, 28);
+  assert.equal(w.ice, 'Schneeglätte');
+
+  // Outside the day there is no weather to draw.
+  assert.equal(Profile.weatherAt(snowy, Date.UTC(2026, 1, 12, 9)), null);
+  assert.equal(Profile.weatherAt({ source: null, hourly: [] }, at(9)), null);
+});
+
+test('slippery: freezing rain, wet roads freezing over', () => {
+  const freezing = dayOf(Array.from({ length: 24 }, () => ({ temp: -1, precip: 1, rain: 1 })));
+  assert.equal(Profile.weatherAt(freezing, at(8)).ice, 'Glatteis');
+  // Rain in the evening, frost at night: überfrierende Nässe.
+  const rows = Array.from({ length: 24 }, (_, h) => (h < 18 ? { temp: 3, precip: h >= 15 ? 1 : 0, rain: h >= 15 ? 1 : 0 } : { temp: -0.5 }));
+  assert.equal(Profile.weatherAt(dayOf(rows), at(20)).ice, 'überfrierende Nässe');
+  assert.equal(Profile.weatherAt(dayOf(rows), at(12)).ice, null);
+});
+
+test('without separate rain and snowfall the temperature splits the precipitation', () => {
+  const old = (temp) => ({ source: 'archive', hourly: Array.from({ length: 24 }, (_, h) => ({ t: Date.UTC(2026, 1, 10, h), precip: 1, cloud: 90, temp })) });
+  assert.equal(Profile.weatherAt(old(-1), at(10)).falling, 'schnee');
+  assert.equal(Profile.weatherAt(old(1.2), at(10)).falling, 'schneeregen');
+  assert.equal(Profile.weatherAt(old(6), at(10)).falling, 'regen');
+  assert.equal(Profile.weatherAt(old(6), at(10)).snowDepth, null, 'no snow depth is invented');
+});

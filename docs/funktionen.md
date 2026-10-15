@@ -231,6 +231,21 @@ ist die Himmelsrichtung von Nordost über Süd bis Nordwest, die senkrechte die 
   ab dem für den Spot erwarteten Tag (Höhe, Exposition und Kaltluft, wie unter den Baumarten angezeigt),
   *Laubfall* zwei Wochen später, danach *kahl*. Lärchen werden golden und verlieren dann die Nadeln. Ohne
   erfasste Arten steht im Wald ein Mischwald als Platzhalter, und die Zeile darunter sagt es.
+- **Wetter** der gewählten Stunde aus `/api/weather/day` (Open-Meteo: ERA5 für vergangene Tage, die Vorhersage
+  für die letzten Tage und die nächsten zwei Wochen; ausserhalb davon kein Wetter, die Zeile sagt es):
+  - *Wolken*: Der Himmel wird mit der Bewölkung grau, ab 25 % ziehen Wolkenbänke, die Sonne wird blasser.
+  - *Regen* (mm/h) als schräge Striche, der Boden nass und dunkler; *Schneefall* (cm/h) als Flocken;
+    *Schneeregen*, wenn beides fällt. Ohne getrennte Werte (ältere Daten) teilt die Temperatur den Niederschlag:
+    Schnee bis 0,5 °C, Regen ab 2 °C, dazwischen Schneeregen.
+  - *Schneedecke* ab 1 cm: Boden und Bänder werden weiss, Nadelbäume bepudert.
+  - *Glätte*: Glatteis bei Regen und höchstens 0 °C, Schneeglätte bei Schnee am Boden oder Schneefall bis 1 °C,
+    überfrierende Nässe bei Frost nach Niederschlag in den letzten sechs Stunden. Der Boden bekommt einen eisigen
+    Glanz, die Zeile nennt die Art.
+  - Darunter stehen Temperatur, Niederschlag oder Bewölkung, Schneehöhe und Glätte; bei Vorhersagen mit
+    *(Vorhersage)*.
+
+  ![Licht und Wald bei Regen im Herbst, Regen im November und Schneefall mit Schneedecke im Februar](screenshots/licht-wald-wetter.jpg)
+
 - **Zeit**: *Fototag* nimmt Tag und Uhrzeit des gezeigten Fotos und folgt dem Zeitregler der Zeitreise; *Heute*
   den heutigen Tag und die aktuelle Uhrzeit. Der Regler darunter verschiebt die Uhrzeit. Die Zeile unter der
   Grafik nennt, von wann bis wann die Sonne über dem Grat steht, und den Sonnenstand zur gewählten Zeit.
