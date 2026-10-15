@@ -1027,9 +1027,9 @@ der gewählten Zeit über die ganze Karte, nicht nur über den Spot:
   ebenso Hänge, die von der Sonne abgewandt sind; Hänge, auf die die Sonne steil fällt, leuchten leicht golden.
   Das Panel nennt Sonnenhöhe, Richtung und den Anteil der Karte im Schatten. Mit *Abspielen* wandern die
   Schatten durch den Tag.
-- **Bäume und Gebäude** (ab Zoomstufe 16, in der Schweiz): Waldränder, einzelne Bäume und Häuser werfen ihre
+- **Bäume und Gebäude** (ab Zoomstufe 16): Waldränder, einzelne Bäume und Häuser werfen ihre
   Schatten, auf die Wiese, die Strasse oder in die Lichtung. Kronen und Dächer selbst liegen in der Sonne, solange
-  nichts Höheres davor steht. Beim ersten Mal an einem Ort dauert das Laden einige Sekunden, das Panel sagt
+  nichts Höheres davor steht. Ausserhalb der Schweiz nur Bäume (siehe unten). Beim ersten Mal an einem Ort dauert das Laden einige Sekunden, das Panel sagt
   *Bäume und Gebäude werden geladen …*.
 - **Tag und Nacht**: wo die Sonne unter dem Horizont steht, wird die Karte dunkelblau, mit weichem Übergang
   durch die bürgerliche und nautische Dämmerung (bis −12°). Weit herausgezoomt sieht man so die
@@ -1053,8 +1053,15 @@ der Server liest nur den nötigen Teil, hält die Höhen pro km-Kachel auf 1 m i
 als Kacheln (`GET /api/surface/{z}/{x}/{y}.png`, wie die Höhenkacheln codiert). Im Browser läuft für jede Zelle
 von ~3 m (Zoomstufe 16) bzw. ~1,6 m (17) ein zweiter, kurzer Strahl über Gelände plus Bäume und Häuser, so weit
 der höchste Baum bei dieser Sonne einen Schatten werfen kann (höchstens 400 m); 300 m um den Ausschnitt zählen
-mit. Ausserhalb der Schweiz gibt es kein solches Modell; dort bleibt es beim Geländeschatten und der Linie des
-25-m-Baums am Spot.
+mit.
+
+Ausserhalb der Schweiz (und wo swisstopo keine Daten hat) nimmt der Server die Höhen der Baumkronen aus der
+[Kronenhöhenkarte von Meta](https://registry.opendata.aws/dataforgood-fb-forests/) (CHM v2, mit DINOv3 aus
+Satellitenbildern geschätzt, 1,2 m, weltweit, CC BY 4.0, AWS Open Data). Sie liegt als Cloud Optimized GeoTIFF
+in Kacheln vor, je eine pro Web-Mercator-Kachel der Zoomstufe 10 (nach ihrem Quadkey benannt), mit Übersichten;
+die volle Auflösung entspricht der Zoomstufe 17 der Karte, also ist jede Kartenkachel ein Fenster einer Datei.
+Gebäude fehlen darin, und die Höhen sind geschätzt (Meta nennt einige Meter Fehler); das Panel nennt die Quelle.
+An der Landesgrenze mischt der Server beide pro Pixel.
 
 Die Rechnung läuft in einem Web Worker (`public/shade-worker.js`) neben der Seite: Die Karte bleibt beim
 Verschieben und beim *Abspielen* flüssig, auch im Gebirge und nah herangezoomt mit Bäumen und Häusern. Die

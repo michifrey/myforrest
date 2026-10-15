@@ -1056,17 +1056,18 @@ function createApp({
     res.json(await dwd.layers());
   });
 
-  /** Heights of trees and buildings (swissSURFACE3D − swissALTI3D) as a Terrarium-encoded PNG tile; 204 outside Switzerland. */
+  /** Heights of trees and buildings (swissSURFACE3D − swissALTI3D; elsewhere Meta's canopy heights) as a Terrarium-encoded PNG tile; 204 without data. */
   app.get('/api/surface/:z/:x/:y.png', async (req, res) => {
     const [z, x, y] = ['z', 'x', 'y'].map((k) => Number(req.params[k]));
     if (![z, x, y].every(Number.isInteger) || z < SURFACE_MIN_Z || z > SURFACE_MAX_Z || x < 0 || y < 0 || x >= 2 ** z || y >= 2 ** z) {
       return res.status(400).json({ error: `Zoomstufe ${SURFACE_MIN_Z}–${SURFACE_MAX_Z} und gültige Kachel angeben` });
     }
     try {
-      const png = await surface.tile(z, x, y);
-      if (!png) return res.status(204).end();
+      const t = await surface.tile(z, x, y);
+      if (!t) return res.status(204).end();
       res.set('Cache-Control', 'public, max-age=604800');
-      res.type('png').send(png);
+      res.set('X-Surface-Source', t.source);
+      res.type('png').send(t.png);
     } catch (err) {
       res.status(502).json({ error: err.message });
     }
