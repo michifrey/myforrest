@@ -127,7 +127,8 @@ sie: Glatteis (Regen bei Frost), Schneeglätte oder überfrierende Nässe nach N
 
 Unter dem Bild lassen sich pro Foto Beobachtungen taggen und eine Notiz erfassen. Jedes Foto nennt
 Urheber und Lizenz und lässt sich melden. Mit einem Pl@ntNet-Key bestimmt *Art bestimmen* die Pflanzen
-auf dem Foto und erkennt invasive Neophyten.
+auf dem Foto und erkennt invasive Neophyten. Bäume übernimmt der Spot nur bei einem eindeutigen Ergebnis von
+selbst; sonst übernimmt man die richtige Art aus den Vorschlägen.
 
 ### 3. Vorher / Nachher mit Veränderungs-Heatmap
 

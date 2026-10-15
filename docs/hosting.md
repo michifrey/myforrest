@@ -203,7 +203,9 @@ nicht.
 1. Im [Dashboard von Render](https://dashboard.render.com) **New → Blueprint** wählen.
 2. GitHub verbinden (falls noch nicht geschehen) und das Repository **myforrest** auswählen. Render findet
    `render.yaml` und zeigt den Dienst `myforrest` mit Disk an.
-3. Die Felder `ADMIN_EMAIL` und `SMTP_URL` ausfüllen oder leer lassen, dann **Apply** (bzw. *Deploy Blueprint*).
+3. Die Felder `ADMIN_EMAIL`, `SMTP_URL` und `PLANTNET_API_KEY` ausfüllen oder leer lassen, dann **Apply** (bzw.
+   *Deploy Blueprint*). Ohne `PLANTNET_API_KEY` (kostenlos bei [my.plantnet.org](https://my.plantnet.org)) gibt es
+   keine Pflanzenbestimmung; der Key lässt sich auch später im Dienst unter **Environment** setzen.
 4. Der erste Build dauert einige Minuten. Danach ist MyForrest unter `https://myforrest-….onrender.com`
    erreichbar (die Adresse steht oben im Dienst). Diese Adresse übernimmt MyForrest selbst als `PUBLIC_URL`
    (aus `RENDER_EXTERNAL_URL`).

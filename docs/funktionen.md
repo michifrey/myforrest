@@ -1443,16 +1443,25 @@ speichert nichts davon.
 
 ### Pflanzenbestimmung (optional)
 
-Mit einem kostenlosen [Pl@ntNet](https://my.plantnet.org)-API-Key
-werden Pflanzen auf einem Foto bestimmt. Bekannte invasive Neophyten wie Drüsiges Springkraut,
+Mit einem kostenlosen [Pl@ntNet](https://my.plantnet.org)-API-Key (`PLANTNET_API_KEY`; ohne ihn fehlt der
+Knopf *Art bestimmen*) werden Pflanzen auf einem Foto bestimmt. Bekannte invasive Neophyten wie Drüsiges Springkraut,
 Japanischer Staudenknöterich, Goldruten oder Götterbaum werden erkannt, und das Foto erhält
 automatisch den Tag *Neophyt*.
 
 ### Baumarten
 
-Jeder Spot führt einen Artenbestand. Arten kommen automatisch aus der Pl@ntNet-Bestimmung
-(Organ wählbar: Blatt/Nadeln, Rinde, ganzer Baum, Blüte, Frucht) oder werden von Hand aus einer
-Liste von gut 30 mitteleuropäischen Waldbaumarten gewählt. Zu jeder Art gibt es einen Steckbrief: Nadel/Laub,
+Jeder Spot führt einen Artenbestand. Arten kommen aus der Pl@ntNet-Bestimmung (Organ wählbar: Blatt/Nadeln,
+Rinde, ganzer Baum, Blüte, Frucht) oder werden von Hand aus einer Liste von gut 30 mitteleuropäischen
+Waldbaumarten gewählt.
+
+Von selbst übernimmt der Spot einen Baum nur bei einem **eindeutigen** Ergebnis: Der beste Vorschlag von
+Pl@ntNet ist ein Baum, mindestens 50 % sicher und mindestens 15 Prozentpunkte vor dem nächsten. Sonst bleiben
+die Bäume Vorschläge am Foto, jeder mit dem Knopf *… übernehmen*; so erfasst man die richtige Art, auch wenn sie
+nicht an erster Stelle steht. Die Art steht dann mit dem Score von Pl@ntNet beim Spot, falsch erfasste Arten
+lassen sich unter *Baumarten* entfernen. Ein ganzer Baum aus der Ferne ist für Pl@ntNet schwierig (eine Eiche
+im Regen kommt leicht als Robinie heraus); Blätter, Nadeln, Früchte oder Rinde aus der Nähe, mit dem passenden
+Organ bei *Was zeigt das Foto?*, ergeben viel sicherere Bestimmungen. Bei einem unsicheren Ergebnis (unter 50 %)
+sagt die App das unter den Vorschlägen. Zu jeder Art gibt es einen Steckbrief: Nadel/Laub,
 typischer Beginn der Herbstfärbung, Trockenheitsempfindlichkeit, worauf zu achten ist. Die Arten machen die
 Auffälligkeiten genauer:
 
