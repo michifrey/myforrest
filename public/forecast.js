@@ -59,7 +59,23 @@
     return out;
   }
 
-  const pure = { wmoLabel, iconKind, radarFrames };
+  /**
+   * From the MeteoSwiss frames (every 5 minutes, oldest first) up to `count`
+   * frames `stepMin` minutes apart, ending with the newest.
+   */
+  function pickFrames(frames, { count = 9, stepMin = 15 } = {}) {
+    if (!frames?.length) return [];
+    const newest = Date.parse(frames[frames.length - 1].time);
+    const out = [];
+    for (let i = count - 1; i >= 0; i--) {
+      const want = newest - i * stepMin * 60000;
+      const hit = frames.find((f) => Math.abs(Date.parse(f.time) - want) < 150000);
+      if (hit && !out.includes(hit)) out.push(hit);
+    }
+    return out;
+  }
+
+  const pure = { wmoLabel, iconKind, radarFrames, pickFrames };
   if (typeof document === 'undefined' || typeof window === 'undefined' || !window.L) return pure;
 
   /* ---------- Icons ---------- */
@@ -96,6 +112,7 @@
   if (!$('side-pane-weather')) return pure;
   const forecasts = new Map(); // "lat,lon" → forecast (or a promise of it)
   let dwd = null; // /api/dwd/layers, once
+  let source = null; // which radar is shown: 'ch' (MeteoSwiss) or 'dwd'
   let radarMap = null;
   let radarLayers = [];
   let radarFramesNow = [];
@@ -121,6 +138,17 @@
     radarMap.setView([spot.lat, spot.lon], 9, { animate: false });
     spotDot?.remove();
     spotDot = L.circleMarker([spot.lat, spot.lon], { radius: 6, weight: 2.5, className: 'mini-dot current', interactive: false }).addTo(radarMap);
+    // MeteoSwiss for the whole of Switzerland when the spot lies in its composite, else the DWD radar.
+    if (state.config.radarCh) {
+      const ch = await api('/api/radar/ch').catch((err) => ({ frames: [], error: err.message }));
+      const [[s, w], [n, e]] = ch.bounds || [[0, 0], [0, 0]];
+      const inside = spot.lat > s + 0.3 && spot.lat < n - 0.3 && spot.lon > w + 0.3 && spot.lon < e - 0.3;
+      const frames = pickFrames(ch.frames);
+      if (inside && frames.length) return showLayers('ch', frames.map((f) => f.time), () => frames.map((f) => L.imageOverlay(f.url, ch.bounds, {
+        opacity: 0, pane: 'radar', interactive: false, className: 'radar-img',
+        attribution: '© <a href="https://www.meteoschweiz.admin.ch/">MeteoSchweiz</a>',
+      })));
+    }
     if (!dwd) dwd = await api('/api/dwd/layers').catch((err) => ({ layers: [], error: err.message }));
     const layer = dwd.layers?.find((l) => l.id === 'radar');
     if (!layer) {
@@ -129,13 +157,19 @@
       return;
     }
     const frames = radarFrames(layer);
-    if (radarLayers.length && frames.join() === radarFramesNow.join()) return showFrame(Number($('radar-time').value));
-    for (const l of radarLayers) l.remove();
-    radarFramesNow = frames;
-    radarLayers = frames.map((time) => L.tileLayer.wms(dwd.url, {
+    return showLayers('dwd', frames, () => frames.map((time) => L.tileLayer.wms(dwd.url, {
       layers: layer.name, format: 'image/png', transparent: true, version: '1.3.0', opacity: 0, pane: 'radar',
       attribution: `© <a href="https://www.dwd.de/">${dwd.attribution}</a>`, ...(time ? { time } : {}),
-    }).addTo(radarMap));
+    })));
+  }
+
+  /** Puts the layers of `frames` (made by `make`, all preloaded and hidden) on the radar map and shows the newest. */
+  function showLayers(kind, frames, make) {
+    if (source === kind && radarLayers.length && frames.join() === radarFramesNow.join()) return showFrame(Number($('radar-time').value));
+    for (const l of radarLayers) l.remove();
+    source = kind;
+    radarFramesNow = frames;
+    radarLayers = make().map((l) => l.addTo(radarMap));
     $('radar-time').max = String(frames.length - 1);
     $('radar-time').value = String(frames.length - 1);
     $('radar-bar').hidden = frames.length < 2;
@@ -151,7 +185,9 @@
     const when = age === null ? '' : age > 180
       ? ` vom ${new Date(Date.parse(time)).toLocaleString('de-CH', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}`
       : ` von ${clock(Date.parse(time))}${i === radarFramesNow.length - 1 ? ` (vor ${age} min)` : ''}`;
-    $('radar-note').textContent = `Niederschlagsradar${when} · Deutschland und Grenzgebiet, © Deutscher Wetterdienst`;
+    $('radar-note').textContent = source === 'ch'
+      ? `Niederschlagsradar${when} · Quelle: MeteoSchweiz`
+      : `Niederschlagsradar${when} · Deutschland und Grenzgebiet, © Deutscher Wetterdienst`;
   }
 
   function stopPlay() {

@@ -257,12 +257,20 @@ ist die Himmelsrichtung von Nordost über Süd bis Nordwest, die senkrechte die 
 
 Der Tab *Wetter* in der Seitenspalte des Spots:
 
-- **Niederschlagsradar**: eine kleine Karte (Zoom 9, rund 70 km breit) mit dem Spot (gold) und dem Radar des
-  Deutschen Wetterdienstes (`dwd:Niederschlagsradar`, WMS wie bei *Sonne & Wetter*). Es deckt Deutschland und
-  das Grenzgebiet ab, in der Schweiz etwa den Norden bis ins Mittelland. Der Regler wählt eines der Bilder der
-  letzten zwei Stunden im Abstand von 15 Minuten, ▶ spielt sie als Film ab. Die Zeile darunter nennt die Zeit
-  des Bildes und wie alt das neueste ist; ist es älter als drei Stunden, steht das Datum dabei. Die Bilder
-  lädt der Browser direkt beim DWD; der Server liest nur einmal pro Stunde, welche Zeiten es gibt.
+- **Niederschlagsradar**: eine kleine Karte (Zoom 9, rund 70 km breit) mit dem Spot (gold) und dem Radar. Der
+  Regler wählt eines der Bilder der letzten zwei Stunden im Abstand von 15 Minuten, ▶ spielt sie als Film ab.
+  Die Zeile darunter nennt die Quelle, die Zeit des Bildes und wie alt das neueste ist; ist es älter als drei
+  Stunden, steht das Datum dabei.
+  - **MeteoSchweiz** für Spots in ihrem Radarverbund (die Schweiz mit Rand, 710 × 640 km): die Niederschlagsrate
+    aus den fünf Radaren (Produkt RZC/PRECIP), alle 5 Minuten, aus den offenen Daten der MeteoSchweiz
+    (STAC-Sammlung `ch.meteoschweiz.ogd-radar-precip` bei geo.admin.ch, „Quelle: MeteoSchweiz“). Browser
+    können die HDF5-Dateien nicht lesen: Der Server (`/api/radar/ch`) holt jede Datei einmal, liest sie (ODIM
+    HDF5, 1-km-Raster in LV95, Rohwert × `gain` + `offset` = mm/h), färbt den Regen (ab 0,1 mm/h hellblau über
+    Blau, Grün, Gelb, Orange und Rot bis Violett ab 40 mm/h), glättet zwischen den Zellen und rechnet das Bild in
+    Web Mercator um. Die Bilder bleiben sechs Stunden auf dem Server, die Liste der Dateien zwei Minuten.
+  - **Deutscher Wetterdienst** sonst (`dwd:Niederschlagsradar`, WMS wie bei *Sonne & Wetter*): Deutschland und
+    das Grenzgebiet. Die Bilder lädt der Browser direkt beim DWD. Liefert die MeteoSchweiz gerade keine Bilder,
+    springt der DWD ein.
 - **Vorhersage** (`/api/weather/forecast`, Open-Meteo mit den Modellen der Wetterdienste, in der Schweiz u. a.
   MeteoSchweiz, für die Höhe des Spots): die nächsten 24 Stunden zum Wischen, je mit Symbol (Tag oder Nacht),
   Temperatur, Niederschlag als Balken und in mm, Wahrscheinlichkeit ab 10 %, Windrichtung (der Pfeil zeigt,

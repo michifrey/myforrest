@@ -62,6 +62,7 @@ src/gpmf.js          GoPro-Telemetrie (GPMF): GPS5/GPS9, GPSU, SCAL
 src/video.js         Bilder entlang der Strecke planen, Blickrichtung, Schärfe und Wahl des schärfsten Bildes, ffmpeg-Aufruf
 src/routes/video.js  Video-Upload und Fortschritt (/api/videos)
 src/routes/terrain.js  Geländekacheln der 3D-Karte: einmal von TERRAIN_URL geholt, unter data/terrain gehalten (/api/terrain)
+src/routes/radar-ch.js  Niederschlagsradar der MeteoSchweiz: STAC-Liste, ODIM-HDF5 lesen (jsfive), als PNG in Web Mercator unter data/radar-ch (/api/radar/ch)
 src/routes/walk.js   Durchgehen: Nachbarbilder entlang einer Reihe, entlang der Wege, zu Spots und zu Mapillary-Bildern in der Nähe, Schritte mit Tiefe (/api/walk, /api/mapillary)
 src/waynet.js        Wegnetz aus OpenStreetMap (Overpass, pro Feld zwischengespeichert): Standort auf den Weg setzen, kürzeste Wege zu Bildern, Richtung, in die der Weg wegführt
 src/mapillary.js     Mapillary API v4: Suche pro Feld (zwischengespeichert), Bild über den Server (Token bleibt dort), Urheber und Lizenz
@@ -129,7 +130,7 @@ public/pwa.js        Registrierung, Warteschlangen-Anzeige, Installieren-Knopf, 
 public/offline-map.js  Karte und Spots entlang einer Route offline speichern (eigener Cache pro Route)
 public/drive-select.js  Fahrtmodus: welche der Bilder einer Fahrt behalten werden (Spots, Abstand, Stillstand, Schärfe, Differenz-Hash)
 public/map3d.js      3D-Karte: Spots, Route und Gletscher auf dem Gelände mit MapLibre (erst beim Öffnen geladen)
-public/forecast.js   Wetter im Spot: DWD-Niederschlagsradar (letzte zwei Stunden) und Vorhersage für Stunden und Tage
+public/forecast.js   Wetter im Spot: Niederschlagsradar (MeteoSchweiz, sonst DWD; letzte zwei Stunden) und Vorhersage für Stunden und Tage
 public/spotprofile.js  Licht & Wald im Spot: Horizont, Sonnenbogen und Baumarten in ihrer Jahreszeit (Canvas, Jahreszeit auch in Node getestet)
 public/drive.js      Fahrtmodus (Handy als Dashcam): Kamera, GPS-Route, Upload über die Warteschlange; in der Android-App nur Anzeige und Upload
 public/native.js     Brücke zur Android-App (nativeApp, im Browser null): Aufzeichnung und Fahrtmodus im Hintergrund

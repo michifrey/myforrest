@@ -127,8 +127,9 @@ sie: Glatteis (Regen bei Frost), Schneeglätte oder überfrierende Nässe nach N
 
 <p align="center"><img src="docs/screenshots/wetter-spot.jpg" width="360" alt="Wetter am Spot: Niederschlagsradar, Vorhersage für die nächsten Stunden und sieben Tage"></p>
 
-Der Tab **Wetter** daneben zeigt das **Niederschlagsradar** des Deutschen Wetterdienstes rund um den Spot
-(Deutschland und Grenzgebiet, also auch die Nordschweiz), mit ▶ als Film der letzten zwei Stunden, und die
+Der Tab **Wetter** daneben zeigt das **Niederschlagsradar der MeteoSchweiz** für die ganze Schweiz rund um den
+Spot (offene Daten, alle 5 Minuten; ausserhalb der Schweiz das Radar des Deutschen Wetterdienstes), mit ▶ als
+Film der letzten zwei Stunden, und die
 **Vorhersage** wie in einer Wetter-App: die nächsten 24 Stunden zum Wischen (Symbol, Temperatur, Niederschlag
 und Wahrscheinlichkeit, Wind; starke Böen orange) und darunter sieben Tage mit Tiefst- und Höchstwert.
 

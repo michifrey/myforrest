@@ -31,6 +31,8 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/photos/:id/aligned.jpg?frame=` | 360°-Panorama in die Blickrichtung eines anderen Panoramas desselben Spots gedreht (JPEG 2048 × 1024, mit ETag) |
 | `GET`    | `/api/weather/day?lat=&lon=&date=` | Stundenwerte eines Tages (Einstrahlung, Niederschlag, Regen, Schneefall in cm, Schneehöhe in cm, Bewölkung, Temperatur): Messung oder Prognose |
 | `GET`    | `/api/weather/day/spots?date=` | Tagesniederschlag an allen Spots                       |
+| `GET`    | `/api/radar/ch` | Niederschlagsradar der MeteoSchweiz: Bilder der letzten zwei Stunden (`frames` mit `time` und `url`), `bounds` (WGS84) |
+| `GET`    | `/api/radar/ch/{JJJJMMTTHHMM}.png` | Radarbild einer Zeit (UTC) in Web Mercator zwischen `bounds`, transparent wo es nicht regnet |
 | `GET`    | `/api/weather/forecast?lat=&lon=&elevation=` | Vorhersage: 36 Stunden ab der aktuellen (Temperatur, Niederschlag, Wahrscheinlichkeit, Schnee, Wettercode, Wind, Böen, Tag/Nacht) und 7 Tage |
 | `GET`    | `/api/horizon?lat=&lon=`       | Geländehorizont (36 Richtungen) und Himmelssicht       |
 | `GET`    | `/api/dwd/layers`              | Karten des DWD zum Einblenden (WMS-Adresse, Ebenen, Zeiten des Radars) |

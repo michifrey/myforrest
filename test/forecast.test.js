@@ -23,3 +23,15 @@ test('radar frames: the last two hours in 15-minute steps, ending with the newes
   // Without a time range, the newest picture only.
   assert.deepEqual(Forecast.radarFrames({ name: 'dwd:Niederschlagsradar' }), [null]);
 });
+
+test('MeteoSwiss frames: every 15 minutes back from the newest, gaps skipped', () => {
+  const t0 = Date.UTC(2026, 9, 15, 11, 30);
+  const frames = Array.from({ length: 25 }, (_, i) => ({ time: new Date(t0 + i * 300000).toISOString(), url: `/api/radar/ch/${i}.png` }))
+    .filter((_, i) => i !== 9); // 12:15 is missing
+  const picked = Forecast.pickFrames(frames);
+  assert.equal(picked.length, 8, 'nine wanted, one missing');
+  assert.equal(picked[picked.length - 1].time, '2026-10-15T13:30:00.000Z');
+  assert.equal(picked[0].time, '2026-10-15T11:30:00.000Z');
+  assert.ok(!picked.some((f) => f.time === '2026-10-15T12:15:00.000Z'));
+  assert.deepEqual(Forecast.pickFrames([]), []);
+});

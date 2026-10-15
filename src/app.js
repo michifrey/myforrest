@@ -113,6 +113,8 @@ function createApp({
   dwdFetch = fetch,
   // Terrain tiles for the 3D map (routes/terrain.js); TERRAIN_URL= (empty) turns the 3D map off.
   terrainUrl = (process.env.TERRAIN_URL ?? require('./routes/terrain').DEFAULT_URL) || null, terrainFetch = fetch,
+  // MeteoSwiss precipitation radar for the weather tab (src/routes/radar-ch.js); empty = off.
+  mchRadarUrl = (process.env.MCH_RADAR_URL ?? require('./routes/radar-ch').DEFAULT_URL) || null, mchRadarFetch = fetch,
   // Reverse proxies whose X-Forwarded-For counts (Express 'trust proxy'), so rate limits see the client's
   // address instead of the proxy's. Off by default: otherwise anyone could fake the header.
   trustProxy = parseTrustProxy(process.env.TRUST_PROXY),
@@ -528,12 +530,13 @@ function createApp({
   const climate = require('./routes/climate')(app, { db, weatherFetch, getPhoto, terrainOf, background, reassessSpot, visibleSpotIds: accounts.visibleSpotIds });
 
   const terrain = require('./routes/terrain')(app, { dataDir, url: terrainUrl, fetchImpl: terrainFetch });
+  const radarCh = require('./routes/radar-ch')(app, { dataDir, url: mchRadarUrl, fetchImpl: mchRadarFetch });
 
   app.get('/api/config', (req, res) => {
     res.json({
       tags: TAGS, activities: ACTIVITIES, plantnet: Boolean(plantnetKey), spotRadiusM, routing: Boolean(routerUrl), wildlifeZones: wildlife.enabled(),
       landscapes: LANDSCAPES, glaciers: glaciers.enabled() ? { years: glaciers.years() } : null, mapillary: mapillary.enabled(),
-      terrain: terrain.enabled(),
+      terrain: terrain.enabled(), radarCh: radarCh.enabled(),
     });
   });
 

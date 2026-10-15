@@ -206,9 +206,33 @@ async function dwdFetch() {
     <Layer><Name>dwd:Warnungen_Gemeinden</Name><Title>Warnungen</Title></Layer></Layer></Capability></WMS_Capabilities>`);
 }
 
+/**
+ * MeteoSwiss radar stand-in: the STAC listing has a file every 5 minutes for the last three hours; the files are
+ * the four steps of a rain front crossing the demo forest (radar-ch/make.py), the newest with the front over it.
+ */
+const RADAR_STAC = require('../../src/routes/radar-ch').DEFAULT_URL;
+const radarNewest = () => Math.floor((Date.now() - 4 * 60000) / 300000) * 300000;
+async function mchRadarFetch(url) {
+  if (url.startsWith(`${RADAR_STAC}/items`)) {
+    const assets = {};
+    for (let t = radarNewest() - 3 * 3600000; t <= radarNewest(); t += 300000) {
+      const d = new Date(t);
+      const doyUtc = Math.floor((t - Date.UTC(d.getUTCFullYear(), 0, 1)) / DAY) + 1;
+      const name = `rzc${String(d.getUTCFullYear()).slice(2)}${String(doyUtc).padStart(3, '0')}${d.toISOString().slice(11, 13)}${d.toISOString().slice(14, 16)}vl.801.h5`;
+      assets[name] = { href: `https://data.geo.admin.ch/ch.meteoschweiz.ogd-radar-precip/demo/${name}` };
+    }
+    return new Response(JSON.stringify({ features: [{ id: 'demo', assets }], links: [] }));
+  }
+  const t = require('../../src/routes/radar-ch').timeOfFile(url);
+  if (t === null) return new Response('nope', { status: 404 });
+  const step = Math.max(0, Math.min(3, Math.floor((t - (radarNewest() - 2 * 3600000)) / 1800000)));
+  return new Response(fs.readFileSync(path.join(__dirname, 'radar-ch', `front-${step}.h5`)));
+}
+
 const app = createApp({
   dataDir: path.join(work, 'data'),
   dwdFetch,
+  mchRadarFetch,
   // DEMO_GLETSCHER=1: the glacier inventories of the demo glacier (written by seed-gletscher.js).
   ...(process.env.DEMO_MAPILLARY === '1' ? { mapillaryToken: 'MLY|demo', mapillaryFetch } : {}),
   glacierFiles: process.env.DEMO_GLETSCHER === '1' ? Object.keys(glacier.inventories()).map((f) => path.join(work, 'gletscher', f)).join(',') : '',
