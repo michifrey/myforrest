@@ -162,6 +162,8 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
   OSM, Landeskarte und Luftbild; Panel *Ebenen* mit Wald und Waldbrand, Bevölkerung, Bodennutzung, Verkehr von
   geo.admin.ch, Baumkataster Zürich, SITG Genf, EFFIS und NASA FIRMS, mit *Was ist hier?*; Baumkataster Zürich auch
   als Baumart-Vorschlag
+- Startseite: Abschnitt *Funktionen* mit einer Kachel pro Funktion, die sie direkt öffnet (auch per `/?funktion=…`),
+  *Funktionen* und *Doku* in der Navigation, *Fahrtmodus starten* im Upload-Dialog, Footer mit Doku und Quellcode
 - 3D-Karte mit Gebäuden (swissBUILDINGS3D) und Bäumen (Vegetation 3D) von swisstopo als 3D Tiles über deck.gl,
   vom Ellipsoid auf Meereshöhe gesenkt
 - Explorer aufgeräumt (eine Leiste für Filter und Kartenmodi, schmale Explorer-Karte mit Bildkacheln) und Spots

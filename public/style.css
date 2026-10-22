@@ -383,6 +383,38 @@ input[type="checkbox"] { accent-color: var(--accent); width: 1.05rem; height: 1.
 .cards .card:nth-child(2) { transition-delay: 0.12s; }
 .cards .card:nth-child(3) { transition-delay: 0.24s; }
 
+/* ---------- Features (start page) ---------- */
+.features {
+  padding: clamp(3.5rem, 8vw, 6.5rem) clamp(16px, 6vw, 96px);
+  background: var(--bg-deep);
+  border-top: 1px solid var(--border);
+}
+.features .section-head { margin-bottom: 2.2rem; }
+.features .section-head p.muted { margin: 0.8rem 0 0; }
+.feature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+.feature {
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start;
+  width: 100%; text-align: left; font: inherit; color: var(--text); text-decoration: none;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: 1.4rem 1.4rem 1.3rem; box-shadow: var(--shadow); cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.feature[hidden] { display: none; }
+.feature:is(button, a):hover, .feature:is(button, a):focus-visible { transform: translateY(-3px); border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+.feature:is(button, a):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.feature .card-icon { width: 40px; height: 40px; margin-bottom: 0.8rem; }
+.feature h3 { font-size: 1.15rem; margin: 0 0 0.4rem; }
+.feature:is(button, a) h3::after { content: ' →'; color: var(--accent); transition: margin 0.2s ease; }
+.feature:is(button, a):hover h3::after { margin-left: 0.2rem; }
+.feature p { margin: 0; color: var(--muted); font-size: 0.92rem; line-height: 1.5; }
+.feature-links { cursor: default; }
+.feature-links a { color: var(--accent); }
+.footer a { color: inherit; }
+.drive-hint { margin: 0.4rem 0 0; }
+.drive-hint .link { padding: 0; color: var(--accent); }
+@media (max-width: 860px) { .features { padding-inline: 16px; } .feature-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 520px) { .feature-grid { grid-template-columns: 1fr; } }
+
 /* ---------- Explorer (map + panel) ---------- */
 .explore { position: relative; height: 100svh; min-height: 640px; border-top: 1px solid var(--border); }
 #map { position: absolute; inset: 0; z-index: 0; background: var(--bg-deep); }

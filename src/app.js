@@ -136,6 +136,8 @@ function createApp({
   // Vector style for the base map «MyForrest» (OpenMapTiles-like layer names; repainted in the browser), empty = OSM only.
   basemapStyle = process.env.BASISKARTE_STIL ?? 'https://tiles.openfreemap.org/styles/positron',
   basemapAttribution = process.env.BASISKARTE_QUELLE || '<a href="https://openfreemap.org">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/">OpenMapTiles</a>, Daten © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap-Mitwirkende</a>',
+  // The documentation website (MkDocs, docs/), linked from the start page; empty = no links.
+  docsUrl = process.env.DOKU_URL ?? 'https://michifrey.github.io/myforrest/',
   // MeteoSwiss precipitation radar for the weather tab (src/routes/radar-ch.js); empty = off.
   mchRadarUrl = (process.env.MCH_RADAR_URL ?? require('./routes/radar-ch').DEFAULT_URL) || null, mchRadarFetch = fetch,
   // Climate models for the projections of "Klima im Wandel" (src/routes/klima.js), comma-separated; empty = none.
@@ -578,6 +580,7 @@ function createApp({
       landscapes: LANDSCAPES, glaciers: glaciers.enabled() ? { years: glaciers.years() } : null, mapillary: mapillary.enabled(), wikimedia: wikimedia.enabled(),
       terrain: terrain.enabled(), radarCh: radarCh.enabled(),
       basemap: { style: basemapStyle || null, attribution: basemapAttribution },
+      docs: docsUrl ? docsUrl.replace(/\/?$/, '/') : null,
       tiles3d: {
         layers: [['gebaeude', 'Gebäude', tiles3dBuildings], ['baeume', 'Bäume', tiles3dVegetation]]
           .filter(([, , url]) => url).map(([id, title, url]) => ({ id, title, url })),

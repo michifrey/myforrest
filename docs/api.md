@@ -5,7 +5,7 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 
 | Methode  | Pfad                         | Zweck                                                    |
 |----------|------------------------------|----------------------------------------------------------|
-| `GET`    | `/api/config`                | Tag-Vokabular, Aktivitäten, aktivierte Features (u. a. `mapillary`, `terrain` für die 3D-Karte), Landschaftsprofile (`landscapes`: Bezeichnung und Beobachtungen je Profil) und Gletscherinventare (`glaciers.years`, `null` ohne Umrisse) |
+| `GET`    | `/api/config`                | Tag-Vokabular, Aktivitäten, aktivierte Features (u. a. `mapillary`, `terrain` für die 3D-Karte), Landschaftsprofile (`landscapes`: Bezeichnung und Beobachtungen je Profil), Gletscherinventare (`glaciers.years`, `null` ohne Umrisse) und die Adresse der Doku-Website (`docs`, mit `/` am Ende, `null` ohne) |
 | `GET`    | `/api/spots?tag=…`           | Alle Spots mit Anzahl Fotos, Zeitraum, Tags, Blickrichtung (`heading`), Landschaft (`landscape`) und Vorschaubild (`latestThumbUrl`) |
 | `GET`    | `/api/spots/:id`             | Ein Spot mit Blickrichtung, Landschaft (`landscape`, `landscapeSource`: `upload`, `auto`, `manual` oder `null`) und allen Fotos chronologisch (jedes Foto mit `url`, `thumbUrl` und `largeUrl`, `archive` für Archivfotos, `panorama` für 360°-Bilder und `alignment`: bei Fotos die Homographie `h`, bei Panoramen `kind: 'rotation'` mit der Drehung `r`, `yaw` und `tilt`) |
 | `GET`    | `/thumbs/:datei`             | Vorschaubilder (WebP)                                    |

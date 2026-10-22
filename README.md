@@ -23,6 +23,13 @@ eigener gezeichneter Szene, Farbstimmung und Überschrift; die Knöpfe unter der
 
 ![Die vier Landschaften der Startseite: Wald, Gletscher, Gebirge und Wüste](docs/screenshots/hero-landschaften.jpg)
 
+Unter *So geht's* stellt der Abschnitt **Funktionen** vor, was MyForrest neben Vorher und Nachher kann: Ebenen,
+Klima im Wandel, Sonne und Schatten, Arten und Neophyten, Touren, 3D-Karte, Gletscher, Fahrtmodus, Videos, PRO,
+offene Geodaten und die Doku. Ein Klick auf eine Kachel öffnet die Funktion direkt auf der Karte; ein Link wie
+`/?funktion=klima` tut dasselbe. Die Navigation führt zu *Funktionen* und zur Doku-Website.
+
+![Abschnitt Funktionen der Startseite: eine Kachel pro Funktion, jede öffnet sie direkt](docs/screenshots/funktionen.jpg)
+
 ## Die App im Überblick
 
 Die Idee ist einfach: Wer regelmässig dieselben Wege läuft, kommt immer wieder an denselben Stellen

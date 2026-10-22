@@ -180,6 +180,7 @@ Die feste Adresse lässt sich als Variable `APP_URL` in die Android-App bauen, d
 | `BAUMINVENTAR_RADIUS_M` | `40` | Umkreis um den Spot in Metern |
 | `BASISKARTE_STIL` | `https://tiles.openfreemap.org/styles/positron` | Vektorstil der Grundkarte *MyForrest* ([Details](funktionen.md#grundkarte)), wird im Browser in den Farben der App gezeichnet; leer = nur OpenStreetMap |
 | `BASISKARTE_QUELLE` | OpenFreeMap, OpenMapTiles, OSM | Quellenangabe der Grundkarte, falls der Stil keine nennt |
+| `DOKU_URL` | `https://michifrey.github.io/myforrest/` | Adresse der Doku-Website für die Links auf der Startseite (Navigation, Funktionen, Footer); leer = keine Links |
 | `EBENEN_WMS_URL` | `https://wms.geo.admin.ch/` | Kartendienst für die Themen des Panels [Ebenen](funktionen.md#ebenen-karten-aus-offiziellen-quellen); leer = keine Ebenen von geo.admin.ch |
 | `EBENEN_IDENTIFY_URL` | Identify-Dienst von geo.admin.ch | Für *Was ist hier?* bei Ebenen von geo.admin.ch |
 | `EBENEN_REGIONAL` | Baumkataster Zürich, SITG Genf, EFFIS | Regionale WMS-Dienste als JSON-Liste `[{ "url", "group", "bbox": [W, S, O, N], "attribution" }]`; alle ihre Ebenen erscheinen, wenn die Karte im Gebiet steht |

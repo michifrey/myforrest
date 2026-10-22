@@ -5,6 +5,7 @@ Einen kürzeren Überblick mit Screenshots gibt das [README](https://github.com/
 
 **Inhalt**
 
+- [Startseite](#startseite)
 - [Fotos erfassen und verorten](#fotos-erfassen-und-verorten)
 - [Spots und Zeitreise](#spots-und-zeitreise)
 - [Bildanalyse](#bildanalyse)
@@ -15,6 +16,22 @@ Einen kürzeren Überblick mit Screenshots gibt das [README](https://github.com/
 - [Pflanzen und Baumarten](#pflanzen-und-baumarten)
 - [Geschützte Funde und PRO-Mitglieder](#geschützte-funde-und-pro-mitglieder)
 - [Konten, Moderation und Lizenzen](#konten-moderation-und-lizenzen)
+
+## Startseite
+
+![Abschnitt Funktionen der Startseite](screenshots/funktionen.jpg)
+
+Die Startseite zeigt nach der Einleitung (*So geht's*) den Abschnitt **Funktionen**: eine Kachel pro Funktion mit
+zwei Sätzen dazu. Ein Klick scrollt zur Karte und öffnet das passende Panel (*Ebenen*, *Klima*, *Sonne & Wetter*,
+*Arten & Neophyten*, *Touren & Aufträge*, *3D*, *Gletscher*), den Fahrtmodus, den Upload (Videos und 360°) oder die
+PRO-Mitgliedschaft (vorher die Anmeldung). Kacheln von Funktionen, die der Server nicht eingerichtet hat (3D-Karte
+ohne Gelände, Gletscher ohne Inventar), bleiben wie ihre Kartenknöpfe verborgen. Dazu kommen die offenen Geodaten
+(OGC API, GeoPackage, Vektorkarten) und die Doku.
+
+Jede Funktion lässt sich auch verlinken: `/?funktion=` mit `ebenen`, `klima`, `sonne`, `arten`, `touren`, `3d`,
+`gletscher`, `fahrt`, `video` oder `pro`. Die Navigation oben führt zu *So geht's*, *Funktionen*, *Karte* und
+zur **Doku** (diese Website, Adresse über `DOKU_URL`); der Footer verlinkt Doku, Funktionen, die Klima-Quellen und
+den Quellcode.
 
 ## Fotos erfassen und verorten
 
@@ -104,8 +121,9 @@ nächstgelegenen Stelle gezogen. So füllt jede Runde dieselben Spots weiter.
 ![Fahrtmodus während der Fahrt](screenshots/fahrtmodus.jpg)
 
 Wer viel mit dem Auto im Wald unterwegs ist (Forstdienst, Revierfahrten), kann ein Handy in einer Halterung
-an der Scheibe als **Dashcam** nutzen. *Touren & Aufträge → Fahrtmodus* (oder die Verknüpfung *Fahrtmodus*
-der installierten App, `/?action=fahrt`) zeigt eine dunkle Vollbildansicht für das Auto:
+an der Scheibe als **Dashcam** nutzen. *Touren & Aufträge → Fahrtmodus*, die Kachel *Fahrtmodus* auf der
+Startseite, *Fahrtmodus starten* im Upload-Dialog oder die Verknüpfung *Fahrtmodus* der installierten App
+(`/?action=fahrt`) zeigt eine dunkle Vollbildansicht für das Auto:
 
 - **Aufnahme**: Die Kamera nach vorn macht alle 2, 3, 5 oder 10 Sekunden ein Bild (Standard 3 s). Das GPS
   zeichnet die Strecke auf (ein Punkt alle 25 m); beim Beenden wird sie als private Tour *Fahrt …* mit der
