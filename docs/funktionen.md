@@ -812,6 +812,29 @@ Sturmereignisse) im Zeitraum bzw. in den Monaten davor.
 - Ohne Internetzugang bleibt der Bereich leer und wird später erneut versucht. Fällt nur Landsat aus,
   läuft Sentinel-2 weiter.
 
+### Klima im Wandel
+
+Das Modul [Klima im Wandel](klimawandel.md) stellt die Fotos in den Zusammenhang des Klimas der Region. Der Knopf
+**Klima** auf der Karte öffnet ein Dossier für die Kartenmitte, der Tab **Klima** eines Spots die Kurzfassung für
+den Ort:
+
+- **Klimastreifen** seit 1940 aus ERA5 (Open-Meteo, auf die Höhe des Ortes umgerechnet) und, wenn geladen, der
+  nächsten homogenen Messreihe der MeteoSchweiz seit 1864, mit der Erwärmung gegenüber 1961–1990 bzw. 1871–1900;
+- **Kennzahlen** früher und heute: Hitzetage, Tropennächte, Sommertage, Frosttage, Neuschnee, Vegetationstage,
+  Sommerregen und längste Trockenphase;
+- eine **Zeitachse**, die unter die Sommer der Region legt, was die Spots im Umkreis im selben Jahr festhielten:
+  Fotos, Hinweise auf Trockenheit und Hitze, Stürme, NDVI im Hochsommer, Austrieb und Verfärbung der Buche,
+  Schneeschmelze, Eis im Spätsommer und Neophyten;
+- eine **Synthese** mit Aussagen wie «In den Hitzesommern zeigten die Fotos an 11 von 14 besuchten Spots Hinweise
+  auf Trockenheit …»;
+- einen **Ausblick** bis 2050 aus sieben Klimamodellen (CMIP6 HighResMIP, Delta-Methode) und, wenn geladen, die
+  Klimaszenarien CH2025.
+
+![Zeitachse des Klima-Dossiers](screenshots/klima-zeitachse.jpg)
+
+Quellen, Methode, Grenzen und wie man die Messreihen und Szenarien lädt, stehen auf der eigenen Seite
+[Klima im Wandel](klimawandel.md).
+
 ## Landschaften und Gletscher
 
 MyForrest begann im Wald. Spots, Wiederholungsfotos, Ausrichtung, Vergleich, Touren und Durchgehen

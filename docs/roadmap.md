@@ -90,6 +90,24 @@ mit echten Dateien und Diensten; das steht jeweils als offener Punkt dabei.
   nicht), etwa als gerenderte Rasterkacheln im selben Gitter; den Kachel-Speicher für ganz grosse Datenmengen auf
   mehrere Dateien verteilen.
 
+## Phase 5: Klima im Wandel
+
+Das Modul [Klima im Wandel](klimawandel.md) zeigt das Klima der Region seit 1940 neben den Beobachtungen der Spots.
+Als Nächstes:
+
+- **Mit echten Dateien prüfen**: die homogenen Messreihen der MeteoSchweiz (`ch.meteoschweiz.ogd-nbcn`) gegen die
+  echten Dateien und die STAC-Liste prüfen (gebaut nach der Dokumentation, getestet mit nachgebauten Dateien); die
+  Klima-API von Open-Meteo im Betrieb prüfen (Namen der Modelle, Antwort mit mehreren Modellen).
+- **CH2025 direkt**: die Indikatoren der Klimaszenarien CH2025 pro Station und auf dem 1-km-Gitter direkt von der
+  MeteoSchweiz lesen statt als vorbereitetes CSV, für alle drei Erwärmungsstufen.
+- **Mehr Messdaten**: Raumanalysen der MeteoSchweiz (Gitter ab 1961) als Gegenprobe zu ERA5, Schneehöhen des SLF,
+  Wassertemperaturen des BAFU, Permafrost (PERMOS) an Gebirge-Spots.
+- **Neue Verbindungen**: Käfergenerationen pro Jahr aus Wärmesummen neben den Borkenkäfer-Fotos; Ausbreitungstempo der
+  Neophyten gegenüber den Wintern; Baumarten am Spot unter den Szenarien mit Verweis auf die Tree-App; Klima-Analoga
+  («wo ist es heute so warm wie hier um 2050?»); kühle Abschnitte aus Touren an Hitzetagen.
+- **Regionen statt Kreise**: Dossier pro Gemeinde, Bezirk, Kanton oder Waldregion (Grenzen von swisstopo), als Seite
+  mit fester Adresse zum Teilen und als PDF.
+
 ## Bereits umgesetzt
 
 Aus früheren Versionen dieser Roadmap, nach Themen:
@@ -152,6 +170,10 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
   Metas Kronenhöhenkarte und Gebäude aus OpenStreetMap); steil
   besonnte Hänge, Tag, Nacht und Dämmerung; Niederschlagsradar und Warnungen des DWD einblendbar; gerechnet in
   einem Web Worker, damit die Karte beim Abspielen flüssig bleibt
+
+- Klima im Wandel: Klimastreifen und Kennzahlen seit 1940 (ERA5) am Ort, homogene Messreihen der MeteoSchweiz seit
+  1864, Zeitachse mit den Beobachtungen der Spots, Synthese, Ausblick bis 2050 aus Klimamodellen (CMIP6 HighResMIP),
+  Import der Klimaszenarien CH2025
 
 ### Arten und geschützte Funde
 

@@ -170,6 +170,7 @@ Die feste Adresse lässt sich als Variable `APP_URL` in die Android-App bauen, d
 | `GEBAEUDE_URL` | wie `WEGNETZ_URL` | Overpass-API für die Gebäude aus OpenStreetMap, die ausserhalb der Schweiz Schatten auf die Karte werfen ([Details](funktionen.md#licht-und-schatten-auf-der-karte)); leer gesetzt schaltet das ab |
 | `WEGNETZ_URL` | – | Overpass-API für das Wegnetz aus OpenStreetMap (z. B. `https://overpass-api.de/api/interpreter` oder eine eigene Instanz); im Durchgehen führen Pfeile dann entlang der Wege ([Details](funktionen.md#durchgehen-wie-street-view)) |
 | `MCH_RADAR_URL` | STAC-Sammlung `ch.meteoschweiz.ogd-radar-precip` bei geo.admin.ch | Niederschlagsradar der MeteoSchweiz im Tab *Wetter* eines Spots ([Details](funktionen.md#wetter-am-spot)); leer = nur das DWD-Radar |
+| `KLIMA_MODELS` | sieben Modelle (`CMCC_CM2_VHR4,FGOALS_f3_H,HiRAM_SIT_HR,MRI_AGCM3_2_S,EC_Earth3P_HR,MPI_ESM1_2_XR,NICAM16_8S`) | Klimamodelle der Klima-API von Open-Meteo für den Ausblick bis 2050 in [Klima im Wandel](klimawandel.md), kommagetrennt; leer = kein Ausblick |
 | `TERRAIN_URL` | Terrain Tiles auf AWS | Geländekacheln für die [3D-Karte](funktionen.md#3d-karte), Vorlage mit `{z}`, `{x}`, `{y}` (Terrarium-PNG, z. B. ein eigener Spiegel); leer = keine 3D-Karte |
 | `MAPILLARY_TOKEN` | – | Client-Token von [Mapillary](https://www.mapillary.com/dashboard/developers) (`MLY|…`): Mapillary-Bilder im Durchgehen und auf der Karte, wo es keine eigenen gibt ([Details](funktionen.md#mapillary)) |
 | `GEBIRGE_AB_M` | `2100` | Ab dieser Höhe (m ü. M.) wird ein Spot ohne Profil, Baumarten und Wald-Beobachtungen ein Gebirge-Spot; `0` = aus |
@@ -336,6 +337,13 @@ Andere Quellen lassen sich als generisches CSV importieren (`format=generic`). E
 Spalten `source;station_id;station_name;lat;lon;elevation;species;year;doy`, optional `phase` (lateinischer
 Artname, Tag im Jahr; Phase `colour` für die beginnende Blattverfärbung, Standard, oder `leafout` für die
 Blattentfaltung).
+
+## Klimadaten laden
+
+Das Dossier [Klima im Wandel](klimawandel.md) holt ERA5 und die Klimamodelle selbst bei Open-Meteo. Die homogenen
+Messreihen der MeteoSchweiz (seit 1864) und die Klimaszenarien CH2025 lädt ein Admin dazu: `POST /api/klima/sync`
+holt die Messreihen über `data.geo.admin.ch`, `POST /api/klima/import` nimmt Dateien entgegen. Formate und
+Beispiele stehen unter [Klima im Wandel → Einrichten](klimawandel.md#einrichten).
 
 ## Mit Docker und QGIS Server
 

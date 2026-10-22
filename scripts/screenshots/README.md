@@ -7,8 +7,8 @@ ohne echte Fotos, ohne Netz und ohne API-Schlüssel reproduzierbar sind.
 | Datei | Aufgabe |
 |-------|---------|
 | `scene.js` | Zeichnet Demo-Waldfotos (Windwurf mit Verjüngung, Borkenkäfer, Springkraut, Goldrute, frühe Verfärbung) |
-| `demo-server.js` | Startet die echte App mit einem synthetischen Open-Meteo-Ersatz (Wetter, Vorhersage, Stürme, Nächte, Höhenmodell), DWD-Capabilities, einem MeteoSchweiz-Radar-Ersatz (STAC-Liste und `radar-ch/`) und einem Overpass-Ersatz (Wegnetz am Waldweg) |
-| `seed.js` | Lädt die Demo-Fotos über die API hoch und ergänzt Pl@ntNet-Bestimmungen und Sentinel-/Landsat-Szenen direkt in der Datenbank |
+| `demo-server.js` | Startet die echte App mit einem synthetischen Open-Meteo-Ersatz (Wetter, Vorhersage, Stürme, Nächte, Höhenmodell; für *Klima im Wandel* die Jahre seit 1940 und die Klimamodelle bis 2050 mit einer Erwärmung wie im Mittelland), DWD-Capabilities, einem MeteoSchweiz-Radar-Ersatz (STAC-Liste und `radar-ch/`) und einem Overpass-Ersatz (Wegnetz am Waldweg) |
+| `seed.js` | Lädt die Demo-Fotos über die API hoch und ergänzt Pl@ntNet-Bestimmungen, Sentinel-/Landsat-Szenen sowie für *Klima im Wandel* eine erfundene Messreihe «Zürich / Fluntern (Demo)» seit 1864 und eine Phänologie-Station direkt in der Datenbank |
 | `tiles.js` | Platzhalter-Kacheln für OpenStreetMap (Web Mercator) und die Landeskarte grau (LV95), Höhenkacheln (Terrarium) aus dem Demo-Gelände und ein gezeichnetes Regenband für das DWD-Radar |
 | `radar-ch/` | Radardateien im Aufbau der MeteoSchweiz (ODIM HDF5): eine Regenfront in vier Schritten über dem Demo-Wald; neu erzeugen mit `python3 radar-ch/make.py` (braucht h5py) |
 | `shoot.js` | Nimmt mit Playwright alle Screenshots auf und baut das Zeitraffer-GIF und das GIF eines Schritts im Durchgehen (`uebergang`, aus einer Videoaufnahme) |
