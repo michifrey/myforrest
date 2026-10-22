@@ -101,13 +101,22 @@ module.exports = function registerLandscapes(app, {
     const item = archives?.byId(String(req.params.itemId));
     if (!item || !archives.near(spot).some((it) => it.id === item.id)) return res.status(404).json({ error: 'Archivbild nicht gefunden' });
     if (!item.licenseKey || !item.image) return res.status(409).json({ error: 'Die Lizenz dieses Bilds erlaubt keine Übernahme; der Link führt zum Bildarchiv' });
+    await importPicture(req, res, id, item, (file) => archives.download(item, file));
+  });
+
+  /**
+   * Takes a picture from an open collection over as an archive photo of spot `id` (`item`: id, title,
+   * takenAt, licenseKey, and source, license, page for the note; `download(file)` writes it to a file).
+   * Also used for photos from Wikimedia Commons (routes/wikimedia.js).
+   */
+  async function importPicture(req, res, id, item, download) {
     if (imported.all(id).some((r) => r.item_id === item.id)) return res.status(409).json({ error: 'Schon übernommen' });
     const file = path.join(tmpDir, `archiv-${crypto.randomUUID()}`);
     try {
-      await archives.download(item, file);
+      await download(file);
       const ref = db.prepare('SELECT id FROM photos WHERE spot_id = ? AND hidden_at IS NULL ORDER BY taken_at DESC LIMIT 1').get(id);
       const note = [`Archivbild: ${item.title}`, item.source, item.license, item.page].filter(Boolean).join(' · ');
-      const [status, body] = await processUpload([{ path: file, originalname: `${item.id}.jpg` }], null, {
+      const [status, body] = await processUpload([{ path: file, originalname: `${String(item.id).replace(/[^\w.-]+/g, '_').slice(0, 120)}.jpg` }], null, {
         spotId: String(id), archive: '1', takenAt: new Date(item.takenAt).toISOString(), note, refPhotoId: ref ? String(ref.id) : undefined,
         // The picture's own licence; given as the default so the account's default licence stays as it is.
       }, { user: { ...req.user, default_license: item.licenseKey }, body: { license: item.licenseKey } });
@@ -120,5 +129,7 @@ module.exports = function registerLandscapes(app, {
     } finally {
       fs.rmSync(file, { force: true });
     }
-  });
+  }
+
+  return { importPicture, importedItems: (id) => new Map(imported.all(id).map((r) => [r.item_id, r.photo_id])), visibleSpot };
 };

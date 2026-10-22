@@ -240,6 +240,7 @@ ohne die jeweilige Funktion weiter.
 | `GEBAEUDE_URL` (sonst `WEGNETZ_URL`) | Gebäude für die Schatten auf der Karte ausserhalb der Schweiz (OpenStreetMap) | pro Kachel von rund 1,6 km, alle 30 Tage | nur wenn eine der beiden gesetzt ist |
 | `graph.mapillary.com` und die Bild-Hosts von Mapillary | Mapillary-Bilder im Durchgehen | pro Feld, eine Woche zwischengespeichert | nur mit `MAPILLARY_TOKEN` |
 | Hosts der Bild-Adressen in `ARCHIV_KATALOG` | Archivbild übernehmen | auf Knopfdruck | nur wenn gesetzt |
+| `query.wikidata.org`, `www.wikidata.org`, `commons.wikimedia.org`, `upload.wikimedia.org` | *Wikipedia, Wikidata & Commons* am Spot, Commons-Foto übernehmen | beim Aufklappen, eine Woche pro Ort zwischengespeichert | `WIKIMEDIA=0` schaltet ab |
 
 Beim Bauen der Images zusätzlich: `registry.npmjs.org` (npm), `deb.debian.org` (ffmpeg), Docker Hub bzw.
 `ghcr.io` (Basis-Images), `github.com` (BRouter-Release).
@@ -253,6 +254,8 @@ im Firmennetz:
 |------|-------|
 | `tile.openstreetmap.org` | Kartenkacheln der App und Offline-Karten |
 | `wmts.geo.admin.ch` | Landeskarte und Luftbild der Vektorkarte LV95 |
+| `commons.wikimedia.org`, `upload.wikimedia.org` | Vorschaubilder im Teil *Wikipedia, Wikidata & Commons* eines Spots |
+| `s3.amazonaws.com` | Höhenkacheln für Licht und Schatten auf der Karte und Sonne und Schatten entlang einer Route |
 
 Alle JavaScript-Bibliotheken und Schriften liefert der Server selbst aus, ohne CDN.
 
@@ -261,7 +264,7 @@ Alle JavaScript-Bibliotheken und Schriften liefert der Server selbst aus, ohne C
 Wer möglichst wenig nach aussen geben will (z. B. in einem abgeschotteten Behördennetz):
 
 ```bash
-SENTINEL_STAC_URL= LANDSAT_STAC_URL= CANTON_LOOKUP_URL= \
+SENTINEL_STAC_URL= LANDSAT_STAC_URL= CANTON_LOOKUP_URL= WIKIMEDIA=0 \
 ROUTER_URL=http://brouter:17777/brouter ROUTER_PROFILE=myforrest-wald \
 npm start
 ```

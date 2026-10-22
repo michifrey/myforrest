@@ -37,6 +37,12 @@ async function routeTiles(ctx) {
     if (!tileCache.has(key)) tileCache.set(key, await tiles.terrariumTile(z, x, y));
     await route.fulfill({ body: tileCache.get(key), contentType: 'image/png', headers: { 'access-control-allow-origin': '*' } });
   }));
+  // Pictures of Wikidata items (Special:FilePath on Commons): the drawn demo photos of the demo server.
+  await ctx.route(/commons\.wikimedia\.org\/wiki\/Special:FilePath\//, safe(async (route) => {
+    const n = /Stieleiche/.test(decodeURIComponent(route.request().url())) ? 5 : 3;
+    const res = await fetch(`${BASE}/demo-commons/${n}.jpg`);
+    await route.fulfill({ body: Buffer.from(await res.arrayBuffer()), contentType: 'image/jpeg' });
+  }));
   // DWD maps: a drawn rain band for the radar, nothing for other layers.
   await ctx.route(/maps\.dwd\.de\/geoserver\/dwd\/wms/, safe(async (route) => {
     const q = new URL(route.request().url()).searchParams;

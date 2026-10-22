@@ -14,6 +14,7 @@ const { createWildlife } = require('./wildlife');
 const { createGlaciers } = require('./glaciers');
 const { createGlamos } = require('./glamos');
 const { createArchives } = require('./archives');
+const { createWikimedia } = require('./wikimedia');
 const { createMapillary } = require('./mapillary');
 const { createWaynet } = require('./waynet');
 const { LANDSCAPES, ICE_LANDSCAPES, MOUNTAIN_MIN_M, FOREST_ONLY_TAGS, isLandscape, landscapeOf } = require('./landscapes');
@@ -107,6 +108,8 @@ function createApp({
   glamosFiles = process.env.GLAMOS_CSV || '',
   // Catalogue of openly licensed archive pictures (src/archives.js): CSV/GeoJSON files, comma-separated; and how to fetch them.
   archiveFiles = process.env.ARCHIV_KATALOG || '', archiveFetch = fetch,
+  // OpenStreetMap and Wikimedia around a spot (src/wikimedia.js): fetch for Wikidata and Commons, and { enabled } for tests.
+  wikimediaFetch = fetch, wikimediaOptions = {},
   // Spots without a profile above this height become mountain spots (src/landscapes.js); 0 = off.
   mountainMinM = MOUNTAIN_MIN_M,
   // Storm warnings from the forecast (src/stormwatch.js): hours between checks, 0 = off.
@@ -186,6 +189,8 @@ function createApp({
   const glaciers = createGlaciers({ files: glacierFiles });
   const mapillary = createMapillary({ db, dataDir, token: mapillaryToken, fetchImpl: mapillaryFetch });
   const waynet = createWaynet({ db, url: waynetUrl, fetchImpl: waynetFetch });
+  // Wikipedia, Wikidata and Commons around a spot, and OSM objects linked to them (Overpass of the path network).
+  const wikimedia = createWikimedia({ db, fetchImpl: wikimediaFetch, overpassUrl: waynetUrl, overpassFetch: waynetFetch, ...wikimediaOptions });
   app.locals.remindPro = accounts.remindPro;
   // Protection lists per canton (src/sensitive.js) and the canton of each spot (src/canton.js).
   const sensitiveLists = createSensitiveLists(db);
@@ -572,7 +577,7 @@ function createApp({
   app.get('/api/config', (req, res) => {
     res.json({
       tags: TAGS, activities: ACTIVITIES, plantnet: Boolean(plantnetKey), spotRadiusM, routing: Boolean(routerUrl), wildlifeZones: wildlife.enabled(),
-      landscapes: LANDSCAPES, glaciers: glaciers.enabled() ? { years: glaciers.years() } : null, mapillary: mapillary.enabled(),
+      landscapes: LANDSCAPES, glaciers: glaciers.enabled() ? { years: glaciers.years() } : null, mapillary: mapillary.enabled(), wikimedia: wikimedia.enabled(),
       terrain: terrain.enabled(), radarCh: radarCh.enabled(),
       basemap: { style: basemapStyle || null, attribution: basemapAttribution },
       docs: docsUrl ? docsUrl.replace(/\/?$/, '/') : null,
@@ -1424,10 +1429,11 @@ function createApp({
   for (const { id } of db.prepare('SELECT id FROM spots WHERE landscape IS NULL AND (? OR elevation >= ?)').all(glaciers.enabled() ? 1 : 0, mountainMinM > 0 ? mountainMinM : 1e9)) {
     classifySpot(id);
   }
-  require('./routes/landscapes')(app, {
+  const landscapes = require('./routes/landscapes')(app, {
     db, glaciers, glamos: createGlamos({ files: glamosFiles }), archives: createArchives({ files: archiveFiles, fetchImpl: archiveFetch }),
     processUpload, tmpDir, vegetation, accounts, classifySpot, spotJson, idParam,
   });
+  require('./routes/wikimedia')(app, { wikimedia, landscapes, idParam });
   Object.assign(tours, require('./routes/tracks')(app, {
     db, spotRadiusM, satelliteAlerts: vegetation.alerts, routerUrl, routerFetch, routerProfile, accounts, wildlife, elevation: elevationService, push,
     weather,
