@@ -1325,6 +1325,24 @@ einbinden.
   Webkarten auf anderen Domains sie laden können.
 - **GeoPackage**: `/api/export/myforrest.gpkg` liefert alle Collections als eine Datei (LV95, mit
   `?crs=4326` in WGS84), ohne GDAL direkt mit SQLite geschrieben. Die Fusszeile der App verlinkt beides.
+- **GeoParquet und STAC (cloud-native, ohne Server)**: Geodaten-Infrastrukturen wandern weg von Diensten wie
+  WMS/WFS hin zu Dateien in einem Objektspeicher, die ein Katalog beschreibt (etwa
+  [Portolan](https://spatialists.ch/posts/2026/10/11-reinventing-sdis/), ein «Katalog der Kataloge»). MyForrest
+  liefert dafür alles mit:
+  - **GeoParquet**: `/api/export/parquet/<collection>.parquet` liefert eine Collection als GeoParquet 1.1
+    (WGS84, mit `?crs=2056` in LV95), ohne GDAL oder Arrow direkt geschrieben: Spalten typisiert wie im
+    GeoPackage, Geometrie als WKB, gzip-komprimiert. DuckDB, GeoPandas, QGIS/GDAL und Webkarten wie lonboard
+    lesen die Datei direkt, auch von einem Objektspeicher. `/api/export/geojson/<collection>.geojson` gibt
+    dieselben Daten als eine GeoJSON-Datei.
+  - **STAC-Katalog**: `/stac/catalog.json` (STAC 1.1) führt zur Collection `myforrest` mit Zeitraum,
+    Ausdehnung, Lizenz, GeoPackage, PMTiles und Metadaten für geocat.ch und von dort zu einem Item pro
+    Collection (`spots`, `photos`, `findings`, `spread_fronts`). Jedes Item nennt Zeilenzahl und Spalten
+    (Erweiterung *table*) und verweist auf GeoParquet in WGS84 und LV95 (Erweiterung *projection*) und
+    GeoJSON. STAC-Browser, pystac und QGIS (*STAC*-Datenquelle) lesen den Katalog.
+  - **Als Ordner für einen Objektspeicher**: `npm run stac -- <Ordner> [Basis-URL]` schreibt denselben
+    Katalog mit allen Dateien (GeoParquet, GeoJSON, GeoPackage, PMTiles) und nur relativen Links. Den Ordner
+    auf S3, R2, Azure Blob oder einen beliebigen Webserver kopieren, und die Daten bleiben lesbar, auch wenn
+    der MyForrest-Server nicht läuft. Die Basis-URL steht in den Daten (Links auf die Fotos).
 - **QGIS Server**: Für WMS, WMTS und WFS mit eigener Gestaltung, wie sie Geoportale wie map.geo.admin.ch
   einbinden, liegt unter [`deploy/qgis-server`](https://github.com/michifrey/myforrest/blob/main/deploy/qgis-server/README.md) ein fertiges QGIS-Projekt
   mit Stilen in den Farben der App (Ausbreitungsfronten nach Jahr, Spots nach Befund mit Pfeil in
@@ -1674,7 +1692,7 @@ Info Flora. Die Listen werden bei der jeweiligen Fachstelle bezogen.
 | Foto, Spot, genaue Lage | – | ✓ (mit Konto) | ✓ |
 | Karte | schraffiertes 5-km-Quadrat mit Anzahl Funde | Pin mit Schloss | Pin mit Schloss |
 | Arten, Hotspots, Ausbreitung, Export (Darwin Core, iNaturalist) | ohne den Fund | mit | mit |
-| Offene Geodaten (OGC API, Vektorkacheln, GeoPackage, PMTiles) | ohne den Fund | ohne | ohne |
+| Offene Geodaten (OGC API, Vektorkacheln, GeoPackage, PMTiles, GeoParquet, STAC) | ohne den Fund | ohne | ohne |
 | Fotoaufträge an geschützten Spots, Vorschläge entlang der Route | – | ✓ | ✓ |
 
 Das Raster ist fest (0,045° × 0,065°, rund 5 × 5 km) und verschiebt sich nicht mit den Daten. Ein Spot

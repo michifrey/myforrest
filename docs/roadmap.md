@@ -86,6 +86,9 @@ mit echten Dateien und Diensten; das steht jeweils als offener Punkt dabei.
   der Weg über `/ows/` lokal mit podman getestet).
 - **Metadaten**: Collection-Einträge und Objektkatalog gegen die Schemas und Schematron-Regeln von geocat.ch
   prüfen; den Weg zu opendata.swiss einmal mit einem echten Konto durchspielen.
+- **Cloud-native Daten**: den STAC-Ordner regelmässig auf einen echten Objektspeicher legen (Cron-Job nach
+  `npm run stac`) und bei Portolan eintragen; GeoParquet mit Bbox-Spalte (*covering*) und nach Ort sortierten
+  Zeilengruppen, damit DuckDB und GDAL bei grossen Datenmengen nur die nötigen Teile lesen.
 - **Doku-Website**: die eigene Domain docs.myforrest.xyz einrichten (CNAME und `DOCS_URL`), sobald es die
   Domain gibt.
 - **Kacheln**: die LV95-Kacheln in einer Form, die QGIS direkt öffnet (GDAL liest Vektorkacheln in GeoPackage noch
@@ -224,6 +227,8 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 - Geodienste: OGC API – Features und Tiles (auch im LV95-Kachelgitter, vorberechnet, PMTiles/MBTiles),
   Vektorkarten, QGIS Server, Metadaten für geocat.ch (GM03)
 - Metadaten pro Collection (Teil des Datensatzes) und Objektkatalog nach ISO 19110
+- Cloud-native ohne Server: GeoParquet pro Collection (WGS84 und LV95), STAC-Katalog unter `/stac` und als
+  statischer Ordner für einen Objektspeicher (`npm run stac`)
 - Betrieb mit Docker Compose und Kubernetes (podman-Startskript)
 - Render mit eigenem Routing-Server (BRouter) und Kartenserver (QGIS Server unter `/ows/`) als private Dienste,
   Wildruhezonen und Wegnetz eingeschaltet
