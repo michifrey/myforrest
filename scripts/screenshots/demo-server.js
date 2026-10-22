@@ -66,7 +66,7 @@ function daily(d, lat) {
 // the plain demo weather, and every other request keeps it unchanged.
 const HOT_SUMMERS = { 1947: 1.9, 1952: 1.1, 1976: 1.3, 1983: 1.4, 1994: 1.2, 2003: 4.2, 2015: 2.3, 2018: 2.6, 2019: 1.9, 2022: 3.0, 2023: 2.2, 2025: 1.8 };
 const DRY_SUMMERS = new Set([1947, 1976, 1991, 2003, 2015, 2018, 2022]);
-function climateShift(d, w, model) {
+function climateShift(d, w, model, elev, lat = 47.37) {
   const year = Number(d.slice(0, 4));
   const month = Number(d.slice(5, 7));
   const pace = model ? 0.75 + hash(`m${model}`) * 0.7 : 1; // the models warm faster or slower
@@ -74,7 +74,10 @@ function climateShift(d, w, model) {
   const shift = trend + (hash(`y${year}${model || ''}`) - 0.5) * 1.1 - 1.36 +
     (!model && month >= 6 && month <= 8 ? HOT_SUMMERS[year] || 0 : 0);
   const dry = !model && month >= 6 && month <= 8 && DRY_SUMMERS.has(year);
-  return { tm: w.tm + shift, tx: w.tx + shift * 1.15, tn: w.tn + shift * 0.9, p: dry ? Math.round(w.p * 0.3 * 10) / 10 : w.p };
+  // Downscaled to the requested altitude (0.55 °C per 100 m), like Open-Meteo; the models without it.
+  // The plain demo weather cools 2 °C per 0.1° northwards; across a region that is too much.
+  const lapse = (Number.isFinite(elev) && elev > 0 ? -(elev - 600) * 0.0055 : 0) + (lat > 47 ? (lat - 47.37) * 17 : 0);
+  return { tm: w.tm + shift + lapse, tx: w.tx + shift * 1.15 + lapse, tn: w.tn + shift * 0.9 + lapse, p: dry ? Math.round(w.p * 0.3 * 10) / 10 : w.p };
 }
 
 // Days with drawn weather for "Licht & Wald": a snowy winter morning and a rainy November day.
@@ -90,7 +93,11 @@ function elevation(lat, lon) {
   // Hill (Adlisberg-like) north-east, hollow towards the south-west.
   const hill = 130 * Math.exp(-(((lat - 47.3765) / 0.006) ** 2 + ((lon - 8.578) / 0.009) ** 2));
   const hollow = -45 * Math.exp(-(((lat - 47.367) / 0.0025) ** 2 + ((lon - 8.566) / 0.0035) ** 2));
-  return Math.round(560 + hill + hollow + (lat - 47.37) * 900);
+  // Hills and valleys of the wider region, for the climate map; flat out to ~4 km around the forest.
+  const r = Math.hypot(lat - 47.373, (lon - 8.575) * 0.68);
+  const far = Math.max(0, Math.min(1, (r - 0.04) / 0.08));
+  const relief = far * (260 * Math.sin((lon - 8.3) * 14) * Math.cos((lat - 47.2) * 11) + 180 * Math.sin((lat - 47.1) * 19));
+  return Math.round(560 + hill + hollow + (lat - 47.37) * 900 + relief);
 }
 
 async function weatherFetch(url) {
@@ -118,7 +125,7 @@ async function weatherFetch(url) {
       const climate = q.get('start_date') && vars.includes('snowfall_sum') && vars.includes('temperature_2m_min');
       for (const v of vars) {
         out[v] = days.map((d) => {
-          const w = climate ? climateShift(d, daily(d, lat), q.get('models')) : daily(d, lat);
+          const w = climate ? climateShift(d, daily(d, lat), q.get('models'), Number(q.get('elevation')), lat) : daily(d, lat);
           switch (v) {
             case 'precipitation_sum': return w.p;
             case 'temperature_2m_mean': return Math.round(w.tm * 10) / 10;
@@ -286,6 +293,51 @@ async function surfaceFetch(url, opts = {}) {
   return new Response(buf.subarray(Number(r[1]), end + 1), { status: 206, headers: { 'content-range': `bytes ${r[1]}-${end}/${buf.length}` } });
 }
 
+// A stand-in for the WMS of geo.admin.ch: capabilities with three demo layers and maps drawn from the demo
+// terrain: the climate normal (temperature by altitude) and the forest belts today and with a warmer climate.
+const DEMO_WMS_LAYERS = [
+  ['ch.meteoschweiz.klimanormwerte-temperatur_aktuelle_periode', 'Klimanormwerte Temperatur 1991–2020 (Demo)'],
+  ['ch.bafu.wald-vegetationshoehenstufen_1975', 'Vegetationshöhenstufen heute (Demo)'],
+  ['ch.bafu.wald-vegetationshoehenstufen_2085_trocken', 'Vegetationshöhenstufen 2085, trockeneres Klima (Demo)'],
+];
+const BELTS = [[600, [205, 170, 90]], [1000, [150, 180, 90]], [1400, [80, 140, 80]], [1800, [60, 105, 110]], [Infinity, [150, 150, 170]]];
+async function demoWms(url) {
+  const q = new URL(url).searchParams;
+  const get = (k) => q.get(k) ?? q.get(k.toLowerCase());
+  if (/getcapabilities/i.test(get('REQUEST') || '')) {
+    const layers = DEMO_WMS_LAYERS.map(([n, t]) => `<Layer queryable="1"><Name>${n}</Name><Title>${t}</Title></Layer>`).join('');
+    return new Response(`<?xml version="1.0"?><WMS_Capabilities version="1.3.0"><Capability><Layer><Title>geo.admin.ch (Demo)</Title>${layers}</Layer></Capability></WMS_Capabilities>`,
+      { headers: { 'content-type': 'text/xml' } });
+  }
+  const [x0, y0, x1, y1] = get('BBOX').split(',').map(Number);
+  const w = Number(get('WIDTH')); const h = Number(get('HEIGHT'));
+  const layer = get('LAYERS');
+  const shift = layer.endsWith('2085_trocken') ? 600 : 0;
+  const R = 6378137;
+  const px = Buffer.alloc(w * h * 4);
+  for (let j = 0; j < h; j += 2) {
+    const lat = (Math.atan(Math.sinh((y1 - (j / h) * (y1 - y0)) / R)) * 180) / Math.PI;
+    for (let i = 0; i < w; i += 2) {
+      const lon = ((x0 + (i / w) * (x1 - x0)) / R) * 180 / Math.PI;
+      const z = elevation(lat, lon);
+      let c;
+      if (layer.includes('klimanormwerte')) {
+        const t = Math.max(0, Math.min(1, (11 - (z - 400) * 0.0055 - 4) / 7));
+        c = [Math.round(60 + 190 * t), Math.round(120 + 40 * (1 - Math.abs(t - 0.5) * 2)), Math.round(220 - 180 * t)];
+      } else {
+        c = BELTS.find(([top]) => z + shift < top)[1];
+      }
+      for (const [di, dj] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+        if (i + di >= w || j + dj >= h) continue;
+        const o = ((j + dj) * w + i + di) * 4;
+        px[o] = c[0]; px[o + 1] = c[1]; px[o + 2] = c[2]; px[o + 3] = 170;
+      }
+    }
+  }
+  const png = await sharp(px, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer();
+  return new Response(png, { headers: { 'content-type': 'image/png' } });
+}
+
 const app = createApp({
   dataDir: path.join(work, 'data'),
   dwdFetch,
@@ -314,6 +366,12 @@ const app = createApp({
     agov: { clientId: 'demo', clientSecret: 'demo', issuer: 'https://agov.example' },
   },
   mailer: { send: async () => ({ sent: true }) },
+  // Climate map: every cell at once in the demo, and the demo WMS below instead of geo.admin.ch.
+  klimaOptions: { cellsPerDay: 500, wmsUrl: `http://localhost:${Number(process.env.PORT) || 3123}/demo-wms`, wmsFetch: demoWms, wmsGenf: '' },
+});
+app.get('/demo-wms', async (req, res) => {
+  const r = await demoWms(`http://x/demo-wms?${new URLSearchParams(req.query)}`);
+  res.type(r.headers.get('content-type')).send(Buffer.from(await r.arrayBuffer()));
 });
 const port = Number(process.env.PORT) || 3123;
 app.listen(port, () => console.log(`Demo-Server auf http://localhost:${port}`));

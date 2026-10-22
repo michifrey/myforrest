@@ -171,6 +171,10 @@ Die feste Adresse lässt sich als Variable `APP_URL` in die Android-App bauen, d
 | `WEGNETZ_URL` | – | Overpass-API für das Wegnetz aus OpenStreetMap (z. B. `https://overpass-api.de/api/interpreter` oder eine eigene Instanz); im Durchgehen führen Pfeile dann entlang der Wege ([Details](funktionen.md#durchgehen-wie-street-view)) |
 | `MCH_RADAR_URL` | STAC-Sammlung `ch.meteoschweiz.ogd-radar-precip` bei geo.admin.ch | Niederschlagsradar der MeteoSchweiz im Tab *Wetter* eines Spots ([Details](funktionen.md#wetter-am-spot)); leer = nur das DWD-Radar |
 | `KLIMA_MODELS` | sieben Modelle (`CMCC_CM2_VHR4,FGOALS_f3_H,HiRAM_SIT_HR,MRI_AGCM3_2_S,EC_Earth3P_HR,MPI_ESM1_2_XR,NICAM16_8S`) | Klimamodelle der Klima-API von Open-Meteo für den Ausblick bis 2050 in [Klima im Wandel](klimawandel.md), kommagetrennt; leer = kein Ausblick |
+| `KLIMA_KARTE_PRO_TAG` | `30` | Neue Felder des Klima-Rasters pro Tag ([Details](klimawandel.md#klima-auf-der-karte)); jedes kostet bei Open-Meteo mehrere hundert Abfragen |
+| `KLIMA_KARTE_MODELLE` | `3` | Wie viele der Klimamodelle (die ersten aus `KLIMA_MODELS`) das Klima-Raster für die Szenarien nutzt; `0` = Raster ohne Szenarien |
+| `KLIMA_WMS_URL` | `https://wms.geo.admin.ch/` | Kartendienst (WMS) für die offiziellen Klima- und Waldkarten im Panel *Klima auf der Karte*; leer = aus |
+| `KLIMA_WMS_GENF` | vier Dienste des SITG (Wärmeinsel, Kronendach 2023 und 2017, Baumstrategie) | WMS-Dienste für Genf, kommagetrennt; ihre Karten erscheinen, wenn die Karte im Kanton Genf steht ([Details](klimawandel.md#klima-auf-der-karte)); leer = keine |
 | `TERRAIN_URL` | Terrain Tiles auf AWS | Geländekacheln für die [3D-Karte](funktionen.md#3d-karte), Vorlage mit `{z}`, `{x}`, `{y}` (Terrarium-PNG, z. B. ein eigener Spiegel); leer = keine 3D-Karte |
 | `MAPILLARY_TOKEN` | – | Client-Token von [Mapillary](https://www.mapillary.com/dashboard/developers) (`MLY|…`): Mapillary-Bilder im Durchgehen und auf der Karte, wo es keine eigenen gibt ([Details](funktionen.md#mapillary)) |
 | `GEBIRGE_AB_M` | `2100` | Ab dieser Höhe (m ü. M.) wird ein Spot ohne Profil, Baumarten und Wald-Beobachtungen ein Gebirge-Spot; `0` = aus |

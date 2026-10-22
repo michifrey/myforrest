@@ -30,6 +30,8 @@ const PREINDUSTRIAL = [1871, 1900]; // MeteoSchweiz' pre-industrial reference (h
 const FUTURE = [2031, 2050]; // projection window around 2040
 const RECENT_YEARS = 10;
 const MIN_DAYS = 360; // a year counts when it is (almost) complete
+const BEETLE_BASE = 8.3; // °C, development threshold of Ips typographus (PHENIPS)
+const BEETLE_DD = 557; // degree days for one generation (PHENIPS)
 
 // Indicators: label, unit, decimals; `kind` says how a projected change is applied.
 const INDICATORS = {
@@ -48,6 +50,9 @@ const INDICATORS = {
   summerP: { label: 'Sommerniederschlag (Jun–Aug)', unit: 'mm', digits: 0, kind: 'ratio' },
   winterT: { label: 'Wintertemperatur (Dez–Feb)', unit: '°C', digits: 1, kind: 'add' },
   winterP: { label: 'Winterniederschlag (Dez–Feb)', unit: 'mm', digits: 0, kind: 'ratio' },
+  // Warmth for the spruce bark beetle: degree days above 8.3 °C, April–September, from the daily mean air
+  // temperature (PHENIPS needs ~557 per generation; bark in the sun is warmer, so this is a lower bound).
+  beetleDD: { label: 'Wärmesumme Borkenkäfer (Apr–Sep, über 8,3 °C)', unit: '°C-Tage', digits: 0, kind: 'add' },
 };
 
 const round = (v, d = 1) => (Number.isFinite(v) ? Math.round(v * 10 ** d) / 10 ** d : null);
@@ -81,7 +86,7 @@ function yearlyIndicators(daily) {
     if (!years.has(y)) {
       years.set(y, {
         days: 0, tm: [], hot: 0, summer: 0, tropical: 0, frost: 0, ice: 0, grow: 0, snowDays: 0, snow: 0, snowN: 0,
-        p: 0, pN: 0, dry: 0, run: 0, sT: [], sP: 0, sPN: 0, wT: [], wP: 0, wPN: 0, wDec: 0,
+        p: 0, pN: 0, dry: 0, run: 0, sT: [], sP: 0, sPN: 0, wT: [], wP: 0, wPN: 0, wDec: 0, dd: 0, ddN: 0,
       });
     }
     return years.get(y);
@@ -117,6 +122,10 @@ function yearlyIndicators(daily) {
       a.snowN++;
       if (snow >= 1) a.snowDays++;
     }
+    if (m >= 4 && m <= 9 && Number.isFinite(mean_)) {
+      a.dd += Math.max(0, mean_ - BEETLE_BASE);
+      a.ddN++;
+    }
     if (m >= 6 && m <= 8) {
       if (Number.isFinite(mean_)) a.sT.push(mean_);
       if (Number.isFinite(rain)) { a.sP += rain; a.sPN++; }
@@ -150,6 +159,7 @@ function yearlyIndicators(daily) {
       summerP: a.sPN >= 85 ? round(a.sP, 0) : null,
       winterT: a.wDec >= 28 && a.wT.length >= 85 ? round(mean(a.wT), 2) : null,
       winterP: a.wDec >= 28 && a.wPN >= 85 ? round(a.wP, 0) : null,
+      beetleDD: a.ddN >= 180 ? round(a.dd, 0) : null,
     });
   }
   return out;
@@ -592,7 +602,7 @@ function synthesize({ climate, rows = [], obs = {}, projection = null, station =
     out.push({
       kind: 'beobachtung',
       title: `${total} Neophyten-Funde`,
-      text: `Seit ${neo[0]} bestimmten Fotos der Region ${total} Funde invasiver Neophyten, Einige invasive Arten profitieren von milderen Wintern und längeren Vegetationsperioden.`,
+      text: `Seit ${neo[0]} bestimmten Fotos der Region ${total} Funde invasiver Neophyten. Einige invasive Arten profitieren von milderen Wintern und längeren Vegetationsperioden.`,
     });
   }
 
@@ -616,9 +626,182 @@ function synthesize({ climate, rows = [], obs = {}, projection = null, station =
   return out;
 }
 
+/* ---------- Scenarios: global warming levels ---------- */
+
+// Global warming (°C above 1850–1900) of the normal and of the projection window, after IPCC AR6 WG I (SPM, Table SPM.1):
+// 1991–2020 about 0.9 °C; 2031–2050 on the high emission path SSP5-8.5 about 2.0 °C (2021–2040: 1.6, 2041–2060: 2.4).
+const GWL_NORMAL = 0.9;
+const GWL_FUTURE = 2.0;
+const LAPSE = 0.55; // °C per 100 m: mean annual lapse rate, for "the climate moves uphill"
+
+/** The warming levels of CH2025, with when the world reaches them according to IPCC AR6 (best estimates). */
+const WARMING_LEVELS = [
+  {
+    level: 'GWL1.5', gwl: 1.5, title: '+1,5 °C weltweit', pathway: 'Pariser Ziel, sehr starker Klimaschutz',
+    when: 'Nach dem IPCC in allen Szenarien Anfang der 2030er-Jahre erreicht; nur mit sehr starkem Klimaschutz (SSP1-1.9) bleibt es dabei.',
+  },
+  {
+    level: 'GWL2.0', gwl: 2.0, title: '+2 °C weltweit', pathway: 'Mittlere bis hohe Emissionen um die Jahrhundertmitte',
+    when: 'Mit hohen Emissionen (SSP5-8.5) um 2040–2050, mit mittleren (SSP2-4.5) um 2050–2060; mit starkem Klimaschutz (SSP1-2.6) wahrscheinlich nicht.',
+  },
+  {
+    level: 'GWL3.0', gwl: 3.0, title: '+3 °C weltweit', pathway: 'Ohne zusätzlichen Klimaschutz',
+    when: 'Mit mittleren Emissionen (SSP2-4.5: 2,7 °C) gegen Ende des Jahrhunderts, mit hohen (SSP5-8.5) um 2060–2070.',
+  },
+];
+
+/**
+ * The indicators at the global warming levels of CH2025 (+1.5, +2, +3 °C). Where CH2025 changes were
+ * imported (`ch2025`: { 'GWL2.0': [{ key, value, low, high }] }), those count; otherwise the change of
+ * the models between 1991–2020 and 2031–2050 is scaled with the global warming (pattern scaling:
+ * the local change grows in proportion to the global one). Each level: { level, gwl, title, pathway,
+ * when, source, shiftM, indicators: [{ key, label, unit, normal, value, low, high }] }.
+ */
+function scenarioLevels(projection, ch2025 = null) {
+  if (!projection) return [];
+  return WARMING_LEVELS.map((l) => {
+    const factor = (l.gwl - GWL_NORMAL) / (GWL_FUTURE - GWL_NORMAL);
+    const official = ch2025?.[l.level] || [];
+    const indicators = projection.indicators.map((i) => {
+      const ind = INDICATORS[i.key];
+      const ch = official.find((o) => o.key === i.key);
+      const apply = (v, scale) => {
+        if (!Number.isFinite(v)) return null;
+        if (ind.kind === 'ratio') return i.normal ? i.normal * (1 + (((v - i.normal) / i.normal) * scale)) : v;
+        const out = i.normal + (v - i.normal) * scale;
+        return ind.kind === 'count' ? Math.min(366, Math.max(0, out)) : out;
+      };
+      // CH2025 gives changes: °C and days absolute, precipitation and snow in %.
+      const fromCh = (d) => (Number.isFinite(d) ? (ind.kind === 'ratio' ? i.normal * (1 + d / 100) : ind.kind === 'count' ? Math.max(0, i.normal + d) : i.normal + d) : null);
+      const [value, low, high] = ch ? [fromCh(ch.value), fromCh(ch.low), fromCh(ch.high)] : [apply(i.value, factor), apply(i.low, factor), apply(i.high, factor)];
+      const [lo, hi] = [low, high].filter(Number.isFinite).sort((a, b) => a - b);
+      return { key: i.key, label: i.label, unit: i.unit, normal: i.normal, value: round(value, ind.digits), low: round(lo ?? value, ind.digits), high: round(hi ?? value, ind.digits), source: ch ? 'CH2025' : 'Modelle' };
+    });
+    const t = indicators.find((i) => i.key === 'tmean');
+    return {
+      ...l,
+      factor: round(factor, 2),
+      source: official.length ? 'CH2025' : 'Modelle',
+      shiftM: t ? Math.round(((t.value - t.normal) / LAPSE) * 10) * 10 : null, // metres, to 10 m
+      indicators,
+    };
+  });
+}
+
+/** Generations of the spruce bark beetle a degree-day sum allows (rough, from air temperature). */
+const beetleGenerations = (dd) => (Number.isFinite(dd) ? Math.round((dd / BEETLE_DD) * 10) / 10 : null);
+
+// Species that cope with warmth and drought and gain ground (cf. the Tree-App of BAFU and WSL); only the native ones.
+const GAINERS = ['Quercus petraea', 'Quercus robur', 'Acer campestre', 'Sorbus torminalis', 'Tilia cordata', 'Prunus avium', 'Castanea sativa', 'Pinus sylvestris'];
+
+/**
+ * What the scenarios mean for the forest at a place: rules of thumb from the research programme
+ * "Wald und Klimawandel" (BAFU, WSL) and the Tree-App, applied to the elevation, the indicators of
+ * each warming level and the tree species found there. Each topic: { key, title, text, levels:
+ * { 'GWL1.5': 'gering' | 'mittel' | 'hoch', … }, species?: [names] }. Not a site assessment: the
+ * soil (water storage) decides as much as the climate.
+ */
+function forestImpacts({ elevation, levels, normal = null, species = [] }) {
+  if (!levels.length) return [];
+  const out = [];
+  const val = (l, k) => l.indicators.find((i) => i.key === k);
+  const elev = Number.isFinite(elevation) ? elevation : null;
+  const names = new Set(species.map((t) => t.sci));
+  const name = (sci) => species.find((t) => t.sci === sci)?.de;
+  const effective = (l) => (elev !== null && Number.isFinite(l.shiftM) ? elev - l.shiftM : null);
+  const levelsOf = (fn) => Object.fromEntries(levels.map((l) => [l.level, fn(l)]));
+  const mid = levels.find((l) => l.level === 'GWL2.0') || levels[0];
+
+  // The climate moves uphill: the vegetation belts follow, with a delay of decades.
+  if (elev !== null && Number.isFinite(mid.shiftM)) {
+    const belt = (m) => (m < 600 ? 'kollin (Eichen, Linden, Hainbuchen)' : m < 1000 ? 'submontan bis untermontan (Buchenwälder)' : m < 1400 ? 'obermontan (Tannen-Buchenwälder)' : m < 1800 ? 'subalpin (Fichtenwälder)' : 'hochsubalpin bis alpin (Lärchen, Arven, Waldgrenze)');
+    out.push({
+      key: 'hoehenstufen',
+      title: 'Das Klima steigt den Hang hinauf',
+      text: `Bei ${mid.title} entspricht das Klima auf ${elev} m dem heutigen Klima auf rund ${Math.max(0, Math.round(effective(mid) / 10) * 10)} m ` +
+        `(${mid.shiftM} m tiefer; ${levels.map((l) => `${l.title.replace(' weltweit', '')}: ${l.shiftM} m`).join(', ')}). ` +
+        `Die Höhenstufe wechselt damit von ${belt(elev)} gegen ${belt(effective(mid))}. Wälder folgen langsam, über Jahrzehnte; ` +
+        'wer heute pflanzt, pflanzt für dieses künftige Klima.',
+      levels: levelsOf((l) => (l.shiftM >= 400 ? 'hoch' : l.shiftM >= 200 ? 'mittel' : 'gering')),
+    });
+  }
+
+  // Spruce: drought and bark beetles; in the lowlands it is the first tree to lose.
+  const dd = (l) => val(l, 'beetleDD');
+  const genNow = beetleGenerations(normal?.beetleDD ?? dd(mid)?.normal);
+  if (dd(mid)) {
+    const gens = levels.map((l) => `${l.title.replace(' weltweit', '')}: ${beetleGenerations(dd(l).value)}`).join(', ');
+    out.push({
+      key: 'fichte',
+      title: names.has('Picea abies') ? 'Fichte und Borkenkäfer: hier betroffen' : 'Fichte und Borkenkäfer',
+      text: `Die Wärme reicht 1991–2020 rechnerisch für ${genNow} Generationen des Buchdruckers pro Jahr, künftig für ${gens} ` +
+        '(grobe Schätzung aus der Lufttemperatur). Jede zusätzliche Generation vervielfacht den Befall, und trockengestresste Fichten wehren sich schlecht. ' +
+        (elev !== null ? `Die Fichte gilt unter rund 1000 m künftig als stark gefährdet; ${effective(mid) < 1000 ? `der Ort liegt klimatisch bei ${mid.title} auf rund ${Math.round(effective(mid) / 10) * 10} m.` : 'der Ort liegt auch künftig darüber.'}` : ''),
+      levels: levelsOf((l) => {
+        const g = beetleGenerations(dd(l).value);
+        const e = effective(l);
+        return g >= 2.5 || (e !== null && e < 800) ? 'hoch' : g >= 1.8 || (e !== null && e < 1100) ? 'mittel' : 'gering';
+      }),
+      species: names.has('Picea abies') ? [name('Picea abies')] : [],
+    });
+  }
+
+  // Beech and other drought-sensitive broadleaves: summer heat and less summer rain.
+  const sp = (l) => val(l, 'summerP');
+  const st = (l) => val(l, 'summerT');
+  const hot = (l) => val(l, 'hotDays');
+  if (st(mid) && sp(mid)) {
+    const sensitive = species.filter((t) => t.drought === 'hoch' && t.sci !== 'Picea abies').map((t) => t.de);
+    const pct = (l) => (sp(l).normal ? Math.round(((sp(l).value - sp(l).normal) / sp(l).normal) * 100) : 0);
+    out.push({
+      key: 'trockenheit',
+      title: 'Sommertrockenheit',
+      text: `Der Sommer wird bei ${mid.title} ${signed(st(mid).value - st(mid).normal, '°C')} wärmer, mit ${hot(mid) ? `${hot(mid).value} statt ${hot(mid).normal} Hitzetagen und ` : ''}` +
+        `${pct(mid) > 0 ? '+' : ''}${pct(mid)} % Sommerregen. Mehr Verdunstung bei kaum mehr Regen heisst trockenere Böden. ` +
+        `Buchen in tiefen Lagen und auf flachgründigen Böden reagieren mit früher Verfärbung, Kronenverlichtung und Absterben wie 2018 und 2022.` +
+        (sensitive.length ? ` Trockenheitsempfindlich am Ort: ${list(sensitive)}.` : ''),
+      levels: levelsOf((l) => {
+        const dT = st(l).value - st(l).normal;
+        const e = effective(l);
+        return dT >= 2.5 || (pct(l) <= -10 && dT >= 1.5) || (e !== null && e < 400) ? 'hoch' : dT >= 1.2 ? 'mittel' : 'gering';
+      }),
+      species: sensitive,
+    });
+  }
+
+  // Winter: fewer frost days and less snow; earlier leaf-out keeps late frost a risk.
+  const frost = (l) => val(l, 'frostDays');
+  const snowD = (l) => val(l, 'snowDays');
+  if (frost(mid)) {
+    out.push({
+      key: 'winter',
+      title: 'Milde Winter, früher Austrieb',
+      text: `Frosttage ${frost(mid).normal} → ${frost(mid).value}${snowD(mid) && snowD(mid).normal >= 1 ? `, Tage mit Neuschnee ${snowD(mid).normal} → ${snowD(mid).value}` : ''} (bei ${mid.title}). ` +
+        'Schädlinge überwintern besser, Schneebruch wird seltener. Weil die Bäume früher austreiben, bleiben späte Fröste gefährlich, gerade in Senken.',
+      levels: levelsOf((l) => (frost(l).normal - frost(l).value >= 30 ? 'mittel' : 'gering')),
+    });
+  }
+
+  // Who gains: native species that cope with warmth and drought.
+  const gain = GAINERS.map((sci) => ({ sci, t: species.find((x) => x.sci === sci) }));
+  const present = gain.filter((g) => g.t).map((g) => g.t.de);
+  out.push({
+    key: 'chancen',
+    title: 'Wer profitiert',
+    text: 'Wärme- und trockenheitsertragende Arten wie Traubeneiche, Stieleiche, Feldahorn, Elsbeere, Winterlinde, Kirsche und in tieferen Lagen die Edelkastanie gewinnen; ' +
+      'eine Mischung vieler Arten verteilt das Risiko. ' +
+      (present.length ? `Schon am Ort: ${list(present)}. ` : '') +
+      'Auch invasive Neophyten wie Götterbaum und Robinie profitieren und brauchen Aufmerksamkeit. Welche Arten genau passen, zeigt die Tree-App von BAFU und WSL für jeden Standort.',
+    levels: levelsOf(() => 'chance'),
+    species: present,
+  });
+  return out;
+}
+
+
 module.exports = {
   INDICATORS, HEAT_NOTES, REF, NORMAL, FUTURE, PREINDUSTRIAL,
   yearlyIndicators, periodMeans, trend, stripes, ranked, climateSummary, projectDelta, modelAnomalies,
   parseNbcnStations, parseNbcnYearly, parseStationCsv, parseScenarioCsv, nearest, stationSummary, synthesize,
-  parseTable, yearOf,
+  parseTable, yearOf, WARMING_LEVELS, GWL_NORMAL, GWL_FUTURE, LAPSE, BEETLE_DD, scenarioLevels, forestImpacts, beetleGenerations,
 };

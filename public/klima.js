@@ -270,7 +270,53 @@
     ['Klimaszenarien CH2025 (MeteoSchweiz, ETH Zürich, NCCS)', 'https://www.nccs.admin.ch/', 'für +1.5, +2 und +3 °C globale Erwärmung'],
     ['Phänologie (MeteoSchweiz, DWD)', 'https://opendatadocs.meteoswiss.ch/', 'Blattaustrieb und Verfärbung der Buche'],
     ['Sentinel-2 und Landsat', 'https://dataspace.copernicus.eu/', 'NDVI, Schnee und Eis an den Spots'],
+    ['IPCC AR6, Arbeitsgruppe I', 'https://www.ipcc.ch/report/ar6/wg1/', 'wann die Welt +1,5, +2 und +3 °C erreicht'],
+    ['Wald und Klimawandel, Tree-App (BAFU, WSL)', 'https://www.tree-app.ch/', 'Baumartenempfehlung für jeden Waldstandort'],
+    ['Karten von geo.admin.ch', 'https://map.geo.admin.ch/', 'Klimanormwerte, Höhenstufen des Waldes und weitere offizielle Karten'],
   ];
+
+  /** One card per warming level: when it is reached, what it means here. */
+  function levelCards(levels) {
+    const get = (l, k) => l.indicators.find((i) => i.key === k);
+    const row = (label, i, unit, d = 0, pct = false) => {
+      if (!i || !Number.isFinite(i.value)) return '';
+      const text = pct ? `${i.normal ? `${Math.round(((i.value - i.normal) / i.normal) * 100) > 0 ? '+' : ''}${Math.round(((i.value - i.normal) / i.normal) * 100)} %` : '–'}`
+        : `${fmt(i.normal, d)} → ${fmt(i.value, d)}${unit ? ` ${unit}` : ''}`;
+      return el('div', {}, [el('dt', { text: label }), el('dd', { text })]);
+    };
+    return el('div', { class: 'k-levels' }, levels.map((l) => {
+      const t = get(l, 'tmean');
+      const dd = get(l, 'beetleDD');
+      return el('article', { class: `k-level k-${l.level.replace('.', '')}` }, [
+        el('p', { class: 'k-kind', text: l.pathway }),
+        el('h4', { text: l.title }),
+        el('p', { class: 'k-level-dt', text: t ? `${signed(t.value - t.normal, '°C')} am Ort` : '' }),
+        el('p', { class: 'k-when', text: l.when }),
+        el('dl', { class: 'k-level-facts' }, [
+          row('Jahresmittel', t, '°C', 1),
+          row('Hitzetage', get(l, 'hotDays'), ''),
+          row('Tropennächte', get(l, 'tropicalNights')?.value >= 1 ? get(l, 'tropicalNights') : null, ''),
+          row('Frosttage', get(l, 'frostDays'), ''),
+          row('Tage mit Neuschnee', get(l, 'snowDays')?.normal >= 1 ? get(l, 'snowDays') : null, ''),
+          row('Sommerregen', get(l, 'summerP'), '', 0, true),
+          dd ? el('div', {}, [el('dt', { text: 'Käfergenerationen' }), el('dd', { text: `${fmt(dd.normal / 557, 1)} → ${fmt(dd.value / 557, 1)}` })]) : '',
+          Number.isFinite(l.shiftM) ? el('div', {}, [el('dt', { text: 'Klima wie heute' }), el('dd', { text: `${fmt(l.shiftM)} m tiefer` })]) : '',
+        ]),
+        el('p', { class: 'k-src', text: l.source === 'CH2025' ? 'Quelle: CH2025' : `aus den Modellen skaliert (Faktor ${fmt(l.factor, 2)})` }),
+      ]);
+    }));
+  }
+
+  const SEVERITY = { gering: 'gering', mittel: 'mittel', hoch: 'hoch', chance: 'Chance' };
+  /** Impacts on the forest, each with its severity per warming level. */
+  function forestCards(topics, levels) {
+    return el('div', { class: 'k-forest' }, topics.map((t) => el('article', { class: `k-impact k-impact-${t.key}` }, [
+      el('h4', { text: t.title }),
+      el('ul', { class: 'k-sev', 'aria-label': 'Einschätzung pro Szenario' }, levels.map((l) => el('li', { class: `sev-${t.levels[l.level]}` },
+        [el('span', { text: l.title.replace(' weltweit', '') }), el('strong', { text: SEVERITY[t.levels[l.level]] || '–' })]))),
+      el('p', { text: t.text }),
+    ])));
+  }
 
   /* ---------- Dossier ---------- */
 
@@ -290,8 +336,7 @@
     const box = $('klima');
     if (box) box.hidden = true;
     document.documentElement.classList.remove('klima-open');
-    $('klima-toggle')?.setAttribute('aria-pressed', 'false');
-    $('klima-toggle')?.focus();
+    (K.open ? $('klima-dossier-here') : $('klima-toggle'))?.focus();
   }
 
   /** Opens the dossier for `{ lat, lon }` or `{ spot }`, with the radius in km. */
@@ -300,7 +345,6 @@
     const box = dossier();
     box.hidden = false;
     document.documentElement.classList.add('klima-open');
-    $('klima-toggle')?.setAttribute('aria-pressed', 'true');
     const my = ++token;
     box.replaceChildren(header(null, radius), el('p', { class: 'k-loading', text: 'Klimadaten seit 1940 werden geladen … beim ersten Mal kann das einige Sekunden dauern.' }));
     box.querySelector('.k-close').focus();
@@ -324,6 +368,7 @@
         el('p', { class: 'eyebrow', text: 'Klima im Wandel' }),
         el('h2', { id: 'klima-title', text: d?.spot ? `Die Region um Spot ${d.spot}` : 'Die Region auf der Karte' }),
         el('p', { class: 'muted small', text: d ? placeLine(d) : '' }),
+        d ? geneva3d(d.centre.lat, d.centre.lon) : '',
       ]),
       el('div', { class: 'k-head-tools' }, [el('label', { class: 'small' }, ['Umkreis ', select]),
         el('button', { type: 'button', class: 'icon k-close', 'aria-label': 'Schliessen', text: '×', onclick: close })]),
@@ -370,6 +415,19 @@
         'Für die Kennzahlen kommt die Änderung jedes Modells zum gemessenen Mittel dazu.',
         outlookChart(d.years, d.modelSeries), projectionTable(d.projection), el('p', { class: 'k-src', text: d.sources.models })));
     }
+    if (d.levels?.length) {
+      parts.push(section('k-levels', 'Drei Szenarien für die Region',
+        'Die Klimaszenarien der Schweiz (CH2025) rechnen mit Stufen der globalen Erwärmung gegenüber 1850–1900. ' +
+        (d.levels[0].source === 'CH2025' ? 'Die Zahlen stammen aus CH2025.' : 'Ohne geladene CH2025-Daten skaliert MyForrest die Änderung der Klimamodelle mit der globalen Erwärmung (Pattern Scaling); 2031–2050 entsprechen auf dem hohen Emissionspfad etwa +2 °C.'),
+        levelCards(d.levels)));
+    }
+    if (d.forest?.length) {
+      parts.push(section('k-forest', 'Was das für den Wald bedeutet',
+        `Faustregeln aus dem Forschungsprogramm «Wald und Klimawandel» von BAFU und WSL, angewandt auf die Höhe (${fmt(d.centre.elevation)} m), die Szenarien und ` +
+        (d.species?.length ? `die Baumarten der Spots (${d.species.map((t) => t.name).join(', ')}).` : 'die häufigen Baumarten (an den Spots sind noch keine bestimmt).') +
+        ' Der Boden, vor allem wie viel Wasser er speichert, entscheidet ebenso viel; für einen Bestand gibt die Tree-App die Empfehlung.',
+        forestCards(d.forest, d.levels)));
+    }
     if (d.scenarios) {
       parts.push(section('k-ch2025', `Klimaszenarien CH2025: ${d.scenarios.place}`,
         `Änderungen bei 1.5, 2 und 3 °C globaler Erwärmung, für den nächsten Ort mit Szenarien (${d.scenarios.km} km).`, scenarioTable(d.scenarios)));
@@ -408,18 +466,225 @@
       stripesChart(c.stripes, { height: 46, labels: false, label: `Klimastreifen ${c.first}–${c.last}` }),
       el('p', { class: 'k-spot-line' }, [el('strong', { text: signed(c.warming, '°C') }), ` wärmer als 1961–1990 (${c.first}–${c.last}, ${fmt(d.centre.elevation)} m)`]),
       el('dl', { class: 'k-facts' }, facts.map((f) => el('div', {}, [el('dt', { text: f.label }), el('dd', { text: `${fmt(f.ref)} → ${fmt(f.recent)}` })]))),
-      d.synthesis.length > 1 ? synthesisList(d.synthesis.slice(1, 4)) : '',
+      d.synthesis.length > 1 ? synthesisList(d.synthesis.slice(1, 3)) : '',
+      d.forest?.length ? el('h4', { class: 'label', text: 'Was das für den Wald hier bedeutet' }) : '',
+      d.forest?.length ? forestCards(d.forest.filter((t) => t.key !== 'winter').slice(0, 3), d.levels) : '',
       el('button', { type: 'button', class: 'secondary', text: 'Ganzes Klima-Dossier der Region', onclick: () => open({ spot: spot.id }, 15) }),
+      geneva3d(d.centre.lat, d.centre.lon),
     );
+  }
+
+  /* ---------- Climate on the map ---------- */
+
+  // What the cells show: value of a cell (`c`) at the chosen level (`l`), colour scale and legend.
+  const WARM = ['#fff5eb', '#fee6ce', '#fdd0a2', '#fdae6b', '#fd8d3c', '#f16913', '#d94801', '#a63603', '#7f2704'];
+  const DRYWET = ['#8c510a', '#bf812d', '#dfc27d', '#f6e8c3', '#c7eae5', '#80cdc1', '#35978f'];
+  const LAYERS = {
+    warming: { label: 'Erwärmung seit 1961–1990', unit: '°C', scenario: false, get: (c) => c.warming, steps: [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4], colours: WARM, d: 1, sign: true },
+    hotNow: { label: 'Hitzetage heute (letzte 10 Jahre)', unit: 'Tage', scenario: false, get: (c) => c.hotDays, steps: [1, 3, 6, 10, 15, 20, 30, 40], colours: WARM, d: 0 },
+    dT: { label: 'Wärmer als 1991–2020', unit: '°C', scenario: true, get: (c, l) => c.levels?.[l]?.dT, steps: [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4], colours: WARM, d: 1, sign: true },
+    hot: { label: 'Hitzetage im Szenario', unit: 'Tage', scenario: true, get: (c, l) => c.levels?.[l]?.hotDays, steps: [1, 3, 6, 10, 15, 20, 30, 40], colours: WARM, d: 0 },
+    summerP: { label: 'Sommerregen im Szenario', unit: '%', scenario: true, get: (c, l) => c.levels?.[l]?.summerP, steps: [-25, -15, -8, -3, 3, 8], colours: DRYWET, d: 0, sign: true },
+    beetle: { label: 'Borkenkäfer-Generationen im Szenario', unit: '', scenario: true, get: (c, l) => c.levels?.[l]?.beetle, steps: [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4], colours: WARM, d: 1 },
+    shift: { label: 'Klima wie heute … m tiefer', unit: 'm', scenario: true, get: (c, l) => c.levels?.[l]?.shiftM, steps: [100, 200, 300, 400, 500, 600, 700, 800], colours: WARM, d: 0 },
+  };
+  const K = { open: false, grid: null, wms: null, layer: 'dT', level: 'GWL2.0', poll: null, timer: null, data: null, wmsList: null };
+  const colourOf = (def, v) => {
+    if (!Number.isFinite(v)) return null;
+    let i = def.steps.findIndex((s) => v < s);
+    if (i < 0) i = def.steps.length;
+    return def.colours[Math.min(i, def.colours.length - 1)];
+  };
+  const valueText = (def, v) => (Number.isFinite(v) ? `${def.sign ? signed(v, '', def.d) : fmt(v, def.d)}${def.unit ? ` ${def.unit}` : ''}` : '–');
+
+  function buildPanel() {
+    const panel = $('klimapanel');
+    const layerSel = el('select', { id: 'klima-layer', class: 'small' }, Object.entries(LAYERS).map(([k, l]) => el('option', { value: k, text: l.label })));
+    layerSel.value = K.layer;
+    const levelSel = el('select', { id: 'klima-level', class: 'small' }, [
+      el('option', { value: 'GWL1.5', text: '+1,5 °C weltweit (Pariser Ziel)' }),
+      el('option', { value: 'GWL2.0', text: '+2 °C weltweit (um 2040–2060)' }),
+      el('option', { value: 'GWL3.0', text: '+3 °C weltweit (ohne mehr Klimaschutz)' }),
+    ]);
+    levelSel.value = K.level;
+    layerSel.addEventListener('change', () => { K.layer = layerSel.value; syncLevel(); drawGrid(); });
+    levelSel.addEventListener('change', () => { K.level = levelSel.value; drawGrid(); });
+    const gridToggle = el('input', { type: 'checkbox', id: 'klima-grid', checked: '' });
+    gridToggle.addEventListener('change', () => { if (gridToggle.checked) loadGrid(); else { K.grid?.remove(); K.grid = null; } });
+    const wmsSel = el('select', { id: 'klima-wms', class: 'small' }, [el('option', { value: '', text: 'keine' })]);
+    wmsSel.addEventListener('change', () => setWms(wmsSel.value));
+    const opacity = el('input', { type: 'range', id: 'klima-wms-opacity', min: '0.2', max: '1', step: '0.1', value: '0.7', 'aria-label': 'Deckkraft der offiziellen Karte' });
+    opacity.addEventListener('input', () => K.wms?.setOpacity(Number(opacity.value)));
+    panel.replaceChildren(
+      el('header', { class: 'sun-head' }, [
+        el('div', {}, [el('p', { class: 'eyebrow', text: 'Klima im Wandel' }), el('h2', { id: 'klima-panel-title', text: 'Klima auf der Karte' }),
+          el('p', { class: 'muted small', text: 'Felder von 0,1° (rund 8 × 11 km), auf die Höhe der Feldmitte gerechnet.' })]),
+        el('button', { type: 'button', class: 'icon', 'aria-label': 'Schliessen', text: '×', onclick: () => toggle(false) }),
+      ]),
+      el('button', { type: 'button', id: 'klima-dossier-here', class: 'btn primary wide', text: 'Klima-Dossier für die Kartenmitte', onclick: () => { const c = map.getCenter(); open({ lat: c.lat, lon: c.lng }, 15); } }),
+      el('div', { class: 'k-panel-box' }, [
+        el('label', { class: 'toggle small' }, [gridToggle, ' Klima-Raster auf der Karte']),
+        el('label', { class: 'small k-row' }, ['Zeigen ', layerSel]),
+        el('label', { class: 'small k-row', id: 'klima-level-row' }, ['Szenario ', levelSel]),
+        el('div', { id: 'klima-legend', class: 'k-legend' }),
+        el('p', { id: 'klima-status', class: 'muted small' }),
+        el('p', { id: 'klima-when', class: 'small k-when' }),
+      ]),
+      el('div', { class: 'k-panel-box' }, [
+        el('label', { class: 'small k-row' }, ['Offizielle Karte ', wmsSel]),
+        el('label', { class: 'small k-row' }, ['Deckkraft ', opacity]),
+        el('p', { id: 'klima-wms-status', class: 'muted small', text: 'Karten von geo.admin.ch, z. B. Klimanormwerte der MeteoSchweiz oder die Höhenstufen des Waldes heute und im Klimawandel (BAFU); im Kanton Genf auch Hitzeinseln und Kronendach (SITG).' }),
+      ]),
+      el('p', { class: 'wx-source', text: 'ERA5 und Klimamodelle (CMIP6) über Open-Meteo, Szenarien nach CH2025 und IPCC AR6; Karten: geo.admin.ch' }),
+    );
+    syncLevel();
+  }
+
+  const WHEN = {
+    'GWL1.5': 'Pariser Ziel: Anfang der 2030er-Jahre erreicht; dabei bleibt es nur mit sehr starkem Klimaschutz.',
+    'GWL2.0': 'Mit hohen Emissionen um 2040–2050, mit mittleren um 2050–2060 (IPCC AR6).',
+    'GWL3.0': 'Mit mittleren Emissionen gegen Ende des Jahrhunderts, mit hohen um 2060–2070 (IPCC AR6).',
+  };
+  function syncLevel() {
+    const def = LAYERS[K.layer];
+    $('klima-level-row').hidden = !def.scenario;
+    $('klima-when').textContent = def.scenario ? WHEN[K.level] : '';
+    const steps = def.steps;
+    $('klima-legend').replaceChildren(...def.colours.slice(0, steps.length + 1).map((c, i) => el('span', {}, [
+      el('i', { style: `background:${c}` }),
+      i === 0 ? `< ${fmt(steps[0], def.d)}` : i === steps.length ? `≥ ${fmt(steps[i - 1], def.d)}` : `${fmt(steps[i - 1], def.d)}`,
+    ])), el('span', { class: 'k-unit', text: def.unit }));
+  }
+
+  async function loadGrid() {
+    if (!K.open || !$('klima-grid')?.checked) return;
+    const b = map.getBounds();
+    clearTimeout(K.poll);
+    let d;
+    try {
+      d = await api(`/api/klima/karte?bbox=${[b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((v) => v.toFixed(3)).join(',')}`);
+    } catch (err) {
+      $('klima-status').textContent = `Klimaraster nicht verfügbar: ${err.message}`;
+      return;
+    }
+    K.data = d;
+    drawGrid();
+    if (d.tooLarge) $('klima-status').textContent = 'Für das Klima-Raster näher heranzoomen.';
+    else {
+      $('klima-status').textContent = `${d.cells.length} Felder${d.pending ? `, ${d.pending} werden berechnet` : ''}` +
+        (d.pending && !d.budgetLeft ? ' (Tageskontingent erreicht, morgen weiter)' : '');
+      // While cells are computed in the background, ask again.
+      if (d.pending && d.budgetLeft) K.poll = setTimeout(loadGrid, 6000);
+    }
+  }
+
+  function drawGrid() {
+    syncLevel();
+    if (!K.data || !$('klima-grid')?.checked) return;
+    const def = LAYERS[K.layer];
+    const half = K.data.cell / 2;
+    K.grid?.remove();
+    K.grid = L.layerGroup(K.data.cells.map((c) => {
+      const v = def.get(c, K.level);
+      const colour = colourOf(def, v);
+      return L.rectangle([[c.lat - half, c.lon - half], [c.lat + half, c.lon + half]], {
+        className: 'k-cell-rect', weight: 0.6, color: '#ffffff', fillColor: colour || 'transparent', fillOpacity: colour ? 0.62 : 0,
+      }).bindTooltip(`${def.label}: <b>${valueText(def, v)}</b><br>${fmt(c.elevation)} m · heute ${fmt(c.hotDays)} Hitzetage`, { sticky: true })
+        .bindPopup(() => cellPopup(c));
+    })).addTo(map);
+  }
+
+  function cellPopup(c) {
+    const l = c.levels?.[K.level];
+    const lv = { 'GWL1.5': '+1,5 °C', 'GWL2.0': '+2 °C', 'GWL3.0': '+3 °C' }[K.level];
+    return el('div', { class: 'k-popup' }, [
+      el('strong', { text: `${fmt(c.lat, 2)}° N, ${fmt(c.lon, 2)}° O · ${fmt(c.elevation)} m` }),
+      el('p', { text: `Seit 1961–1990 ${signed(c.warming, '°C')}; heute ${fmt(c.hotDays)} Hitzetage, ${fmt(c.frostDays)} Frosttage.` }),
+      l ? el('p', { text: `Bei ${lv} weltweit: ${signed(l.dT, '°C')} gegenüber 1991–2020, ${fmt(l.hotDays)} Hitzetage, Sommerregen ${l.summerP > 0 ? '+' : ''}${fmt(l.summerP)} %, ${fmt(l.beetle, 1)} Käfergenerationen; das Klima entspricht dem heutigen ${fmt(l.shiftM)} m tiefer.` }) : '',
+      el('button', { type: 'button', class: 'btn primary', text: 'Klima-Dossier hier', onclick: () => open({ lat: c.lat, lon: c.lon }, 15) }),
+      geneva3d(c.lat, c.lon),
+    ]);
+  }
+
+  async function loadWms() {
+    if (!K.wmsList) {
+      try {
+        K.wmsList = await api('/api/klima/layers');
+      } catch {
+        K.wmsList = { layers: [] };
+      }
+    }
+    fillWms();
+  }
+
+  /** The maps on offer: everywhere those of geo.admin.ch, regional ones (Geneva) only when the map is there. */
+  function fillWms() {
+    const sel = $('klima-wms');
+    if (!sel || !K.wmsList) return;
+    const c = map.getCenter();
+    const here = (l) => !l.bbox || (c.lng >= l.bbox[0] && c.lng <= l.bbox[2] && c.lat >= l.bbox[1] && c.lat <= l.bbox[3]);
+    const chosen = sel.value;
+    const groups = new Map();
+    K.wmsList.layers.forEach((l, i) => { if (here(l)) (groups.get(l.group) || groups.set(l.group, []).get(l.group)).push([i, l]); });
+    sel.replaceChildren(el('option', { value: '', text: 'keine' }),
+      ...[...groups].map(([g, ls]) => el('optgroup', { label: g }, ls.map(([i, l]) => el('option', { value: String(i), text: l.title })))));
+    sel.value = [...sel.options].some((o) => o.value === chosen) ? chosen : '';
+    if (sel.value !== chosen) setWms('');
+    if (!K.wmsList.layers.length) $('klima-wms-status').textContent = K.wmsList.error || 'Keine offiziellen Klimakarten gefunden.';
+  }
+
+  function setWms(value) {
+    K.wms?.remove();
+    K.wms = null;
+    const l = value === '' ? null : K.wmsList?.layers[Number(value)];
+    if (!l) return;
+    K.wms = L.tileLayer.wms(l.url, {
+      layers: l.name, format: 'image/png', transparent: true, version: '1.3.0', opacity: Number($('klima-wms-opacity').value),
+      attribution: l.attribution || '© geo.admin.ch', className: 'k-wms',
+    }).addTo(map);
+  }
+
+  // Genève 3D (geneva3d.ch): a 3D twin of the canton by Arnaud Ricci (volunteer project, beta), linked for places in Geneva.
+  const GENEVA = [5.95, 46.12, 6.32, 46.37];
+  const inGeneva = (lat, lon) => lon >= GENEVA[0] && lon <= GENEVA[2] && lat >= GENEVA[1] && lat <= GENEVA[3];
+  const geneva3d = (lat, lon) => (inGeneva(lat, lon) ? el('p', { class: 'k-src k-g3d' }, [
+    el('a', { href: 'https://geneva3d.ch/', target: '_blank', rel: 'noopener', text: 'In Genève 3D ansehen' }),
+    ' – der Kanton als 3D-Modell mit 239 000 Bäumen, ÖV und Wetter (privates Projekt von Arnaud Ricci, Beta)',
+  ]) : '');
+
+  const OTHER_PANELS = ['sun-toggle', 'species-toggle', 'tours-toggle'];
+  function toggle(open_) {
+    K.open = open_;
+    $('klimapanel').hidden = !open_;
+    $('klima-toggle').setAttribute('aria-expanded', String(open_));
+    if (open_) {
+      // Only one map panel at a time.
+      for (const id of OTHER_PANELS) if ($(id)?.getAttribute('aria-expanded') === 'true') $(id).click();
+      if (!$('klimapanel').childElementCount) buildPanel();
+      loadGrid();
+      loadWms();
+      if (K.wms) K.wms.addTo(map);
+    } else {
+      clearTimeout(K.poll);
+      K.grid?.remove();
+      K.grid = null;
+      K.wms?.remove();
+    }
   }
 
   /* ---------- Wiring ---------- */
 
-  $('klima-toggle')?.addEventListener('click', () => {
-    const c = map.getCenter();
-    open({ lat: c.lat, lon: c.lng }, 15);
+  $('klima-toggle')?.addEventListener('click', () => toggle(!K.open));
+  for (const id of OTHER_PANELS) {
+    $(id)?.addEventListener('click', () => setTimeout(() => {
+      if (K.open && $(id).getAttribute('aria-expanded') === 'true') toggle(false);
+    }));
+  }
+  map.on('moveend', () => {
+    clearTimeout(K.timer);
+    if (K.open) K.timer = setTimeout(() => { loadGrid(); fillWms(); }, 400);
   });
   $('tab-klima')?.addEventListener('click', () => renderSpot(state.spot));
 
-  window.Klima = { open, close, renderSpot };
+  window.Klima = { open, close, renderSpot, toggle };
 })();

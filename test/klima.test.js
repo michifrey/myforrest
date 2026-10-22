@@ -289,3 +289,127 @@ test('homogeneous series from the STAC API of data.geo.admin.ch: stations file a
     assert.deepEqual([status.stations, status.stationYears], [1, 162]);
   });
 });
+
+/* ---------- Scenarios, forest, map ---------- */
+
+test('warming levels: model change scaled with the global warming, CH2025 values where loaded, altitude shift', () => {
+  const observed = klima.yearlyIndicators(synthDaily(1985, 2025, { perDecade: 0.4 }));
+  const models = { A: klima.yearlyIndicators(synthDaily(1991, 2050, { perDecade: 0.44 })) };
+  const p = klima.projectDelta(observed, models);
+  const dT = p.indicators.find((i) => i.key === 'tmean').delta; // the model change 1991–2020 → 2031–2050, ≈ +2 °C globally
+  const levels = klima.scenarioLevels(p);
+  assert.deepEqual(levels.map((l) => l.level), ['GWL1.5', 'GWL2.0', 'GWL3.0']);
+  const t = (l) => l.indicators.find((i) => i.key === 'tmean');
+  assert.ok(Math.abs((t(levels[1]).value - t(levels[1]).normal) - dT) < 0.15, 'GWL2.0 is the model window');
+  assert.ok(Math.abs((t(levels[0]).value - t(levels[0]).normal) - dT * (0.6 / 1.1)) < 0.15, 'GWL1.5 scaled by (1.5−0.9)/(2.0−0.9)');
+  assert.equal(levels[2].shiftM, Math.round(((t(levels[2]).value - t(levels[2]).normal) / 0.55) * 10) * 10);
+  assert.ok(levels.every((l) => l.source === 'Modelle' && l.when));
+  // CH2025: +17 hot days at +3 °C replaces the scaled value; precipitation as % change.
+  const ch = klima.scenarioLevels(p, { 'GWL3.0': [{ key: 'hotDays', value: 17, low: 10, high: 26 }, { key: 'summerP', value: -10, low: -20, high: 0 }] });
+  const hot = ch[2].indicators.find((i) => i.key === 'hotDays');
+  assert.deepEqual([hot.value - hot.normal, hot.source, ch[2].source], [17, 'CH2025', 'CH2025']);
+  const sp = ch[2].indicators.find((i) => i.key === 'summerP');
+  assert.equal(sp.value, Math.round(sp.normal * 0.9));
+  assert.deepEqual(klima.scenarioLevels(null), []);
+});
+
+test('forest: belts move uphill, spruce and drought rated per level, the species of the place named', () => {
+  const observed = klima.yearlyIndicators(synthDaily(1985, 2025, { perDecade: 0.4, dry: [2018] }));
+  const models = { A: klima.yearlyIndicators(synthDaily(1991, 2050, { perDecade: 0.6 })) };
+  const levels = klima.scenarioLevels(klima.projectDelta(observed, models));
+  const { treeInfo } = require('../src/trees');
+  const species = ['Picea abies', 'Fagus sylvatica', 'Quercus petraea'].map(treeInfo);
+  const low = klima.forestImpacts({ elevation: 550, levels, species });
+  assert.deepEqual(low.map((t) => t.key), ['hoehenstufen', 'fichte', 'trockenheit', 'winter', 'chancen']);
+  const spruce = low.find((t) => t.key === 'fichte');
+  assert.equal(spruce.title, 'Fichte und Borkenkäfer: hier betroffen');
+  assert.equal(spruce.levels['GWL3.0'], 'hoch', 'spruce in the lowlands');
+  assert.match(low.find((t) => t.key === 'trockenheit').text, /Trockenheitsempfindlich am Ort: Rotbuche\./);
+  assert.match(low.find((t) => t.key === 'chancen').text, /Schon am Ort: Traubeneiche/);
+  assert.match(low[0].text, /auf 550 m dem heutigen Klima auf rund \d+ m/);
+  // Up high it is colder: a climate with a mean of 2 °C.
+  const cold = klima.scenarioLevels(klima.projectDelta(klima.yearlyIndicators(synthDaily(1985, 2025, { base: 2 })), { A: klima.yearlyIndicators(synthDaily(1991, 2050, { base: 2, perDecade: 0.5 })) }));
+  const high = klima.forestImpacts({ elevation: 1900, levels: cold, species: [] });
+  assert.equal(high.find((t) => t.key === 'fichte').levels['GWL1.5'], 'gering', 'spruce at 1900 m with little warming');
+  assert.equal(high.find((t) => t.key === 'fichte').title, 'Fichte und Borkenkäfer');
+  assert.equal(klima.beetleGenerations(1114), 2);
+  assert.deepEqual(klima.forestImpacts({ elevation: 500, levels: [] }), []);
+});
+
+test('climate map: cells of 0.1° computed in the background within the daily budget; official maps from WMS capabilities', async () => {
+  const hosts = [];
+  const weatherFetch = async (url) => {
+    const u = new URL(url);
+    hosts.push(u.hostname);
+    const q = u.searchParams;
+    if (u.pathname.includes('/elevation')) return Response.json({ elevation: [500 + Math.round(Number(q.get('latitude')) * 10) % 7 * 50] });
+    if (u.hostname.endsWith('open-meteo.com')) {
+      return Response.json({ daily: synthDaily(Number(q.get('start_date').slice(0, 4)), Number(q.get('end_date').slice(0, 4)), { perDecade: q.get('models') ? 0.5 : 0.4 }) });
+    }
+    return new Response('offline', { status: 503 });
+  };
+  const capabilities = `<?xml version="1.0"?><WMS_Capabilities><Capability><Layer><Title>geo.admin</Title>
+    <Layer><Name>ch.meteoschweiz.klimanormwerte-temperatur_aktuelle_periode</Name><Title>Klimanormwerte Temperatur</Title></Layer>
+    <Layer><Name>ch.bafu.wald-vegetationshoehenstufen_1975</Name><Title>Vegetationshöhenstufen 1975</Title></Layer>
+    <Layer><Name>ch.swisstopo.pixelkarte-farbe</Name><Title>Landeskarte</Title></Layer>
+  </Layer></Capability></WMS_Capabilities>`;
+  // An ArcGIS service of Geneva: layers named 0, 1 …, the service title in front.
+  const sitg = `<?xml version="1.0"?><WMS_Capabilities><Service><Title>SIPV_ICA_MNC_2023</Title></Service><Capability><Layer><Title>Layers</Title>
+    <Layer><Name>0</Name><Title>Canopée 2023</Title></Layer></Layer></Capability></WMS_Capabilities>`;
+  const wmsFetch = async (url) => {
+    if (url.startsWith('https://sitg.example/')) return new Response(sitg);
+    if (url.startsWith('https://down.example/')) return new Response('', { status: 500 });
+    return url.includes('GetCapabilities') ? new Response(capabilities) : new Response('', { status: 404 });
+  };
+  const pending = [];
+  await withServer({ weatherFetch, klimaModels: 'A,B,C,D', klimaOptions: { cellsPerDay: 3, mapModels: 2, wmsUrl: 'https://wms.example/', wmsFetch, wmsGenf: 'https://sitg.example/WMSServer,https://down.example/WMSServer' } }, async (base) => {
+    assert.equal((await fetch(`${base}/api/klima/karte?bbox=1,2`)).status, 400);
+    assert.equal((await (await fetch(`${base}/api/klima/karte?bbox=5,45,11,48`)).json()).tooLarge, true);
+    let d = await (await fetch(`${base}/api/klima/karte?bbox=8.51,47.31,8.69,47.44`)).json();
+    assert.deepEqual([d.cells.length, d.pending, d.cell], [0, 4, 0.1], '2 × 2 cells queued');
+    for (let i = 0; i < 100 && d.cells.length < 3; i++) {
+      await new Promise((r) => setTimeout(r, 50));
+      d = await (await fetch(`${base}/api/klima/karte?bbox=8.51,47.31,8.69,47.44`)).json();
+    }
+    assert.equal(d.cells.length, 3, 'three cells a day');
+    assert.equal(d.budgetLeft, 0);
+    assert.equal(d.pending, 1);
+    const c = d.cells[0];
+    assert.ok([8.55, 8.65].includes(c.lon) && [47.35, 47.45].includes(c.lat));
+    assert.ok(c.warming > 1 && c.levels['GWL2.0'].dT > 0 && c.levels['GWL3.0'].shiftM > c.levels['GWL1.5'].shiftM);
+    assert.equal(hosts.filter((h) => h === 'climate-api.open-meteo.com').length, 2, 'two models for the map, on one 0.5° cell');
+    const layers = await (await fetch(`${base}/api/klima/layers`)).json();
+    assert.equal(layers.url, 'https://wms.example/');
+    assert.deepEqual(layers.layers.map((l) => [l.group, l.title]), [
+      ['Klima heute (MeteoSchweiz)', 'Klimanormwerte Temperatur'], ['Wald im Klimawandel (BAFU)', 'Vegetationshöhenstufen 1975'],
+      ['Stadtklima und Bäume Genf (SITG)', 'SIPV_ICA_MNC_2023: Canopée 2023']]);
+    const geneva = layers.layers[2];
+    assert.deepEqual([geneva.url, geneva.name, geneva.attribution, geneva.bbox], ['https://sitg.example/WMSServer', '0', '© SITG / État de Genève', [5.95, 46.12, 6.32, 46.37]]);
+    assert.deepEqual(layers.errors, ['down.example: HTTP 500'], 'a service that does not answer is left out');
+  });
+  await Promise.all(pending);
+});
+
+test('dossier API: scenarios and the meaning for the forest, with the trees of the spot', async () => {
+  const weatherFetch = async (url) => {
+    const u = new URL(url);
+    const q = u.searchParams;
+    if (u.hostname.endsWith('open-meteo.com') && q.get('start_date')) {
+      return Response.json({ daily: synthDaily(Number(q.get('start_date').slice(0, 4)), Number(q.get('end_date').slice(0, 4)), { perDecade: 0.5 }) });
+    }
+    return new Response('offline', { status: 503 });
+  };
+  await withServer({ weatherFetch, klimaModels: 'A' }, async (base, dataDir) => {
+    const { DatabaseSync } = require('node:sqlite');
+    const db = new DatabaseSync(path.join(dataDir, 'myforrest.db'));
+    const id = Number(db.prepare('INSERT INTO spots (lat, lon, created_at, elevation) VALUES (47.37, 8.55, 0, 520)').run().lastInsertRowid);
+    db.prepare(`INSERT INTO photos (spot_id, file, taken_at, lat, lon, location_source, created_at) VALUES (?, 'a.jpg', ?, 47.37, 8.55, 'exif', 0)`).run(id, Date.UTC(2024, 6, 1));
+    db.prepare("INSERT INTO spot_species (spot_id, scientific_name, source, created_at) VALUES (?, 'Picea abies', 'manual', 0)").run(id);
+    db.close();
+    const d = await (await fetch(`${base}/api/klima?spot=${id}`)).json();
+    assert.equal(d.centre.elevation, 520);
+    assert.deepEqual(d.levels.map((l) => l.level), ['GWL1.5', 'GWL2.0', 'GWL3.0']);
+    assert.deepEqual(d.species, [{ scientificName: 'Picea abies', name: 'Fichte', drought: 'hoch' }]);
+    assert.equal(d.forest.find((t) => t.key === 'fichte').title, 'Fichte und Borkenkäfer: hier betroffen');
+  });
+});

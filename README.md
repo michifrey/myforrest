@@ -475,7 +475,7 @@ App Fotos dort an der Horizontlinie aus.
 
 ![Klima-Dossier der Region: Klimastreifen seit 1940 und die Messreihe seit 1864](docs/screenshots/klima-dossier.jpg)
 
-Der Knopf **Klima** auf der Karte öffnet ein **Dossier der Region** um die Kartenmitte: Klimastreifen seit 1940
+Der Knopf **Klima** auf der Karte öffnet das Panel *Klima auf der Karte* und von dort ein **Dossier der Region** um die Kartenmitte: Klimastreifen seit 1940
 (ERA5 über Open-Meteo, auf die Höhe des Ortes umgerechnet) und, wenn geladen, die nächste homogene Messreihe der
 MeteoSchweiz seit 1864. Daneben steht, wie viel wärmer die letzten zehn Jahre waren als 1961–1990, im Beispiel
 +2,2 °C.
@@ -496,7 +496,27 @@ Die **Zeitachse** legt unter die Sommer der Region, was MyForrest im selben Jahr
 Trockenheit und Hitze, Stürme mit und ohne Windwurf, den NDVI im Hochsommer, Austrieb und Verfärbung der Buche an
 den Phänologie-Stationen, Schneeschmelze, Eis und Neophyten. Daraus entstehen **Aussagen**, die Klima und
 Beobachtungen verbinden, etwa wie viele besuchte Spots in den Hitzesommern Trockenstress zeigten und wie viele in
-den anderen Jahren. Im Spot fasst der Tab **Klima** das Wichtigste für den Ort zusammen. Quellen, Methode und Grenzen:
+den anderen Jahren. Im Spot fasst der Tab **Klima** das Wichtigste für den Ort zusammen.
+
+<p>
+  <img src="docs/screenshots/klima-szenarien.jpg" width="49%" alt="Drei Szenarien: +1,5, +2 und +3 °C weltweit, was sie am Ort bedeuten">
+  <img src="docs/screenshots/klima-wald.jpg" width="49%" alt="Was das für den Wald bedeutet: Einschätzung pro Szenario">
+</p>
+
+**Drei Szenarien** (links) zeigen, was +1,5, +2 und +3 °C globale Erwärmung am Ort bedeuten und wann die Welt sie nach
+dem IPCC je nach Klimaschutz erreicht: Temperatur, Hitzetage, Frost, Schnee, Sommerregen und wie weit das Klima den
+Hang hinaufsteigt (bei +2 °C weltweit rund 350 m). Die Zahlen kommen aus den Szenarien CH2025, wo geladen, sonst aus
+den Klimamodellen, skaliert mit der globalen Erwärmung. **Was das für den Wald bedeutet** (rechts) schätzt pro
+Szenario ein, wie stark sich die Höhenstufen verschieben, wie es um Fichte und Borkenkäfer (Generationen pro Jahr aus
+der Wärmesumme) und um die Sommertrockenheit steht und welche Arten profitieren, mit den Baumarten der Spots.
+
+![Klima-Raster auf der Karte: Hitzetage bei +2 °C weltweit](docs/screenshots/klima-karte.jpg)
+
+Auf der **Karte** zeigt ein Raster aus Feldern von rund 8 × 11 km die Erwärmung seit 1961–1990, die Hitzetage heute
+oder pro Szenario Hitzetage, Sommerregen, Käfergenerationen und die Höhenverschiebung; ein Klick auf ein Feld öffnet
+dort das Dossier. Darüber lassen sich offizielle Karten von geo.admin.ch legen, etwa die Klimanormwerte der
+MeteoSchweiz oder die Höhenstufen des Waldes im Klimawandel (BAFU); im Kanton Genf auch die Wärmeinsel und das
+Kronendach des SITG, und Orte dort verweisen auf das 3D-Modell [Genève 3D](https://geneva3d.ch/). Quellen, Methode und Grenzen:
 [Klima im Wandel](docs/klimawandel.md).
 
 ## Was MyForrest kann
@@ -531,7 +551,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   Vorschläge aus offenen Bildarchiven; im Trockengebiet Ausrichtung am Horizont.
 - **[Klima im Wandel](docs/klimawandel.md)**: Dossier der Region mit Klimastreifen und Kennzahlen seit 1940 (ERA5),
   homogenen Messreihen der MeteoSchweiz seit 1864, einer Zeitachse mit den Beobachtungen der Spots, Aussagen, die
-  beides verbinden, und einem Ausblick bis 2050 aus Klimamodellen bzw. den Szenarien CH2025.
+  beides verbinden, einem Ausblick bis 2050 aus Klimamodellen, drei Szenarien (+1,5, +2, +3 °C, CH2025) und was sie
+  für den Wald bedeuten; dazu ein Klima-Raster und offizielle Karten von geo.admin.ch auf der Karte.
 - **[Kartenmodi](docs/funktionen.md#kartenmodi)**: Sonnenstand, Schatten und Einstrahlung inklusive
   Geländehorizont sowie Hotspots und Ausbreitungsfronten von Neophyten; **[3D-Karte](docs/funktionen.md#3d-karte)**
   mit den Spots auf dem Gelände.
