@@ -1,6 +1,6 @@
 'use strict';
 // Takes the README screenshots from the demo server (see README.md here).
-// Usage: node shoot.js [hero map standort spot klima satellite sun schatten species vektor touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher mobile]
+// Usage: node shoot.js [hero map standort spot baeume klima satellite sun schatten species vektor touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher mobile]
 // «mapillary» needs the demo server started with DEMO_MAPILLARY=1 (a Mapillary stand-in, see README.md).
 // «gletscher» uses the glacier demo server (BASE_GLETSCHER, default http://localhost:3124; see README.md).
 const path = require('path');
@@ -412,6 +412,18 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.evaluate(() => map.setView([47.37388, 8.57279], 17, { animate: false }));
     await settle(page, 3500);
     await page.screenshot({ path: out('mapillary-karte.jpg'), ...jpg });
+    await page.close();
+  }
+
+  if (want('baeume')) {
+    // Species suggestions from a tree inventory in the species box of the windthrow spot.
+    const page = await explore(ctx);
+    await pin(page, 1).click();
+    await page.waitForSelector('#species-inventory:not([hidden]) .inventory-list', { state: 'attached', timeout: 60000 });
+    await page.setViewportSize({ width: 1440, height: 2400 });
+    await page.evaluate(() => { const d = document.querySelector('#species-box'); d.open = true; document.querySelector('#species-inventory').scrollIntoView({ block: 'center' }); });
+    await settle(page, 1200);
+    await page.locator('#species-inventory').screenshot({ path: out('bauminventar.jpg'), ...jpg });
     await page.close();
   }
 

@@ -108,9 +108,10 @@ Als Nächstes:
 - **Wald genauer**: die Wasserspeicherung des Bodens (Bodeneignungskarte) und die Exposition in die Einschätzung
   nehmen; die Empfehlung der Tree-App direkt verlinken, sobald sie Koordinaten in der Adresse annimmt; die Faustregeln
   mit Fachleuten von WSL oder kantonalen Forstdiensten prüfen.
-- **Genf**: die Adressen der SITG-Dienste und ihre Ebenen prüfen; das Bauminventar von Genf als Vorschlag für die
-  Baumarten eines Spots; einen Link auf die Position in Genève 3D, falls das Projekt eine solche Adresse anbietet
-  (Absprache mit dem Autor).
+- **Genf**: die Adressen der SITG-Dienste und ihre Ebenen prüfen; die Abfrage des Bauminventars gegen den echten
+  Dienst prüfen (gebaut nach der Beschreibung der Ebene, getestet mit Daten im selben Format); einen Link auf die
+  Position in Genève 3D, falls das Projekt eine solche Adresse anbietet (Absprache mit dem Autor); weitere
+  Bauminventare (z. B. Baumkataster der Städte Zürich, Basel, Bern), sobald mehrere gleichzeitig einstellbar sind.
 - **3D-Karte mit Gebäuden und Bäumen**: die 3D Tiles von swisstopo (swissBUILDINGS3D, Vegetation 3D) über deck.gl in
   der 3D-Karte, für die ganze Schweiz.
 - **Karte**: die offiziellen Karten von geo.admin.ch mit echten Ebenen prüfen (gefunden über die Namen in den
@@ -188,6 +189,7 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 - Klima im Wandel: drei Szenarien (+1,5, +2, +3 °C, CH2025 oder Pattern Scaling), was sie für den Wald bedeuten
   (Höhenstufen, Fichte und Borkenkäfer, Trockenheit, Winter, Chancen), Klima-Raster auf der Karte und offizielle
   Karten von geo.admin.ch; in Genf Wärmeinsel und Kronendach des SITG und ein Verweis auf Genève 3D
+- Baumart-Vorschläge aus dem Bauminventar des Kantons Genf (Arten im Umkreis von 40 m, mit einem Klick übernehmen)
 
 ### Arten und geschützte Funde
 

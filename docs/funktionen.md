@@ -1581,6 +1581,26 @@ Auffälligkeiten genauer:
 - Fichte bei Trockenheit oder Hitze löst eine Borkenkäfer-Warnung mit Prüfhinweisen aus.
 - Bei Esche mit Auflichtung oder Verfärbung erscheint ein Hinweis auf das Eschentriebsterben.
 
+### Vorschläge aus dem Bauminventar
+
+Wo ein öffentliches Bauminventar die Bäume Stück für Stück verzeichnet, schlägt die App unter *Baumarten* die Arten
+in der Nähe des Spots vor. Eingestellt ist das **Bauminventar des Kantons Genf** (Inventaire cantonal des arbres,
+SITG): Für einen Spot im Kanton fragt der Server die Bäume im Umkreis von 40 m ab und fasst sie nach Art zusammen,
+die nächste zuerst, mit Anzahl, Abstand des nächsten Baums, grösster Höhe und ob bemerkenswerte Bäume darunter sind.
+Gefällte oder verschwundene Bäume zählen nicht. Arten mit Steckbrief übernimmt man mit *übernehmen* (als von Hand
+erfasst), schon erfasste sind markiert, andere (etwa Platanen) stehen nur zur Information da.
+
+<p align="center"><img src="screenshots/bauminventar.jpg" width="420" alt="Vorschläge aus dem Bauminventar: Arten im Umkreis von 40 m mit Anzahl, Abstand und Höhe"></p>
+
+Das Genfer Inventar führt nur Bäume **ausserhalb des Waldes** (Strassen, Parks, Gärten, Waldränder), und ältere
+Einträge können bis ±25 m danebenliegen; darum der grosszügige Umkreis, und darum sind es Vorschläge, keine
+automatische Übernahme. Die Abfrage geht an die ArcGIS-Schnittstelle des Kantons (Ebene `ICA/MapServer/1` mit dem
+lateinischen Namen); das Ergebnis bleibt einen Monat gespeichert. Andere Inventare mit ArcGIS-Schnittstelle, etwa der
+Baumkataster einer Stadt, lassen sich mit `BAUMINVENTAR_URL`, `BAUMINVENTAR_BBOX` und `BAUMINVENTAR_NAME` statt
+Genf einstellen ([Installation](installation.md#umgebungsvariablen)); die Felder erkennt die App an ihren Namen
+(lateinischer und gebräuchlicher Name, Höhe, Kronendurchmesser, bemerkenswert, Zustand). (Im Screenshot liefert ein
+Demo-Inventar im Genfer Format die Bäume um den Demo-Wald.)
+
 ## Geschützte Funde und PRO-Mitglieder
 
 Wer eine Orchideenwiese, eine Pilzstelle oder einen Horst veröffentlicht, lockt auch Sammler und

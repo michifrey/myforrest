@@ -252,9 +252,13 @@ MyForrest bindet es deshalb so ein:
 - **Dieselben Daten direkt**: Die Bäume, das Kronendach und die Hitzekarten, auf denen Genève 3D aufbaut, kommen
   vom SITG; MyForrest legt sie als Karten über die Spots (siehe oben).
 
-Geplant (siehe [Roadmap](roadmap.md#phase-5-klima-im-wandel)): das Bauminventar von Genf als Vorschlag für die
-Baumarten eines Spots (nur Bäume ausserhalb des Waldes; ältere Einträge sind bis ±25 m ungenau) und Gebäude und
-Vegetation in der 3D-Karte aus den 3D Tiles von swisstopo (swissBUILDINGS3D, Vegetation 3D) für die ganze Schweiz.
+- **Bauminventar als Baumart-Vorschlag**: Für einen Spot in Genf schlägt die App die Arten des kantonalen
+  Bauminventars im Umkreis von 40 m vor, zum Übernehmen mit einem Klick (siehe
+  [Vorschläge aus dem Bauminventar](funktionen.md#vorschläge-aus-dem-bauminventar)). So stützt sich auch die
+  Einschätzung für den Wald auf die Bäume, die dort wirklich stehen.
+
+Geplant (siehe [Roadmap](roadmap.md#phase-5-klima-im-wandel)): Gebäude und Vegetation in der 3D-Karte aus den
+3D Tiles von swisstopo (swissBUILDINGS3D, Vegetation 3D) für die ganze Schweiz.
 
 ## Welche Daten es gibt
 
@@ -312,7 +316,7 @@ Die Recherche für dieses Modul, nach Themen. *Eingebaut* heisst: MyForrest läd
 | [Biodiversitätsmonitoring BDM](https://www.biodiversitymonitoring.ch/) | BAFU | Verschiebung der Arten in die Höhe | Verweis |
 | [Info Flora](https://www.infoflora.ch/) | Info Flora | Neophyten, Rote Liste | **eingebaut** (Export, Schutzlisten) |
 | Kantonale Klimakarten | Kantone (z. B. Zürich) | Hitzebelastung, Kaltluftströme im Siedlungsgebiet | geplant (Abgleich mit kühlen Abschnitten) |
-| [SITG Genf](https://ge.ch/sitg/) | Kanton Genf | Wärmeinsel (FITNAH-3D), Kronendach aus LiDAR 2017/2019/2023, Bauminventar, Baumstrategie | **eingebaut** (Karten); geplant: Bauminventar als Baumart-Vorschlag |
+| [SITG Genf](https://ge.ch/sitg/) | Kanton Genf | Wärmeinsel (FITNAH-3D), Kronendach aus LiDAR 2017/2019/2023, Bauminventar, Baumstrategie | **eingebaut** (Karten, Bauminventar als Baumart-Vorschlag) |
 | [Genève 3D](https://geneva3d.ch/) | Arnaud Ricci (privat, Beta) | 3D-Modell des Kantons mit Bäumen, ÖV, Wetter | Verweis |
 | [3D Tiles von swisstopo](https://docs.geo.admin.ch/visualize-data/3d-tiles.html) | swisstopo | Gebäude (swissBUILDINGS3D) und Vegetation in 3D, ganze Schweiz | geplant (3D-Karte) |
 

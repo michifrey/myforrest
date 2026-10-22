@@ -174,6 +174,10 @@ Die feste Adresse lässt sich als Variable `APP_URL` in die Android-App bauen, d
 | `KLIMA_KARTE_PRO_TAG` | `30` | Neue Felder des Klima-Rasters pro Tag ([Details](klimawandel.md#klima-auf-der-karte)); jedes kostet bei Open-Meteo mehrere hundert Abfragen |
 | `KLIMA_KARTE_MODELLE` | `3` | Wie viele der Klimamodelle (die ersten aus `KLIMA_MODELS`) das Klima-Raster für die Szenarien nutzt; `0` = Raster ohne Szenarien |
 | `KLIMA_WMS_URL` | `https://wms.geo.admin.ch/` | Kartendienst (WMS) für die offiziellen Klima- und Waldkarten im Panel *Klima auf der Karte*; leer = aus |
+| `BAUMINVENTAR_URL` | Bauminventar des Kantons Genf (`https://ge.ch/terags/rest/services/ICA/MapServer/1`) | ArcGIS-Ebene eines Bauminventars für die [Baumart-Vorschläge](funktionen.md#vorschläge-aus-dem-bauminventar); leer = aus |
+| `BAUMINVENTAR_BBOX` | Kanton Genf (`5.95,46.12,6.32,46.37`) | Gebiet des Inventars (West, Süd, Ost, Nord in WGS84); nur Spots darin fragen das Inventar ab |
+| `BAUMINVENTAR_NAME`, `BAUMINVENTAR_QUELLE` | Genf (SITG) | Name des Inventars und Quellenangabe unter den Vorschlägen |
+| `BAUMINVENTAR_RADIUS_M` | `40` | Umkreis um den Spot in Metern |
 | `KLIMA_WMS_GENF` | vier Dienste des SITG (Wärmeinsel, Kronendach 2023 und 2017, Baumstrategie) | WMS-Dienste für Genf, kommagetrennt; ihre Karten erscheinen, wenn die Karte im Kanton Genf steht ([Details](klimawandel.md#klima-auf-der-karte)); leer = keine |
 | `TERRAIN_URL` | Terrain Tiles auf AWS | Geländekacheln für die [3D-Karte](funktionen.md#3d-karte), Vorlage mit `{z}`, `{x}`, `{y}` (Terrarium-PNG, z. B. ein eigener Spiegel); leer = keine 3D-Karte |
 | `MAPILLARY_TOKEN` | – | Client-Token von [Mapillary](https://www.mapillary.com/dashboard/developers) (`MLY|…`): Mapillary-Bilder im Durchgehen und auf der Karte, wo es keine eigenen gibt ([Details](funktionen.md#mapillary)) |
