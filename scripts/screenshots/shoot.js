@@ -1,6 +1,6 @@
 'use strict';
 // Takes the README screenshots from the demo server (see README.md here).
-// Usage: node shoot.js [hero map standort spot baeume gebaeude3d klima satellite sun schatten species vektor touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher mobile]
+// Usage: node shoot.js [hero map standort spot baeume ebenen gebaeude3d klima satellite sun schatten species vektor touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher mobile]
 // «mapillary» needs the demo server started with DEMO_MAPILLARY=1 (a Mapillary stand-in, see README.md).
 // «gletscher» uses the glacier demo server (BASE_GLETSCHER, default http://localhost:3124; see README.md).
 const path = require('path');
@@ -225,6 +225,27 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.waitForFunction(() => window.Map3D?.map?.loaded(), null, { timeout: 120000, polling: 1000 });
     await settle(page, 4000);
     await page.screenshot({ path: out('karte-3d-spot.jpg'), ...jpg });
+    await page.close();
+  }
+
+  if (want('ebenen')) {
+    // Panel «Ebenen»: fire danger and residents over the demo area, the answer of a click; then land use and
+    // the tree register of Zürich (demo services in the format of geo.admin.ch and the city).
+    const page = await explore(ctx);
+    await page.evaluate(() => map.setView([47.3705, 8.5655], 15, { animate: false }));
+    await page.click('#layers-toggle');
+    await page.waitForSelector('#layers-groups .layer-group', { timeout: 60000 });
+    for (const title of ['Bevölkerung pro Hektare (Demo)', 'Waldbrandgefahr (Demo)']) await page.evaluate((t) => window.Layers.add(t), title);
+    await settle(page, 3500);
+    await page.mouse.click(480, 720); // in the village: residents and fire danger
+    await page.waitForSelector('.layer-popup dl', { timeout: 30000 });
+    await settle(page, 1200);
+    await page.screenshot({ path: out('ebenen.jpg'), ...jpg });
+    await page.evaluate(() => { document.querySelectorAll('#layers-active button').forEach((b) => b.click()); map.closePopup(); });
+    for (const title of ['Arealstatistik: Bodennutzung (Demo)', 'Baumstandorte (Demo)']) await page.evaluate((t) => window.Layers.add(t), title);
+    await settle(page, 3500);
+    await page.screenshot({ path: out('ebenen-nutzung.jpg'), ...jpg });
+    await page.evaluate(() => document.querySelectorAll('#layers-active button').forEach((b) => b.click()));
     await page.close();
   }
 

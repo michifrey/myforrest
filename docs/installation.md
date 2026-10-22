@@ -178,6 +178,13 @@ Die feste Adresse lässt sich als Variable `APP_URL` in die Android-App bauen, d
 | `BAUMINVENTAR_BBOX` | Kanton Genf (`5.95,46.12,6.32,46.37`) | Gebiet des Inventars (West, Süd, Ost, Nord in WGS84); nur Spots darin fragen das Inventar ab |
 | `BAUMINVENTAR_NAME`, `BAUMINVENTAR_QUELLE` | Genf (SITG) | Name des Inventars und Quellenangabe unter den Vorschlägen |
 | `BAUMINVENTAR_RADIUS_M` | `40` | Umkreis um den Spot in Metern |
+| `BASISKARTE_STIL` | `https://tiles.openfreemap.org/styles/positron` | Vektorstil der Grundkarte *MyForrest* ([Details](funktionen.md#grundkarte)), wird im Browser in den Farben der App gezeichnet; leer = nur OpenStreetMap |
+| `BASISKARTE_QUELLE` | OpenFreeMap, OpenMapTiles, OSM | Quellenangabe der Grundkarte, falls der Stil keine nennt |
+| `EBENEN_WMS_URL` | `https://wms.geo.admin.ch/` | Kartendienst für die Themen des Panels [Ebenen](funktionen.md#ebenen-karten-aus-offiziellen-quellen); leer = keine Ebenen von geo.admin.ch |
+| `EBENEN_IDENTIFY_URL` | Identify-Dienst von geo.admin.ch | Für *Was ist hier?* bei Ebenen von geo.admin.ch |
+| `EBENEN_REGIONAL` | Baumkataster Zürich, SITG Genf, EFFIS | Regionale WMS-Dienste als JSON-Liste `[{ "url", "group", "bbox": [W, S, O, N], "attribution" }]`; alle ihre Ebenen erscheinen, wenn die Karte im Gebiet steht |
+| `FIRMS_MAP_KEY` | – | Schlüssel von [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/api/map_key/): aktive Feuer (MODIS, VIIRS) als Ebene |
+| `BAUMKATASTER_ZUERICH` | WFS des Baumkatasters der Stadt Zürich | Zweites Bauminventar für die [Baumart-Vorschläge](funktionen.md#vorschläge-aus-dem-bauminventar); leer = aus |
 | `KLIMA_WMS_GENF` | vier Dienste des SITG (Wärmeinsel, Kronendach 2023 und 2017, Baumstrategie) | WMS-Dienste für Genf, kommagetrennt; ihre Karten erscheinen, wenn die Karte im Kanton Genf steht ([Details](klimawandel.md#klima-auf-der-karte)); leer = keine |
 | `TILES3D_GEBAEUDE` | `https://3d.geo.admin.ch/ch.swisstopo.swissbuildings3d.3d/v1/tileset.json` | 3D Tiles der Gebäude für die [3D-Karte](funktionen.md#gebäude-und-bäume-in-3d); leer = kein Schalter *Gebäude* |
 | `TILES3D_VEGETATION` | `https://3d.geo.admin.ch/ch.swisstopo.vegetation.3d/v1/tileset.json` | 3D Tiles der Bäume; leer = kein Schalter *Bäume* |

@@ -130,6 +130,9 @@ function createApp({
   tiles3dBuildings = process.env.TILES3D_GEBAEUDE ?? 'https://3d.geo.admin.ch/ch.swisstopo.swissbuildings3d.3d/v1/tileset.json',
   tiles3dVegetation = process.env.TILES3D_VEGETATION ?? 'https://3d.geo.admin.ch/ch.swisstopo.vegetation.3d/v1/tileset.json',
   tiles3dHeight = Number(process.env.TILES3D_HOEHE ?? -50),
+  // Vector style for the base map «MyForrest» (OpenMapTiles-like layer names; repainted in the browser), empty = OSM only.
+  basemapStyle = process.env.BASISKARTE_STIL ?? 'https://tiles.openfreemap.org/styles/positron',
+  basemapAttribution = process.env.BASISKARTE_QUELLE || '<a href="https://openfreemap.org">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/">OpenMapTiles</a>, Daten © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap-Mitwirkende</a>',
   // MeteoSwiss precipitation radar for the weather tab (src/routes/radar-ch.js); empty = off.
   mchRadarUrl = (process.env.MCH_RADAR_URL ?? require('./routes/radar-ch').DEFAULT_URL) || null, mchRadarFetch = fetch,
   // Climate models for the projections of "Klima im Wandel" (src/routes/klima.js), comma-separated; empty = none.
@@ -137,7 +140,9 @@ function createApp({
   // Climate map and official maps (routes/klima.js): { wmsUrl, wmsFetch, cellsPerDay, mapModels } for tests and the demo.
   klimaOptions = {},
   // Tree inventory as species suggestions (src/treeinventory.js): fetch and { url, name, bbox, radiusM } for tests and the demo.
-  treeInventoryFetch = fetch, treeInventoryOptions = {},
+  treeInventoryFetch = fetch, treeInventoryOptions = {}, treeInventoryZurich = undefined,
+  // Layers of the panel «Ebenen» (routes/layers.js): fetch and { geoadminUrl, identifyUrl, regional, firmsKey }.
+  layersFetch = fetch, layersOptions = {},
   // Reverse proxies whose X-Forwarded-For counts (Express 'trust proxy'), so rate limits see the client's
   // address instead of the proxy's. Off by default: otherwise anyone could fake the header.
   trustProxy = parseTrustProxy(process.env.TRUST_PROXY),
@@ -207,6 +212,7 @@ function createApp({
   app.use('/vendor/leaflet', express.static(path.dirname(require.resolve('leaflet/dist/leaflet.js'))));
   app.use('/vendor/maplibre', express.static(path.dirname(require.resolve('maplibre-gl/dist/maplibre-gl.js')), { maxAge: '30d' }));
   // deck.gl (standalone bundle) for the 3D Tiles of buildings and trees in the 3D map, loaded only when switched on.
+  app.use('/vendor/maplibre-leaflet', express.static(path.dirname(require.resolve('@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js')), { maxAge: '30d' }));
   app.get('/vendor/deck/deck.min.js', (req, res) => res.sendFile(path.join(path.dirname(require.resolve('deck.gl')), '..', 'dist.min.js'), { maxAge: '30d' }));
   // OpenLayers for the LV95 map (vektorkarte-lv95.html): the full build plus its stylesheet.
   const olDir = path.dirname(require.resolve('ol/package.json'));
@@ -566,6 +572,7 @@ function createApp({
       tags: TAGS, activities: ACTIVITIES, plantnet: Boolean(plantnetKey), spotRadiusM, routing: Boolean(routerUrl), wildlifeZones: wildlife.enabled(),
       landscapes: LANDSCAPES, glaciers: glaciers.enabled() ? { years: glaciers.years() } : null, mapillary: mapillary.enabled(),
       terrain: terrain.enabled(), radarCh: radarCh.enabled(),
+      basemap: { style: basemapStyle || null, attribution: basemapAttribution },
       tiles3d: {
         layers: [['gebaeude', 'Gebäude', tiles3dBuildings], ['baeume', 'Bäume', tiles3dVegetation]]
           .filter(([, , url]) => url).map(([id, title, url]) => ({ id, title, url })),
@@ -1361,8 +1368,18 @@ function createApp({
   });
 
   require('./routes/species')(app, { db, spotRadiusM, visibleSql: accounts.visibleSql });
+  // Map layers from external sources for the panel «Ebenen» (src/routes/layers.js).
+  require('./routes/layers')(app, { fetchImpl: layersFetch, ...layersOptions });
   // Tree species near a spot from a public tree inventory (src/treeinventory.js; by default Geneva, SITG).
-  registerTreeInventory(app, { db, inventory: createTreeInventory({ db, fetchImpl: treeInventoryFetch, ...treeInventoryOptions }), accounts, idParam });
+  // Geneva (or BAUMINVENTAR_URL) first, then the tree register of the city of Zürich (BAUMKATASTER_ZUERICH=, empty = off).
+  const zurichUrl = treeInventoryZurich ?? process.env.BAUMKATASTER_ZUERICH ?? require('./treeinventory').ZURICH.url;
+  registerTreeInventory(app, {
+    db, accounts, idParam,
+    inventories: [
+      createTreeInventory({ db, fetchImpl: treeInventoryFetch, ...treeInventoryOptions }),
+      ...(zurichUrl ? [createTreeInventory({ db, fetchImpl: treeInventoryFetch, ...require('./treeinventory').ZURICH, url: zurichUrl })] : []),
+    ],
+  });
   require('./routes/profile')(app, { db, thumbs, accounts, uploadDir, rateLimits });
   require('./routes/protection')(app, { db, accounts, sensitiveLists, cantons, reprotect });
   /**

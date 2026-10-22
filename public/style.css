@@ -419,7 +419,7 @@ input[type="checkbox"] { accent-color: var(--accent); width: 1.05rem; height: 1.
   border-right: 1px solid var(--border);
 }
 .pill-select svg { width: 16px; height: 16px; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; fill: none; }
-.pill-select select { border: none; background: transparent; font-weight: 700; font-size: 0.86rem; padding: 0.4rem 0.3rem; }
+.pill-select select { border: none; background: transparent; font-weight: 700; font-size: 0.86rem; padding: 0.4rem 0.3rem; max-width: 10rem; text-overflow: ellipsis; }
 .legend { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; font-size: 0.76rem; color: var(--muted); font-weight: 600; }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 0.35rem; vertical-align: -1px; }
 .dot.ok { background: var(--ok); }
@@ -744,7 +744,7 @@ input[type="checkbox"] { accent-color: var(--accent); width: 1.05rem; height: 1.
 .pill-btn {
   display: inline-flex; align-items: center; gap: 0.4rem;
   background: transparent; border: 1px solid transparent; border-radius: 14px;
-  padding: 0.45rem 0.8rem; font-size: 0.86rem;
+  padding: 0.45rem 0.62rem; font-size: 0.86rem;
 }
 .pill-btn:hover { background: var(--surface-2); }
 .pill-btn svg { width: 16px; height: 16px; fill: none; stroke: var(--sun); stroke-width: 1.8; stroke-linecap: round; }
@@ -2020,3 +2020,31 @@ html.klima-open { overflow: hidden; }
 .inventory-list li > .muted:first-of-type { grid-column: 1; }
 .inventory-list li > :last-child { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
 .inv-name i { color: var(--muted); font-size: 0.85em; }
+
+/* Base map switch (basemap.js) */
+.basemap-control select {
+  font: inherit; font-size: 0.82rem; padding: 0.35rem 0.6rem; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--glass); backdrop-filter: blur(12px); color: var(--text); box-shadow: var(--shadow); cursor: pointer;
+}
+/* The vector base map has its own colours: no filter on the raster tiles above it (overlays keep theirs). */
+html.basemap-vector .leaflet-tile-pane { filter: none; }
+.leaflet-basemap-pane canvas { outline: none; }
+
+/* Panel «Ebenen» (layers.js) */
+.layerpanel input[type="search"] { width: 100%; font: inherit; padding: 0.45rem 0.7rem; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); margin: 0.6rem 0 0.2rem; }
+.layer-group { border-top: 1px solid var(--border); padding: 0.45rem 0; }
+.layer-group summary { cursor: pointer; font-weight: 600; }
+.layer-group ul { list-style: none; padding: 0.3rem 0 0.2rem; margin: 0; display: grid; gap: 0.25rem; font-size: 0.86rem; }
+.layer-group label { display: flex; gap: 0.45rem; align-items: baseline; cursor: pointer; }
+.layers-active { list-style: none; padding: 0; margin: 0.8rem 0 0.2rem; display: grid; gap: 0.6rem; }
+.layers-active li { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem 0.75rem; display: grid; gap: 0.35rem; }
+.layers-active[hidden], .layers-hint[hidden] { display: none; }
+.layer-head { display: flex; justify-content: space-between; gap: 0.6rem; align-items: baseline; }
+.layer-head strong { font-size: 0.88rem; }
+.layer-legend { max-width: 100%; margin-top: 0.3rem; background: #fff; border-radius: 6px; padding: 4px; }
+.layers-hint { color: var(--accent); margin: 0.2rem 0; }
+.layer-popup dl { display: grid; grid-template-columns: auto 1fr; gap: 0.1rem 0.6rem; margin: 0.3rem 0 0.6rem; font-size: 0.82rem; }
+.layer-popup dt { color: var(--muted); }
+.layer-popup dd { margin: 0; }
+.pill-btn.layers-btn svg { stroke: var(--accent); }
+.pill-btn.layers-btn[aria-expanded="true"] svg { stroke: currentColor; }
