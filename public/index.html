@@ -110,6 +110,10 @@
         <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="4.5" cy="15.5" r="2"/><circle cx="15.5" cy="4.5" r="2"/><path d="M6.5 15.5h5a3 3 0 0 0 0-6h-3a3 3 0 0 1 0-6h5"/></svg>
         Touren &amp; Aufträge
       </button>
+      <button type="button" id="klima-toggle" class="pill-btn klima-btn" aria-pressed="false" aria-haspopup="dialog">
+        <svg viewBox="0 0 20 20" aria-hidden="true" class="k-icon"><rect x="2" y="3" width="4" height="14" fill="#2171b5"/><rect x="6" y="3" width="4" height="14" fill="#c6dbef"/><rect x="10" y="3" width="4" height="14" fill="#fb6a4a"/><rect x="14" y="3" width="4" height="14" fill="#a50f15"/></svg>
+        Klima
+      </button>
       <button type="button" id="glacier-toggle" class="pill-btn glacier-btn" aria-pressed="false" hidden>
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M1.5 16.5 7 6l3 4 2-3 6.5 9.5z"/><path d="M5.2 9.6 7 11l1.4-1.6L10 10"/></svg>
         Gletscher
@@ -242,6 +246,7 @@
               <button type="button" role="tab" id="tab-vergleich" data-tab="vergleich" aria-selected="false" aria-controls="pane-vergleich">Vergleich</button>
               <button type="button" role="tab" id="tab-auswertung" data-tab="auswertung" aria-selected="false" aria-controls="pane-auswertung">Auswertung</button>
               <button type="button" role="tab" id="tab-kontext" data-tab="kontext" aria-selected="false" aria-controls="pane-kontext">Wetter &amp; Kontext</button>
+              <button type="button" role="tab" id="tab-klima" data-tab="klima" aria-selected="false" aria-controls="pane-klima">Klima</button>
               <button type="button" role="tab" id="tab-verlauf" data-tab="verlauf" aria-selected="false" aria-controls="pane-verlauf" hidden>Verlauf</button>
             </nav>
             <div class="spot-panes">
@@ -306,6 +311,12 @@
               <section class="context" aria-labelledby="context-title">
                 <h3 class="label" id="context-title">Kontext zur Aufnahme</h3>
                 <div id="context-body" aria-live="polite"></div>
+              </section>
+              </div>
+              <div class="spot-pane" id="pane-klima" role="tabpanel" aria-labelledby="tab-klima" hidden>
+              <section class="klima-spot" aria-labelledby="klima-spot-title">
+                <h3 class="label" id="klima-spot-title">Klima im Wandel am Spot</h3>
+                <div id="klima-spot-body" aria-live="polite"></div>
               </section>
               </div>
               <div class="spot-pane" id="pane-verlauf" role="tabpanel" aria-labelledby="tab-verlauf" hidden>
@@ -589,6 +600,7 @@
   <script src="map3d.js"></script>
   <script src="spotprofile.js"></script>
   <script src="forecast.js"></script>
+  <script src="klima.js"></script>
   <script src="offline-queue.js"></script>
   <script src="drive-select.js"></script>
   <script src="drive.js"></script>

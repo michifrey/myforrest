@@ -23,7 +23,7 @@
 
 importScripts('offline-queue.js');
 
-const SHELL_VERSION = 'v20';
+const SHELL_VERSION = 'v21';
 const DATA_VERSION = 'v1';
 const CACHE = {
   shell: `myforrest-shell-${SHELL_VERSION}`,
@@ -68,6 +68,7 @@ const PRECACHE = [
   'map3d.js',
   'spotprofile.js',
   'forecast.js',
+  'klima.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',

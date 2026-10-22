@@ -198,6 +198,7 @@ async function main() {
     if (!res.ok) console.warn('request', await res.text());
   }
   seedSatellite(db, spots);
+  seedKlima(db);
   // Live picture for the fake camera on the phone: spot 1 today, from a slightly different position.
   const live = path.join(IMG, 'live.jpg');
   await scene.render(SPOTS[0].lay, { season: 'summer', fallen: [3, 4, 5], regrowth: 1, jitter: 977 }, live);
@@ -231,6 +232,28 @@ function seedSatellite(db, spots) {
       }
     }
     meta.run(id, spot.lat, spot.lon, '1984-04-01', '2026-10-08', Date.now() + 365 * 86400000);
+  }
+}
+
+/**
+ * "Klima im Wandel": a homogeneous series like Zürich / Fluntern since 1864 and the beech phenology of a station
+ * nearby, both invented (the server reads them as if loaded from MeteoSchweiz). Written directly, without re-assessing
+ * the photos, so the other screenshots stay as they are.
+ */
+function seedKlima(db) {
+  const wobble = (k) => (Math.sin(k * 78.233) * 43758.5453) % 1;
+  db.prepare("INSERT OR REPLACE INTO klima_stations (id, name, lat, lon, elevation, source) VALUES ('SMA', 'Zürich / Fluntern (Demo)', 47.3779, 8.5657, 556, 'meteoschweiz')").run();
+  const year = db.prepare('INSERT OR REPLACE INTO klima_station_years (station, year, temp, precip) VALUES (?, ?, ?, ?)');
+  for (let y = 1864; y <= 2025; y++) {
+    const trend = y < 1980 ? (y - 1864) * 0.0035 : 0.41 + (y - 1980) * 0.05;
+    year.run('SMA', y, +(7.9 + trend + wobble(y) * 0.6).toFixed(1), Math.round(1080 + wobble(y + 500) * 160));
+  }
+  db.prepare("INSERT OR REPLACE INTO pheno_stations (source, id, name, lat, lon, elevation) VALUES ('meteoschweiz', 'ADL', 'Adlisberg (Demo)', 47.372, 8.585, 640)").run();
+  const leaf = db.prepare("INSERT OR REPLACE INTO pheno_leafout (source, station_id, species, year, doy) VALUES ('meteoschweiz', 'ADL', 'Fagus sylvatica', ?, ?)");
+  const colour = db.prepare("INSERT OR REPLACE INTO pheno_obs (source, station_id, species, year, doy) VALUES ('meteoschweiz', 'ADL', 'Fagus sylvatica', ?, ?)");
+  for (let y = 1996; y <= 2025; y++) {
+    leaf.run(y, Math.round(124 - (y - 1996) * 0.45 + wobble(y + 7) * 5));
+    colour.run(y, Math.round(282 + (y - 1996) * 0.3 + wobble(y + 9) * 6 - ([2003, 2018, 2022].includes(y) ? 14 : 0)));
   }
 }
 

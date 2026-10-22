@@ -61,6 +61,22 @@ function daily(d, lat) {
   return { tm, tx: tm + 5 + hash(`x${d}`) * 3, tn: tm - 5 - hash(`n${d}`) * 2, p };
 }
 
+// "Klima im Wandel" asks for the years since 1940 and for the climate models to 2050 (daily values with snowfall
+// and a date range): those carry a warming like the Swiss lowlands', hot and dry summers; the 1991–2020 mean stays
+// the plain demo weather, and every other request keeps it unchanged.
+const HOT_SUMMERS = { 1947: 1.9, 1952: 1.1, 1976: 1.3, 1983: 1.4, 1994: 1.2, 2003: 4.2, 2015: 2.3, 2018: 2.6, 2019: 1.9, 2022: 3.0, 2023: 2.2, 2025: 1.8 };
+const DRY_SUMMERS = new Set([1947, 1976, 1991, 2003, 2015, 2018, 2022]);
+function climateShift(d, w, model) {
+  const year = Number(d.slice(0, 4));
+  const month = Number(d.slice(5, 7));
+  const pace = model ? 0.75 + hash(`m${model}`) * 0.7 : 1; // the models warm faster or slower
+  const trend = year < 1980 ? (year - 1940) * 0.004 : 0.16 + (year - 1980) * 0.048 * pace;
+  const shift = trend + (hash(`y${year}${model || ''}`) - 0.5) * 1.1 - 1.36 +
+    (!model && month >= 6 && month <= 8 ? HOT_SUMMERS[year] || 0 : 0);
+  const dry = !model && month >= 6 && month <= 8 && DRY_SUMMERS.has(year);
+  return { tm: w.tm + shift, tx: w.tx + shift * 1.15, tn: w.tn + shift * 0.9, p: dry ? Math.round(w.p * 0.3 * 10) / 10 : w.p };
+}
+
 // Days with drawn weather for "Licht & Wald": a snowy winter morning and a rainy November day.
 const WEATHER_DAYS = {
   '2026-02-10': { temp: (h) => -3 + h * 0.08, precip: (h) => (h >= 5 && h <= 17 ? 0.5 : 0), cloud: 96, depth: 0.28 },
@@ -99,9 +115,10 @@ async function weatherFetch(url) {
     if (q.get('daily')) {
       const vars = q.get('daily').split(',');
       const out = { time: days };
+      const climate = q.get('start_date') && vars.includes('snowfall_sum') && vars.includes('temperature_2m_min');
       for (const v of vars) {
         out[v] = days.map((d) => {
-          const w = daily(d, lat);
+          const w = climate ? climateShift(d, daily(d, lat), q.get('models')) : daily(d, lat);
           switch (v) {
             case 'precipitation_sum': return w.p;
             case 'temperature_2m_mean': return Math.round(w.tm * 10) / 10;

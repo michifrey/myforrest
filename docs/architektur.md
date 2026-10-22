@@ -42,6 +42,8 @@ src/stormwatch.js    Sturmwarnung aus der Böenprognose (ICON), Push vor und nac
 src/nightcool.js     Nächtliche Abkühlung in Senken aus Wind und Bewölkung
 src/openmeteo.js     Zeitreihen aus Archiv und Prognose von Open-Meteo zusammensetzen
 src/routes/climate.js  Routen und Analyse-Hooks für Stürme, Phänologie-Referenz und Frostnächte
+src/klima.js         Klima im Wandel: Kennzahlen pro Jahr, Klimastreifen, Trends, Delta-Methode, Messreihen und CH2025 lesen, Synthese
+src/routes/klima.js  Dossier der Region: ERA5 seit 1940 und Klimamodelle (Open-Meteo), MeteoSchweiz-Reihen, Beobachtungen der Spots
 src/elevation.js     Geländehöhe, Hangneigung, Exposition und Geländeform (Copernicus-DEM über Open-Meteo)
 src/surface.js       Höhe von Bäumen und Gebäuden (swissSURFACE3D − swissALTI3D, sonst Metas Kronenhöhen) als Kacheln für die Schatten auf der Karte
 src/buildings.js     Gebäude aus OpenStreetMap (Overpass) mit Höhe, für dieselben Kacheln ausserhalb der Schweiz

@@ -4,6 +4,7 @@
 
 📖 **Dokumentation: [michifrey.github.io/myforrest](https://michifrey.github.io/myforrest/)** ·
 [Funktionen](https://michifrey.github.io/myforrest/funktionen/) ·
+[Klima im Wandel](https://michifrey.github.io/myforrest/klimawandel/) ·
 [Installation](https://michifrey.github.io/myforrest/installation/) ·
 [REST-API](https://michifrey.github.io/myforrest/api/) ·
 [Roadmap](https://michifrey.github.io/myforrest/roadmap/) ·
@@ -42,7 +43,7 @@ Der Ablauf hat drei Schritte:
 > Platzhalter-Karte und synthetische Wetter- und Satellitendaten. Im Betrieb zeigt die App echte Fotos,
 > OpenStreetMap- bzw. swisstopo-Kacheln und Daten von Open-Meteo, Sentinel-2 und Landsat. Wie die Bilder
 > entstehen, steht unter [`scripts/screenshots`](scripts/screenshots/README.md). Auch Gletscher und Alpweide in
-> Abschnitt 14 sind erfunden.
+> Abschnitt 14 sind erfunden, ebenso die Klimareihen, die Messreihe und die Phänologie-Station in Abschnitt 15.
 
 ### 1. Karte mit Spots
 
@@ -84,7 +85,7 @@ Spot an, sich **aufzuteilen**: ein Spot pro Blickrichtung, jeder für sich ausge
 oder nur das gezeigte Foto abzutrennen.
 Die Leiste oben links filtert die Karte nach Beobachtungen und Meldungen und schaltet *Sonne & Wetter*,
 *Arten & Neophyten* und *Touren & Aufträge* ein (Abschnitte 7, 8 und 10), mit Gletscherinventaren auch
-*Gletscher* (Abschnitt 14). Gelbe Kamera-Pins sind Fotoaufträge. Rechts fasst eine schmale Explorer-Karte
+*Gletscher* (Abschnitt 14); *Klima* öffnet das Klima-Dossier der Region (Abschnitt 15). Gelbe Kamera-Pins sind Fotoaufträge. Rechts fasst eine schmale Explorer-Karte
 Kennzahlen, die zuletzt fotografierten Spots als Bilder und die Legende zusammen.
 
 ### 2. Zeitreise an einem Spot
@@ -470,6 +471,34 @@ eigenes Profil (Wanderdüne, Bodenerosion, Vegetationsverlust, Überweidung, Ver
 dort meldet der NDVI den Verlust an Vegetation. Weil wandernde Dünen keine festen Punkte haben, richtet die
 App Fotos dort an der Horizontlinie aus.
 
+### 15. Klima im Wandel
+
+![Klima-Dossier der Region: Klimastreifen seit 1940 und die Messreihe seit 1864](docs/screenshots/klima-dossier.jpg)
+
+Der Knopf **Klima** auf der Karte öffnet ein **Dossier der Region** um die Kartenmitte: Klimastreifen seit 1940
+(ERA5 über Open-Meteo, auf die Höhe des Ortes umgerechnet) und, wenn geladen, die nächste homogene Messreihe der
+MeteoSchweiz seit 1864. Daneben steht, wie viel wärmer die letzten zehn Jahre waren als 1961–1990, im Beispiel
++2,2 °C.
+
+<p>
+  <img src="docs/screenshots/klima-kennzahlen.jpg" width="49%" alt="Kennzahlen früher und heute: Hitzetage, Frosttage, Neuschnee, Sommerregen">
+  <img src="docs/screenshots/klima-ausblick.jpg" width="49%" alt="Ausblick: gemessene Temperatur und sieben Klimamodelle bis 2050">
+</p>
+
+Kennzahlen zeigen, was sich konkret verändert hat (links: Hitzetage, Tropennächte, Frosttage, Neuschnee,
+Vegetationstage, Sommerregen, 1961–1990 gegenüber heute), der **Ausblick** (rechts), wie es nach sieben
+Klimamodellen bis 2050 weitergeht, mit den Kennzahlen um 2040 und ihrer Spanne. Geladene **Klimaszenarien CH2025**
+stehen darunter.
+
+![Zeitachse: Sommer der Region und die Beobachtungen von MyForrest](docs/screenshots/klima-zeitachse.jpg)
+
+Die **Zeitachse** legt unter die Sommer der Region, was MyForrest im selben Jahr sah: Fotos, Hinweise auf
+Trockenheit und Hitze, Stürme mit und ohne Windwurf, den NDVI im Hochsommer, Austrieb und Verfärbung der Buche an
+den Phänologie-Stationen, Schneeschmelze, Eis und Neophyten. Daraus entstehen **Aussagen**, die Klima und
+Beobachtungen verbinden, etwa wie viele besuchte Spots in den Hitzesommern Trockenstress zeigten und wie viele in
+den anderen Jahren. Im Spot fasst der Tab **Klima** das Wichtigste für den Ort zusammen. Quellen, Methode und Grenzen:
+[Klima im Wandel](docs/klimawandel.md).
+
 ## Was MyForrest kann
 
 Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen unter
@@ -500,6 +529,9 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   Gebirge und Trockengebiet mit eigenen Beobachtungen; Gletscherumrisse aus Inventaren (z. B. GLAMOS) pro Jahr, Eis im Spätsommer
   und Schneeschmelze aus Sentinel-2, Längenänderung der Zunge aus GLAMOS, Archivfotos mit Datum von Hand und
   Vorschläge aus offenen Bildarchiven; im Trockengebiet Ausrichtung am Horizont.
+- **[Klima im Wandel](docs/klimawandel.md)**: Dossier der Region mit Klimastreifen und Kennzahlen seit 1940 (ERA5),
+  homogenen Messreihen der MeteoSchweiz seit 1864, einer Zeitachse mit den Beobachtungen der Spots, Aussagen, die
+  beides verbinden, und einem Ausblick bis 2050 aus Klimamodellen bzw. den Szenarien CH2025.
 - **[Kartenmodi](docs/funktionen.md#kartenmodi)**: Sonnenstand, Schatten und Einstrahlung inklusive
   Geländehorizont sowie Hotspots und Ausbreitungsfronten von Neophyten; **[3D-Karte](docs/funktionen.md#3d-karte)**
   mit den Spots auf dem Gelände.

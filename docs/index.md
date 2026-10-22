@@ -23,6 +23,15 @@ jeder Seite führt *Diese Seite bearbeiten* direkt zur Datei auf GitHub; daraus 
 
     [Funktionen im Detail](funktionen.md) · [Android-App](android.md)
 
+-   **Klima im Wandel**
+
+    ---
+
+    Das Klima der Region seit 1940 neben den Fotos: Klimastreifen, Kennzahlen, Messreihen der MeteoSchweiz,
+    Zeitachse mit den Beobachtungen, Ausblick bis 2050, dazu ein Katalog der offenen Klimadaten der Schweiz.
+
+    [Klima im Wandel](klimawandel.md)
+
 -   **Selbst hosten**
 
     ---

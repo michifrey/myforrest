@@ -1,6 +1,6 @@
 'use strict';
 // Takes the README screenshots from the demo server (see README.md here).
-// Usage: node shoot.js [hero map standort spot satellite sun schatten species vektor touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher mobile]
+// Usage: node shoot.js [hero map standort spot klima satellite sun schatten species vektor touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher mobile]
 // «mapillary» needs the demo server started with DEMO_MAPILLARY=1 (a Mapillary stand-in, see README.md).
 // «gletscher» uses the glacier demo server (BASE_GLETSCHER, default http://localhost:3124; see README.md).
 const path = require('path');
@@ -412,6 +412,31 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.evaluate(() => map.setView([47.37388, 8.57279], 17, { animate: false }));
     await settle(page, 3500);
     await page.screenshot({ path: out('mapillary-karte.jpg'), ...jpg });
+    await page.close();
+  }
+
+  if (want('klima')) {
+    // "Klima im Wandel": the dossier of the region around the windthrow spot, its parts, and the spot's tab.
+    const page = await explore(ctx);
+    await page.evaluate(() => map.setView([47.3733, 8.5720], 14, { animate: false }));
+    await page.click('#klima-toggle');
+    await page.waitForSelector('#klima .k-hero', { timeout: 120000 });
+    await settle(page, 1500);
+    await page.screenshot({ path: out('klima-dossier.jpg'), ...jpg });
+    await page.addStyleTag({ content: '#klima .k-head { position: static; }' }); // the sticky header would cover the parts
+    for (const [id, file] of [['k-changes', 'klima-kennzahlen.jpg'], ['k-timeline-title', 'klima-zeitachse.jpg'], ['k-synth-title', 'klima-synthese.jpg'], ['k-outlook', 'klima-ausblick.jpg']]) {
+      const part = page.locator(`#klima section[aria-labelledby="${id}"]`);
+      await part.scrollIntoViewIfNeeded();
+      await settle(page, 600);
+      await part.screenshot({ path: out(file), ...jpg });
+    }
+    await page.keyboard.press('Escape');
+    await pin(page, 1).click();
+    await settle(page, 2500);
+    await page.click('#tab-klima');
+    await page.waitForSelector('#klima-spot-body .k-stripes', { timeout: 60000 });
+    await settle(page, 1200);
+    await page.locator('#pane-klima').screenshot({ path: out('klima-spot.jpg'), ...jpg });
     await page.close();
   }
 

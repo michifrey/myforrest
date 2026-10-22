@@ -126,6 +126,8 @@ function createApp({
   terrainUrl = (process.env.TERRAIN_URL ?? require('./routes/terrain').DEFAULT_URL) || null, terrainFetch = fetch,
   // MeteoSwiss precipitation radar for the weather tab (src/routes/radar-ch.js); empty = off.
   mchRadarUrl = (process.env.MCH_RADAR_URL ?? require('./routes/radar-ch').DEFAULT_URL) || null, mchRadarFetch = fetch,
+  // Climate models for the projections of "Klima im Wandel" (src/routes/klima.js), comma-separated; empty = none.
+  klimaModels = process.env.KLIMA_MODELS ?? undefined,
   // Reverse proxies whose X-Forwarded-For counts (Express 'trust proxy'), so rate limits see the client's
   // address instead of the proxy's. Off by default: otherwise anyone could fake the header.
   trustProxy = parseTrustProxy(process.env.TRUST_PROXY),
@@ -544,6 +546,8 @@ function createApp({
 
   const terrain = require('./routes/terrain')(app, { dataDir, url: terrainUrl, fetchImpl: terrainFetch });
   const radarCh = require('./routes/radar-ch')(app, { dataDir, url: mchRadarUrl, fetchImpl: mchRadarFetch });
+  // Climate change in the region: ERA5 since 1940, MeteoSchweiz series, projections and the spots' observations.
+  require('./routes/klima')(app, { db, fetchImpl: weatherFetch, elevation: elevationService, accounts, models: klimaModels });
 
   app.get('/api/config', (req, res) => {
     res.json({
