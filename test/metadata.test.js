@@ -117,7 +117,7 @@ test('Metadata endpoints use the data and the METADATA_* settings', async () => 
     assert.match(await (await fetch(`${base}/api/metadata/iso19139.xml`)).text(), /<gmd:MD_Metadata/);
     const landing = await (await fetch(`${base}/ogc`)).json();
     assert.deepEqual(landing.links.filter((l) => l.rel === 'describedby').map((l) => l.href),
-      [`${base}/api/metadata/geocat.xml`, `${base}/api/metadata/iso19139.xml`, `${base}/api/metadata/objektkatalog.xml`]);
+      [`${base}/stac/catalog.json`, `${base}/api/metadata/geocat.xml`, `${base}/api/metadata/iso19139.xml`, `${base}/api/metadata/objektkatalog.xml`]);
 
     // The feature catalogue (ISO 19110): every collection, every field, coded values listed.
     const fcRes = await fetch(`${base}/api/metadata/objektkatalog.xml`);

@@ -6,7 +6,8 @@
  * can read MyForrest directly. Collections: spots, photos, plant findings
  * and spread fronts. Coordinates in WGS84 (CRS84) or Swiss LV95
  * (EPSG:2056) via `crs`; `bbox` (with `bbox-crs`), `datetime`, `limit` and
- * `offset` filter and page. Plus the GeoPackage export of all collections.
+ * `offset` filter and page. Plus the GeoPackage export of all collections
+ * and, in routes/stac.js, GeoParquet files with a STAC catalog.
  */
 
 const fs = require('node:fs');
@@ -167,6 +168,8 @@ module.exports = function registerOgc(app, {
         link(`${base}/api/export/myforrest.gpkg`, 'enclosure', 'application/geopackage+sqlite3', 'Alles als GeoPackage (LV95)'),
         link(`${base}/api/export/myforrest.pmtiles`, 'enclosure', 'application/vnd.pmtiles', 'Vektorkacheln als PMTiles (WebMercatorQuad)'),
         link(`${base}/api/export/myforrest.mbtiles`, 'enclosure', 'application/vnd.sqlite3', 'Vektorkacheln als MBTiles (WebMercatorQuad)'),
+        ...Object.keys(COLLECTIONS).map((id) => link(`${base}/api/export/parquet/${id}.parquet`, 'enclosure', 'application/vnd.apache.parquet', `${COLLECTIONS[id].title} als GeoParquet (WGS84)`)),
+        link(`${base}/stac/catalog.json`, 'describedby', 'application/json', 'STAC-Katalog (GeoParquet, GeoPackage, PMTiles)'),
         link(`${base}/api/metadata/geocat.xml`, 'describedby', 'application/xml', 'Metadaten für geocat.ch (ISO 19139, Profil GM03)'),
         link(`${base}/api/metadata/iso19139.xml`, 'describedby', 'application/xml', 'Metadaten (ISO 19139)'),
         link(`${base}/api/metadata/objektkatalog.xml`, 'describedby', 'application/xml', 'Objektkatalog: alle Collections und Felder (ISO 19110)'),
@@ -372,20 +375,26 @@ module.exports = function registerOgc(app, {
     res.type('application/xml').send(featureCatalogue({ base: baseUrl(req), contact: contactOf(), date: today() }));
   });
 
+  /** A collection as a layer of the file exports (GeoPackage, GeoParquet), geometries in `srs` (2056 or 4326). */
+  const layerOf = (id, base, srs) => {
+    const c = COLLECTIONS[id];
+    return {
+      name: id,
+      title: c.title,
+      description: c.description,
+      geometryType: c.geometry,
+      fields: c.fields,
+      features: geodata.features(id, base).map((f) => (srs === 2056 ? { ...f, geometry: toLv95(f.geometry) } : f)),
+    };
+  };
+
   app.get('/api/export/myforrest.gpkg', (req, res, next) => {
     const srs = req.query.crs === undefined || req.query.crs === '2056' ? 2056 : req.query.crs === '4326' ? 4326 : null;
     if (!srs) return res.status(400).json({ error: 'crs: 2056 (LV95) oder 4326 (WGS84)' });
     const base = baseUrl(req);
     const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'myforrest-gpkg-')), 'myforrest.gpkg');
     try {
-      writeGeoPackage(file, Object.entries(COLLECTIONS).map(([id, c]) => ({
-        name: id,
-        title: c.title,
-        description: c.description,
-        geometryType: c.geometry,
-        fields: c.fields,
-        features: geodata.features(id, base).map((f) => (srs === 2056 ? { ...f, geometry: toLv95(f.geometry) } : f)),
-      })), { srsId: srs });
+      writeGeoPackage(file, Object.keys(COLLECTIONS).map((id) => layerOf(id, base, srs)), { srsId: srs });
     } catch (err) {
       fs.rmSync(path.dirname(file), { recursive: true, force: true });
       return next(err);
@@ -396,6 +405,9 @@ module.exports = function registerOgc(app, {
     });
     return undefined;
   });
+
+  // Cloud-native files and the STAC catalog that lists them (routes/stac.js).
+  app.locals.openData = require('./stac')(app, { geodata, baseUrl, layerOf, collectionJson, metadata });
 };
 
 module.exports.parseDatetime = parseDatetime;

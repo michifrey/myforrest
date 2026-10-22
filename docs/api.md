@@ -41,6 +41,9 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/ogc/collections[/:id]`       | Collections `spots`, `photos`, `findings`, `spread_fronts` mit Ausdehnung und Koordinatensystemen |
 | `GET`    | `/ogc/collections/:id/items[/:fid]` | GeoJSON; `crs` (CRS84 oder `http://www.opengis.net/def/crs/EPSG/0/2056`), `bbox`, `bbox-crs`, `datetime`, `limit`, `offset` |
 | `GET`    | `/api/export/myforrest.gpkg`   | Alle Collections als GeoPackage (LV95, `?crs=4326` für WGS84) |
+| `GET`    | `/api/export/parquet/:id.parquet` | Eine Collection als GeoParquet 1.1 (WGS84, `?crs=2056` für LV95), gzip-komprimiert |
+| `GET`    | `/api/export/geojson/:id.geojson` | Eine Collection vollständig als GeoJSON-Datei (WGS84) |
+| `GET`    | `/stac/catalog.json`           | STAC-Katalog (1.1): `myforrest/collection.json` und ein Item pro Collection (`myforrest/<id>/<id>.json`) mit GeoParquet, GeoJSON, GeoPackage und PMTiles als Assets |
 | `GET`    | `/api/export/myforrest.pmtiles` | Vektorkacheln des Datensatzes (WebMercatorQuad, Zoom 0–18) als PMTiles v3; mit Range-Anfragen; 503 während der Berechnung |
 | `GET`    | `/api/metadata/geocat.xml`     | Metadaten des Datensatzes nach GM03 (ISO19139.che) für geocat.ch |
 | `GET`    | `/api/metadata/iso19139.xml`   | Dieselben Metadaten als reines ISO 19139 |

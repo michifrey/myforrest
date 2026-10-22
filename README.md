@@ -574,6 +574,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   - Vektorkacheln (OGC API – Tiles, MVT) in Web Mercator und im Schweizer Kachelgitter LV95, vorberechnet
     und als PMTiles/MBTiles zum Herunterladen (Kachel für Kachel geschrieben, auch für sehr grosse Datenmengen),
     die LV95-Kacheln als GeoPackage.
+  - Cloud-native ohne Server: jede Collection als GeoParquet (WGS84 und LV95) mit einem STAC-Katalog, der sich
+    als Ordner auf einen Objektspeicher legen und in Registern wie Portolan eintragen lässt.
   - Zwei Vektorkarten: MapLibre in Web Mercator, OpenLayers auf der Landeskarte von swisstopo.
   - Metadaten für geocat.ch und opendata.swiss (GM03/ISO 19139), auch pro Collection, mit Objektkatalog
     (ISO 19110).
