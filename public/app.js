@@ -512,6 +512,7 @@ async function openSpot(id, photoId) {
   renderChronicle(state.spot);
   loadSpotStorms(state.spot);
   renderSpecies(state.spot);
+  renderInventory(state.spot);
   renderElevation(state.spot);
   renderSpotStep(state.spot);
   if (!$('side-pane-map').hidden) renderMinimap(state.spot);
@@ -933,6 +934,41 @@ function renderSpecies(spot) {
     options('laub', 'Laubbäume'),
     options('nadel', 'Nadelbäume'),
   );
+}
+
+/**
+ * Suggestions from a public tree inventory (by default Geneva, SITG): the species recorded near the spot,
+ * nearest first; those MyForrest knows can be added with one click.
+ */
+let inventoryToken = 0;
+async function renderInventory(spot) {
+  const box = $('species-inventory');
+  const my = ++inventoryToken;
+  let d;
+  try {
+    d = await api(`/api/spots/${spot.id}/tree-inventory`);
+  } catch {
+    d = null;
+  }
+  if (my !== inventoryToken) return;
+  if (!d?.covered) { box.hidden = true; return; }
+  box.hidden = false;
+  const head = el('p', { class: 'label', text: `Im ${d.name}, ${d.radiusM} m um den Spot` });
+  if (d.error || !d.species.length) {
+    box.replaceChildren(head, el('p', { class: 'muted small', text: d.error ? `Nicht erreichbar: ${d.error}` : 'Keine Bäume verzeichnet (das Inventar erfasst nur Bäume ausserhalb des Waldes).' }));
+    return;
+  }
+  const add = async (sci) => {
+    await api(`/api/spots/${spot.id}/species`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scientificName: sci }) });
+    await refreshAfterSpecies();
+  };
+  box.replaceChildren(head, el('ul', { class: 'inventory-list' }, d.species.slice(0, 8).map((s) => el('li', {}, [
+    el('span', { class: 'inv-name' }, [el('strong', { text: s.name || s.commonName || s.scientificName }), ' ', el('i', { text: s.scientificName })]),
+    el('span', { class: 'muted small', text: `${s.count} ${s.count === 1 ? 'Baum' : 'Bäume'}, nächster ${s.nearestM ?? '?'} m${s.maxHeight ? `, bis ${s.maxHeight} m hoch` : ''}${s.remarkable ? ', bemerkenswert' : ''}` }),
+    s.atSpot ? el('span', { class: 'muted small', text: 'schon erfasst' })
+      : s.known ? el('button', { type: 'button', class: 'link small', text: 'übernehmen', 'aria-label': `${s.name} übernehmen`, onclick: () => add(s.scientificName) })
+        : el('span', { class: 'muted small', title: 'Diese Art hat in MyForrest keinen Steckbrief', text: 'ohne Steckbrief' }),
+  ]))), el('p', { class: 'wx-source', text: `${d.trees} Bäume, ältere Einträge bis ±25 m ungenau · ${d.attribution}` }));
 }
 
 async function refreshAfterSpecies() {

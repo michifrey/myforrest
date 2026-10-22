@@ -137,7 +137,9 @@ und Wahrscheinlichkeit, Wind; starke Böen orange) und darunter sieben Tage mit 
 Unter dem Bild lassen sich pro Foto Beobachtungen taggen und eine Notiz erfassen. Jedes Foto nennt
 Urheber und Lizenz und lässt sich melden. Mit einem Pl@ntNet-Key bestimmt *Art bestimmen* die Pflanzen
 auf dem Foto und erkennt invasive Neophyten. Bäume übernimmt der Spot nur bei einem eindeutigen Ergebnis von
-selbst; sonst übernimmt man die richtige Art aus den Vorschlägen.
+selbst; sonst übernimmt man die richtige Art aus den Vorschlägen. Im Kanton Genf schlägt die App zusätzlich die Arten
+des kantonalen **Bauminventars** im Umkreis von 40 m vor
+([Details](docs/funktionen.md#vorschläge-aus-dem-bauminventar)).
 
 ### 3. Vorher / Nachher mit Veränderungs-Heatmap
 

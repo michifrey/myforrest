@@ -2007,3 +2007,12 @@ html.klima-open { overflow: hidden; }
 .k-popup .btn { padding: 0.35rem 0.7rem; font-size: 0.85rem; }
 .leaflet-pane .k-wms { mix-blend-mode: multiply; }
 @media (prefers-color-scheme: dark) { .leaflet-pane .k-wms { mix-blend-mode: normal; } }
+
+/* Tree inventory suggestions in the species box (app.js renderInventory) */
+.species-inventory { border-top: 1px solid var(--border); margin-top: 0.7rem; padding-top: 0.6rem; }
+.species-inventory .label { margin: 0 0 0.4rem; }
+.inventory-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.35rem; }
+.inventory-list li { display: grid; grid-template-columns: 1fr auto; gap: 0 0.6rem; align-items: baseline; }
+.inventory-list li > .muted:first-of-type { grid-column: 1; }
+.inventory-list li > :last-child { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+.inv-name i { color: var(--muted); font-size: 0.85em; }

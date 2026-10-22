@@ -37,6 +37,7 @@ const { assess } = require('./irregularities');
 const { TREES, treeInfo, treeJson } = require('./trees');
 const { createElevation } = require('./elevation');
 const { createDwd } = require('./dwd');
+const { createTreeInventory, registerTreeInventory } = require('./treeinventory');
 const { createSurface, MIN_Z: SURFACE_MIN_Z, MAX_Z: SURFACE_MAX_Z } = require('./surface');
 const { createBuildings } = require('./buildings');
 const registerAccounts = require('./routes/accounts');
@@ -130,6 +131,8 @@ function createApp({
   klimaModels = process.env.KLIMA_MODELS ?? undefined,
   // Climate map and official maps (routes/klima.js): { wmsUrl, wmsFetch, cellsPerDay, mapModels } for tests and the demo.
   klimaOptions = {},
+  // Tree inventory as species suggestions (src/treeinventory.js): fetch and { url, name, bbox, radiusM } for tests and the demo.
+  treeInventoryFetch = fetch, treeInventoryOptions = {},
   // Reverse proxies whose X-Forwarded-For counts (Express 'trust proxy'), so rate limits see the client's
   // address instead of the proxy's. Off by default: otherwise anyone could fake the header.
   trustProxy = parseTrustProxy(process.env.TRUST_PROXY),
@@ -1345,6 +1348,8 @@ function createApp({
   });
 
   require('./routes/species')(app, { db, spotRadiusM, visibleSql: accounts.visibleSql });
+  // Tree species near a spot from a public tree inventory (src/treeinventory.js; by default Geneva, SITG).
+  registerTreeInventory(app, { db, inventory: createTreeInventory({ db, fetchImpl: treeInventoryFetch, ...treeInventoryOptions }), accounts, idParam });
   require('./routes/profile')(app, { db, thumbs, accounts, uploadDir, rateLimits });
   require('./routes/protection')(app, { db, accounts, sensitiveLists, cantons, reprotect });
   /**

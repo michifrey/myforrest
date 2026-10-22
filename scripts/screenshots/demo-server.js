@@ -338,6 +338,25 @@ async function demoWms(url) {
   return new Response(png, { headers: { 'content-type': 'image/png' } });
 }
 
+// A stand-in for a tree inventory (ArcGIS query) around the demo forest: trees outside the stand at the windthrow
+// spot, as Geneva's inventory lists them (Latin and French names, height, remarkable trees).
+const INVENTORY = [
+  ['Acer pseudoplatanus', 'Erable sycomore', 0.00012, 0.00005, 22], ['Acer pseudoplatanus', 'Erable sycomore', 0.0002, -0.0001, 19],
+  ['Carpinus betulus', 'Charme', -0.00008, 0.00015, 14], ['Quercus robur L.', 'Chêne pédonculé', 0.00025, 0.0002, 27, 1],
+  ['Fagus sylvatica', 'Hêtre commun', -0.0002, -0.00012, 29], ['Platanus x hispanica Mill. ex Münchh.', 'Platane commun', 0.0003, -0.00025, 24],
+  ['Tilia cordata Mill.', 'Tilleul à petites feuilles', -0.00028, 0.00026, 17],
+];
+async function inventoryFetch(url) {
+  const q = new URL(url).searchParams;
+  const [lon, lat] = q.get('geometry').split(',').map(Number);
+  return Response.json({
+    features: INVENTORY.map(([latin, common, dLat, dLon, h, rem = 0], i) => ({
+      attributes: { OBJECTID: i + 1, NOM_LATIN: latin, NOM_COMMUN: common, HAUTEUR_TOTALE: h, REMARQUABLE: rem },
+      geometry: { x: lon + dLon, y: lat + dLat },
+    })),
+  });
+}
+
 const app = createApp({
   dataDir: path.join(work, 'data'),
   dwdFetch,
@@ -367,6 +386,9 @@ const app = createApp({
   },
   mailer: { send: async () => ({ sent: true }) },
   // Climate map: every cell at once in the demo, and the demo WMS below instead of geo.admin.ch.
+  // The tree inventory stand-in, covering the demo forest instead of Geneva.
+  treeInventoryFetch: inventoryFetch,
+  treeInventoryOptions: { url: 'https://inventar.demo.invalid/MapServer/1', name: 'Bauminventar (Demo)', attribution: 'Demo-Daten im Format des Genfer Bauminventars (SITG)', bbox: [8.5, 47.3, 8.65, 47.45] },
   klimaOptions: { cellsPerDay: 500, wmsUrl: `http://localhost:${Number(process.env.PORT) || 3123}/demo-wms`, wmsFetch: demoWms, wmsGenf: '' },
 });
 app.get('/demo-wms', async (req, res) => {
