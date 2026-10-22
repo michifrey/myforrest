@@ -110,6 +110,10 @@
         <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="4.5" cy="15.5" r="2"/><circle cx="15.5" cy="4.5" r="2"/><path d="M6.5 15.5h5a3 3 0 0 0 0-6h-3a3 3 0 0 1 0-6h5"/></svg>
         Touren &amp; Aufträge
       </button>
+      <button type="button" id="layers-toggle" class="pill-btn layers-btn" aria-expanded="false" aria-controls="layerpanel">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 18 6.5 10 10.5 2 6.5z"/><path d="M2 10l8 4 8-4M2 13.5l8 4 8-4"/></svg>
+        Ebenen
+      </button>
       <button type="button" id="klima-toggle" class="pill-btn klima-btn" aria-expanded="false" aria-controls="klimapanel">
         <svg viewBox="0 0 20 20" aria-hidden="true" class="k-icon"><rect x="2" y="3" width="4" height="14" fill="#2171b5"/><rect x="6" y="3" width="4" height="14" fill="#c6dbef"/><rect x="10" y="3" width="4" height="14" fill="#fb6a4a"/><rect x="14" y="3" width="4" height="14" fill="#a50f15"/></svg>
         Klima
@@ -174,6 +178,7 @@
     </section>
     <section id="speciespanel" class="sunpanel sppanel" hidden aria-labelledby="sp-title"></section>
     <section id="tourpanel" class="sunpanel tourpanel" hidden aria-labelledby="tour-title"></section>
+    <section id="layerpanel" class="sunpanel layerpanel" hidden aria-labelledby="layers-title"></section>
     <section id="klimapanel" class="sunpanel klimapanel" hidden aria-labelledby="klima-panel-title"></section>
 
     <div id="pick-hint" class="pick-hint" hidden>Klicke auf die Karte, um den Standort zu wählen · <button id="pick-cancel" class="link">Abbrechen</button></div>
@@ -587,6 +592,7 @@
   <script src="shade.js"></script>
   <script src="forest.js"></script>
   <script src="app.js"></script>
+  <script src="basemap.js"></script>
   <script src="hotspots.js"></script>
   <script src="video.js"></script>
   <script src="vegetation.js"></script>
@@ -603,6 +609,7 @@
   <script src="spotprofile.js"></script>
   <script src="forecast.js"></script>
   <script src="klima.js"></script>
+  <script src="layers.js"></script>
   <script src="offline-queue.js"></script>
   <script src="drive-select.js"></script>
   <script src="drive.js"></script>

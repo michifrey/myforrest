@@ -173,6 +173,42 @@ function colorAt(lat, lon, mpp, st) {
   return c;
 }
 
+/** Land cover at a point for the demo vector tiles: wood, grass, residential, water, ice, rock or land. */
+function classAt(lat, lon) {
+  const x = lon * M_LON;
+  const y = lat * M_LAT;
+  if (lat < 46.9) {
+    if (glacier.iceToday(lat, lon)) return 'ice';
+    if (glacier.inLake(lat, lon)) return 'water';
+    const e = glacier.elevation(lat, lon);
+    return e < 2180 + fbm(x / 120 + 3, y / 120) * 260 && fbm(x / 180, y / 180) > 0.42 ? 'grass' : 'rock';
+  }
+  if (Math.hypot((lat - 47.3749) * M_LAT, (lon - 8.5755) * M_LON * 0.7) < 35) return 'water';
+  const dc = Math.hypot((lat - 47.3722) * M_LAT, (lon - 8.5735) * M_LON * 0.8);
+  let forest = dc < 1250 + (fbm(x / 400, y / 400) - 0.5) * 700;
+  if (fbm(x / 160 + 50, y / 160 + 20) > 0.74) forest = false;
+  if (forest) return 'wood';
+  if (lon < 8.5585 + (fbm(x / 500, y / 500) - 0.5) * 0.004) return 'residential';
+  return fbm(x / 250, y / 250) > 0.45 ? 'grass' : 'land';
+}
+
+/** The demo's lines with an OpenMapTiles class: [name, [[lat, lon] …], class]. */
+const demoLines = () => Object.entries(LINES).map(([k, pts]) => [k, pts, k === 'main' ? 'secondary' : k === 'track' ? 'track' : k === 'stream' ? 'stream' : 'path']);
+
+/** Houses of the demo village in a box, as [south, west, north, east]. */
+function demoHouses(s, w, n, e) {
+  const out = [];
+  for (let by = Math.floor((s * M_LAT) / 30); by <= Math.ceil((n * M_LAT) / 30); by++) {
+    for (let bx = Math.floor((w * M_LON) / 38); bx <= Math.ceil((e * M_LON) / 38); bx++) {
+      if (hash2(bx, by) >= 0.6) continue;
+      const lat = ((by + 0.5) * 30) / M_LAT; const lon = ((bx + 0.5) * 38) / M_LON;
+      if (classAt(lat, lon) !== 'residential') continue;
+      out.push([((by + 0.25) * 30) / M_LAT, ((bx + 0.2) * 38) / M_LON, ((by + 0.75) * 30) / M_LAT, ((bx + 0.75) * 38) / M_LON]);
+    }
+  }
+  return out;
+}
+
 const TILE = 256;
 async function render(pixelToLatLon, mpp, style) {
   const st = STYLES[style];
@@ -289,4 +325,4 @@ function objectHeight(lat, lon) {
   return 0;
 }
 
-module.exports = { mercatorTile, lv95Tile, terrariumTile, radarImage, objectHeight };
+module.exports = { mercatorTile, lv95Tile, terrariumTile, radarImage, objectHeight, classAt, demoLines, demoHouses };

@@ -13,6 +13,11 @@ mit echten Dateien und Diensten; das steht jeweils als offener Punkt dabei.
   Dateien verschiedener Modelle prüfen (bisher nach den bekannten Formaten mit Testdaten) und weitere Formate
   (z. B. GPS-Spur von Garmin- und Nextbase-Kameras, verschlüsselte Viofo-Daten).
 
+- **Karte**: die Grundkarte *MyForrest* mit echten Kacheln von OpenFreeMap im Betrieb prüfen (gebaut nach dem
+  Schema OpenMapTiles, getestet mit Demo-Kacheln); die Ebenen von geo.admin.ch, des Baumkatasters Zürich und von EFFIS
+  gegen die echten Dienste prüfen (Namen der Ebenen, Attribute bei *Was ist hier?*), die Attributnamen in lesbare
+  Bezeichnungen übersetzen; Geoportale der Kantone (z. B. Aargau, Zürich) mit ihrem Waldentwicklungsplan und
+  Baumkataster als regionale Dienste; Verkehr in Echtzeit, falls ein offener Dienst entsteht.
 - **3D-Karte ausbauen**: das Höhenmodell swissALTI3D von swisstopo (2 m) für die Schweiz statt der weltweiten
   Kacheln (braucht einen eigenen Kachel-Dienst, swisstopo liefert keine Terrarium-Kacheln), dann passen auch Gebäude
   und Bäume genauer aufs Gelände; die Höhenkorrektur der 3D Tiles mit dem Geoid-Modell von swisstopo statt fest 50 m;
@@ -142,6 +147,10 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 
 - 3D-Karte: Spots mit Blickrichtung, Route und Gletscherumrisse auf dem Gelände (MapLibre, Terrain Tiles über
   den Server), Karte oder Luftbild, Überhöhung wählbar; aus einem Spot direkt in die 3D-Ansicht seiner Umgebung; Route abfliegen
+- Grundkarte *MyForrest* als Vektorkarte in den Farben der App (OpenFreeMap, umgefärbt nach Ebenennamen), Wechsel zu
+  OSM, Landeskarte und Luftbild; Panel *Ebenen* mit Wald und Waldbrand, Bevölkerung, Bodennutzung, Verkehr von
+  geo.admin.ch, Baumkataster Zürich, SITG Genf, EFFIS und NASA FIRMS, mit *Was ist hier?*; Baumkataster Zürich auch
+  als Baumart-Vorschlag
 - 3D-Karte mit Gebäuden (swissBUILDINGS3D) und Bäumen (Vegetation 3D) von swisstopo als 3D Tiles über deck.gl,
   vom Ellipsoid auf Meereshöhe gesenkt
 - Explorer aufgeräumt (eine Leiste für Filter und Kartenmodi, schmale Explorer-Karte mit Bildkacheln) und Spots
