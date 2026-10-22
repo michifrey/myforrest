@@ -33,6 +33,14 @@ mit echten Dateien und Diensten; das steht jeweils als offener Punkt dabei.
   Kantone).
 - **Touren**: Abgleich mit Strava/Komoot per OAuth (braucht dort registrierte Apps); die Karte kühler Abschnitte
   mit Messnetzen in der Nähe vergleichen (z. B. Stadtklima-Messnetze), sobald es genug echte Touren gibt.
+- **Sonne und Schatten unterwegs**: das Tempo nach Steigung (z. B. Wanderzeit nach SchweizMobil) statt gleichmässig;
+  Bewölkung aus der Prognose für die nächsten Tage; den Wege-Magnet auf Wunsch schattige (oder sonnige) Wege
+  bevorzugen lassen; mit echten Höhen und Routen prüfen, wie gut Waldwege mit Lücken im Kronendach getroffen werden
+  (bisher mit den Demo-Höhen im Format von swisstopo).
+- **Wikipedia, Wikidata & Commons**: mit den echten Diensten im Betrieb prüfen (gebaut nach der Dokumentation der
+  APIs, getestet mit Antworten im selben Format); die Blickrichtung alter Commons-Fotos aus der Vorlage *Location*
+  lesen und wie beim Archiv-Katalog nach Richtung filtern; eigene Fotos (mit Einverständnis) auf Commons hochladen;
+  Wikidata-Einträge ohne OSM-Verknüpfung als Liste für Mapper (z. B. über den OSM↔Wikidata-Matcher).
 
 - **Android-App ausbauen**: auf F-Droid bzw. im Play Store veröffentlichen (braucht ein Entwicklerkonto und
   die Begründung für Kamera und Standort im Hintergrund); Downloads (GPX, Datenexport) und Push-Mitteilungen

@@ -54,6 +54,8 @@ src/landscapes.js    Landschaftsprofile (Wald, Gletscher, Gebirge, Trockengebiet
 src/glaciers.js      Gletscherumrisse aus Inventaren (GeoJSON, WGS84/LV95, Jahr aus Eigenschaft oder Dateiname): Eis pro Jahr an einem Ort, Abstand, Umrisse für die Karte
 src/glamos.js        Längenänderung der Gletscherzungen (GLAMOS-CSV): Zuordnung über SGI-Id oder Name, aufsummierte Kurve, Rate der letzten zehn Jahre
 src/archives.js      Katalog offener Archivbilder (CSV/GeoJSON, WGS84/LV95): Vorschläge in der Nähe und Blickrichtung, Lizenzprüfung, Download nur der Katalog-Adressen
+src/wikimedia.js     OpenStreetMap und Wikimedia um einen Spot: OSM-Objekte mit wikidata-Tag (Overpass), Wikidata-Einträge mit Koordinaten (SPARQL), Name, Bild und Wikipedia-Artikel, Fotos auf Commons (Geosuche), eine Woche zwischengespeichert
+src/routes/wikimedia.js  Wikipedia, Wikidata & Commons am Spot (/api/spots/:id/wikimedia), Commons-Foto als Archivfoto übernehmen
 src/horizon-align.js Ausrichtung an der Horizontlinie (Trockengebiet, wo Dünen keine festen Punkte haben): Verschiebung aus der Korrelation der Skylines
 src/routes/landscapes.js  Landschaft eines Spots setzen, Gletscher am Spot (mit Längenänderung), Umrisse (/api/glaciers), Archivbild-Vorschläge
 src/lenient-fetch.js HTTP-Client für BRouters eigenen Server (Kopfzeilen nur mit \n)
@@ -119,10 +121,13 @@ docs/                Dokumentation; docs/screenshots/ enthält die Bilder für d
 mkdocs.yml           Doku-Website aus docs/ (MkDocs Material), gebaut und veröffentlicht von .github/workflows/docs.yml
 public/              Frontend (Leaflet, ohne Build-Schritt; forest.js zeichnet die Landschaften der Startseite (Wald, Gletscher, Gebirge, Wüste) und wechselt sie,
                      sun.js berechnet Sonnenstand und Einstrahlung, shade.js Gelände-, Baum- und Nachtschatten
-                     (in shade-worker.js neben der Seite gerechnet),
+                     (in shade-worker.js neben der Seite gerechnet), routesun.js Sonne und Schatten entlang einer Route
+                     (Horizont pro Punkt aus Gelände, Bäumen und Häusern, Startzeiten des Tages),
                      sunmap.js den Kartenmodus „Sonne & Wetter“ (mit Licht und Schatten, Radar der MeteoSchweiz und DWD-Karten),
                      hotspots.js den Kartenmodus „Arten & Neophyten“,
-                     tours.js den Kartenmodus „Touren & Aufträge“ (Route zeichnen, aufzeichnen, importieren, Fotoaufträge),
+                     tours.js den Kartenmodus „Touren & Aufträge“ (Route zeichnen, aufzeichnen, importieren, Fotoaufträge,
+                     Sonne und Schatten unterwegs),
+                     wiki.js den Teil „Wikipedia, Wikidata & Commons“ eines Spots,
                      video.js den Video-Upload und die 360°-Ansicht,
                      walk.js das Durchgehen wie Street View (weiche Übergänge, Mapillary-Bilder und deren Kartenebene),
                      vegetation.js die Diagramme zu Vegetationsdichte und NDVI,

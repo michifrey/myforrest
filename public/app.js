@@ -513,6 +513,7 @@ async function openSpot(id, photoId) {
   loadSpotStorms(state.spot);
   renderSpecies(state.spot);
   renderInventory(state.spot);
+  window.Wiki?.reset(state.spot);
   renderElevation(state.spot);
   renderSpotStep(state.spot);
   if (!$('side-pane-map').hidden) renderMinimap(state.spot);

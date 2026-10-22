@@ -1,6 +1,6 @@
 'use strict';
 // Takes the README screenshots from the demo server (see README.md here).
-// Usage: node shoot.js [hero map standort spot baeume gebaeude3d klima satellite sun schatten species vektor touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher mobile]
+// Usage: node shoot.js [hero map standort spot baeume gebaeude3d klima satellite sun schatten species vektor tourschatten wikimedia touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher mobile]
 // «mapillary» needs the demo server started with DEMO_MAPILLARY=1 (a Mapillary stand-in, see README.md).
 // «gletscher» uses the glacier demo server (BASE_GLETSCHER, default http://localhost:3124; see README.md).
 const path = require('path');
@@ -303,6 +303,50 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     const d = await page.locator('#upload-dialog').boundingBox();
     await page.screenshot({ path: out('upload-ordner.png'), clip: { x: d.x, y: a.y - 12, width: d.width, height: b.y + b.height - a.y + 28 } });
     await page.close();
+  }
+
+  if (want('wikimedia')) {
+    // The windthrow spot: what Wikidata, OpenStreetMap and Commons know about the place (demo stand-ins).
+    const page = await explore(ctx);
+    await page.setViewportSize({ width: 1440, height: 1400 });
+    await page.evaluate(() => document.querySelector('#explore').scrollIntoView());
+    await pin(page, 1).click();
+    await settle(page, 2500);
+    await page.evaluate(() => { document.querySelector('#wiki-box').open = true; });
+    await page.waitForSelector('#wiki-body .wiki-photos', { timeout: 60000 });
+    await page.evaluate(() => document.querySelector('#wiki-box').scrollIntoView({ block: 'start' }));
+    await page.waitForFunction(() => [...document.querySelectorAll('#wiki-box img')].every((i) => i.complete && i.naturalWidth > 0), null, { timeout: 30000 });
+    await settle(page, 800);
+    // The box with a margin of the page around it.
+    const clip = await page.evaluate(() => {
+      const b = document.querySelector('#wiki-box').getBoundingClientRect();
+      return { x: b.left - 16, y: b.top - 16, width: b.width + 32, height: b.height + 32 };
+    });
+    await page.screenshot({ path: out('wikimedia.jpg'), clip, ...jpg });
+    await page.close();
+  }
+
+  if (want('tourschatten')) {
+    // Sun and shade along a summer evening walk: across the meadow, along the forest edge and onto the forest track.
+    const wp = [[47.3641, 8.5500], [47.3645, 8.5590], [47.3660, 8.5652], [47.3700, 8.5690]]
+      .map(([lat, lon]) => ({ lat, lon }));
+    const route = { waypoints: wp, segments: wp.slice(1).map((p, i) => [wp[i], p]), raw: null, kind: 'gezeichnet', name: 'Abendrunde', savedId: null, hasTime: false };
+    const tctx = await desktop(browser);
+    await tctx.addInitScript((r) => { try { localStorage.setItem('myforrest.route.v1', r); } catch {} }, JSON.stringify(route));
+    const page = await explore(tctx);
+    await page.click('#tours-toggle');
+    await settle(page, 2000);
+    await page.evaluate(() => { document.querySelector('#tour-sun').open = true; });
+    await page.fill('#tour-sun-date', '2026-07-15');
+    await page.fill('#tour-sun-time', '18:30');
+    await page.click('#tour-sun-go');
+    await page.waitForSelector('#tour-sun-result .sun-bar', { timeout: 120000 });
+    await page.evaluate(() => map.fitBounds([[47.3636, 8.5495], [47.3705, 8.5695]], { paddingTopLeft: [440, 70], paddingBottomRight: [380, 50] }));
+    await settle(page, 2500);
+    await page.evaluate(() => document.querySelector('#tour-sun')?.scrollIntoView({ block: 'start' }));
+    await settle(page, 800);
+    await page.screenshot({ path: out('tour-sonne-schatten.jpg'), ...jpg });
+    await tctx.close();
   }
 
   if (want('touren')) {

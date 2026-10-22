@@ -459,6 +459,46 @@ einen Client-Token aus dem Entwicklerbereich von Mapillary (`MAPILLARY_TOKEN`); 
 Grenzen: Eigene Reihen lassen sich noch nicht zu Mapillary hochladen. Wie gut Mapillary einen Ort abdeckt,
 hängt von der Community ab; im Wald und in den Bergen ist das oft dünner als an Strassen.
 
+### Wikipedia, Wikidata und Commons
+
+Unter den Baumarten eines Spots steht der aufklappbare Teil *Wikipedia, Wikidata & Commons*. Er verbindet den
+Ort mit dem, was OpenStreetMap und die Wikimedia-Projekte über ihn wissen, und zeigt, wo die beiden noch nicht
+verknüpft sind. Gefragt wird erst beim Aufklappen, danach eine Woche lang aus dem Zwischenspeicher.
+
+![Wikipedia, Wikidata und Commons am Spot: ein Eintrag ohne OSM-Verknüpfung, verknüpfter Wald und Baum, Fotos von 1934 bis 2023 (Demo-Daten)](screenshots/wikimedia.jpg)
+
+**Einträge im Umkreis von 500 m**, die nächsten zuerst, aus zwei Richtungen:
+
+- **Von OpenStreetMap aus**: Objekte mit einem Tag `wikidata`, `wikipedia` oder `species:wikidata` (ein Wald, ein
+  Naturschutzgebiet, ein Gipfel, ein Naturdenkmal-Baum …), über die Overpass-API des Wegnetzes (`WEGNETZ_URL`).
+  Bei einem Baum mit `species:wikidata` erscheint seine Art (*Art eines Baums in OSM*). Ohne Overpass-API fällt
+  dieser Teil weg.
+- **Von Wikidata aus**: Einträge mit Koordinaten (P625) im selben Umkreis, über den SPARQL-Dienst von Wikidata
+  (`wikibase:around`). Ein Eintrag gilt als **mit OSM verknüpft**, wenn ein OSM-Objekt per `wikidata`-Tag auf ihn
+  verweist oder er selbst eine OSM-Relation (P402) nennt. Sonst steht **noch nicht mit OSM verknüpft** dabei und ein
+  Link in den OSM-Editor an der Stelle des Spots: Wer das passende Objekt kennt, trägt dort `wikidata=Q…` ein.
+
+Zu jedem Eintrag holt der Server aus Wikidata Name und Beschreibung (Deutsch, sonst Französisch, Italienisch,
+Englisch), das Bild (P18) als Vorschau von Commons, die Commons-Kategorie (P373) und den Wikipedia-Artikel in
+derselben Reihenfolge der Sprachen; fehlt ein Wikidata-Eintrag, gilt der `wikipedia`-Tag aus OSM.
+
+**Fotos auf Wikimedia Commons** bis 1 km um den Spot (Geosuche nach dem Aufnahmeort der Dateien), mit Jahr,
+Abstand, Urheber und Lizenz; ein Klick öffnet die Seite der Datei. Oft sind das ältere Aufnahmen desselben Wegs
+oder derselben Lichtung. Ein Foto mit **Aufnahmedatum** und einer Lizenz, die MyForrest erlaubt (gemeinfrei, CC0,
+CC BY, CC BY-SA, CC BY-NC-SA), lässt sich mit *Als Archivfoto übernehmen* (angemeldet) in den Zeitverlauf des Spots
+holen, wie ein Bild aus einem [Archiv-Katalog](#archivfotos): Der Server lädt es von Commons (höchstens 2560 px),
+datiert es auf das Aufnahmedatum (ohne Monat Juli, ohne Tag der 15.), legt es an den Spot, richtet es auf die neuen
+Fotos aus und schreibt Titel, Urheber, Lizenz und Link in die Notiz; das Foto trägt die Lizenz der Datei. Andere
+Lizenzen (z. B. CC BY-ND) und Fotos ohne Datum bleiben beim Link. Jedes Foto wird pro Spot einmal übernommen.
+Der Server lädt nur Fotos, die seine eigene Suche um den Spot gefunden hat, keine Adressen aus dem Browser.
+
+Die Anfragen tragen eine eigene Kennung (User-Agent), wie es die Regeln der Wikimedia-API verlangen. Antwortet ein
+Teil nicht, zeigt der Rest, was er hat, und unten steht, was fehlt. `WIKIMEDIA=0` schaltet den Teil ab.
+
+Grenzen: Die Blickrichtung der Commons-Fotos kennt die Geosuche nicht; ob ein altes Foto denselben Ausschnitt zeigt,
+entscheidet, wer es übernimmt. Wikidata-Einträge ohne Koordinaten (z. B. die meisten Baumarten) erscheinen nur über
+einen OSM-Tag.
+
 ## Bildanalyse
 
 ### Automatische Feinausrichtung
@@ -1003,7 +1043,8 @@ Blickrichtung haben, höchstens 60° davon abweichen, die nächsten zuerst. Jede
 Abstand, Quelle und Lizenz und führt mit *Im Archiv ansehen* zur Seite des Archivs. Angemeldete übernehmen ein
 Bild mit **Übernehmen** als Archivfoto des Spots: Der Server lädt es von der Bild-Adresse des Katalogs, datiert
 es auf das Katalogdatum, legt es an den Spot, richtet es aus und schreibt Titel, Quelle, Lizenz und Link in die
-Notiz. Das Foto trägt die Lizenz des Archivbilds, nicht die Standardlizenz des Kontos.
+Notiz. Das Foto trägt die Lizenz des Archivbilds, nicht die Standardlizenz des Kontos. Auch Fotos von Wikimedia
+Commons lassen sich so übernehmen, an jedem Spot (siehe [Wikipedia, Wikidata und Commons](#wikipedia-wikidata-und-commons)).
 
 Übernommen werden nur Bilder, deren Lizenz das erlaubt: gemeinfrei (Public Domain, CC0), CC BY, CC BY-SA und
 CC BY-NC-SA. Bei anderen Lizenzen («Alle Rechte vorbehalten», CC BY-ND, unbekannt) bleibt es beim Link. Jedes
@@ -1107,6 +1148,9 @@ die Rechnung langsamer als das Abspielen, zeigt die Karte jeweils das neueste fe
 dazwischen liegende aus. Kann der Browser keinen Worker starten, rechnet die Seite selbst.
 
 ![Bäume und Häuser werfen ihre Schatten: Dorfrand, Waldrand und Lichtung am Nachmittag](screenshots/baumschatten.jpg)
+
+Dieselben Höhen nimmt [Sonne und Schatten unterwegs](#sonne-und-schatten-unterwegs) für eine ganze Route und alle
+Startzeiten eines Tages.
 
 ### 3D-Karte
 
@@ -1529,6 +1573,48 @@ privat, bis man sie veröffentlicht. Andere sehen eine öffentliche Tour ohne Ze
 letzten 200 m, denn Start und Ziel liegen oft vor der Haustür. *Öffentliche Touren auf der Karte zeigen*
 setzt einen Pin an den Anfang jeder öffentlichen Tour; beim Überfahren erscheint die Strecke, ein Klick lädt
 sie ins Panel.
+
+### Sonne und Schatten unterwegs
+
+Im Panel einer Route (ab 100 m) steht *Sonne und Schatten unterwegs*: An welchem Tag, um welche Zeit und mit
+welchem Tempo man startet, und die App zeigt, wo die Route dann in der Sonne liegt und wo im Schatten, im Sommer für
+eine kühle Runde, im Winter für eine sonnige.
+
+![Sonne und Schatten entlang einer Abendrunde: die Wiese in der Sonne mit dem Schatten einzelner Bäume, der Wald im Schatten, darunter der Schattenanteil je nach Startzeit](screenshots/tour-sonne-schatten.jpg)
+
+- **Anteile**: wie viel der Strecke in der Sonne liegt, wie viel im Schatten des Geländes und wie viel im Schatten
+  von Bäumen und Häusern, und was nach Sonnenuntergang liegt; ein Balken und ein Streifen vom Start zum Ziel zeigen
+  es, die Route auf der Karte färbt sich gleich (gelb Sonne, violett Gelände, blau Bäume und Häuser, dunkel Nacht).
+- **Zeit unterwegs**: Jeder Punkt wird zu der Zeit gerechnet, zu der man ihn erreicht, aus Startzeit und Tempo
+  (vorgeschlagen nach der Aktivität: Joggen 9 km/h, Wandern 4, Biken 15, sonst 4,5; änderbar). Hat die Route
+  eigene Zeiten (Aufzeichnung, Import), rechnet *Zeiten der Aufzeichnung nehmen* mit diesen: Wo lag man damals in
+  der Sonne?
+- **Startzeiten**: Eine Kurve zeigt den Schattenanteil für jede Startzeit des Tages, alle 15 Minuten von
+  Sonnenaufgang bis Sonnenuntergang; darunter die Startzeit mit **am meisten Schatten** und die mit **am meisten
+  Sonne**, je nur unter den Starts, die vor Sonnenuntergang ankommen. Ein Klick übernimmt sie. Eine neue Zeit oder
+  ein neues Tempo rechnet sofort, nur eine geänderte Route muss neu berechnet werden.
+
+Verfahren (`public/routesun.js`, im Browser): Alle 25 m entlang der Route (bei langen Routen gröber, höchstens
+1600 Punkte) bekommt die Route einen eigenen **Horizont**, gesehen aus 1,7 m über dem Boden, in 72 Richtungen (alle
+5°):
+
+- **Gelände**: der höchste Winkel des Geländes in jeder Richtung, von 30 m bis 20 km in wachsenden Schritten, mit
+  Erdkrümmung und Lichtbrechung. Die Höhen sind dieselben [Terrain Tiles](https://registry.opendata.aws/terrain-tiles/)
+  wie für [Licht und Schatten auf der Karte](#licht-und-schatten-auf-der-karte): fein (Zoomstufe 13, rund 13 m)
+  bis 1,5 km neben der Route, gröber (Zoomstufe 10) bis 20 km.
+- **Bäume und Häuser**: der höchste Winkel der Kronen und Dächer bis 120 m, in Schritten von 1,5 m, aus denselben
+  Höhen über dem Boden wie auf der Karte (`/api/surface`, Zoomstufe 16: in der Schweiz swissSURFACE3D minus
+  swissALTI3D, sonst Metas Kronenhöhen und Gebäude aus OpenStreetMap). Steht über dem Punkt selbst eine Krone oder
+  ein Dach, liegt er ganz im Schatten (Weg unter Bäumen). Routen, die mehr als 160 solcher Kacheln (rund 400 m)
+  berühren, rechnen nur mit dem Gelände; das Panel sagt es.
+
+Der Horizont hängt nicht von der Zeit ab: Ihn rechnet die Seite einmal (in Teilen, damit sie bedienbar bleibt), danach
+für jede Startzeit nur noch den Sonnenstand an jedem Punkt. Ein Punkt liegt in der Sonne, wenn der obere Rand der
+Sonnenscheibe über beiden Horizonten steht.
+
+Grenzen: ohne Wolken; das Tempo ist gleichmässig, Steigungen und Pausen zählen nicht; ein Weg durch den Wald gilt als
+schattig, auch wo eine Lücke im Kronendach kleiner ist als die Auflösung der Höhen (1–2 m); kleine Abweichungen der
+Route vom Weg können einen Punkt unter eine Krone am Wegrand legen.
 
 ### Fotos über eine Tour verorten
 
