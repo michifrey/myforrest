@@ -41,6 +41,16 @@ services:
         sync: false
       - key: SMTP_URL
         sync: false
+      # Log in and sign up with Google or GitHub (docs/hosting.md, section "Render"); the button shows once both
+      # values are set. Callback: https://<address>/api/auth/oauth/google/callback (…/github/callback).
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
 
   # Routing along paths (deploy/brouter): loads the routing data for Switzerland (≈ 400 MB) onto its disk on first
   # start and renews it every 30 days. Only reachable from MyForrest.

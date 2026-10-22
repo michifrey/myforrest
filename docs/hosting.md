@@ -211,6 +211,24 @@ nicht.
    (aus `RENDER_EXTERNAL_URL`).
 5. Konto anlegen: ohne `SMTP_URL` steht der Bestätigungslink unter **Logs** im Dienst.
 
+**Mit Google und GitHub anmelden und registrieren:** Die Knöpfe *Mit Google* und *Mit GitHub* erscheinen im
+Anmeldedialog (Anmelden und Registrieren), sobald Client-ID und Secret gesetzt sind; ohne sie gibt es nur
+E-Mail und Passwort. Die Rücksprungadresse ist die Adresse des Dienstes plus `/api/auth/oauth/<anbieter>/callback`:
+
+- *Google*: In der [Google Cloud Console](https://console.cloud.google.com/apis/credentials) unter
+  *Anmeldedaten → Anmeldedaten erstellen → OAuth-Client-ID* den Typ *Webanwendung* wählen und als autorisierte
+  Weiterleitungs-URI `https://myforrest-….onrender.com/api/auth/oauth/google/callback` eintragen (vorher unter
+  *OAuth-Zustimmungsbildschirm* App-Name und Support-E-Mail angeben und die App veröffentlichen, sonst können
+  sich nur Testnutzer anmelden).
+- *GitHub*: Unter *Settings → Developer settings → [OAuth Apps](https://github.com/settings/developers) → New OAuth
+  App* als *Homepage URL* die Adresse des Dienstes und als *Authorization callback URL*
+  `https://myforrest-….onrender.com/api/auth/oauth/github/callback` eintragen, danach *Generate a new client secret*.
+- Die Werte im Dienst `myforrest` unter **Environment** als `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+  `GITHUB_CLIENT_ID` und `GITHUB_CLIENT_SECRET` setzen (bei einem neuen Blueprint fragt Render danach) und speichern;
+  Render startet den Dienst neu. Mit eigener Domain dort die Rücksprungadresse mit dieser Domain eintragen.
+
+Microsoft, SWITCH edu-ID und AGOV gehen gleich, siehe [Installation](installation.md#anmelden-über-google-github-microsoft-und-switch-edu-id).
+
 **Schon mit einer früheren Vorlage eingerichtet?** Render übernimmt Änderungen an `render.yaml` über den
 Blueprint: im Dashboard unter **Blueprints → myforrest** die neuen Dienste prüfen und **Sync** (bzw. *Manual
 Sync*) auslösen. Danach baut Render die beiden privaten Dienste und setzt bei MyForrest die neuen Variablen.
