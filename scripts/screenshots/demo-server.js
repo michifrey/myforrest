@@ -7,6 +7,7 @@ const sharp = require('sharp');
 const { createApp } = require('../../src/app');
 const glacier = require('./glacier-demo');
 const tiles = require('./tiles');
+const tiles3d = require('./tiles3d-demo');
 
 // DEMO_MAPILLARY=1: a stand-in for the Mapillary API, a 360° sequence crossing the forest track of the
 // walk-through (seed.js) from north-west to south-east, with panoramas drawn like the demo ones.
@@ -387,9 +388,19 @@ const app = createApp({
   mailer: { send: async () => ({ sent: true }) },
   // Climate map: every cell at once in the demo, and the demo WMS below instead of geo.admin.ch.
   // The tree inventory stand-in, covering the demo forest instead of Geneva.
+  // Buildings and trees as 3D Tiles: a hamlet and tree crowns at the demo forest instead of swisstopo's.
+  tiles3dBuildings: `http://localhost:${Number(process.env.PORT) || 3123}/demo-3d/gebaeude/tileset.json`,
+  tiles3dVegetation: `http://localhost:${Number(process.env.PORT) || 3123}/demo-3d/baeume/tileset.json`,
   treeInventoryFetch: inventoryFetch,
   treeInventoryOptions: { url: 'https://inventar.demo.invalid/MapServer/1', name: 'Bauminventar (Demo)', attribution: 'Demo-Daten im Format des Genfer Bauminventars (SITG)', bbox: [8.5, 47.3, 8.65, 47.45] },
   klimaOptions: { cellsPerDay: 500, wmsUrl: `http://localhost:${Number(process.env.PORT) || 3123}/demo-wms`, wmsFetch: demoWms, wmsGenf: '' },
+});
+app.get('/demo-3d/:kind/:file', (req, res) => {
+  const kind = req.params.kind === 'gebaeude' ? 'gebaeude' : 'baeume';
+  res.set('access-control-allow-origin', '*');
+  if (req.params.file === 'tileset.json') return res.json(tiles3d.tileset(kind, elevation));
+  const { content } = kind === 'gebaeude' ? tiles3d.buildings(elevation) : tiles3d.trees(elevation);
+  return res.type('application/octet-stream').send(content);
 });
 app.get('/demo-wms', async (req, res) => {
   const r = await demoWms(`http://x/demo-wms?${new URLSearchParams(req.query)}`);

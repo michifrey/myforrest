@@ -5,7 +5,9 @@
    vektorkarte.html) is loaded only when the view is opened. Elevation comes
    from the server (/api/terrain, Terrarium tiles, kept there), the picture
    from OpenStreetMap or the aerial photo of swisstopo; glacier outlines and
-   the current route of "Touren & Aufträge" lie on the terrain.
+   the current route of "Touren & Aufträge" lie on the terrain. Buildings and
+   trees of swisstopo come as 3D Tiles through deck.gl (loaded only when
+   switched on), shifted from the ellipsoid down to the terrain's sea level.
    Uses the globals of app.js ($, el, api, state, map, pinKind, openSpot) and
    tours.js (Tours).
    ========================================================= */
@@ -13,7 +15,7 @@
   const COLORS = { ok: '#2f5d34', damage: '#c2611d', neo: '#8650c8' };
   const SWISS = [5.7, 45.7, 10.7, 47.95]; // where the aerial photo of swisstopo exists
   const STORE = 'myforrest-map3d';
-  const prefs = (() => { try { return { base: 'osm', exaggeration: 1.5, ...JSON.parse(localStorage.getItem(STORE)) }; } catch { return { base: 'osm', exaggeration: 1.5 }; } })();
+  const prefs = (() => { try { return { base: 'osm', exaggeration: 1.5, tiles: [], ...JSON.parse(localStorage.getItem(STORE)) }; } catch { return { base: 'osm', exaggeration: 1.5, tiles: [] }; } })();
   const savePrefs = () => { try { localStorage.setItem(STORE, JSON.stringify(prefs)); } catch { /* private mode */ } };
 
   let lib = null; // promise of maplibregl
@@ -29,6 +31,69 @@
       document.head.append(s);
     });
     return lib;
+  }
+
+  let deckLib = null; // promise of the deck.gl bundle
+  function loadDeck() {
+    if (window.deck?.Tile3DLayer) return Promise.resolve(window.deck);
+    deckLib = deckLib || new Promise((resolve, reject) => {
+      const s = el('script', { src: 'vendor/deck/deck.min.js' });
+      s.onload = () => resolve(window.deck);
+      s.onerror = () => { deckLib = null; reject(new Error('3D-Bibliothek konnte nicht geladen werden (offline?)')); };
+      document.head.append(s);
+    });
+    return deckLib;
+  }
+
+  /* ---------- Buildings and trees (3D Tiles of swisstopo) ---------- */
+
+  /**
+   * Shift of the tiles along the vertical at the middle of Switzerland, in Earth-centred coordinates:
+   * the tiles stand on the WGS84 ellipsoid, the terrain on sea level (geoid ~50 m above it).
+   */
+  function heightShift(metres) {
+    const lat = (46.8 * Math.PI) / 180; const lon = (8.2 * Math.PI) / 180;
+    return [Math.cos(lat) * Math.cos(lon) * metres, Math.cos(lat) * Math.sin(lon) * metres, Math.sin(lat) * metres];
+  }
+
+  /** Puts the chosen 3D Tiles layers on the map (deck.gl interleaved with MapLibre), or takes them off. */
+  async function setTiles(m, ids, status) {
+    const cfg = state.config.tiles3d;
+    const wanted = (cfg?.layers || []).filter((l) => ids.includes(l.id));
+    if (m.getLayer('tiles3d-credit')) m.setLayoutProperty('tiles3d-credit', 'visibility', wanted.length ? 'visible' : 'none');
+    if (!wanted.length) {
+      if (view?.overlay) view.overlay.setProps({ layers: [] });
+      return;
+    }
+    let deck;
+    try {
+      deck = await loadDeck();
+    } catch (err) {
+      status.textContent = err.message;
+      status.hidden = false;
+      return;
+    }
+    if (!view || view.map !== m) return;
+    const shift = heightShift(cfg.height);
+    const layers = wanted.map((l) => new deck.Tile3DLayer({
+      id: `tiles3d-${l.id}`,
+      data: l.url,
+      pointSize: 2.5,
+      // The tiles are as sharp as the screen needs; a bit coarser keeps phones fluid.
+      loadOptions: { tileset: { maximumScreenSpaceError: 12, throttleRequests: true } },
+      onTilesetLoad: (tileset) => {
+        const matrix = tileset.modelMatrix.clone();
+        [matrix[12], matrix[13], matrix[14]] = shift;
+        tileset.modelMatrix = matrix;
+      },
+      onTileError: (tile, url, message) => console.warn('3D Tiles:', url, message),
+    }));
+    if (!view.overlay) {
+      view.overlay = new deck.MapboxOverlay({ interleaved: true, layers });
+      m.addControl(view.overlay);
+    } else {
+      view.overlay.setProps({ layers });
+    }
   }
 
   const fmtDay = (iso) => (iso ? new Date(iso).toLocaleDateString('de-CH') : '');
@@ -86,11 +151,14 @@
         route: { type: 'geojson', data: routeFeature() },
         cones: { type: 'geojson', data: coneFeatures() },
         glaciers: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+        // Carries the credit of the 3D Tiles (deck.gl layers have none in MapLibre); its layer is shown with them.
+        tiles3dCredit: { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, attribution: 'Gebäude und Bäume 3D © swisstopo' },
       },
       layers: [
         { id: 'osm', type: 'raster', source: 'osm', layout: { visibility: prefs.base === 'osm' ? 'visible' : 'none' } },
         { id: 'swissimage', type: 'raster', source: 'swissimage', layout: { visibility: prefs.base === 'luftbild' ? 'visible' : 'none' } },
         { id: 'hillshade', type: 'hillshade', source: 'hill', paint: { 'hillshade-exaggeration': 0.3, 'hillshade-shadow-color': '#2b3a2c' } },
+        { id: 'tiles3d-credit', type: 'circle', source: 'tiles3dCredit', layout: { visibility: 'none' } },
         { id: 'glacier-fill', type: 'fill', source: 'glaciers', paint: { 'fill-color': '#9ad0ec', 'fill-opacity': 0.45 } },
         { id: 'glacier-line', type: 'line', source: 'glaciers', paint: { 'line-color': '#3d8fc0', 'line-width': 1.2 } },
         { id: 'cones', type: 'fill', source: 'cones', paint: { 'fill-color': '#c9a227', 'fill-opacity': 0.4 } },
@@ -231,13 +299,20 @@
     const base = el('select', { id: 'map3d-base', 'aria-label': 'Hintergrund' },
       [['osm', 'Karte (OSM)'], ['luftbild', 'Luftbild (CH)']].map(([v, t]) => el('option', { value: v, text: t })));
     base.value = prefs.base;
+    // Buildings and trees: only where swisstopo has them, and on terrain without exaggeration (they would float).
+    const tilesCfg = state.config.tiles3d?.layers || [];
+    const tileBoxes = tilesCfg.map((l) => {
+      const input = el('input', { type: 'checkbox', value: l.id });
+      input.checked = (prefs.tiles || []).includes(l.id);
+      return el('label', { class: 'map3d-tile' }, [input, ` ${l.title}`]);
+    });
     const status = el('p', { class: 'map3d-status', role: 'status', text: '3D-Karte wird geladen …' });
     const container = el('div', { class: 'map3d-canvas' });
     const root = el('div', { id: 'map3d', class: 'map3d', role: 'dialog', 'aria-modal': 'true', 'aria-label': '3D-Karte' }, [
       container,
       el('div', { class: 'map3d-bar' }, [
         el('strong', { text: '3D-Karte' }),
-        base, exag,
+        base, exag, ...tileBoxes,
         el('button', { type: 'button', class: 'btn secondary map3d-fly', hidden: '', text: 'Route abfliegen' }),
         el('span', { class: 'map3d-hint', text: 'Rechte Maustaste oder zwei Finger: kippen und drehen' }),
         el('button', { type: 'button', class: 'icon map3d-close', 'aria-label': 'Schliessen', text: '×' }),
@@ -256,7 +331,26 @@
       prefs.exaggeration = Number(exag.value);
       savePrefs();
       view?.map?.setTerrain({ source: 'dem', exaggeration: prefs.exaggeration });
+      // Exaggerated terrain and real buildings do not fit: the buildings go off.
+      if (prefs.exaggeration !== 1 && prefs.tiles.length) {
+        prefs.tiles = [];
+        savePrefs();
+        for (const b of tileBoxes) b.querySelector('input').checked = false;
+        if (view?.map) setTiles(view.map, [], status);
+      }
     });
+    for (const box of tileBoxes) {
+      box.querySelector('input').addEventListener('change', () => {
+        prefs.tiles = tileBoxes.filter((b) => b.querySelector('input').checked).map((b) => b.querySelector('input').value);
+        if (prefs.tiles.length && prefs.exaggeration !== 1) {
+          prefs.exaggeration = 1;
+          exag.value = '1';
+          view?.map?.setTerrain({ source: 'dem', exaggeration: 1 });
+        }
+        savePrefs();
+        if (view?.map) setTiles(view.map, prefs.tiles, status);
+      });
+    }
 
     let maplibregl;
     try {
@@ -283,6 +377,11 @@
     m.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
     m.on('load', () => {
       status.hidden = true;
+      if (prefs.tiles.length) {
+        if (prefs.exaggeration !== 1) m.setTerrain({ source: 'dem', exaggeration: (prefs.exaggeration = 1) });
+        exag.value = String(prefs.exaggeration);
+        setTiles(m, prefs.tiles, status);
+      }
       loadGlaciers(m);
       if (spot) popupFor(maplibregl, m, spot.id, [spot.lon, spot.lat]);
     });
@@ -295,6 +394,20 @@
     m.on('mouseenter', 'spots', () => { m.getCanvas().style.cursor = 'pointer'; });
     m.on('mouseleave', 'spots', () => { m.getCanvas().style.cursor = ''; });
     window.Map3D.map = m;
+  }
+
+  /** Switches buildings and trees on or off from outside (screenshots, tests). */
+  function showTiles(ids) {
+    prefs.tiles = ids;
+    savePrefs();
+    for (const box of view?.root.querySelectorAll('.map3d-tile input') || []) box.checked = ids.includes(box.value);
+    if (view?.map) {
+      if (ids.length) {
+        view.map.setTerrain({ source: 'dem', exaggeration: (prefs.exaggeration = 1) });
+        view.root.querySelector('#map3d-exag').value = '1';
+      }
+      setTiles(view.map, ids, view.root.querySelector('.map3d-status'));
+    }
   }
 
   function close() {
@@ -329,5 +442,5 @@
     $('spot-3d').hidden = !state.config.terrain;
   }, 300);
 
-  window.Map3D = { open, close, showSpot, fly, map: null };
+  window.Map3D = { open, close, showSpot, fly, showTiles, map: null };
 }());

@@ -14,8 +14,10 @@ mit echten Dateien und Diensten; das steht jeweils als offener Punkt dabei.
   (z. B. GPS-Spur von Garmin- und Nextbase-Kameras, verschlüsselte Viofo-Daten).
 
 - **3D-Karte ausbauen**: das Höhenmodell swissALTI3D von swisstopo (2 m) für die Schweiz statt der weltweiten
-  Kacheln (braucht einen eigenen Kachel-Dienst, swisstopo liefert keine Terrarium-Kacheln); beim Abfliegen einer
-  Tour die Fotos am Weg einblenden.
+  Kacheln (braucht einen eigenen Kachel-Dienst, swisstopo liefert keine Terrarium-Kacheln), dann passen auch Gebäude
+  und Bäume genauer aufs Gelände; die Höhenkorrektur der 3D Tiles mit dem Geoid-Modell von swisstopo statt fest 50 m;
+  die Gebäude und Bäume mit den echten Tilesets prüfen (Adresse der Gebäude nach dem Muster der Dokumentation, getestet
+  mit Demo-Tiles im selben Format); beim Abfliegen einer Tour die Fotos am Weg einblenden.
 - **Durchgehen ausbauen**: eigene Reihen zu Mapillary hochladen (OAuth bei Mapillary, ohne geschützte Funde);
   Schritte mit echter Parallaxe (Tiefenschätzung statt einer Ebene); das Wegnetz mit einer echten Overpass-Instanz
   im Betrieb prüfen.
@@ -112,8 +114,6 @@ Als Nächstes:
   Dienst prüfen (gebaut nach der Beschreibung der Ebene, getestet mit Daten im selben Format); einen Link auf die
   Position in Genève 3D, falls das Projekt eine solche Adresse anbietet (Absprache mit dem Autor); weitere
   Bauminventare (z. B. Baumkataster der Städte Zürich, Basel, Bern), sobald mehrere gleichzeitig einstellbar sind.
-- **3D-Karte mit Gebäuden und Bäumen**: die 3D Tiles von swisstopo (swissBUILDINGS3D, Vegetation 3D) über deck.gl in
-  der 3D-Karte, für die ganze Schweiz.
 - **Karte**: die offiziellen Karten von geo.admin.ch mit echten Ebenen prüfen (gefunden über die Namen in den
   Capabilities, bisher mit einem Demo-Dienst getestet); das Klima-Raster mit CH2025 auf dem 1-km-Gitter statt aus
   ERA5 und Modellen.
@@ -142,6 +142,8 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 
 - 3D-Karte: Spots mit Blickrichtung, Route und Gletscherumrisse auf dem Gelände (MapLibre, Terrain Tiles über
   den Server), Karte oder Luftbild, Überhöhung wählbar; aus einem Spot direkt in die 3D-Ansicht seiner Umgebung; Route abfliegen
+- 3D-Karte mit Gebäuden (swissBUILDINGS3D) und Bäumen (Vegetation 3D) von swisstopo als 3D Tiles über deck.gl,
+  vom Ellipsoid auf Meereshöhe gesenkt
 - Explorer aufgeräumt (eine Leiste für Filter und Kartenmodi, schmale Explorer-Karte mit Bildkacheln) und Spots
   als eigene Detailseite: grosses Foto, Tabs, Minikarte und Blättern durch die Spots
 - Licht & Wald auf der Spot-Seite: Horizont aus dem Höhenmodell, Sonnenbogen und Sonnenstand, Baumarten in ihrer
