@@ -102,9 +102,20 @@ Als Nächstes:
   MeteoSchweiz lesen statt als vorbereitetes CSV, für alle drei Erwärmungsstufen.
 - **Mehr Messdaten**: Raumanalysen der MeteoSchweiz (Gitter ab 1961) als Gegenprobe zu ERA5, Schneehöhen des SLF,
   Wassertemperaturen des BAFU, Permafrost (PERMOS) an Gebirge-Spots.
-- **Neue Verbindungen**: Käfergenerationen pro Jahr aus Wärmesummen neben den Borkenkäfer-Fotos; Ausbreitungstempo der
-  Neophyten gegenüber den Wintern; Baumarten am Spot unter den Szenarien mit Verweis auf die Tree-App; Klima-Analoga
-  («wo ist es heute so warm wie hier um 2050?»); kühle Abschnitte aus Touren an Hitzetagen.
+- **Neue Verbindungen**: die Käfergenerationen pro Jahr neben die Borkenkäfer-Fotos legen; Ausbreitungstempo der
+  Neophyten gegenüber den Wintern; Klima-Analoga («wo ist es heute so warm wie hier um 2050?») aus dem Klima-Raster;
+  kühle Abschnitte aus Touren an Hitzetagen.
+- **Wald genauer**: die Wasserspeicherung des Bodens (Bodeneignungskarte) und die Exposition in die Einschätzung
+  nehmen; die Empfehlung der Tree-App direkt verlinken, sobald sie Koordinaten in der Adresse annimmt; die Faustregeln
+  mit Fachleuten von WSL oder kantonalen Forstdiensten prüfen.
+- **Genf**: die Adressen der SITG-Dienste und ihre Ebenen prüfen; das Bauminventar von Genf als Vorschlag für die
+  Baumarten eines Spots; einen Link auf die Position in Genève 3D, falls das Projekt eine solche Adresse anbietet
+  (Absprache mit dem Autor).
+- **3D-Karte mit Gebäuden und Bäumen**: die 3D Tiles von swisstopo (swissBUILDINGS3D, Vegetation 3D) über deck.gl in
+  der 3D-Karte, für die ganze Schweiz.
+- **Karte**: die offiziellen Karten von geo.admin.ch mit echten Ebenen prüfen (gefunden über die Namen in den
+  Capabilities, bisher mit einem Demo-Dienst getestet); das Klima-Raster mit CH2025 auf dem 1-km-Gitter statt aus
+  ERA5 und Modellen.
 - **Regionen statt Kreise**: Dossier pro Gemeinde, Bezirk, Kanton oder Waldregion (Grenzen von swisstopo), als Seite
   mit fester Adresse zum Teilen und als PDF.
 
@@ -174,6 +185,9 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 - Klima im Wandel: Klimastreifen und Kennzahlen seit 1940 (ERA5) am Ort, homogene Messreihen der MeteoSchweiz seit
   1864, Zeitachse mit den Beobachtungen der Spots, Synthese, Ausblick bis 2050 aus Klimamodellen (CMIP6 HighResMIP),
   Import der Klimaszenarien CH2025
+- Klima im Wandel: drei Szenarien (+1,5, +2, +3 °C, CH2025 oder Pattern Scaling), was sie für den Wald bedeuten
+  (Höhenstufen, Fichte und Borkenkäfer, Trockenheit, Winter, Chancen), Klima-Raster auf der Karte und offizielle
+  Karten von geo.admin.ch; in Genf Wärmeinsel und Kronendach des SITG und ein Verweis auf Genève 3D
 
 ### Arten und geschützte Funde
 

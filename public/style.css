@@ -1966,3 +1966,44 @@ html.klima-open { overflow: hidden; }
   .k-hero { grid-template-columns: 1fr; }
   .k-head { flex-direction: column; align-items: stretch; }
 }
+
+/* Klima im Wandel: scenarios, forest, map panel */
+:root { --sev-gering: #3f7a3c; --sev-mittel: #c99512; --sev-hoch: #b5261e; --sev-chance: #2f6fb0; }
+@media (prefers-color-scheme: dark) { :root { --sev-gering: #7cbf72; --sev-mittel: #e3b23c; --sev-hoch: #f0685c; --sev-chance: #6fa8e0; } }
+.k-levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 0.9rem; }
+.k-level { background: var(--surface); border: 1px solid var(--border); border-top: 5px solid #fc9272; border-radius: var(--radius); padding: 0.9rem 1rem 0.7rem; }
+.k-level.k-GWL20 { border-top-color: #ef3b2c; }
+.k-level.k-GWL30 { border-top-color: #67000d; }
+.k-level h4 { font: 600 1.35rem var(--font-display); margin: 0.1rem 0 0.1rem; }
+.k-level-dt { font: 600 1.6rem/1.1 var(--font-display); color: #cb181d; margin: 0 0 0.4rem; }
+@media (prefers-color-scheme: dark) { .k-level-dt { color: #fb6a4a; } }
+.k-when { font-size: 0.85rem; color: var(--muted); margin: 0 0 0.6rem; }
+.k-level-facts { display: grid; grid-template-columns: 1fr auto; gap: 0.15rem 0.8rem; margin: 0 0 0.5rem; font-size: 0.88rem; }
+.k-level-facts div { display: contents; }
+.k-level-facts dt { color: var(--muted); }
+.k-level-facts dd { margin: 0; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.k-forest { display: grid; grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr)); gap: 0.9rem; }
+.k-impact { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.85rem 1rem; }
+.k-impact h4 { font: 600 1.1rem var(--font-display); margin: 0 0 0.45rem; }
+.k-impact p { margin: 0.5rem 0 0; font-size: 0.9rem; }
+.k-sev { list-style: none; display: flex; flex-wrap: wrap; gap: 0.35rem; padding: 0; margin: 0; }
+.k-sev li { display: flex; gap: 0.35rem; align-items: baseline; font-size: 0.75rem; border-radius: 999px; padding: 0.15rem 0.6rem; background: var(--surface-2); }
+.k-sev li span { color: var(--muted); }
+.k-sev li.sev-gering strong { color: var(--sev-gering); }
+.k-sev li.sev-mittel strong { color: var(--sev-mittel); }
+.k-sev li.sev-hoch strong { color: var(--sev-hoch); }
+.k-sev li.sev-chance strong { color: var(--sev-chance); }
+.klima-spot .k-forest { grid-template-columns: 1fr; margin-bottom: 0.9rem; }
+.klima-spot h4.label { margin: 0.6rem 0 0.4rem; }
+.klimapanel .btn.wide { margin: 0.8rem 0; }
+.k-panel-box { border-top: 1px solid var(--border); padding: 0.7rem 0 0.4rem; display: grid; gap: 0.45rem; }
+.k-row { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
+.k-row select { max-width: 15rem; }
+.k-row[hidden] { display: none; }
+.k-legend { display: flex; flex-wrap: wrap; gap: 0.2rem 0.5rem; font-size: 0.72rem; color: var(--muted); align-items: center; }
+.k-legend span { display: inline-flex; align-items: center; gap: 0.2rem; }
+.k-legend i { width: 14px; height: 12px; border-radius: 2px; display: inline-block; border: 1px solid rgb(0 0 0 / 0.08); }
+.k-popup p { margin: 0.35rem 0; font-size: 0.85rem; }
+.k-popup .btn { padding: 0.35rem 0.7rem; font-size: 0.85rem; }
+.leaflet-pane .k-wms { mix-blend-mode: multiply; }
+@media (prefers-color-scheme: dark) { .leaflet-pane .k-wms { mix-blend-mode: normal; } }

@@ -22,6 +22,8 @@
 const express = require('express');
 const klima = require('../klima');
 const { iceSeries } = require('../sentinel');
+const { treeInfo } = require('../trees');
+const { parseCapabilities } = require('../dwd');
 
 const ARCHIVE = 'https://archive-api.open-meteo.com/v1/archive';
 const CLIMATE = 'https://climate-api.open-meteo.com/v1/climate';
@@ -36,11 +38,38 @@ const STATION_MAX_KM = 80; // effective distance (altitude counts) to a homogene
 const SCENARIO_MAX_KM = 60;
 const PHENO_MAX_KM = 50;
 const FAILED_RETRY = 10 * 60000;
+// Climate map: cells of 0.1° (the ERA5-Land grid), the models on cells of 0.5° (their own grid is coarser).
+const CELL = 0.1;
+const MODEL_CELL = 0.5;
+const MAX_CELLS = 80;
+const DEFAULT_MAP_MODELS = 3; // the first models of KLIMA_MODELS; fewer requests per cell
+// Official maps from geo.admin.ch (WMS): layers found in the capabilities by name.
+const DEFAULT_WMS = 'https://wms.geo.admin.ch/';
+const WMS_TTL = 24 * 3600000;
+// Geneva (SITG, ArcGIS WMS per service): urban heat island at night and the tree canopy 2017 and 2023 from LiDAR,
+// the canopy target of the tree strategy. Offered only around Geneva; every layer of these services is listed.
+const DEFAULT_WMS_GENF = [
+  'https://raster.sitg.ge.ch/arcgis/services/CLIMAT_ILOT_CHALEUR_4H00_P0_2020/MapServer/WMSServer',
+  'https://vector.sitg.ge.ch/arcgis/services/SIPV_ICA_MNC_2023/MapServer/WMSServer',
+  'https://vector.sitg.ge.ch/arcgis/services/SIPV_ICA_MNC_2017/MapServer/WMSServer',
+  'https://vector.sitg.ge.ch/arcgis/services/FFP_STRAT_ARBO_AIRE_URB/MapServer/WMSServer',
+].join(',');
+const GENEVA_BBOX = [5.95, 46.12, 6.32, 46.37]; // west, south, east, north
+const WMS_LAYERS = [
+  { group: 'Klima heute (MeteoSchweiz)', match: /klimanormwerte/i },
+  { group: 'Szenarien', match: /klimaszenarien|ch2018|ch2025/i },
+  { group: 'Wald im Klimawandel (BAFU)', match: /vegetationshoehenstufen|hoehenstufen.*wald|wald.*klima/i },
+  { group: 'Trockenheit und Waldbrand', match: /trockenheit|drought|waldbrand/i },
+];
 const DAY = 86400000;
 
 module.exports = function registerKlima(app, {
   db, fetchImpl = fetch, elevation = null, accounts = null, models = process.env.KLIMA_MODELS ?? DEFAULT_MODELS,
-  now = () => Date.now(),
+  mapModels = Number(process.env.KLIMA_KARTE_MODELLE ?? DEFAULT_MAP_MODELS),
+  cellsPerDay = Number(process.env.KLIMA_KARTE_PRO_TAG ?? 30),
+  wmsUrl = (process.env.KLIMA_WMS_URL ?? DEFAULT_WMS) || null, wmsFetch = fetchImpl,
+  wmsGenf = process.env.KLIMA_WMS_GENF ?? DEFAULT_WMS_GENF,
+  background = (p) => p, now = () => Date.now(),
 }) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS weather_cache (key TEXT PRIMARY KEY, json TEXT NOT NULL, fetched_at INTEGER NOT NULL);
@@ -87,7 +116,7 @@ module.exports = function registerKlima(app, {
   /** Yearly indicators from ERA5 at the place (1940 to the last complete year), in three requests. */
   function era5(lat, lon, elev) {
     const to = lastYear();
-    return cachedForever(`klima:era5:${placeKey(lat, lon, elev)}:${to}`, async () => {
+    return cachedForever(`klima:era5:v2:${placeKey(lat, lon, elev)}:${to}`, async () => {
       const daily = { time: [] };
       for (const k of DAILY.split(',')) daily[k] = [];
       for (let from = FIRST_YEAR; from <= to; from += 30) {
@@ -104,7 +133,7 @@ module.exports = function registerKlima(app, {
 
   /** Yearly indicators of one climate model, 1991–2050. Keys may carry the model's name as suffix. */
   function model(lat, lon, elev, name) {
-    return cachedForever(`klima:model:${name}:${placeKey(lat, lon, elev)}`, async () => {
+    return cachedForever(`klima:model:v2:${name}:${placeKey(lat, lon, elev)}`, async () => {
       const body = await getJson(`${CLIMATE}?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}${elevParam(elev)}` +
         `&start_date=${klima.NORMAL[0]}-01-01&end_date=${klima.FUTURE[1]}-12-31&models=${name}&daily=${DAILY}`);
       const d = body.daily;
@@ -202,6 +231,16 @@ module.exports = function registerKlima(app, {
       (levels[r.level] ||= []).push({ key: r.indicator, label: ind?.label || r.indicator, unit: ind?.kind === 'ratio' ? '%' : ind?.unit || '', value: r.value, low: r.low, high: r.high });
     }
     return { place: p.place, km: p.km, levels };
+  }
+  /** CH2025 changes per level as scenarioLevels() reads them. */
+  const ch2025Of = (sc) => (sc ? Object.fromEntries(Object.entries(sc.levels).map(([l, rows]) => [l, rows.map((r) => ({ key: r.key, value: r.value, low: r.low, high: r.high }))])) : null);
+
+  /** Tree species found at the spots (Pl@ntNet or by hand), as trees.js entries. */
+  function speciesOf(spots) {
+    if (!spots.length) return [];
+    const ids = spots.map((s) => s.id);
+    return db.prepare(`SELECT DISTINCT scientific_name FROM spot_species WHERE spot_id IN (${ids.map(() => '?').join(',')})`).all(...ids)
+      .map((r) => treeInfo(r.scientific_name)).filter((t, i, all) => t && all.findIndex((x) => x?.sci === t.sci) === i);
   }
 
   /* ---------- Observations of the region ---------- */
@@ -363,6 +402,10 @@ module.exports = function registerKlima(app, {
     const station = stationFor({ ...at, elevation: elev });
     const spots = regionSpots(req, at, radiusKm);
     const { obs, pheno } = observations(req, spots, { ...at, elevation: elev });
+    const scenarios = scenariosFor({ ...at, elevation: elev });
+    const levels = klima.scenarioLevels(projection, ch2025Of(scenarios));
+    // For a spot its own trees, else those of the spots in the region.
+    const species = speciesOf(spotId ? [{ id: spotId }] : spots);
     res.json({
       centre: { lat: at.lat, lon: at.lon, elevation: elev },
       spot: spotId,
@@ -375,7 +418,10 @@ module.exports = function registerKlima(app, {
       projection,
       modelSeries,
       projectionErrors: projectionErrors.length ? projectionErrors : undefined,
-      scenarios: scenariosFor({ ...at, elevation: elev }),
+      scenarios,
+      levels,
+      species: species.map((t) => ({ scientificName: t.sci, name: t.de, drought: t.drought })),
+      forest: klima.forestImpacts({ elevation: elev, levels, species }),
       observations: obs,
       phenoStations: pheno,
       synthesis: klima.synthesize({ climate, rows, obs, projection, station }),
@@ -385,6 +431,152 @@ module.exports = function registerKlima(app, {
         models: modelList.length ? 'CMIP6 HighResMIP über die Klima-API von Open-Meteo (CC BY 4.0)' : null,
         station: station ? (station.source === 'meteoschweiz' ? 'Homogene Messreihen, Quelle: MeteoSchweiz' : 'Eigene Messreihe (CSV)') : null,
       },
+    });
+  });
+
+  /* ---------- Climate map ---------- */
+
+  const snap = (v, step) => Math.round((Math.floor(v / step) * step + step / 2) * 1000) / 1000;
+  const cellKey = (lat, lon) => `klima:cell:v1:${lat.toFixed(3)},${lon.toFixed(3)}:${lastYear()}`;
+  const queue = [];
+  const queued = new Set();
+  let running = null;
+  let budget = { day: '', used: 0 };
+
+  /** What the map shows for a cell: climate now, the change since 1961–1990 and at each warming level. */
+  async function computeCell(lat, lon) {
+    let elev = null;
+    if (elevation) {
+      try { elev = await elevation.lookup(lat, lon); } catch { elev = null; }
+    }
+    const rows = await era5(lat, lon, elev);
+    const c = klima.climateSummary(rows);
+    if (!c) throw new Error('keine Klimareihe');
+    const ch = (k) => c.changes.find((x) => x.key === k);
+    const m = {};
+    for (const name of modelList.slice(0, Math.max(0, mapModels))) {
+      try { m[name] = await model(snap(lat, MODEL_CELL), snap(lon, MODEL_CELL), null, name); } catch { /* fewer models */ }
+    }
+    const levels = klima.scenarioLevels(klima.projectDelta(rows, m), ch2025Of(scenariosFor({ lat, lon, elevation: elev })));
+    const pick = (l, k) => l.indicators.find((i) => i.key === k);
+    return {
+      lat, lon, elevation: elev,
+      tmean: ch('tmean').normal, warming: c.warming, hotDays: ch('hotDays').recent, frostDays: ch('frostDays').recent,
+      beetle: klima.beetleGenerations(ch('beetleDD').normal),
+      levels: Object.fromEntries(levels.map((l) => {
+        const sp = pick(l, 'summerP');
+        return [l.level, {
+          dT: Math.round((pick(l, 'tmean').value - pick(l, 'tmean').normal) * 10) / 10,
+          hotDays: pick(l, 'hotDays').value,
+          frostDays: pick(l, 'frostDays').value,
+          summerP: sp?.normal ? Math.round(((sp.value - sp.normal) / sp.normal) * 100) : null,
+          beetle: klima.beetleGenerations(pick(l, 'beetleDD')?.value),
+          shiftM: l.shiftM,
+          source: l.source,
+        }];
+      })),
+    };
+  }
+
+  /** Works through the queued cells one by one, at most `cellsPerDay` new ones per day (Open-Meteo's free tier). */
+  function pump() {
+    if (running || !queue.length) return;
+    const day = new Date(now()).toISOString().slice(0, 10);
+    if (budget.day !== day) budget = { day, used: 0 };
+    if (budget.used >= cellsPerDay) return;
+    const { lat, lon, key } = queue.shift();
+    budget.used++;
+    running = computeCell(lat, lon)
+      .then((cell) => setCache.run(key, JSON.stringify(cell), now()))
+      .catch(() => failed.set(key, now()))
+      .finally(() => { queued.delete(key); running = null; pump(); });
+    background(running);
+  }
+
+  /**
+   * Cells of the climate map in a bounding box (`?bbox=west,south,east,north`): the computed ones, and
+   * how many are still queued. Missing cells are computed in the background, the nearest to the centre first.
+   */
+  app.get('/api/klima/karte', (req, res) => {
+    const b = String(req.query.bbox || '').split(',').map(Number);
+    if (b.length !== 4 || b.some((v) => !Number.isFinite(v)) || b[0] >= b[2] || b[1] >= b[3]) {
+      return res.status(400).json({ error: 'bbox=west,süd,ost,nord angeben' });
+    }
+    const lats = [];
+    const lons = [];
+    for (let v = snap(b[1], CELL); v <= b[3] + CELL / 2; v = Math.round((v + CELL) * 1000) / 1000) lats.push(v);
+    for (let v = snap(b[0], CELL); v <= b[2] + CELL / 2; v = Math.round((v + CELL) * 1000) / 1000) lons.push(v);
+    if (lats.length * lons.length > MAX_CELLS) return res.json({ cell: CELL, tooLarge: true, cells: [], pending: 0 });
+    const cells = [];
+    const missing = [];
+    const centre = { lat: (b[1] + b[3]) / 2, lon: (b[0] + b[2]) / 2 };
+    for (const lat of lats) {
+      for (const lon of lons) {
+        const key = cellKey(lat, lon);
+        const row = getCache.get(key);
+        if (row) cells.push(JSON.parse(row.json));
+        else if (!queued.has(key) && !(now() - (failed.get(key) || 0) < FAILED_RETRY)) missing.push({ lat, lon, key });
+      }
+    }
+    missing.sort((a, c) => Math.hypot(a.lat - centre.lat, a.lon - centre.lon) - Math.hypot(c.lat - centre.lat, c.lon - centre.lon));
+    for (const m of missing) { queue.push(m); queued.add(m.key); }
+    pump();
+    const day = new Date(now()).toISOString().slice(0, 10);
+    res.json({
+      cell: CELL,
+      cells,
+      pending: queued.size,
+      budgetLeft: budget.day === day ? Math.max(0, cellsPerDay - budget.used) : cellsPerDay,
+      levels: klima.WARMING_LEVELS.map((l) => ({ level: l.level, title: l.title })),
+    });
+  });
+
+  /**
+   * Official climate and forest maps: from geo.admin.ch those found by name in the capabilities, from the
+   * services of Geneva (SITG) every layer, with the area they cover. Each source is read once a day; one
+   * that does not answer is left out.
+   */
+  const sources = [
+    ...(wmsUrl ? [{ url: wmsUrl, filter: true, attribution: '© geo.admin.ch' }] : []),
+    ...String(wmsGenf || '').split(',').map((u) => u.trim()).filter(Boolean)
+      .map((url) => ({ url, group: 'Stadtklima und Bäume Genf (SITG)', bbox: GENEVA_BBOX, attribution: '© SITG / État de Genève' })),
+  ];
+  let wms = { at: 0, layers: null, errors: [] };
+  async function readSource(src) {
+    const sep = src.url.includes('?') ? '&' : '?';
+    const r = await wmsFetch(`${src.url}${sep}SERVICE=WMS&VERSION=1.3.0&REQUEST=GetCapabilities&lang=de`, { signal: AbortSignal.timeout(30000) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const xml = await r.text();
+    const service = xml.match(/<Service>[\s\S]*?<Title>([^<]*)<\/Title>/)?.[1]?.trim();
+    const out = [];
+    for (const l of parseCapabilities(xml)) {
+      const g = src.filter ? WMS_LAYERS.find((w) => w.match.test(l.name)) : { group: src.group };
+      if (!g || out.some((x) => x.name === l.name)) continue;
+      // ArcGIS names its layers 0, 1, …: the title says what it is, with the service's title in front.
+      const title = !src.filter && service && /^\d+$/.test(l.name) && !l.title.includes(service) ? `${service}: ${l.title}` : l.title;
+      out.push({ url: src.url, name: l.name, title, group: g.group, attribution: src.attribution, bbox: src.bbox || null });
+    }
+    return out;
+  }
+  app.get('/api/klima/layers', async (req, res) => {
+    if (!sources.length) return res.json({ url: null, layers: [] });
+    if (!wms.layers || now() - wms.at > WMS_TTL) {
+      const layers = [];
+      const errors = [];
+      for (const src of sources) {
+        try {
+          layers.push(...await readSource(src));
+        } catch (err) {
+          errors.push(`${new URL(src.url).hostname}: ${err.message}`);
+        }
+      }
+      const order = (l) => (l.bbox ? 99 : WMS_LAYERS.findIndex((w) => w.group === l.group));
+      layers.sort((a, c) => order(a) - order(c) || a.group.localeCompare(c.group, 'de') || a.title.localeCompare(c.title, 'de'));
+      if (layers.length || !wms.layers) wms = { at: now(), layers, errors };
+    }
+    res.json({
+      url: wmsUrl, layers: wms.layers,
+      ...(wms.errors.length ? { error: wms.layers.length ? undefined : `Kartendienste nicht erreichbar (${wms.errors.join('; ')})`, errors: wms.errors } : {}),
     });
   });
 

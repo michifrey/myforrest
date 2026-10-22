@@ -418,13 +418,27 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
   if (want('klima')) {
     // "Klima im Wandel": the dossier of the region around the windthrow spot, its parts, and the spot's tab.
     const page = await explore(ctx);
-    await page.evaluate(() => map.setView([47.3733, 8.5720], 14, { animate: false }));
+    // The climate map: hot days at +2 °C in cells of 0.1°, then the forest belts of the (demo) WMS.
+    await page.evaluate(() => map.setView([47.37, 8.58], 11, { animate: false }));
     await page.click('#klima-toggle');
+    await page.selectOption('#klima-layer', 'hot');
+    await page.waitForFunction(() => document.querySelectorAll('.k-cell-rect').length >= 20 && !/berechnet/.test(document.querySelector('#klima-status').textContent), null, { timeout: 180000 });
+    await settle(page, 1500);
+    await page.screenshot({ path: out('klima-karte.jpg'), ...jpg });
+    await page.uncheck('#klima-grid');
+    await page.selectOption('#klima-wms', { label: 'Vegetationshöhenstufen 2085, trockeneres Klima (Demo)' });
+    await settle(page, 3000);
+    await page.screenshot({ path: out('klima-karte-wald.jpg'), ...jpg });
+    await page.check('#klima-grid');
+    await page.selectOption('#klima-wms', '');
+    await page.evaluate(() => map.setView([47.3733, 8.5720], 14, { animate: false }));
+    await page.click('#klima-dossier-here');
     await page.waitForSelector('#klima .k-hero', { timeout: 120000 });
     await settle(page, 1500);
     await page.screenshot({ path: out('klima-dossier.jpg'), ...jpg });
     await page.addStyleTag({ content: '#klima .k-head { position: static; }' }); // the sticky header would cover the parts
-    for (const [id, file] of [['k-changes', 'klima-kennzahlen.jpg'], ['k-timeline-title', 'klima-zeitachse.jpg'], ['k-synth-title', 'klima-synthese.jpg'], ['k-outlook', 'klima-ausblick.jpg']]) {
+    for (const [id, file] of [['k-changes', 'klima-kennzahlen.jpg'], ['k-timeline-title', 'klima-zeitachse.jpg'], ['k-synth-title', 'klima-synthese.jpg'], ['k-outlook', 'klima-ausblick.jpg'],
+      ['k-levels', 'klima-szenarien.jpg'], ['k-forest', 'klima-wald.jpg']]) {
       const part = page.locator(`#klima section[aria-labelledby="${id}"]`);
       await part.scrollIntoViewIfNeeded();
       await settle(page, 600);
@@ -435,6 +449,8 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await settle(page, 2500);
     await page.click('#tab-klima');
     await page.waitForSelector('#klima-spot-body .k-stripes', { timeout: 60000 });
+    // The tab is taller than the window: a tall window shows all of it.
+    await page.setViewportSize({ width: 1440, height: 2600 });
     await settle(page, 1200);
     await page.locator('#pane-klima').screenshot({ path: out('klima-spot.jpg'), ...jpg });
     await page.close();

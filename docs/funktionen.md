@@ -828,7 +828,13 @@ den Ort:
 - eine **Synthese** mit Aussagen wie «In den Hitzesommern zeigten die Fotos an 11 von 14 besuchten Spots Hinweise
   auf Trockenheit …»;
 - einen **Ausblick** bis 2050 aus sieben Klimamodellen (CMIP6 HighResMIP, Delta-Methode) und, wenn geladen, die
-  Klimaszenarien CH2025.
+  Klimaszenarien CH2025;
+- **drei Szenarien** (+1,5, +2 und +3 °C weltweit) mit dem, was sie am Ort bedeuten und wann sie nach dem IPCC
+  eintreten, und eine Einschätzung, **was das für den Wald bedeutet** (Höhenstufen, Fichte und Borkenkäfer,
+  Sommertrockenheit, Winter, wer profitiert), mit den Baumarten der Spots;
+- auf der **Karte** ein Klima-Raster (Felder von 0,1°) mit Erwärmung, Hitzetagen, Sommerregen, Käfergenerationen und
+  Höhenverschiebung pro Szenario und offizielle Karten von geo.admin.ch (Klimanormwerte, Höhenstufen des Waldes),
+  im Kanton Genf auch Wärmeinsel und Kronendach (SITG) und ein Verweis auf Genève 3D.
 
 ![Zeitachse des Klima-Dossiers](screenshots/klima-zeitachse.jpg)
 

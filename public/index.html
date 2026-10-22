@@ -110,7 +110,7 @@
         <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="4.5" cy="15.5" r="2"/><circle cx="15.5" cy="4.5" r="2"/><path d="M6.5 15.5h5a3 3 0 0 0 0-6h-3a3 3 0 0 1 0-6h5"/></svg>
         Touren &amp; Aufträge
       </button>
-      <button type="button" id="klima-toggle" class="pill-btn klima-btn" aria-pressed="false" aria-haspopup="dialog">
+      <button type="button" id="klima-toggle" class="pill-btn klima-btn" aria-expanded="false" aria-controls="klimapanel">
         <svg viewBox="0 0 20 20" aria-hidden="true" class="k-icon"><rect x="2" y="3" width="4" height="14" fill="#2171b5"/><rect x="6" y="3" width="4" height="14" fill="#c6dbef"/><rect x="10" y="3" width="4" height="14" fill="#fb6a4a"/><rect x="14" y="3" width="4" height="14" fill="#a50f15"/></svg>
         Klima
       </button>
@@ -174,6 +174,7 @@
     </section>
     <section id="speciespanel" class="sunpanel sppanel" hidden aria-labelledby="sp-title"></section>
     <section id="tourpanel" class="sunpanel tourpanel" hidden aria-labelledby="tour-title"></section>
+    <section id="klimapanel" class="sunpanel klimapanel" hidden aria-labelledby="klima-panel-title"></section>
 
     <div id="pick-hint" class="pick-hint" hidden>Klicke auf die Karte, um den Standort zu wählen · <button id="pick-cancel" class="link">Abbrechen</button></div>
 
