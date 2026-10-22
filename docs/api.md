@@ -41,6 +41,9 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/ogc/collections[/:id]`       | Collections `spots`, `photos`, `findings`, `spread_fronts` mit Ausdehnung und Koordinatensystemen |
 | `GET`    | `/ogc/collections/:id/items[/:fid]` | GeoJSON; `crs` (CRS84 oder `http://www.opengis.net/def/crs/EPSG/0/2056`), `bbox`, `bbox-crs`, `datetime`, `limit`, `offset` |
 | `GET`    | `/api/export/myforrest.gpkg`   | Alle Collections als GeoPackage (LV95, `?crs=4326` für WGS84) |
+| `GET`    | `/api/export/parquet/:id.parquet` | Eine Collection als GeoParquet 1.1 (WGS84, `?crs=2056` für LV95), gzip-komprimiert |
+| `GET`    | `/api/export/geojson/:id.geojson` | Eine Collection vollständig als GeoJSON-Datei (WGS84) |
+| `GET`    | `/stac/catalog.json`           | STAC-Katalog (1.1): `myforrest/collection.json` und ein Item pro Collection (`myforrest/<id>/<id>.json`) mit GeoParquet, GeoJSON, GeoPackage und PMTiles als Assets |
 | `GET`    | `/api/export/myforrest.pmtiles` | Vektorkacheln des Datensatzes (WebMercatorQuad, Zoom 0–18) als PMTiles v3; mit Range-Anfragen; 503 während der Berechnung |
 | `GET`    | `/api/metadata/geocat.xml`     | Metadaten des Datensatzes nach GM03 (ISO19139.che) für geocat.ch |
 | `GET`    | `/api/metadata/iso19139.xml`   | Dieselben Metadaten als reines ISO 19139 |
@@ -68,6 +71,9 @@ Alle Routen liefern und erwarten JSON, sofern nicht anders angegeben. Den Aufbau
 | `GET`    | `/api/klima/status`          | Geladene Messreihen (`stations`, `stationYears`), Orte mit Szenarien (`scenarioPlaces`) und die Klimamodelle (`models`) |
 | `POST`   | `/api/klima/sync`            | Homogene Messreihen der MeteoSchweiz über die STAC-API von `data.geo.admin.ch` laden (Admin, sobald es Konten gibt) |
 | `POST`   | `/api/klima/import?format=`  | Datei als Text importieren (Admin): `nbcn&kind=stations` bzw. `nbcn` (Jahreswerte einer Station, Dateien der MeteoSchweiz), `stations` (`station;name;lat;lon;elevation;year;temp;precip`) oder `ch2025` (`place;lat;lon;elevation;indicator;level;value;low;high`) |
+| `GET`    | `/api/layers`                | Ebenen aus externen Quellen nach Thema: `groups` mit `id`, `title`, `layers` (`id`, `url`, `name`, `title`, `attribution`, `bbox` für regionale, `legend` als GetLegendGraphic-Adresse, `info` für *Was ist hier?*); `errors` für Quellen, die nicht antworteten |
+| `GET`    | `/api/layers/info?lat=&lon=&layers=` | Was die Ebenen (`id` aus `/api/layers`, kommagetrennt, höchstens 6) an einem Punkt sagen: `items` mit `title` und `attributes` als `[Name, Wert]` |
+| `GET`    | `/vendor/maplibre-leaflet/leaflet-maplibre-gl.js` | MapLibre in Leaflet für die Grundkarte; der Vektorstil steht in `/api/config` unter `basemap` (`style`, `attribution`) |
 | `GET`    | `/api/spots/:id/tree-inventory` | Baumart-Vorschläge aus dem Bauminventar (`BAUMINVENTAR_URL`, Standard Genf): `name`, `attribution`, `radiusM`, `covered` (Spot im Gebiet des Inventars), `trees`, `species` (pro Art `scientificName`, `name` mit Steckbrief, `commonName`, `count`, `nearestM`, `maxHeight`, `remarkable`, `known`, `atSpot`), `error`, wenn das Inventar nicht antwortet |
 | `PATCH`  | `/api/spots/:id`             | Höhe (`{ elevation: 950 }`), Exposition (`{ exposition: 'S' }`, auch `'eben'`) und/oder Geländeform (`{ landform: 'senke' }`) von Hand setzen; `null` ermittelt den Wert neu |
 | `PUT`    | `/api/spots/:id/landscape`   | Landschaftsprofil von Hand setzen (`{ landscape: 'gletscher' }`); `null` bestimmt es neu (Gletscherumrisse) |

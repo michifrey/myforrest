@@ -210,9 +210,61 @@ Fotos, die innerhalb von 25 m aufgenommen wurden, werden automatisch zu
 einem *Spot* zusammengefasst. Die Farbe zeigt Schäden (orange) oder Neophyten (violett).
 
 Über der Karte liegt oben links eine Leiste mit dem Filter und den Kartenmodi (*Sonne & Wetter*, *Arten &
-Neophyten*, *Touren & Aufträge*, je nach Daten *Gletscher* und *Mapillary*); auf dem Handy scrollt sie
-seitwärts. Rechts steht der **Explorer**, eine schmale Karte mit Spots, Fotos und Spots mit Befund, den vier
+Neophyten*, *Touren & Aufträge*, *Ebenen*, *Klima*, *3D*, je nach Daten *Gletscher* und *Mapillary*); auf dem Handy
+scrollt sie seitwärts. Rechts steht der **Explorer**, eine schmale Karte mit Spots, Fotos und Spots mit Befund, den vier
 zuletzt fotografierten Spots als Bildkacheln, der Legende und *Foto beitragen*.
+
+### Grundkarte
+
+Die Karte zeigt standardmässig die Grundkarte **MyForrest**: eine Vektorkarte aus OpenStreetMap-Daten
+([OpenFreeMap](https://openfreemap.org), Schema OpenMapTiles), die der Browser mit MapLibre in den Farben der App
+zeichnet: Land in Leinen, Wald in Moosgrün, Wiesen hell, Gewässer gedämpft blau, Strassen weiss, Wege braun
+gestrichelt, Beschriftungen in der Schriftfarbe; nachts im dunklen Design. Symbole von Läden, Haltestellen und
+Ähnlichem fallen weg; im Vordergrund stehen Wald, Gelände und die Spots.
+
+Unten rechts wechselt eine Auswahl zu **OpenStreetMap**, zur **Landeskarte** oder zum **Luftbild** von swisstopo
+(beide nur Schweiz); die Wahl merkt sich das Gerät. Ohne WebGL, ohne Netz und solange die Vektorkarte lädt, steht
+OpenStreetMap da; seine Kacheln sind auch die, die *Karte entlang der Route offline speichern* ablegt.
+
+Die Farben setzt die App selbst: Sie liest den Vektorstil (`BASISKARTE_STIL`, Standard der Stil *Positron* von
+OpenFreeMap) und färbt jede Ebene nach ihrem Namen um (Wasser, Wald, Wiese, Gebäude, Strasse, Weg, Bahn, Grenze,
+Beschriftung). So passt auch ein anderer Stil mit ähnlichen Namen, etwa die Vektorkarten von swisstopo oder ein
+eigener Kachelserver.
+
+### Ebenen: Karten aus offiziellen Quellen
+
+![Ebenen: Waldbrandgefahr und Bevölkerung über den Spots, mit der Antwort auf einen Klick](screenshots/ebenen.jpg)
+
+Der Knopf **Ebenen** öffnet ein Panel mit Karten aus offiziellen Quellen, nach Themen:
+
+| Thema | Beispiele | Quelle |
+|-------|-----------|--------|
+| **Wald und Waldbrand** | Waldbrandgefahr (aktuelle Warnstufen), Waldmischungsgrad, Vegetationshöhe, Schutzwald, Waldreservate, Höhenstufen im Klimawandel | BAFU über geo.admin.ch |
+| **Bevölkerung** | Einwohnerinnen und Einwohner pro Hektare (STATPOP) | BFS über geo.admin.ch |
+| **Bodennutzung** | Arealstatistik (Bodennutzung und -bedeckung), Bauzonen | BFS, ARE über geo.admin.ch |
+| **Verkehr** | Belastung Personen- und Güterverkehr, ÖV-Güteklassen, Strassenlärm | ARE, BAFU, ASTRA über geo.admin.ch |
+| **Bäume Stadt Zürich** | Baumkataster: alle Bäume der Stadt mit Art und Pflanzjahr (nur in Zürich) | Grün Stadt Zürich |
+| **Stadtklima und Bäume Genf** | Wärmeinsel in der Nacht, Kronendach (nur in Genf) | SITG |
+| **Waldbrände Europa** | Aktive Feuer und Brandflächen (EFFIS) | Copernicus |
+| **Aktive Feuer** (mit `FIRMS_MAP_KEY`) | Feuer der letzten 24 Stunden aus MODIS und VIIRS | NASA FIRMS |
+
+Bis zu vier Ebenen liegen zugleich über der Karte, jede mit eigener Deckkraft und Legende; ein Suchfeld findet
+Ebenen nach Namen (*Einwohner*, *Lärm*, *Schutzwald* …). Regionale Ebenen erscheinen nur, wenn die Karte in ihrem
+Gebiet steht. Die eingeschalteten Ebenen merkt sich das Gerät.
+
+**Was ist hier?** Ein Klick auf die Karte fragt die eingeschalteten Ebenen ab und zeigt ihre Angaben an dieser
+Stelle: die Warnstufe der Waldbrandgefahr, die Einwohnerzahl der Hektare, die Bodennutzung, beim Baumkataster Art und
+Pflanzjahr des Baums. Bei Ebenen von geo.admin.ch fragt der Server dessen Identify-Dienst, bei den anderen
+GetFeatureInfo des Kartendienstes.
+
+![Bodennutzung (Arealstatistik) und Strassenbäume des Baumkatasters über den Spots](screenshots/ebenen-nutzung.jpg)
+
+Die Ebenen von geo.admin.ch findet der Server einmal pro Tag im Verzeichnis des Kartendienstes (WMS GetCapabilities)
+an ihren Namen, bis zu 30 pro Thema, die nützlichsten zuerst; kommt dort eine neue Karte dazu, erscheint sie von
+selbst. Weitere regionale Dienste, etwa das Geoportal eines Kantons, lassen sich mit `EBENEN_REGIONAL` eintragen
+([Installation](installation.md#umgebungsvariablen)). Verkehr **in Echtzeit** (Staus) gibt es nicht als offene
+Daten der Schweiz; die Ebenen zeigen die Belastung im Mittel. (In den Screenshots liefert ein Demo-Dienst im Format
+von geo.admin.ch die Ebenen.)
 
 ### Detailseite eines Spots
 
@@ -1369,6 +1421,24 @@ einbinden.
   Webkarten auf anderen Domains sie laden können.
 - **GeoPackage**: `/api/export/myforrest.gpkg` liefert alle Collections als eine Datei (LV95, mit
   `?crs=4326` in WGS84), ohne GDAL direkt mit SQLite geschrieben. Die Fusszeile der App verlinkt beides.
+- **GeoParquet und STAC (cloud-native, ohne Server)**: Geodaten-Infrastrukturen wandern weg von Diensten wie
+  WMS/WFS hin zu Dateien in einem Objektspeicher, die ein Katalog beschreibt (etwa
+  [Portolan](https://spatialists.ch/posts/2026/10/11-reinventing-sdis/), ein «Katalog der Kataloge»). MyForrest
+  liefert dafür alles mit:
+  - **GeoParquet**: `/api/export/parquet/<collection>.parquet` liefert eine Collection als GeoParquet 1.1
+    (WGS84, mit `?crs=2056` in LV95), ohne GDAL oder Arrow direkt geschrieben: Spalten typisiert wie im
+    GeoPackage, Geometrie als WKB, gzip-komprimiert. DuckDB, GeoPandas, QGIS/GDAL und Webkarten wie lonboard
+    lesen die Datei direkt, auch von einem Objektspeicher. `/api/export/geojson/<collection>.geojson` gibt
+    dieselben Daten als eine GeoJSON-Datei.
+  - **STAC-Katalog**: `/stac/catalog.json` (STAC 1.1) führt zur Collection `myforrest` mit Zeitraum,
+    Ausdehnung, Lizenz, GeoPackage, PMTiles und Metadaten für geocat.ch und von dort zu einem Item pro
+    Collection (`spots`, `photos`, `findings`, `spread_fronts`). Jedes Item nennt Zeilenzahl und Spalten
+    (Erweiterung *table*) und verweist auf GeoParquet in WGS84 und LV95 (Erweiterung *projection*) und
+    GeoJSON. STAC-Browser, pystac und QGIS (*STAC*-Datenquelle) lesen den Katalog.
+  - **Als Ordner für einen Objektspeicher**: `npm run stac -- <Ordner> [Basis-URL]` schreibt denselben
+    Katalog mit allen Dateien (GeoParquet, GeoJSON, GeoPackage, PMTiles) und nur relativen Links. Den Ordner
+    auf S3, R2, Azure Blob oder einen beliebigen Webserver kopieren, und die Daten bleiben lesbar, auch wenn
+    der MyForrest-Server nicht läuft. Die Basis-URL steht in den Daten (Links auf die Fotos).
 - **QGIS Server**: Für WMS, WMTS und WFS mit eigener Gestaltung, wie sie Geoportale wie map.geo.admin.ch
   einbinden, liegt unter [`deploy/qgis-server`](https://github.com/michifrey/myforrest/blob/main/deploy/qgis-server/README.md) ein fertiges QGIS-Projekt
   mit Stilen in den Farben der App (Ausbreitungsfronten nach Jahr, Spots nach Befund mit Pfeil in
@@ -1703,6 +1773,10 @@ erfasst), schon erfasste sind markiert, andere (etwa Platanen) stehen nur zur In
 
 <p align="center"><img src="screenshots/bauminventar.jpg" width="420" alt="Vorschläge aus dem Bauminventar: Arten im Umkreis von 40 m mit Anzahl, Abstand und Höhe"></p>
 
+Ebenso kennt die App den **Baumkataster der Stadt Zürich** (Grün Stadt Zürich, offene Daten): Für Spots in der
+Stadt fragt sie dessen WFS nach den Bäumen im Umkreis, Gattung und Art kommen dort in zwei Feldern und werden
+zusammengesetzt (`BAUMKATASTER_ZUERICH`).
+
 Das Genfer Inventar führt nur Bäume **ausserhalb des Waldes** (Strassen, Parks, Gärten, Waldränder), und ältere
 Einträge können bis ±25 m danebenliegen; darum der grosszügige Umkreis, und darum sind es Vorschläge, keine
 automatische Übernahme. Die Abfrage geht an die ArcGIS-Schnittstelle des Kantons (Ebene `ICA/MapServer/1` mit dem
@@ -1760,7 +1834,7 @@ Info Flora. Die Listen werden bei der jeweiligen Fachstelle bezogen.
 | Foto, Spot, genaue Lage | – | ✓ (mit Konto) | ✓ |
 | Karte | schraffiertes 5-km-Quadrat mit Anzahl Funde | Pin mit Schloss | Pin mit Schloss |
 | Arten, Hotspots, Ausbreitung, Export (Darwin Core, iNaturalist) | ohne den Fund | mit | mit |
-| Offene Geodaten (OGC API, Vektorkacheln, GeoPackage, PMTiles) | ohne den Fund | ohne | ohne |
+| Offene Geodaten (OGC API, Vektorkacheln, GeoPackage, PMTiles, GeoParquet, STAC) | ohne den Fund | ohne | ohne |
 | Fotoaufträge an geschützten Spots, Vorschläge entlang der Route | – | ✓ | ✓ |
 
 Das Raster ist fest (0,045° × 0,065°, rund 5 × 5 km) und verschiebt sich nicht mit den Daten. Ein Spot

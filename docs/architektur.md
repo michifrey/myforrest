@@ -84,6 +84,9 @@ src/lv95.js          Schweizer Landeskoordinaten LV95 ↔ WGS84 (Näherungsforme
 src/geodata.js       Daten als GIS-Collections (Spots, Fotos, Funde, Ausbreitungsfronten)
 src/gpkg.js          GeoPackage-Schreiber (OGC GeoPackage 1.3) ohne GDAL
 src/routes/ogc.js    OGC API – Features und GeoPackage-Export
+src/parquet.js       GeoParquet-Schreiber (GeoParquet 1.1, Thrift Compact, gzip) ohne GDAL oder Arrow
+src/stac.js          Statischer STAC-Katalog (1.1) der offenen Daten mit relativen Links
+src/routes/stac.js   GeoParquet- und GeoJSON-Export pro Collection, STAC-Katalog unter /stac
 src/routes/ows-proxy.js  /ows/ an QGIS Server weiterreichen (OWS_UPSTREAM), mit der öffentlichen Adresse für die Links der Capabilities
 src/tiles.js         Vektorkacheln: WebMercatorQuad, Kachelindex (geojson-vt), MVT-Kodierung (vt-pbf)
 src/tiles-lv95.js    Vektorkacheln im Schweizer Kachelgitter LV95 (swisstopo): Zuschnitt pro Kachel, MVT-Kodierung
@@ -140,6 +143,9 @@ public/offline-queue.js  Warteschlange für Uploads ohne Verbindung (IndexedDB, 
 public/pwa.js        Registrierung, Warteschlangen-Anzeige, Installieren-Knopf, Kamera-Aufnahme im Upload, Erlaubnis für Benachrichtigungen
 public/offline-map.js  Karte und Spots entlang einer Route offline speichern (eigener Cache pro Route)
 public/drive-select.js  Fahrtmodus: welche der Bilder einer Fahrt behalten werden (Spots, Abstand, Stillstand, Schärfe, Differenz-Hash)
+public/basemap.js    Grundkarte «MyForrest»: Vektorkarte (MapLibre in Leaflet) in den Farben der App, Wechsel zu OSM, Landeskarte, Luftbild
+public/layers.js     Panel «Ebenen»: Karten aus offiziellen Quellen nach Thema, Deckkraft, Legende, «Was ist hier?»
+src/routes/layers.js Ebenen-Katalog aus den Capabilities von geo.admin.ch und regionalen Diensten, Abfrage per Identify/GetFeatureInfo
 public/map3d.js      3D-Karte: Spots, Route und Gletscher auf dem Gelände mit MapLibre (erst beim Öffnen geladen); Gebäude und Bäume von swisstopo als 3D Tiles über deck.gl
 public/forecast.js   Wetter im Spot: Niederschlagsradar (MeteoSchweiz, sonst DWD; letzte zwei Stunden) und Vorhersage für Stunden und Tage
 public/spotprofile.js  Licht & Wald im Spot: Horizont, Sonnenbogen und Baumarten in ihrer Jahreszeit (Canvas, Jahreszeit auch in Node getestet)
@@ -151,5 +157,6 @@ public/manifest.webmanifest, public/icons/  Web-App-Manifest und App-Icons
 test/                Tests (`npm test`, Node-Testrunner)
 scripts/generate-icons.js  Erzeugt die App-Icons aus dem Logo (`node scripts/generate-icons.js`)
 scripts/build-tiles.js     Rechnet alle Vektorkacheln vor und schreibt PMTiles/MBTiles (`npm run tiles`)
+scripts/export-stac.js     Schreibt den STAC-Katalog mit allen Dateien in einen Ordner für einen Objektspeicher (`npm run stac`)
 scripts/upload-folder.js   Lädt einen ganzen Ordner über die API hoch (API-Schlüssel, Pakete, Wiederaufnahme)
 ```

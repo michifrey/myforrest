@@ -157,7 +157,8 @@ stageObserver.observe($('swipe'));
 
 const map = L.map('map', { zoomControl: false, scrollWheelZoom: false }).setView([47.2, 8.4], 8);
 L.control.zoom({ position: 'bottomleft' }).addTo(map);
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+// OpenStreetMap: shown first, and whenever the vector base map of basemap.js is not available (offline, no WebGL).
+window.osmBase = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
 }).addTo(map);

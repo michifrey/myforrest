@@ -652,7 +652,7 @@
     ' – der Kanton als 3D-Modell mit 239 000 Bäumen, ÖV und Wetter (privates Projekt von Arnaud Ricci, Beta)',
   ]) : '');
 
-  const OTHER_PANELS = ['sun-toggle', 'species-toggle', 'tours-toggle'];
+  const OTHER_PANELS = ['sun-toggle', 'species-toggle', 'tours-toggle', 'layers-toggle'];
   function toggle(open_) {
     K.open = open_;
     $('klimapanel').hidden = !open_;

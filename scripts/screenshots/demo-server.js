@@ -8,6 +8,7 @@ const { createApp } = require('../../src/app');
 const glacier = require('./glacier-demo');
 const tiles = require('./tiles');
 const tiles3d = require('./tiles3d-demo');
+const vectorDemo = require('./vector-demo');
 
 // DEMO_MAPILLARY=1: a stand-in for the Mapillary API, a 360° sequence crossing the forest track of the
 // walk-through (seed.js) from north-west to south-east, with panoramas drawn like the demo ones.
@@ -370,13 +371,50 @@ const DEMO_WMS_LAYERS = [
   ['ch.meteoschweiz.klimanormwerte-temperatur_aktuelle_periode', 'Klimanormwerte Temperatur 1991–2020 (Demo)'],
   ['ch.bafu.wald-vegetationshoehenstufen_1975', 'Vegetationshöhenstufen heute (Demo)'],
   ['ch.bafu.wald-vegetationshoehenstufen_2085_trocken', 'Vegetationshöhenstufen 2085, trockeneres Klima (Demo)'],
+  // Panel «Ebenen»: one demo layer per theme.
+  ['ch.bafu.gefahren-waldbrand_warnung', 'Waldbrandgefahr (Demo)'],
+  ['ch.bafu.landesforstinventar-vegetationshoehenmodell', 'Vegetationshöhenmodell (Demo)'],
+  ['ch.bfs.volkszaehlung-bevoelkerungsstatistik_einwohner', 'Bevölkerung pro Hektare (Demo)'],
+  ['ch.bfs.arealstatistik', 'Arealstatistik: Bodennutzung (Demo)'],
+  ['ch.are.belastung-personenverkehr-strasse', 'Personenverkehr auf der Strasse (Demo)'],
 ];
+const ZH_LAYERS = [['baumkataster_baumstandorte', 'Baumstandorte (Demo)']];
+// Residents of a hectare cell in the demo village (none in the forest).
+const residents = (lat, lon) => (tiles.classAt(lat, lon) === 'residential' ? 8 + Math.floor(hash(`${Math.floor(lat * 900)}|${Math.floor(lon * 660)}`) * 70) : 0);
+const AREAL = { wood: [[79, 140, 70], 'Wald'], grass: [[190, 215, 120], 'Landwirtschaftsfläche'], residential: [[215, 90, 80], 'Siedlungsfläche'],
+  water: [[90, 150, 210], 'Gewässer'], land: [[230, 215, 140], 'Landwirtschaftsfläche'], ice: [[230, 240, 250], 'Gletscher'], rock: [[180, 180, 180], 'Unproduktive Fläche'] };
+// Street trees along the main road, every ~25 m (the demo «Baumkataster»).
+const STREET_TREES = (() => {
+  const out = [];
+  const main = tiles.demoLines().find(([k]) => k === 'main')[1];
+  for (let k = 1; k < main.length; k++) {
+    const [a, b] = [main[k - 1], main[k]];
+    const n = Math.round(Math.hypot((b[0] - a[0]) * 111320, (b[1] - a[1]) * 75500) / 45);
+    for (let i = 0; i < n; i++) {
+      const t = i / n;
+      out.push({ lat: a[0] + (b[0] - a[0]) * t + 0.00009, lon: a[1] + (b[1] - a[1]) * t, art: ['Tilia cordata', 'Acer platanoides', 'Platanus ×hispanica'][(k + i) % 3] });
+    }
+  }
+  return out;
+})();
+const TREE_NAMES = { 'Tilia cordata': 'Winter-Linde', 'Acer platanoides': 'Spitz-Ahorn', 'Platanus ×hispanica': 'Ahornblättrige Platane' };
 const BELTS = [[600, [205, 170, 90]], [1000, [150, 180, 90]], [1400, [80, 140, 80]], [1800, [60, 105, 110]], [Infinity, [150, 150, 170]]];
 async function demoWms(url) {
   const q = new URL(url).searchParams;
   const get = (k) => q.get(k) ?? q.get(k.toLowerCase());
+  const zh = q.get('src') === 'zh';
+  if (/getfeatureinfo/i.test(get('REQUEST') || '')) {
+    // The nearest street tree within ~15 m of the clicked pixel.
+    const [bx0, by0, bx1, by1] = get('BBOX').split(',').map(Number);
+    const R = 6378137;
+    const lon = (((bx0 + bx1) / 2) / R) * 180 / Math.PI;
+    const lat = (Math.atan(Math.sinh(((by0 + by1) / 2) / R)) * 180) / Math.PI;
+    const t = STREET_TREES.map((x) => ({ ...x, d: Math.hypot((x.lat - lat) * 111320, (x.lon - lon) * 75500) })).sort((a, b) => a.d - b.d)[0];
+    return Response.json({ type: 'FeatureCollection', features: t && t.d < 40 ? [{ properties: { baumnamedeu: TREE_NAMES[t.art], baumartlat: t.art, pflanzjahr: 1960 + Math.floor(t.lat * 1e5) % 55, kronendurchmesser: 6 + Math.floor(t.lon * 1e5) % 7 } }] : [] });
+  }
+  if (/getlegendgraphic/i.test(get('REQUEST') || '')) return new Response('', { status: 404 });
   if (/getcapabilities/i.test(get('REQUEST') || '')) {
-    const layers = DEMO_WMS_LAYERS.map(([n, t]) => `<Layer queryable="1"><Name>${n}</Name><Title>${t}</Title></Layer>`).join('');
+    const layers = (zh ? ZH_LAYERS : DEMO_WMS_LAYERS).map(([n, t]) => `<Layer queryable="1"><Name>${n}</Name><Title>${t}</Title></Layer>`).join('');
     return new Response(`<?xml version="1.0"?><WMS_Capabilities version="1.3.0"><Capability><Layer><Title>geo.admin.ch (Demo)</Title>${layers}</Layer></Capability></WMS_Capabilities>`,
       { headers: { 'content-type': 'text/xml' } });
   }
@@ -392,16 +430,49 @@ async function demoWms(url) {
       const lon = ((x0 + (i / w) * (x1 - x0)) / R) * 180 / Math.PI;
       const z = elevation(lat, lon);
       let c;
-      if (layer.includes('klimanormwerte')) {
+      let alpha = 170;
+      if (layer.includes('waldbrand')) {
+        // Warning levels by region: 3 (considerable) in the west, 2 (moderate) in the east.
+        c = lon < 8.585 ? [240, 150, 40] : [250, 215, 70];
+        alpha = 120;
+      } else if (layer.includes('vegetationshoehenmodell')) {
+        const hgt = tiles.objectHeight(lat, lon);
+        if (hgt < 2) { c = null; } else { const t = Math.min(1, hgt / 35); c = [Math.round(200 - 160 * t), Math.round(220 - 90 * t), Math.round(120 - 80 * t)]; }
+      } else if (layer.includes('bevoelkerung')) {
+        const n = residents(lat, lon);
+        c = n ? (n > 55 ? [130, 30, 90] : n > 30 ? [200, 70, 120] : [240, 150, 180]) : null;
+      } else if (layer.includes('arealstatistik')) {
+        c = AREAL[tiles.classAt(lat, lon)][0];
+        alpha = 150;
+      } else if (layer.includes('personenverkehr')) {
+        const m = (lat - 47.3618) / (47.3690 - 47.3618);
+        const main = tiles.demoLines().find(([k]) => k === 'main')[1];
+        let d = Infinity;
+        for (let k = 1; k < main.length; k++) {
+          const [a, b] = [main[k - 1], main[k]];
+          const ax = a[1] * 75500, ay = a[0] * 111320, bx = b[1] * 75500, by = b[0] * 111320, x = lon * 75500, y = lat * 111320;
+          const tt = Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2)));
+          d = Math.min(d, Math.hypot(x - ax - tt * (bx - ax), y - ay - tt * (by - ay)));
+        }
+        const mpp = (x1 - x0) / w;
+        c = d < Math.max(6, mpp * 3) ? (m < 0.5 ? [200, 40, 40] : [240, 140, 40]) : null;
+        alpha = 230;
+      } else if (zh) {
+        const mpp = (x1 - x0) / w;
+        const hit = STREET_TREES.some((t) => Math.hypot((t.lat - lat) * 111320, (t.lon - lon) * 75500) < Math.max(4, mpp * 2.2));
+        c = hit ? [40, 120, 50] : null;
+        alpha = 255;
+      } else if (layer.includes('klimanormwerte')) {
         const t = Math.max(0, Math.min(1, (11 - (z - 400) * 0.0055 - 4) / 7));
         c = [Math.round(60 + 190 * t), Math.round(120 + 40 * (1 - Math.abs(t - 0.5) * 2)), Math.round(220 - 180 * t)];
       } else {
         c = BELTS.find(([top]) => z + shift < top)[1];
       }
+      if (!c) continue;
       for (const [di, dj] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
         if (i + di >= w || j + dj >= h) continue;
         const o = ((j + dj) * w + i + di) * 4;
-        px[o] = c[0]; px[o + 1] = c[1]; px[o + 2] = c[2]; px[o + 3] = 170;
+        px[o] = c[0]; px[o + 1] = c[1]; px[o + 2] = c[2]; px[o + 3] = alpha;
       }
     }
   }
@@ -426,6 +497,20 @@ async function inventoryFetch(url) {
       geometry: { x: lon + dLon, y: lat + dLat },
     })),
   });
+}
+
+// identify of geo.admin.ch for the demo layers: fire danger, residents of the hectare, land use.
+function demoIdentify(url) {
+  const q = new URL(url).searchParams;
+  const [lon, lat] = q.get('geometry').split(',').map(Number);
+  const names = q.get('layers').replace(/^all:/, '').split(',');
+  const results = [];
+  for (const n of names) {
+    if (n.includes('waldbrand')) results.push({ layerBodId: n, layerName: 'Waldbrandgefahr (Demo)', attributes: { gefahrenstufe: lon < 8.585 ? 3 : 2, beschreibung: lon < 8.585 ? 'erhebliche Gefahr' : 'mässige Gefahr', region: 'Zürich (Demo)' } });
+    if (n.includes('bevoelkerung')) results.push({ layerBodId: n, layerName: 'Bevölkerung pro Hektare (Demo)', attributes: { einwohner: residents(lat, lon), jahr: 2024 } });
+    if (n.includes('arealstatistik')) results.push({ layerBodId: n, layerName: 'Arealstatistik: Bodennutzung (Demo)', attributes: { nutzung: AREAL[tiles.classAt(lat, lon)][1], erhebung: '2013/18' } });
+  }
+  return Response.json({ results });
 }
 
 const app = createApp({
@@ -464,6 +549,15 @@ const app = createApp({
   tiles3dVegetation: `http://localhost:${Number(process.env.PORT) || 3123}/demo-3d/baeume/tileset.json`,
   treeInventoryFetch: inventoryFetch,
   treeInventoryOptions: { url: 'https://inventar.demo.invalid/MapServer/1', name: 'Bauminventar (Demo)', attribution: 'Demo-Daten im Format des Genfer Bauminventars (SITG)', bbox: [8.5, 47.3, 8.65, 47.45] },
+  // The base map «MyForrest» from demo vector tiles, and the panel «Ebenen» from the demo WMS and identify.
+  basemapStyle: `http://localhost:${Number(process.env.PORT) || 3123}/demo-vt/style.json`,
+  basemapAttribution: 'Demo-Vektorkacheln im Format von OpenMapTiles',
+  layersFetch: async (url) => (url.startsWith('http://demo.invalid/identify') ? demoIdentify(url) : demoWms(url)),
+  layersOptions: {
+    geoadminUrl: `http://localhost:${Number(process.env.PORT) || 3123}/demo-wms`,
+    identifyUrl: 'http://demo.invalid/identify',
+    regional: [{ url: `http://localhost:${Number(process.env.PORT) || 3123}/demo-wms?src=zh`, group: 'Bäume Stadt Zürich', bbox: [8.44, 47.32, 8.63, 47.44], attribution: 'Demo im Format des Baumkatasters der Stadt Zürich' }],
+  },
   klimaOptions: { cellsPerDay: 500, wmsUrl: `http://localhost:${Number(process.env.PORT) || 3123}/demo-wms`, wmsFetch: demoWms, wmsGenf: '' },
 });
 app.get('/demo-3d/:kind/:file', (req, res) => {
@@ -474,6 +568,11 @@ app.get('/demo-3d/:kind/:file', (req, res) => {
   return res.type('application/octet-stream').send(content);
 });
 app.get('/demo-commons/:n.jpg', async (req, res) => res.type('image/jpeg').send(await commonsImage(Number(req.params.n))));
+app.get('/demo-vt/style.json', (req, res) => res.json(vectorDemo.style(`http://localhost:${Number(process.env.PORT) || 3123}/demo-vt`)));
+app.get('/demo-vt/:z/:x/:y.pbf', (req, res) => {
+  res.set('access-control-allow-origin', '*');
+  res.type('application/x-protobuf').send(vectorDemo.tile(Number(req.params.z), Number(req.params.x), Number(req.params.y)));
+});
 app.get('/demo-wms', async (req, res) => {
   const r = await demoWms(`http://x/demo-wms?${new URLSearchParams(req.query)}`);
   res.type(r.headers.get('content-type')).send(Buffer.from(await r.arrayBuffer()));

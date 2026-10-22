@@ -94,6 +94,19 @@ Die Leiste oben links filtert die Karte nach Beobachtungen und Meldungen und sch
 *Gletscher* (Abschnitt 14); *Klima* öffnet das Klima-Dossier der Region (Abschnitt 15). Gelbe Kamera-Pins sind Fotoaufträge. Rechts fasst eine schmale Explorer-Karte
 Kennzahlen, die zuletzt fotografierten Spots als Bilder und die Legende zusammen.
 
+Die **Grundkarte** ist eine eigene Vektorkarte in den Farben der App (Daten OpenStreetMap über OpenFreeMap): Wald in
+Moosgrün, Land in Leinen, Wege braun gestrichelt, ohne Laden- und Haltestellen-Symbole, nachts dunkel. Unten rechts
+wechselt man zu OpenStreetMap, zur Landeskarte oder zum Luftbild von swisstopo
+([Details](docs/funktionen.md#grundkarte)).
+
+![Ebenen: Waldbrandgefahr und Bevölkerung über den Spots, mit der Antwort auf einen Klick](docs/screenshots/ebenen.jpg)
+
+**Ebenen** legt Karten aus offiziellen Quellen über die Spots: Waldbrandgefahr, Waldmischung und Vegetationshöhe,
+Bevölkerung pro Hektare, Bodennutzung (Arealstatistik), Verkehrsbelastung und Lärm von geo.admin.ch, regional den
+Baumkataster der Stadt Zürich und Stadtklima-Karten von Genf, dazu Waldbrände in Europa (EFFIS). Bis zu vier zugleich,
+mit Deckkraft und Legende; ein Klick auf die Karte zeigt, was sie an dieser Stelle sagen
+([Details](docs/funktionen.md#ebenen-karten-aus-offiziellen-quellen); im Screenshot Demo-Daten).
+
 ### 2. Zeitreise an einem Spot
 
 ![Spot mit Gelände, Baumarten und Zeitleiste](docs/screenshots/spot.jpg)
@@ -143,8 +156,8 @@ und Wahrscheinlichkeit, Wind; starke Böen orange) und darunter sieben Tage mit 
 Unter dem Bild lassen sich pro Foto Beobachtungen taggen und eine Notiz erfassen. Jedes Foto nennt
 Urheber und Lizenz und lässt sich melden. Mit einem Pl@ntNet-Key bestimmt *Art bestimmen* die Pflanzen
 auf dem Foto und erkennt invasive Neophyten. Bäume übernimmt der Spot nur bei einem eindeutigen Ergebnis von
-selbst; sonst übernimmt man die richtige Art aus den Vorschlägen. Im Kanton Genf schlägt die App zusätzlich die Arten
-des kantonalen **Bauminventars** im Umkreis von 40 m vor
+selbst; sonst übernimmt man die richtige Art aus den Vorschlägen. Im Kanton Genf und in der Stadt Zürich schlägt die App zusätzlich die Arten
+des **Bauminventars** bzw. **Baumkatasters** im Umkreis von 40 m vor
 ([Details](docs/funktionen.md#vorschläge-aus-dem-bauminventar)).
 
 <p align="center"><img src="docs/screenshots/wikimedia.jpg" width="320" alt="Wikipedia, Wikidata und Commons am Spot: verknüpfte OSM-Objekte, ein Eintrag ohne OSM-Verknüpfung und Fotos von 1934 bis 2023"></p>
@@ -592,6 +605,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   - Vektorkacheln (OGC API – Tiles, MVT) in Web Mercator und im Schweizer Kachelgitter LV95, vorberechnet
     und als PMTiles/MBTiles zum Herunterladen (Kachel für Kachel geschrieben, auch für sehr grosse Datenmengen),
     die LV95-Kacheln als GeoPackage.
+  - Cloud-native ohne Server: jede Collection als GeoParquet (WGS84 und LV95) mit einem STAC-Katalog, der sich
+    als Ordner auf einen Objektspeicher legen und in Registern wie Portolan eintragen lässt.
   - Zwei Vektorkarten: MapLibre in Web Mercator, OpenLayers auf der Landeskarte von swisstopo.
   - Metadaten für geocat.ch und opendata.swiss (GM03/ISO 19139), auch pro Collection, mit Objektkatalog
     (ISO 19110).
@@ -655,7 +670,7 @@ jedes Dokument hier im Repository und auf der Website.
 
 ## Daten und Lizenz
 
-Kartendaten © OpenStreetMap-Mitwirkende, Landeskarte und Luftbild © swisstopo. Wetterdaten von
+Kartendaten © OpenStreetMap-Mitwirkende (Grundkarte über OpenFreeMap, Schema OpenMapTiles), Landeskarte und Luftbild © swisstopo; Ebenen von geo.admin.ch (BAFU, BFS, ARE, ASTRA), Baumkataster © Grün Stadt Zürich, SITG Genf, EFFIS (Copernicus), NASA FIRMS. Wetterdaten von
 [Open-Meteo.com](https://open-meteo.com) (ERA5, CC BY 4.0). Enthält modifizierte Copernicus-Sentinel-Daten;
 Landsat-Daten mit freundlicher Genehmigung des U.S. Geological Survey. Phänologie-Daten, Niederschlagsradar und Warnungen:
 Deutscher Wetterdienst; Phänologie auch MeteoSchweiz. Höhenkacheln: Terrain Tiles (AWS Open Data, u. a. EU-DEM). Höhe von Bäumen und Gebäuden:
