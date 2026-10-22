@@ -30,7 +30,9 @@
     </a>
     <nav class="nav-links" aria-label="Hauptnavigation">
       <a href="#how">So geht's</a>
+      <a href="#funktionen">Funktionen</a>
       <a href="#explore">Karte</a>
+      <a href="https://michifrey.github.io/myforrest/" data-docs="" target="_blank" rel="noopener">Doku</a>
     </nav>
     <div id="pwa-status" class="pwa-status" aria-live="polite"></div>
     <button id="open-upload" class="btn primary">Foto beitragen</button>
@@ -87,6 +89,78 @@
         <p>Fotos werden automatisch deckungsgleich ausgerichtet. Blättere wie im Zeitraffer durch die Jahre,
           vergleiche Vorher und Nachher und bestimme Pflanzen und Neophyten.</p>
       </article>
+    </div>
+  </section>
+
+
+  <section class="features" id="funktionen" aria-labelledby="features-title">
+    <div class="section-head">
+      <p class="eyebrow">Funktionen</p>
+      <h2 id="features-title">Mehr als <em>Vorher</em> und Nachher.</h2>
+      <p class="muted">Ein Klick öffnet die Funktion direkt auf der Karte.</p>
+    </div>
+    <div class="feature-grid">
+      <button type="button" class="feature" data-toggle="layers-toggle" data-key="ebenen">
+        <svg class="card-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 6 42 15 24 24 6 15z"/><path d="M6 24l18 9 18-9M6 32l18 9 18-9"/></svg>
+        <h3>Ebenen</h3>
+        <p>Waldbrandgefahr, Schutzwald, Bevölkerung, Bodennutzung, Verkehr und Baumkataster aus offiziellen Quellen. Ein Klick in die Karte zeigt, was dort gilt.</p>
+      </button>
+      <button type="button" class="feature" data-toggle="klima-toggle" data-key="klima">
+        <svg class="card-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 30V8a4 4 0 0 1 8 0v22a8 8 0 1 1-8 0z" transform="translate(-4 0)"/><path d="M24 16h4M24 22h4"/><path d="M36 10l4-4M36 18h6"/></svg>
+        <h3>Klima im Wandel</h3>
+        <p>Messreihen seit 1864, Klimakarte der Schweiz und Szenarien bei +1,5, +2 und +3 °C: Was sie für den Wald an deinem Spot bedeuten.</p>
+      </button>
+      <button type="button" class="feature" data-toggle="sun-toggle" data-key="sonne">
+        <svg class="card-icon" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="8"/><path d="M24 4v6M24 38v6M4 24h6M38 24h6M10 10l4 4M34 34l4 4M10 38l4-4M34 14l4-4"/></svg>
+        <h3>Sonne, Schatten &amp; Wetter</h3>
+        <p>Sonnenstand zu jeder Stunde, Schatten von Gelände, Gebäuden und Bäumen, Wetterradar und kühle Abschnitte für heisse Tage.</p>
+      </button>
+      <button type="button" class="feature" data-toggle="species-toggle" data-key="arten">
+        <svg class="card-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M10 38C10 20 20 9 40 8c1 19-10 30-30 30zM10 38l17-17"/></svg>
+        <h3>Arten &amp; Neophyten</h3>
+        <p>Bestimmte Pflanzen und Baumarten auf der Karte, Hotspots invasiver Neophyten und wie sie sich ausbreiten.</p>
+      </button>
+      <button type="button" class="feature" data-toggle="tours-toggle" data-key="touren">
+        <svg class="card-icon" viewBox="0 0 48 48" aria-hidden="true"><circle cx="11" cy="37" r="4"/><circle cx="37" cy="11" r="4"/><path d="M15 37h12a7 7 0 0 0 0-14h-6a7 7 0 0 1 0-14h12"/></svg>
+        <h3>Touren &amp; Fotoaufträge</h3>
+        <p>Route zeichnen, aufzeichnen oder importieren. Unterwegs zeigt sie Spots, die lange niemand besucht hat, und offene Fotoaufträge.</p>
+      </button>
+      <button type="button" class="feature" data-toggle="map3d-toggle" data-key="3d" hidden>
+        <svg class="card-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M4 40 18 14l7 10 6-7 13 23z"/><path d="M12 30h24"/></svg>
+        <h3>3D-Karte</h3>
+        <p>Gelände, Gebäude und Bäume von swisstopo in 3D, mit Schatten zur gewählten Stunde.</p>
+      </button>
+      <button type="button" class="feature" data-toggle="glacier-toggle" data-key="gletscher" hidden>
+        <svg class="card-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M4 40 17 14l7 10 5-7 15 23z"/><path d="M13 22l4 3 3-4 4 3"/></svg>
+        <h3>Gletscher &amp; Landschaften</h3>
+        <p>Gletscherumrisse seit 1850, Längenänderung, Eis im Spätsommer und Archivfotos: Berge, Gletscher und Wüste erinnern sich auch.</p>
+      </button>
+      <button type="button" class="feature" data-run="fahrt" data-key="fahrt">
+        <svg class="card-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M8 30l4-11a4 4 0 0 1 4-3h16a4 4 0 0 1 4 3l4 11v8H8z"/><path d="M8 30h32"/><circle cx="15" cy="35" r="1.5"/><circle cx="33" cy="35" r="1.5"/></svg>
+        <h3>Fahrtmodus</h3>
+        <p>Das Handy als Dashcam: Es fotografiert unterwegs nach vorn und behält nur scharfe Bilder in sinnvollem Abstand.</p>
+      </button>
+      <button type="button" class="feature" data-run="upload" data-key="video">
+        <svg class="card-icon" viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="12" width="28" height="24" rx="4"/><path d="M33 21l10-6v18l-10-6"/></svg>
+        <h3>Videos &amp; 360°</h3>
+        <p>GoPro-, Dashcam- und 360°-Videos hochladen: MyForrest zieht alle paar Meter ein Bild heraus und verortet es.</p>
+      </button>
+      <button type="button" class="feature" data-run="pro" data-key="pro">
+        <svg class="card-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 5 40 11v11c0 10-7 17-16 21C15 39 8 32 8 22V11z"/><path d="M17 24l5 5 9-10"/></svg>
+        <h3>PRO &amp; Organisationen</h3>
+        <p>Für Forstdienste und Fachstellen: geschützte Funde mit genauer Lage sehen, im Team mit mehreren Mitgliedern.</p>
+      </button>
+      <div class="feature feature-links">
+        <svg class="card-icon" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="18"/><path d="M6 24h36M24 6c6 6 6 30 0 36M24 6c-6 6-6 30 0 36"/></svg>
+        <h3>Offene Geodaten</h3>
+        <p>Alle Spots für GIS und Geoportale: <a href="/ogc">OGC API</a> · <a href="/api/export/myforrest.gpkg" download>GeoPackage</a> ·
+          <a href="/vektorkarte.html">Vektorkarte</a> · <a href="/vektorkarte-lv95.html">LV95</a></p>
+      </div>
+      <a class="feature" href="https://michifrey.github.io/myforrest/" data-docs="" target="_blank" rel="noopener">
+        <svg class="card-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 12c-5-4-12-5-18-4v28c6-1 13 0 18 4 5-4 12-5 18-4V8c-6-1-13 0-18 4zM24 12v28"/></svg>
+        <h3>Doku</h3>
+        <p>Alle Funktionen im Detail, Datenquellen, Installation und API.</p>
+      </a>
     </div>
   </section>
 
@@ -446,6 +520,10 @@
     <div class="footer-inner">
       <p><strong>MyForrest</strong> · Wald im Wandel</p>
       <p class="muted small">Kartendaten © OpenStreetMap-Mitwirkende · Pflanzenbestimmung mit Pl@ntNet</p>
+      <p class="muted small"><a href="https://michifrey.github.io/myforrest/" data-docs="" target="_blank" rel="noopener">Doku</a> ·
+        <a href="#funktionen">Funktionen</a> ·
+        <a href="https://michifrey.github.io/myforrest/klimawandel/" data-docs="klimawandel/" target="_blank" rel="noopener">Klima-Quellen</a> ·
+        <a href="https://github.com/michifrey/myforrest" target="_blank" rel="noopener">Quellcode</a></p>
       <p class="muted small">Offene Geodaten: <a href="/ogc">OGC API – Features</a> (WGS84 und LV95) ·
         <a href="/api/export/myforrest.gpkg" download>GeoPackage (LV95)</a> ·
         <a href="/vektorkarte.html">Vektorkarte (MVT)</a> ·
@@ -579,6 +657,8 @@
         <p class="muted small">Tipp: Fotografiere zu Beginn die Uhrzeit deines Handys – geht die Kamera z. B. 40 s nach, trage +40 ein.</p>
       </details>
 
+      <p class="muted small drive-hint">Im Auto unterwegs? <button type="button" class="link" data-run="fahrt">Fahrtmodus starten</button>: Das Handy fotografiert als Dashcam.</p>
+
       <div id="upload-result" class="upload-result"></div>
       <div class="row end">
         <button type="button" id="upload-cancel" class="link">Schliessen</button>
@@ -610,6 +690,7 @@
   <script src="forecast.js"></script>
   <script src="klima.js"></script>
   <script src="layers.js"></script>
+  <script src="features.js"></script>
   <script src="offline-queue.js"></script>
   <script src="drive-select.js"></script>
   <script src="drive.js"></script>

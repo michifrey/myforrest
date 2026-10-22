@@ -1,6 +1,6 @@
 'use strict';
 // Takes the README screenshots from the demo server (see README.md here).
-// Usage: node shoot.js [hero map standort spot baeume ebenen gebaeude3d klima satellite sun schatten species vektor touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher mobile]
+// Usage: node shoot.js [hero funktionen map standort spot baeume ebenen gebaeude3d klima satellite sun schatten species vektor touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher mobile]
 // «mapillary» needs the demo server started with DEMO_MAPILLARY=1 (a Mapillary stand-in, see README.md).
 // «gletscher» uses the glacier demo server (BASE_GLETSCHER, default http://localhost:3124; see README.md).
 const path = require('path');
@@ -44,6 +44,18 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
       tiles.push({ input: await sharp(await page.screenshot()).resize(720, 450).toBuffer(), left: (i % 2) * 724, top: Math.floor(i / 2) * 454 });
     }
     await sharp({ create: { width: 1444, height: 904, channels: 3, background: '#ffffff' } }).composite(tiles).jpeg({ quality: 82 }).toFile(out('hero-landschaften.jpg'));
+    await page.close();
+  }
+
+  if (want('funktionen')) {
+    // The section «Funktionen» of the start page: every tile opens its feature.
+    const page = await ctx.newPage();
+    await page.goto(`${BASE}/`);
+    await settle(page, 2000);
+    await page.evaluate(() => scrollTo(0, document.querySelector('#funktionen').offsetTop));
+    await settle(page, 1500); // the heading fades in
+    await page.addStyleTag({ content: '.nav { position: static !important; }' });
+    await page.locator('#funktionen').screenshot({ path: out('funktionen.jpg'), ...jpg });
     await page.close();
   }
 
