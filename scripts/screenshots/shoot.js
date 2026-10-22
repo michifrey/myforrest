@@ -1,6 +1,6 @@
 'use strict';
 // Takes the README screenshots from the demo server (see README.md here).
-// Usage: node shoot.js [hero map standort spot baeume klima satellite sun schatten species vektor touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher mobile]
+// Usage: node shoot.js [hero map standort spot baeume gebaeude3d klima satellite sun schatten species vektor touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher mobile]
 // «mapillary» needs the demo server started with DEMO_MAPILLARY=1 (a Mapillary stand-in, see README.md).
 // «gletscher» uses the glacier demo server (BASE_GLETSCHER, default http://localhost:3124; see README.md).
 const path = require('path');
@@ -225,6 +225,19 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.waitForFunction(() => window.Map3D?.map?.loaded(), null, { timeout: 120000, polling: 1000 });
     await settle(page, 4000);
     await page.screenshot({ path: out('karte-3d-spot.jpg'), ...jpg });
+    await page.close();
+  }
+
+  if (want('gebaeude3d')) {
+    // Buildings and trees as 3D Tiles over the terrain (demo tiles in swisstopo's format), from the windthrow spot.
+    const page = await explore(ctx);
+    await page.click('#map3d-toggle');
+    await page.waitForFunction(() => window.Map3D?.map?.loaded(), null, { timeout: 120000, polling: 1000 });
+    await page.evaluate(() => window.Map3D.map.jumpTo({ center: [8.5736, 47.3747], zoom: 17.1, pitch: 64, bearing: 25 }));
+    await page.evaluate(() => window.Map3D.showTiles(['gebaeude', 'baeume']));
+    await page.waitForFunction(() => window.Map3D.map.areTilesLoaded(), null, { timeout: 120000, polling: 1000 });
+    await settle(page, 9000);
+    await page.screenshot({ path: out('karte-3d-gebaeude.jpg'), ...jpg });
     await page.close();
   }
 

@@ -135,7 +135,7 @@ public/offline-queue.js  Warteschlange für Uploads ohne Verbindung (IndexedDB, 
 public/pwa.js        Registrierung, Warteschlangen-Anzeige, Installieren-Knopf, Kamera-Aufnahme im Upload, Erlaubnis für Benachrichtigungen
 public/offline-map.js  Karte und Spots entlang einer Route offline speichern (eigener Cache pro Route)
 public/drive-select.js  Fahrtmodus: welche der Bilder einer Fahrt behalten werden (Spots, Abstand, Stillstand, Schärfe, Differenz-Hash)
-public/map3d.js      3D-Karte: Spots, Route und Gletscher auf dem Gelände mit MapLibre (erst beim Öffnen geladen)
+public/map3d.js      3D-Karte: Spots, Route und Gletscher auf dem Gelände mit MapLibre (erst beim Öffnen geladen); Gebäude und Bäume von swisstopo als 3D Tiles über deck.gl
 public/forecast.js   Wetter im Spot: Niederschlagsradar (MeteoSchweiz, sonst DWD; letzte zwei Stunden) und Vorhersage für Stunden und Tage
 public/spotprofile.js  Licht & Wald im Spot: Horizont, Sonnenbogen und Baumarten in ihrer Jahreszeit (Canvas, Jahreszeit auch in Node getestet)
 public/drive.js      Fahrtmodus (Handy als Dashcam): Kamera, GPS-Route, Upload über die Warteschlange; in der Android-App nur Anzeige und Upload

@@ -69,6 +69,12 @@ ein Spot liegt. Kippen und drehen mit rechter Maustaste oder zwei Fingern, Hinte
 (Schweiz), Überhöhung bis 3×; Route und Gletscherumrisse liegen auf dem Gelände, die Route lässt sich
 abfliegen, und ein Klick auf einen Spot öffnet ihn ([Details](docs/funktionen.md#3d-karte)).
 
+![3D-Karte mit Gebäuden und Bäumen als 3D Tiles (Demo)](docs/screenshots/karte-3d-gebaeude.jpg)
+
+In der Schweiz legen die Schalter **Gebäude** und **Bäume** die 3D-Modelle von swisstopo (swissBUILDINGS3D,
+Vegetation 3D) über das Gelände: wie hoch der Wald um einen Spot steht, wo Lichtungen sind, welche Häuser am Waldrand
+liegen ([Details](docs/funktionen.md#gebäude-und-bäume-in-3d); im Screenshot Demo-Modelle im selben Format).
+
 <p align="center"><img src="docs/screenshots/standort.jpg" width="640" alt="Karte am eigenen Standort mit blauem Punkt und dem Knopf Mein Standort"></p>
 
 Beim Öffnen fragt der Browser bzw. die Android-App nach dem **Standort**. Mit ihm beginnt die Karte dort, wo
@@ -634,7 +640,7 @@ Kartendaten © OpenStreetMap-Mitwirkende, Landeskarte und Luftbild © swisstopo.
 [Open-Meteo.com](https://open-meteo.com) (ERA5, CC BY 4.0). Enthält modifizierte Copernicus-Sentinel-Daten;
 Landsat-Daten mit freundlicher Genehmigung des U.S. Geological Survey. Phänologie-Daten, Niederschlagsradar und Warnungen:
 Deutscher Wetterdienst; Phänologie auch MeteoSchweiz. Höhenkacheln: Terrain Tiles (AWS Open Data, u. a. EU-DEM). Höhe von Bäumen und Gebäuden:
-swissSURFACE3D und swissALTI3D © swisstopo; Kronenhöhen ausserhalb der Schweiz: Meta (Data for Good), CHM v2, CC BY 4.0. Pflanzenbestimmung mit Pl@ntNet. Bilder von Mapillary (CC BY-SA 4.0) mit Urheber im Bild. Wegnetz und Gebäude ausserhalb der Schweiz © OpenStreetMap-Mitwirkende (ODbL). Gletscherumrisse aus den geladenen Inventaren, z. B.
+swissSURFACE3D, swissALTI3D, swissBUILDINGS3D und Vegetation 3D © swisstopo; Kronenhöhen ausserhalb der Schweiz: Meta (Data for Good), CHM v2, CC BY 4.0. Pflanzenbestimmung mit Pl@ntNet. Bilder von Mapillary (CC BY-SA 4.0) mit Urheber im Bild. Wegnetz und Gebäude ausserhalb der Schweiz © OpenStreetMap-Mitwirkende (ODbL). Gletscherumrisse aus den geladenen Inventaren, z. B.
 GLAMOS. Details unter [Datenquellen](docs/betrieb.md#externe-datenquellen-und-netzzugang).
 
 Der Code steht unter der [Apache-Lizenz 2.0](LICENSE).

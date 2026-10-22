@@ -1132,6 +1132,7 @@ verlaufen. Die Ansicht beginnt dort, wo die flache Karte gerade steht, gekippt u
 - **Route abfliegen** (erscheint, wenn eine Route da ist): die Kamera fliegt die Route ab, schräg von oben und
   rund 300 m vorausschauend, in 20 bis 90 Sekunden je nach Länge. Ein zweiter Klick oder ein Griff in die
   Karte hält an.
+- **Gebäude** und **Bäume** (Schweiz): die 3D-Modelle von swisstopo, siehe unten.
 - *Schliessen* (oder Esc) führt zurück auf die flache Karte, an den Ort, an dem man in 3D zuletzt war.
 
 Das Gelände kommt als Kacheln der [Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (AWS Open Data,
@@ -1142,6 +1143,30 @@ geöffnet wird. Ohne WebGL oder mit `TERRAIN_URL=` (leer) gibt es den Knopf nich
 funktioniert die 3D-Karte wie im Browser.
 
 ![Die Umgebung eines Spots in 3D, in seine Blickrichtung](screenshots/karte-3d-spot.jpg)
+
+#### Gebäude und Bäume in 3D
+
+![3D-Karte mit Gebäuden und Bäumen als 3D Tiles über dem Gelände (Demo)](screenshots/karte-3d-gebaeude.jpg)
+
+Die Schalter **Gebäude** und **Bäume** in der Leiste der 3D-Karte legen die 3D-Modelle von swisstopo über das
+Gelände: **swissBUILDINGS3D** (Gebäude mit Dachformen) und **Vegetation 3D** (Bäume als Modelle), beide als offene
+[3D Tiles](https://docs.geo.admin.ch/visualize-data/3d-tiles.html) für die ganze Schweiz. So sieht man, wie hoch der
+Wald um einen Spot steht, wo eine Lichtung ist und welche Häuser am Waldrand liegen. Der Browser lädt die Kacheln
+direkt bei `3d.geo.admin.ch`, nur so fein, wie der Bildausschnitt sie braucht; gezeichnet werden sie mit
+[deck.gl](https://deck.gl/) (Tile3DLayer), das erst beim Einschalten lädt, im selben Bild wie MapLibre.
+
+Zwei Dinge sind dabei angepasst:
+
+- **Höhe**: Die 3D Tiles stehen auf dem WGS84-Ellipsoid, das Gelände der Karte auf Meereshöhe. In der Schweiz liegt
+  das Geoid rund 50 m über dem Ellipsoid; die App senkt die Modelle deshalb um 50 m ab (`TILES3D_HOEHE`). Weil das
+  Geoid zwischen etwa 47 und 55 m schwankt und das Gelände der Karte gröber ist (rund 25 m), können Häuser an
+  steilen Hängen ein paar Meter einsinken oder schweben.
+- **Überhöhung**: Echte Gebäude passen nicht auf ein überhöhtes Gelände. Mit Gebäuden oder Bäumen stellt die Karte
+  das Gelände auf 1×; wer wieder überhöht, schaltet sie aus. Die Wahl merkt sich das Gerät.
+
+Mit `TILES3D_GEBAEUDE=` bzw. `TILES3D_VEGETATION=` (leer) fällt der jeweilige Schalter weg, andere Tilesets (etwa ein
+Stadtmodell) lassen sich dort eintragen. (Im Screenshot zeigt die Demo einen erfundenen Weiler und Baumkronen um den
+Demo-Wald, im selben Format wie bei swisstopo.)
 
 ### Wetterkarten einblenden
 

@@ -12,6 +12,7 @@ ohne echte Fotos, ohne Netz und ohne API-Schlüssel reproduzierbar sind.
 | `tiles.js` | Platzhalter-Kacheln für OpenStreetMap (Web Mercator) und die Landeskarte grau (LV95), Höhenkacheln (Terrarium) aus dem Demo-Gelände und ein gezeichnetes Regenband für das DWD-Radar |
 | `radar-ch/` | Radardateien im Aufbau der MeteoSchweiz (ODIM HDF5): eine Regenfront in vier Schritten über dem Demo-Wald; neu erzeugen mit `python3 radar-ch/make.py` (braucht h5py) |
 | `shoot.js` | Nimmt mit Playwright alle Screenshots auf und baut das Zeitraffer-GIF und das GIF eines Schritts im Durchgehen (`uebergang`, aus einer Videoaufnahme) |
+| `tiles3d-demo.js` | Demo-3D-Tiles im Format von swisstopo für die 3D-Karte (`gebaeude3d`): ein Weiler (b3dm mit glTF) und Baumkronen (pnts) am Demo-Wald, auf Ellipsoidhöhe |
 | `glacier-demo.js` | Der erfundene Demo-Gletscher: Umrisse 1850, 1973 und 2016, heutiges Eis und See, Gelände, GLAMOS-Längenänderung und ein Archiv-Katalog |
 | `seed-gletscher.js` | Eigener Datensatz für die Gletscher- und Gebirge-Bilder: Inventare, Fotos seit 2017, zwei Archivfotos, eine Alpweide, Schnee- und Eisanteil |
 

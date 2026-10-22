@@ -125,6 +125,11 @@ function createApp({
   buildingsUrl = (process.env.GEBAEUDE_URL ?? process.env.WEGNETZ_URL) || '', buildingsFetch = fetch,
   // Terrain tiles for the 3D map (routes/terrain.js); TERRAIN_URL= (empty) turns the 3D map off.
   terrainUrl = (process.env.TERRAIN_URL ?? require('./routes/terrain').DEFAULT_URL) || null, terrainFetch = fetch,
+  // Buildings and trees of swisstopo as 3D Tiles in the 3D map (empty = off), and the height correction: the tiles
+  // stand on the ellipsoid, the terrain on sea level; in Switzerland the geoid lies about 50 m above the ellipsoid.
+  tiles3dBuildings = process.env.TILES3D_GEBAEUDE ?? 'https://3d.geo.admin.ch/ch.swisstopo.swissbuildings3d.3d/v1/tileset.json',
+  tiles3dVegetation = process.env.TILES3D_VEGETATION ?? 'https://3d.geo.admin.ch/ch.swisstopo.vegetation.3d/v1/tileset.json',
+  tiles3dHeight = Number(process.env.TILES3D_HOEHE ?? -50),
   // MeteoSwiss precipitation radar for the weather tab (src/routes/radar-ch.js); empty = off.
   mchRadarUrl = (process.env.MCH_RADAR_URL ?? require('./routes/radar-ch').DEFAULT_URL) || null, mchRadarFetch = fetch,
   // Climate models for the projections of "Klima im Wandel" (src/routes/klima.js), comma-separated; empty = none.
@@ -201,6 +206,8 @@ function createApp({
   app.use(express.static(path.join(__dirname, '..', 'public')));
   app.use('/vendor/leaflet', express.static(path.dirname(require.resolve('leaflet/dist/leaflet.js'))));
   app.use('/vendor/maplibre', express.static(path.dirname(require.resolve('maplibre-gl/dist/maplibre-gl.js')), { maxAge: '30d' }));
+  // deck.gl (standalone bundle) for the 3D Tiles of buildings and trees in the 3D map, loaded only when switched on.
+  app.get('/vendor/deck/deck.min.js', (req, res) => res.sendFile(path.join(path.dirname(require.resolve('deck.gl')), '..', 'dist.min.js'), { maxAge: '30d' }));
   // OpenLayers for the LV95 map (vektorkarte-lv95.html): the full build plus its stylesheet.
   const olDir = path.dirname(require.resolve('ol/package.json'));
   app.get('/vendor/ol/ol.css', (req, res) => res.sendFile(path.join(olDir, 'ol.css'), { maxAge: '30d' }));
@@ -559,6 +566,12 @@ function createApp({
       tags: TAGS, activities: ACTIVITIES, plantnet: Boolean(plantnetKey), spotRadiusM, routing: Boolean(routerUrl), wildlifeZones: wildlife.enabled(),
       landscapes: LANDSCAPES, glaciers: glaciers.enabled() ? { years: glaciers.years() } : null, mapillary: mapillary.enabled(),
       terrain: terrain.enabled(), radarCh: radarCh.enabled(),
+      tiles3d: {
+        layers: [['gebaeude', 'Gebäude', tiles3dBuildings], ['baeume', 'Bäume', tiles3dVegetation]]
+          .filter(([, , url]) => url).map(([id, title, url]) => ({ id, title, url })),
+        height: Number.isFinite(tiles3dHeight) ? tiles3dHeight : -50,
+        area: [5.7, 45.7, 10.7, 47.95],
+      },
     });
   });
 
