@@ -733,6 +733,24 @@ input[type="checkbox"] { accent-color: var(--accent); width: 1.05rem; height: 1.
 .species-list dt { font-weight: 700; color: var(--text); }
 .species-list dd { margin: 0; }
 .species-list .remove { font-size: 0.75rem; padding: 0.1rem 0.3rem; }
+
+/* ---------- Wikipedia, Wikidata & Commons ---------- */
+#wiki-body { padding: 0 0.9rem 0.8rem; font-size: 0.84rem; }
+#wiki-body .label { margin: 0.6rem 0 0.4rem; }
+.wiki-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.55rem; }
+.wiki-item { display: grid; grid-template-columns: 52px 1fr; gap: 0.6rem; border-top: 1px solid var(--border); padding-top: 0.55rem; }
+.wiki-item p { margin: 0.1rem 0 0; }
+.wiki-thumb { width: 52px; height: 52px; border-radius: 8px; overflow: hidden; background: var(--surface-2); display: block; }
+.wiki-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.wiki-links a { color: var(--accent); }
+.wiki-linked { color: var(--ok); font-weight: 600; }
+.wiki-unlinked { color: var(--damage); }
+.wiki-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 0.6rem; }
+.wiki-photo { margin: 0; }
+.wiki-photo img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; display: block; background: var(--surface-2); }
+.wiki-photo figcaption { display: grid; gap: 0.1rem; margin-top: 0.25rem; line-height: 1.3; font-size: 0.74rem; }
+.wiki-photo figcaption .link { justify-self: start; padding: 0; text-align: left; }
+.wiki-photo figcaption .small { font-size: inherit; }
 .species-add { padding: 0.6rem 0.9rem 0; }
 .species-add select { flex: 1; min-width: 0; }
 .species .hint { padding: 0 0.9rem 0.8rem; }
@@ -1726,6 +1744,21 @@ a.menu-item { display: flex; color: var(--text); text-decoration: none; font-siz
 .tour-sensors { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.7rem; margin: -0.2rem 0 0.6rem; }
 .tour-sensors dt { color: var(--muted); }
 .tour-sensors dd { margin: 0; font-variant-numeric: tabular-nums; }
+.tour-sun { margin: 0 0 0.8rem; padding: 0.5rem 0.7rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.tour-sun summary { color: var(--text); }
+.tour-sun-form { display: flex; flex-wrap: wrap; gap: 0.4rem 0.8rem; margin: 0.4rem 0; }
+.tour-sun-form input { font: inherit; padding: 0.2rem 0.3rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
+.tour-sun-form input[type='number'] { width: 4.5rem; }
+.sun-bar, .sun-strip { display: flex; height: 12px; border-radius: 6px; overflow: hidden; margin: 0.3rem 0; }
+.sun-strip { height: 8px; border-radius: 4px; }
+.sun-legend { display: flex; flex-wrap: wrap; gap: 0.2rem 0.8rem; margin: 0.2rem 0 0.5rem; padding: 0; list-style: none; color: var(--muted); }
+.sun-legend i { display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 3px; margin-right: 0.3rem; vertical-align: -0.1rem; }
+.sun-starts svg { display: block; width: 100%; height: 48px; }
+.sun-starts-area { fill: color-mix(in srgb, #3d7ea6 22%, transparent); }
+.sun-starts-line { fill: none; stroke: #3d7ea6; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.sun-starts-now { stroke: var(--gold); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.sun-starts-axis { display: flex; justify-content: space-between; }
+.sun-picks { display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; margin: 0.3rem 0; }
 .profile-area { fill: color-mix(in srgb, var(--accent) 18%, transparent); }
 .profile-line { fill: none; stroke: var(--accent); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .profile-cursor { stroke: var(--gold); stroke-width: 1; vector-effect: non-scaling-stroke; }

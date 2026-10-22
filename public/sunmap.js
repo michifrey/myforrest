@@ -1122,6 +1122,8 @@
     if (k !== lastPlace) { lastPlace = k; load(); } else drawMap();
   };
   map.on('moveend zoomend', refreshPlace);
+  // Elevation and surface tiles for the sun and shade along a route (tours.js), from the same caches.
+  window.ShadeTiles = { dem: demTile, surface: surfaceTile };
   new MutationObserver(refreshPlace).observe($('spot'), { attributes: true, attributeFilter: ['hidden'] });
   new MutationObserver(refreshPlace).observe($('spot-elev-text'), { childList: true, characterData: true, subtree: true });
 }());

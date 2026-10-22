@@ -160,6 +160,14 @@ selbst; sonst übernimmt man die richtige Art aus den Vorschlägen. Im Kanton Ge
 des **Bauminventars** bzw. **Baumkatasters** im Umkreis von 40 m vor
 ([Details](docs/funktionen.md#vorschläge-aus-dem-bauminventar)).
 
+<p align="center"><img src="docs/screenshots/wikimedia.jpg" width="320" alt="Wikipedia, Wikidata und Commons am Spot: verknüpfte OSM-Objekte, ein Eintrag ohne OSM-Verknüpfung und Fotos von 1934 bis 2023"></p>
+
+**Wikipedia, Wikidata & Commons** zeigt, was über den Ort bekannt ist: Einträge aus Wikidata im Umkreis von 500 m
+(Wald, Schutzgebiet, Findling, Gipfel …) mit Bild und Wikipedia-Artikel, ob ein OpenStreetMap-Objekt mit
+`wikidata`-Tag auf sie verweist (sonst ein Hinweis, die Verknüpfung in OSM zu ergänzen), und Fotos auf Wikimedia
+Commons, die bis 1 km entfernt aufgenommen wurden. Ein altes Foto mit Datum und freier Lizenz wird mit einem Klick
+zum **Archivfoto** im Zeitverlauf des Spots ([Details](docs/funktionen.md#wikipedia-wikidata-und-commons)).
+
 ### 3. Vorher / Nachher mit Veränderungs-Heatmap
 
 <p>
@@ -344,6 +352,13 @@ beim Planen zeigt, ebenso um **Holzerei**: Ein
 Foto mit *Holzschlag* sperrt die Stelle sechs Wochen, der Forstdienst sperrt Wege mit Enddatum. Mit Konto lassen sich Touren speichern und veröffentlichen; andere sehen eine öffentliche
 Tour ohne Zeiten und ohne die ersten und letzten 200 m. Über eine Tour mit Zeitstempeln lassen sich im
 Upload auch Fotos ohne GPS verorten.
+
+<p align="center"><img src="docs/screenshots/tour-sonne-schatten.jpg" width="640" alt="Sonne und Schatten entlang einer Abendrunde: über die Wiese in der Sonne, im Wald im Schatten der Bäume, mit dem Schattenanteil je nach Startzeit"></p>
+
+**Sonne und Schatten unterwegs** sagt für Tag, Startzeit und Tempo, wo die Route in der Sonne liegt und wo im
+Schatten von Hügeln, Bäumen und Häusern, färbt sie danach ein und zeigt, welche Startzeit des Tages am meisten
+Schatten (im Hochsommer) oder am meisten Sonne (im Winter) bringt. Jeder Punkt alle 25 m bekommt dafür seinen eigenen
+Horizont aus Gelände, Baumkronen und Dächern ([Details](docs/funktionen.md#sonne-und-schatten-unterwegs)).
 
 Ein **Fotoauftrag** (rechts) bittet um ein Foto von einem Ort, etwa «Neue Lichtung am Waldweg, Blick nach
 Nordost», oder um ein neues Foto eines Spots. Er nennt keine Zeit und keinen Namen. Wer eine Route plant,
@@ -577,6 +592,9 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
 - **[Kartenmodi](docs/funktionen.md#kartenmodi)**: Sonnenstand, Schatten und Einstrahlung inklusive
   Geländehorizont sowie Hotspots und Ausbreitungsfronten von Neophyten; **[3D-Karte](docs/funktionen.md#3d-karte)**
   mit den Spots auf dem Gelände.
+- **[Wikipedia, Wikidata und Commons](docs/funktionen.md#wikipedia-wikidata-und-commons)**: was über einen Spot
+  bekannt ist, welche Einträge OpenStreetMap schon verknüpft (`wikidata`-Tag) und welche nicht, und Fotos von
+  Wikimedia Commons in der Nähe, mit Datum und freier Lizenz als Archivfoto übernehmbar.
 - **[Pflanzen und Baumarten](docs/funktionen.md#pflanzen-und-baumarten)**: Pflanzenbestimmung mit Pl@ntNet,
   Erkennung invasiver Neophyten, Artenbestand pro Spot, Prüfung der Bestimmungen durch Fachleute, Export
   (auf Wunsch nur geprüfter Funde) zu Info Flora, GBIF und iNaturalist und Hotspots pro 100 Fotos gegen
@@ -595,7 +613,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   - Ein fertiges QGIS-Projekt für QGIS Server (WMS/WMTS/WFS) für Geoportale wie map.geo.admin.ch.
 - **[Touren und Fotoaufträge](docs/funktionen.md#touren-und-fotoaufträge)**: Routen zeichnen, per GPS
   aufzeichnen oder importieren (GPX, FIT, TCX, KML, GeoJSON, NMEA), als GPX exportieren und speichern; Fotoaufträge
-  ohne Zeit und Namen und Vorschläge entlang der eigenen Route; eine Karte kühler Abschnitte aus den
+  ohne Zeit und Namen und Vorschläge entlang der eigenen Route; Sonne und Schatten entlang der Route für eine
+  Startzeit, mit der schattigsten bzw. sonnigsten Startzeit des Tages; eine Karte kühler Abschnitte aus den
   Temperaturen vieler Touren, geeicht am Wettermodell, nach Jahres- und Tageszeit.
 - **[Geschützte Funde](docs/funktionen.md#geschützte-funde-und-pro-mitglieder)**: seltene Arten und Pilzstellen
   nur für verifizierte PRO-Mitglieder (Forstdienst, Naturschutz), öffentlich nur als 5-km-Raster;

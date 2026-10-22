@@ -216,6 +216,76 @@ async function overpassFetch() {
 }
 
 const work = process.env.DEMO_DIR || path.join(__dirname, '.demo');
+
+/*
+ * Wikidata, Wikimedia Commons and OSM objects with wikidata tags around the windthrow spot (src/wikimedia.js),
+ * all invented: a forest, an oak whose species Wikidata knows, a boulder that no OSM object links to yet, and
+ * photos of the forest track from 1934 to 2023 (drawn scenes; the old ones in sepia and grey).
+ */
+const WIKI_SPOT = { lat: 47.37327, lon: 8.57203 };
+const COMMONS_DEMO = [
+  { n: 1, year: '1934-06-02', license: 'Public domain', artist: 'Unbekannt', name: 'Waldweg im Hüttenwald, 1934', tone: 'sepia', dLat: 0.0004, dLon: 0.0002 },
+  { n: 2, year: '1968-09-14', license: 'CC BY-SA 3.0', artist: 'H. Keller', name: 'Hüttenwald nach dem Holzschlag', tone: 'grey', dLat: -0.0011, dLon: 0.0008 },
+  { n: 3, year: '2009-05-21', license: 'CC BY-SA 4.0', artist: 'Waldfreund', name: 'Buchen am Hüttenwaldweg', dLat: 0.0016, dLon: -0.0012 },
+  { n: 4, year: '2017-10-03', license: 'CC BY-ND 4.0', artist: 'M. Frei', name: 'Herbst im Hüttenwald', dLat: -0.0024, dLon: -0.0019 },
+  { n: 5, year: '2023-07-11', license: 'CC BY 4.0', artist: 'Lena R.', name: 'Weiher im Hüttenwald', dLat: 0.0035, dLon: 0.0031 },
+];
+const commonsImages = new Map();
+async function commonsImage(n) {
+  if (!commonsImages.has(n)) {
+    commonsImages.set(n, (async () => {
+      const c = COMMONS_DEMO.find((x) => x.n === n) || COMMONS_DEMO[0];
+      const file = path.join(work, `commons-${n}.jpg`);
+      await require('./scene').render(require('./scene').layout(70 + n, { kind: n === 4 ? 'beech' : 'mixed', trees: 8 }), { season: n === 4 ? 'autumn' : 'summer', jitter: n }, file);
+      let img = sharp(file).resize(1200, 900);
+      if (c.tone === 'sepia') img = img.recomb([[0.393, 0.769, 0.189], [0.349, 0.686, 0.168], [0.272, 0.534, 0.131]]).modulate({ brightness: 0.95 });
+      if (c.tone === 'grey') img = img.grayscale();
+      return img.jpeg({ quality: 82 }).toBuffer();
+    })());
+  }
+  return commonsImages.get(n);
+}
+const demoBase = `http://localhost:${Number(process.env.PORT) || 3123}`;
+async function wikimediaFetch(url) {
+  const u = new URL(url);
+  if (u.host === 'query.wikidata.org') {
+    return Response.json({ results: { bindings: [
+      { item: { value: 'http://www.wikidata.org/entity/Q98000101' }, coord: { value: `Point(${WIKI_SPOT.lon + 0.002} ${WIKI_SPOT.lat + 0.001})` } },
+      { item: { value: 'http://www.wikidata.org/entity/Q98000103' }, coord: { value: `Point(${WIKI_SPOT.lon - 0.0012} ${WIKI_SPOT.lat + 0.0006})` } },
+    ] } });
+  }
+  if (u.host === 'www.wikidata.org') {
+    const de = (v) => ({ de: { language: 'de', value: v } });
+    const claim = (v) => [{ mainsnak: { datavalue: { value: v } } }];
+    return Response.json({ entities: {
+      Q98000101: { labels: de('Hüttenwald (Demo)'), descriptions: de('Mischwald östlich der Stadt'), claims: { P18: claim('Huettenwald Demo.jpg'), P373: claim('Hüttenwald (Demo)') },
+        sitelinks: { dewiki: { site: 'dewiki', title: 'Hüttenwald (Demo)', url: 'https://de.wikipedia.org/wiki/H%C3%BCttenwald_(Demo)' } } },
+      Q98000102: { labels: de('Stieleiche'), descriptions: de('Baumart aus der Gattung der Eichen'), claims: { P18: claim('Stieleiche Demo.jpg') },
+        sitelinks: { dewiki: { site: 'dewiki', title: 'Stieleiche', url: 'https://de.wikipedia.org/wiki/Stieleiche' } } },
+      Q98000103: { labels: de('Findling am Weiher (Demo)'), descriptions: de('erratischer Block aus der letzten Eiszeit'), claims: {}, sitelinks: {} },
+    } });
+  }
+  if (u.host === 'commons.wikimedia.org' && u.pathname === '/w/api.php') {
+    const meta = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { value: v }]));
+    return Response.json({ query: { pages: COMMONS_DEMO.map((c) => ({
+      title: `File:Hüttenwald Demo ${c.n}.jpg`, coordinates: [{ lat: WIKI_SPOT.lat + c.dLat, lon: WIKI_SPOT.lon + c.dLon }],
+      imageinfo: [{ mime: 'image/jpeg', thumburl: `${demoBase}/demo-commons/${c.n}.jpg`, descriptionurl: `https://commons.wikimedia.org/wiki/File:H%C3%BCttenwald_Demo_${c.n}.jpg`,
+        extmetadata: meta({ DateTimeOriginal: c.year, LicenseShortName: c.license, Artist: c.artist, ObjectName: c.name }) }],
+    })) } });
+  }
+  const m = /Special:FilePath\/H%C3%BCttenwald_Demo_(\d)\.jpg/.exec(u.pathname + u.search) || /Special:FilePath\/.*?(\d)\.jpg/.exec(decodeURIComponent(u.pathname));
+  if (m) return new Response(await commonsImage(Number(m[1])), { headers: { 'content-type': 'image/jpeg' } });
+  return new Response('not found', { status: 404 });
+}
+// Overpass: the path network, and around the windthrow spot the objects with wikidata tags.
+async function demoOverpass(url, init) {
+  const q = decodeURIComponent(String(init?.body || ''));
+  if (!/wikidata/.test(q)) return overpassFetch(url, init);
+  return Response.json({ elements: [
+    { type: 'way', id: 9100, center: { lat: WIKI_SPOT.lat + 0.001, lon: WIKI_SPOT.lon + 0.002 }, tags: { landuse: 'forest', name: 'Hüttenwald (Demo)', wikidata: 'Q98000101', wikipedia: 'de:Hüttenwald (Demo)' } },
+    { type: 'node', id: 9101, lat: WIKI_SPOT.lat + 0.0009, lon: WIKI_SPOT.lon + 0.0004, tags: { natural: 'tree', 'species:wikidata': 'Q98000102', denotation: 'natural_monument' } },
+  ] });
+}
 // DEMO_GLETSCHER=1 also gets the GLAMOS length change and an archive catalogue; the archive pictures are drawn.
 const glacierDir = path.join(work, 'gletscher');
 if (process.env.DEMO_GLETSCHER === '1') {
@@ -460,7 +530,8 @@ const app = createApp({
     const [z, x, y] = url.match(/\/(\d+)\/(\d+)\/(\d+)\.png$/).slice(1).map(Number);
     return new Response(await tiles.terrariumTile(z, x, y), { headers: { 'Content-Type': 'image/png' } });
   },
-  waynetUrl: 'https://overpass.demo.invalid/api/interpreter', waynetFetch: overpassFetch,
+  waynetUrl: 'https://overpass.demo.invalid/api/interpreter', waynetFetch: demoOverpass,
+  wikimediaFetch,
   tileOptions: { precompute: false },
   // Sign-in buttons for the screenshots; the demo never talks to Google, GitHub, Microsoft, Switch or AGOV.
   oauthProviders: {
@@ -496,6 +567,7 @@ app.get('/demo-3d/:kind/:file', (req, res) => {
   const { content } = kind === 'gebaeude' ? tiles3d.buildings(elevation) : tiles3d.trees(elevation);
   return res.type('application/octet-stream').send(content);
 });
+app.get('/demo-commons/:n.jpg', async (req, res) => res.type('image/jpeg').send(await commonsImage(Number(req.params.n))));
 app.get('/demo-vt/style.json', (req, res) => res.json(vectorDemo.style(`http://localhost:${Number(process.env.PORT) || 3123}/demo-vt`)));
 app.get('/demo-vt/:z/:x/:y.pbf', (req, res) => {
   res.set('access-control-allow-origin', '*');

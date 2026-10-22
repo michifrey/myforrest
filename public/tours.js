@@ -195,6 +195,7 @@
 
   function changed() {
     try { localStorage.setItem(STORE, JSON.stringify(T.route)); } catch { /* private mode */ }
+    clearSun();
     drawRoute();
     renderRoute();
     scheduleSuggestions();
@@ -329,6 +330,166 @@
     svgEl.addEventListener('pointerleave', () => { profileMarker.remove(); cursor.setAttribute('x1', -10); cursor.setAttribute('x2', -10); });
   }
 
+  /* ---------- Sun and shade along the route (routesun.js) ---------- */
+
+  const SUN_COLORS = { sonne: '#f0b429', gelaende: '#5a4f8f', baeume: '#3d7ea6', nacht: '#1c2140' };
+  const SUN_LABEL = { sonne: 'Sonne', gelaende: 'Schatten von Gelände', baeume: 'Schatten von Bäumen und Häusern', nacht: 'Sonne untergegangen' };
+  const SUN_TILES_MAX = 160; // surface tiles (zoom 16, ~400 m) for trees and houses; longer routes: terrain only
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const clockOf = (t) => new Date(t).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+  const pct = (f) => `${Math.round(f * 100)} %`;
+  let sunToken = 0;
+
+  function clearSun() {
+    sunToken++;
+    T.sun = null;
+    const box = $('tour-sun-result');
+    if (box) box.replaceChildren();
+  }
+
+  /** Date, start and pace from the form (local time). */
+  function sunInputs() {
+    const recorded = $('tour-sun-recorded').checked && !$('tour-sun-recorded-wrap').hidden;
+    return {
+      start: new Date(`${$('tour-sun-date').value}T${$('tour-sun-time').value || '09:00'}`).getTime(),
+      speedKmh: Math.max(1, Math.min(60, Number($('tour-sun-speed').value) || 4.5)),
+      recorded,
+    };
+  }
+
+  /** Elevation and surface samplers along the samples: fine terrain near, coarse to 20 km, trees and houses within reach. */
+  async function sunSamplers(samples, progress) {
+    const Tiles = window.ShadeTiles;
+    let fz = 13;
+    let fineKeys = RouteSun.tilesNear(samples, fz, 1500);
+    if (fineKeys.length > 80) { fz = 12; fineKeys = RouteSun.tilesNear(samples, fz, 1500); }
+    const coarseKeys = RouteSun.tilesNear(samples, 10, 20000);
+    const load = async (z, keys, fn) => new Map(await Promise.all(keys.map(async (k) => {
+      const [x, y] = k.split('/').map(Number);
+      return [k, await fn(z, x, y)];
+    })));
+    progress('Höhen werden geladen …');
+    const [fine, coarse] = await Promise.all([load(fz, fineKeys, Tiles.dem), load(10, coarseKeys, Tiles.dem)]);
+    const fineAt = RouteSun.tileSampler(fz, (x, y) => fine.get(`${x}/${y}`));
+    const coarseAt = RouteSun.tileSampler(10, (x, y) => coarse.get(`${x}/${y}`));
+    const ground = (lat, lon) => { const v = fineAt(lat, lon); return Number.isFinite(v) ? v : coarseAt(lat, lon); };
+    const objKeys = RouteSun.tilesNear(samples, 16, RouteSun.OBJECT_REACH_M);
+    let objects = null; let sources = new Set(); let objNote = '';
+    if (objKeys.length > SUN_TILES_MAX) objNote = 'Route zu lang für Bäume und Häuser, nur Gelände gerechnet';
+    else {
+      progress('Bäume und Häuser werden geladen …');
+      const surf = await load(16, objKeys, Tiles.surface);
+      const found = [...surf.values()].filter(Boolean);
+      found.forEach((t) => t.source.split('+').forEach((v) => v && sources.add(v)));
+      if (found.length) objects = RouteSun.tileSampler(16, (x, y) => surf.get(`${x}/${y}`)?.heights, { smooth: false, none: null });
+      else objNote = 'keine Höhen von Bäumen und Häusern hier, nur Gelände gerechnet';
+      if ([...surf.values()].some((t) => t === undefined)) objNote = 'Bäume und Häuser nur teilweise geladen';
+    }
+    const missing = [...fine.values(), ...coarse.values()].filter((t) => !t).length;
+    return { ground, objects, sources, objNote, demMissing: missing };
+  }
+
+  async function computeSun() {
+    const pts = routePoints();
+    if (pts.length < 2 || !window.ShadeTiles) return;
+    const my = ++sunToken;
+    const box = $('tour-sun-result');
+    const progress = (text) => { if (my === sunToken) box.replaceChildren(el('p', { class: 'muted small', text })); };
+    try {
+      const samples = RouteSun.sample(pts);
+      const src = await sunSamplers(samples, progress);
+      if (my !== sunToken) return;
+      // The horizons in slices, so the page stays responsive.
+      const hz = [];
+      for (let i = 0; i < samples.length; i += 40) {
+        progress(`Horizonte entlang der Route: ${Math.round((i / samples.length) * 100)} % …`);
+        await new Promise((r) => setTimeout(r));
+        if (my !== sunToken) return;
+        hz.push(...RouteSun.horizons(samples.slice(i, i + 40), src));
+      }
+      T.sun = { samples, hz, src };
+      renderSun();
+    } catch (err) {
+      if (my === sunToken) box.replaceChildren(el('p', { class: 'small', text: `Nicht berechnet: ${err.message}` }));
+    }
+  }
+
+  /** Shares, the route coloured by light, and the start times of the day. */
+  function renderSun() {
+    const box = $('tour-sun-result');
+    if (!T.sun) return;
+    const { samples, hz, src } = T.sun;
+    const opts = sunInputs();
+    const res = RouteSun.along(samples, hz, opts);
+    T.sun.result = res;
+    const sum = res.sum;
+    const f = (k) => (sum.total ? sum[k] / sum.total : 0);
+    const startT = res.points[0].t; const endT = res.points.at(-1).t;
+    const bar = el('div', { class: 'sun-bar', role: 'img', 'aria-label': `${pct(f('sonne'))} in der Sonne, ${pct(f('schatten'))} im Schatten` },
+      ['sonne', 'gelaende', 'baeume', 'nacht'].filter((k) => sum[k] > 0).map((k) => el('span', { style: `flex: ${sum[k]}; background: ${SUN_COLORS[k]}`, title: `${SUN_LABEL[k]}: ${pct(f(k))}` })));
+    // Along the route: one stripe per sample, as on the map.
+    const strip = el('div', { class: 'sun-strip', title: 'Entlang der Route, vom Start zum Ziel' },
+      res.points.map((p, i) => el('span', { style: `flex: ${samples[i].w}; background: ${SUN_COLORS[p.state]}` })));
+    const lines = [
+      el('p', { class: 'small' }, [el('strong', { text: `${pct(f('sonne'))} in der Sonne` }), ` · ${pct(f('schatten'))} im Schatten`
+        + (sum.schatten ? ` (Gelände ${pct(f('gelaende'))}, Bäume und Häuser ${pct(f('baeume'))})` : '')
+        + (sum.nacht ? ` · ${pct(f('nacht'))} nach Sonnenuntergang` : '')]),
+      bar, strip,
+      el('p', { class: 'muted small', text: `${opts.recorded ? 'Wie aufgezeichnet' : `Start ${clockOf(startT)}, ${opts.speedKmh.toLocaleString('de-CH')} km/h`}, Ziel um ${clockOf(endT)}` }),
+      el('ul', { class: 'sun-legend small' }, ['sonne', 'gelaende', 'baeume', 'nacht'].map((k) => el('li', {}, [el('i', { style: `background: ${SUN_COLORS[k]}` }), SUN_LABEL[k]]))),
+    ];
+    if (!opts.recorded) {
+      // Start times of the day: from sunrise to sunset, every 15 minutes.
+      const day = new Date(opts.start); day.setHours(0, 0, 0, 0);
+      const t = Sun.times(day.getTime(), samples[0].lat, samples[0].lon);
+      const from = Number.isFinite(t.sunrise) ? t.sunrise : day.getTime();
+      const to = Number.isFinite(t.sunset) ? t.sunset : day.getTime() + 86400000;
+      const q = 15 * 60000;
+      const st = RouteSun.starts(samples, hz, { from: Math.ceil(from / q) * q, to, speedKmh: opts.speedKmh });
+      if (st.list.length > 1) {
+        const W = 300; const H = 48;
+        const x = (i) => (i / (st.list.length - 1)) * W;
+        const shade = st.list.map((s, i) => `${x(i).toFixed(1)},${(H - s.schatten * (H - 4)).toFixed(1)}`).join(' ');
+        const now = st.list.findIndex((s) => s.start >= opts.start);
+        lines.push(el('p', { class: 'label', text: 'Schatten je nach Startzeit' }));
+        const chart = el('div', { class: 'sun-starts' });
+        chart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Anteil im Schatten je nach Startzeit zwischen ${clockOf(st.list[0].start)} und ${clockOf(st.list.at(-1).start)}">`
+          + `<polygon class="sun-starts-area" points="0,${H} ${shade} ${W},${H}"/><polyline class="sun-starts-line" points="${shade}"/>`
+          + (now >= 0 ? `<line class="sun-starts-now" x1="${x(now)}" x2="${x(now)}" y1="0" y2="${H}"/>` : '') + '</svg>';
+        lines.push(chart, el('div', { class: 'sun-starts-axis muted small' }, [el('span', { text: clockOf(st.list[0].start) }), el('span', { text: clockOf(st.list.at(-1).start) })]));
+        const pick = (s, text) => s && el('button', {
+          type: 'button', class: 'link small', text: `${text}: Start ${clockOf(s.start)} (${pct(text.includes('Schatten') ? s.schatten : s.sonne)})`,
+          onclick: () => { const d = new Date(s.start); $('tour-sun-time').value = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; renderSun(); },
+        });
+        lines.push(el('div', { class: 'sun-picks' }, [pick(st.shadiest, 'Am meisten Schatten'), pick(st.sunniest, 'Am meisten Sonne')].filter(Boolean)));
+      }
+    }
+    const notes = ['Gelände: Terrain Tiles (AWS)'];
+    if (src.sources.size) notes.push(`Bäume und Häuser: ${[...src.sources].map((s) => ({ swisstopo: 'swisstopo', meta: 'Meta (Kronenhöhen)', osm: 'OpenStreetMap' })[s] || s).join(', ')}`);
+    if (src.objNote) notes.push(src.objNote);
+    if (src.demMissing) notes.push(`${src.demMissing} Höhenkacheln fehlen`);
+    notes.push('ohne Wolken');
+    lines.push(el('p', { class: 'muted small', text: notes.join(' · ') }));
+    box.replaceChildren(...lines);
+    drawRoute();
+  }
+
+  /** Fills date, time, pace and the recorded-times switch for the current route. */
+  function prepareSun() {
+    const pts = routePoints();
+    const wrap = $('tour-sun');
+    if (!wrap) return;
+    wrap.hidden = pts.length < 2 || routeLength(pts) < 100 || !window.RouteSun;
+    const timed = pts.length > 1 && pts.every((p) => Number.isFinite(p.time));
+    $('tour-sun-recorded-wrap').hidden = !timed;
+    if (!$('tour-sun-date').value) {
+      const d = new Date(Date.now() + 15 * 60000);
+      $('tour-sun-date').value = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+      $('tour-sun-time').value = `${pad2(d.getHours())}:${pad2(Math.floor(d.getMinutes() / 15) * 15)}`;
+    }
+    if (!$('tour-sun-speed').dataset.touched) $('tour-sun-speed').value = String(RouteSun.SPEEDS[$('tour-activity').value] || 4.5);
+  }
+
   /* ---------- Drawing on the map ---------- */
 
   const dot = (cls) => L.divIcon({ className: '', html: `<span class="wp ${cls}"></span>`, iconSize: [14, 14], iconAnchor: [7, 7] });
@@ -340,7 +501,19 @@
     if (pts.length > 1) {
       L.polyline(pts.map(ll), { color: '#fff', weight: 7, opacity: 0.7, interactive: false }).addTo(routeLayer);
       const key = activeSeries(pts);
-      if (key === 'ele') L.polyline(pts.map(ll), { className: 'route-line', weight: 4, opacity: 0.9, interactive: false }).addTo(routeLayer);
+      const lit = T.sun?.result;
+      if (lit && key === 'ele') {
+        // Coloured by sun and shade, one piece per run of the same light.
+        const s = T.sun.samples;
+        let start = 0;
+        for (let i = 1; i <= s.length; i++) {
+          if (i < s.length && lit.points[i].state === lit.points[start].state) continue;
+          L.polyline(s.slice(start, Math.min(i + 1, s.length)).map(ll), {
+            color: SUN_COLORS[lit.points[start].state], weight: 5, opacity: 0.95, interactive: false,
+          }).addTo(routeLayer);
+          start = i;
+        }
+      } else if (key === 'ele') L.polyline(pts.map(ll), { className: 'route-line', weight: 4, opacity: 0.9, interactive: false }).addTo(routeLayer);
       else {
         // Coloured by the series shown in the profile, one piece per stretch.
         const { bins, binOf } = sensorBins(pts, key);
@@ -996,6 +1169,18 @@
         el('div', { class: 'tour-km' }, [el('output', { id: 'tour-distance', text: '0.00' }), el('span', { text: 'km' }), el('span', { id: 'tour-meta', class: 'muted small' })]),
         el('div', { id: 'tour-profile', class: 'tour-profile', hidden: '' }),
         el('dl', { id: 'tour-sensors', class: 'tour-sensors small', hidden: '' }),
+        el('details', { id: 'tour-sun', class: 'tour-sun', hidden: '' }, [
+          el('summary', { text: 'Sonne und Schatten unterwegs' }),
+          el('p', { class: 'muted small', text: 'Wo die Route zur gewählten Zeit in der Sonne liegt und wo im Schatten von Hügeln, Bäumen und Häusern, und welche Startzeit am meisten Schatten (oder Sonne) bringt.' }),
+          el('div', { class: 'tour-sun-form' }, [
+            el('label', { class: 'small' }, ['Tag ', el('input', { type: 'date', id: 'tour-sun-date' })]),
+            el('label', { class: 'small' }, ['Start ', el('input', { type: 'time', id: 'tour-sun-time', step: '900' })]),
+            el('label', { class: 'small' }, ['km/h ', el('input', { type: 'number', id: 'tour-sun-speed', min: '1', max: '60', step: '0.5', value: '4.5' })]),
+          ]),
+          el('label', { class: 'toggle small', id: 'tour-sun-recorded-wrap', hidden: '' }, [el('input', { type: 'checkbox', id: 'tour-sun-recorded' }), ' Zeiten der Aufzeichnung nehmen']),
+          el('button', { type: 'button', id: 'tour-sun-go', class: 'secondary wide', text: 'Sonne und Schatten berechnen' }),
+          el('div', { id: 'tour-sun-result', 'aria-live': 'polite' }),
+        ]),
         el('div', { class: 'tour-modes', role: 'group', 'aria-label': 'Route erfassen' }, [
           el('button', { type: 'button', id: 'tour-draw', class: 'secondary', 'aria-pressed': 'true', text: 'Zeichnen' }),
           el('button', { type: 'button', id: 'tour-record', class: 'secondary', text: 'Aufzeichnen' }),
@@ -1067,6 +1252,7 @@
     if (r.savedId) meta.push('gespeichert');
     $('tour-meta').textContent = meta.join(' · ');
     renderSensors(r.sensors);
+    prepareSun();
     $('tour-record').textContent = T.recorder ? 'Aufnahme beenden' : 'Aufzeichnen';
     $('tour-record').classList.toggle('recording', Boolean(T.recorder));
     $('tour-draw').setAttribute('aria-pressed', String(!r.raw && !T.recorder));
@@ -1158,6 +1344,15 @@
   $('tour-offline-save').addEventListener('click', () => saveOffline(routePoints(), T.route.name || 'Route'));
   $('tour-save').addEventListener('click', saveRoute);
   $('tour-name').addEventListener('input', (e) => { T.route.name = e.target.value; });
+  $('tour-sun-go').addEventListener('click', () => (T.sun ? renderSun() : computeSun()));
+  // A new time or pace only needs the sun positions again; the horizons stay.
+  for (const id of ['tour-sun-date', 'tour-sun-time', 'tour-sun-speed', 'tour-sun-recorded']) {
+    $(id).addEventListener('change', () => {
+      if (id === 'tour-sun-speed') $(id).dataset.touched = '1';
+      if (T.sun) renderSun();
+    });
+  }
+  $('tour-activity').addEventListener('change', () => { prepareSun(); if (T.sun) renderSun(); });
   $('tour-dist').addEventListener('input', (e) => {
     T.maxDistanceM = Number(e.target.value);
     $('tour-dist-out').textContent = `${T.maxDistanceM} m`;
