@@ -32,6 +32,7 @@
       <a href="#how">So geht's</a>
       <a href="#funktionen">Funktionen</a>
       <a href="#explore">Karte</a>
+      <a href="landschaft.html" class="nav-landscape"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="4" width="4" height="12" fill="#6baed6"/><rect x="6" y="4" width="4" height="12" fill="#fcbba1"/><rect x="10" y="4" width="4" height="12" fill="#ef3b2c"/><rect x="14" y="4" width="4" height="12" fill="#99000d"/></svg>Landschaft im Wandel</a>
       <a href="https://michifrey.github.io/myforrest/" data-docs="" target="_blank" rel="noopener">Doku</a>
     </nav>
     <div id="pwa-status" class="pwa-status" aria-live="polite"></div>
@@ -60,6 +61,40 @@
     </div>
     <div id="hero-stats" class="hero-stats" aria-live="polite"></div>
     <a class="scroll-cue" href="#how" aria-label="Weiter nach unten"><span></span></a>
+  </section>
+
+  <section class="perspectives" id="perspektiven" aria-labelledby="persp-title">
+    <div class="section-head">
+      <p class="eyebrow">Zwei Blickwinkel</p>
+      <h2 id="persp-title">Dieselbe Landschaft, <em>zwei</em> Perspektiven.</h2>
+    </div>
+    <div class="persp-grid">
+      <article class="persp persp-us">
+        <p class="eyebrow">Mit unseren Augen</p>
+        <h3>Wald im Wandel</h3>
+        <p>Wir schauen hin, gemeinsam und von unten nach oben: Fotos von Läufen, Wanderungen und Touren, am selben
+          Ort wiederholt. Sturmschäden, Borkenkäfer, Neophyten, Jahr für Jahr.</p>
+        <div class="persp-strip" aria-hidden="true"><span></span><span></span><span></span></div>
+        <p class="persp-labels three" aria-hidden="true"><span>2023</span><span>2024</span><span>2025</span></p>
+        <div class="persp-cta">
+          <a href="#explore" class="btn primary">Karte erkunden</a>
+          <button type="button" class="btn persp-outline" data-action="upload">Foto beitragen</button>
+        </div>
+      </article>
+      <article class="persp persp-nature">
+        <p class="eyebrow">Aus Sicht der Natur</p>
+        <h3>Landschaft im Wandel</h3>
+        <p>Das Tal erzählt selbst, von der letzten Eiszeit bis 2100: wie Eis kam und ging, wie der Wald den Hang
+          hinaufwandert. Der Mensch ist eine Kraft unter mehreren, neben Erdbahn, Vulkanen, Wasser und wandernden Arten.</p>
+        <div class="persp-strip five" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+        <p class="persp-labels" aria-hidden="true"><span>Eiszeit</span><span>vor 7000 J.</span><span>1850</span><span>heute</span><span>2100</span></p>
+        <blockquote>«Ich lag unter Eis. Dann kam der Wald. Jetzt werde ich wärmer, schneller als seit mindestens 2000 Jahren.»</blockquote>
+        <div class="persp-cta">
+          <a href="landschaft.html" class="btn persp-light">Zeitraffer starten</a>
+          <a href="landschaft.html#daten" class="btn persp-outline">Daten holen</a>
+        </div>
+      </article>
+    </div>
   </section>
 
   <section class="how" id="how">
@@ -534,7 +569,9 @@
       <p class="muted small">Offene Geodaten: <a href="/ogc">OGC API – Features</a> (WGS84 und LV95) ·
         <a href="/api/export/myforrest.gpkg" download>GeoPackage (LV95)</a> ·
         <a href="/vektorkarte.html">Vektorkarte (MVT)</a> ·
-        <a href="/vektorkarte-lv95.html">Vektorkarte LV95</a></p>
+        <a href="/vektorkarte-lv95.html">Vektorkarte LV95</a> ·
+        <a href="/stac/catalog.json">STAC-Katalog</a> ·
+        <a href="landschaft.html#daten">Daten holen</a></p>
     </div>
   </footer>
 

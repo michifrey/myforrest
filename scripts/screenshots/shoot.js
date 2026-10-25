@@ -1,6 +1,6 @@
 'use strict';
 // Takes the README screenshots from the demo server (see README.md here).
-// Usage: node shoot.js [hero funktionen map standort spot baeume ebenen gebaeude3d klima satellite sun schatten species vektor tourschatten wikimedia touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher mobile]
+// Usage: node shoot.js [hero funktionen landschaft map standort spot baeume ebenen gebaeude3d klima satellite sun schatten species vektor tourschatten wikimedia touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher mobile]
 // «mapillary» needs the demo server started with DEMO_MAPILLARY=1 (a Mapillary stand-in, see README.md).
 // «gletscher» uses the glacier demo server (BASE_GLETSCHER, default http://localhost:3124; see README.md).
 const path = require('path');
@@ -33,7 +33,10 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
   if (want('hero')) {
     const page = await ctx.newPage();
     await page.goto(`${BASE}/`);
-    await settle(page, 3500);
+    await settle(page, 2000);
+    // The scenes rotate every eight seconds; the picture shows the forest.
+    await page.click('.scene-pick button[data-scene="wald"]');
+    await settle(page, 3200);
     await page.screenshot({ path: out('hero.jpg'), ...jpg });
     // The four landscapes of the start page, as a 2 × 2 grid.
     const sharp = require('sharp');
@@ -56,6 +59,43 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await settle(page, 1500); // the heading fades in
     await page.addStyleTag({ content: '.nav { position: static !important; }' });
     await page.locator('#funktionen').screenshot({ path: out('funktionen.jpg'), ...jpg });
+    await page.close();
+  }
+
+  if (want('landschaft')) {
+    // The two perspectives on the start page, and «Landschaft im Wandel» (landschaft.html).
+    let page = await ctx.newPage();
+    await page.goto(`${BASE}/`);
+    await settle(page, 2000);
+    await page.evaluate(() => scrollTo(0, document.querySelector('#perspektiven').offsetTop));
+    await settle(page, 1500); // the heading fades in
+    await page.addStyleTag({ content: '.nav { position: static !important; }' });
+    await page.locator('#perspektiven').screenshot({ path: out('perspektiven.jpg'), ...jpg });
+    await page.close();
+
+    page = await ctx.newPage();
+    const at = async (pos, scenario = 'mid') => {
+      await page.evaluate(([p, s]) => {
+        document.querySelector(`#ln-scenarios button[data-id="${s}"]`).click();
+        const range = document.getElementById('ln-pos');
+        range.value = String(p);
+        range.dispatchEvent(new Event('input'));
+      }, [pos, scenario]);
+      await settle(page, 300);
+    };
+    await page.goto(`${BASE}/landschaft.html`);
+    await settle(page, 1500);
+    await at(400);
+    await page.screenshot({ path: out('landschaft.jpg'), ...jpg });
+    await at(0);
+    await page.screenshot({ path: out('landschaft-eiszeit.jpg'), ...jpg });
+    await at(600, 'high');
+    await page.screenshot({ path: out('landschaft-2100.jpg'), ...jpg });
+    for (const view of ['wege', 'daten']) {
+      await page.goto(`${BASE}/landschaft.html#${view}`);
+      await settle(page, 1200);
+      await page.locator(`#${view}`).screenshot({ path: out(`landschaft-${view}.jpg`), ...jpg });
+    }
     await page.close();
   }
 

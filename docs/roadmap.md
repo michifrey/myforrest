@@ -136,6 +136,20 @@ Als Nächstes:
 - **Regionen statt Kreise**: Dossier pro Gemeinde, Bezirk, Kanton oder Waldregion (Grenzen von swisstopo), als Seite
   mit fester Adresse zum Teilen und als PDF.
 
+## Phase 6: Landschaft im Wandel
+
+Die Seite [Landschaft im Wandel](landschaft.md) erzählt aus Sicht der Natur, bisher am Grossen Aletschgletscher.
+Als Nächstes:
+
+- **Mehr Orte**: ein Ort pro Landschaft der Startseite (ein Tal im Mittelland mit Wald und Neophyten, ein Gebirge,
+  ein Trockengebiet), dann der eigene Ort über die Suche.
+- **Echte Daten statt Schema**: das Profil aus swissALTI3D, die Gletscherstände aus den Umrissen von GLAMOS und der
+  LGM-Karte von swisstopo, die Zukunft aus den Klimaszenarien CH2025 am Ort (wie im Klima-Dossier) und aus
+  Gletschermodellen.
+- **Die Fotos dazu**: Spots im Schnitt zeigen und beim Zeitraffer ihre Fotos einblenden, wenn ein Zeitpunkt
+  erreicht ist (die beiden Perspektiven verbinden).
+- **Für Schulen**: Arbeitsblätter zu den sieben Zeitpunkten, Druckansicht, Stimme wahlweise in der dritten Person.
+
 ## Bereits umgesetzt
 
 Aus früheren Versionen dieser Roadmap, nach Themen:
@@ -162,6 +176,9 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
   OSM, Landeskarte und Luftbild; Panel *Ebenen* mit Wald und Waldbrand, Bevölkerung, Bodennutzung, Verkehr von
   geo.admin.ch, Baumkataster Zürich, SITG Genf, EFFIS und NASA FIRMS, mit *Was ist hier?*; Baumkataster Zürich auch
   als Baumart-Vorschlag
+- Landschaft im Wandel: zweite Perspektive aus Sicht der Natur als eigene Seite, Zeitraffer im Schnitt von der Eiszeit
+  bis 2100 mit Stimme des Tals, Wirkkräften und drei Wegen, *Daten holen*; auf der Startseite zwei Perspektiven
+  nebeneinander
 - Startseite: Abschnitt *Funktionen* mit einer Kachel pro Funktion, die sie direkt öffnet (auch per `/?funktion=…`),
   *Funktionen* und *Doku* in der Navigation, *Fahrtmodus starten* im Upload-Dialog, Footer mit Doku und Quellcode
 - 3D-Karte mit Gebäuden (swissBUILDINGS3D) und Bäumen (Vegetation 3D) von swisstopo als 3D Tiles über deck.gl,
