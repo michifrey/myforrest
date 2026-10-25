@@ -14,6 +14,7 @@ nav:
   - Startseite: index.md
   - Funktionen: funktionen.md
   - Klima im Wandel: klimawandel.md
+  - Landschaft im Wandel: landschaft.md
   - Android-App: android.md
   - Selbst hosten:
       - Tech-Onboarding: tech-onboarding.md

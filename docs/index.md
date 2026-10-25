@@ -32,6 +32,15 @@ jeder Seite führt *Diese Seite bearbeiten* direkt zur Datei auf GitHub; daraus 
 
     [Klima im Wandel](klimawandel.md)
 
+-   **Landschaft im Wandel**
+
+    ---
+
+    Die zweite Perspektive, aus Sicht der Natur: Das Tal erzählt im Schnitt, wie Eis und Wald sich von der letzten
+    Eiszeit bis 2100 verändern, mit den Wirkkräften und drei Wegen, wie stark der Mensch weiter einwirkt.
+
+    [Landschaft im Wandel](landschaft.md)
+
 -   **Selbst hosten**
 
     ---

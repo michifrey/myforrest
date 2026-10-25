@@ -19,9 +19,15 @@ Einen kürzeren Überblick mit Screenshots gibt das [README](https://github.com/
 
 ## Startseite
 
+![Zwei Perspektiven auf der Startseite](screenshots/perspektiven.jpg)
+
+Gleich unter dem Hero stehen **zwei Perspektiven** nebeneinander: *Wald im Wandel*, mit unseren Augen (die Karte mit
+den Spots, Foto beitragen), und *Landschaft im Wandel*, aus Sicht der Natur (eigene Seite `/landschaft.html` mit
+Zeitraffer und offenen Daten, siehe [Landschaft im Wandel](landschaft.md)).
+
 ![Abschnitt Funktionen der Startseite](screenshots/funktionen.jpg)
 
-Die Startseite zeigt nach der Einleitung (*So geht's*) den Abschnitt **Funktionen**: eine Kachel pro Funktion mit
+Danach zeigt die Startseite nach der Einleitung (*So geht's*) den Abschnitt **Funktionen**: eine Kachel pro Funktion mit
 zwei Sätzen dazu. Ein Klick scrollt zur Karte und öffnet das passende Panel (*Ebenen*, *Klima*, *Sonne & Wetter*,
 *Arten & Neophyten*, *Touren & Aufträge*, *3D*, *Gletscher*), den Fahrtmodus, den Upload (Videos und 360°) oder die
 PRO-Mitgliedschaft (vorher die Anmeldung). Kacheln von Funktionen, die der Server nicht eingerichtet hat (3D-Karte
@@ -29,9 +35,9 @@ ohne Gelände, Gletscher ohne Inventar), bleiben wie ihre Kartenknöpfe verborge
 (OGC API, GeoPackage, Vektorkarten) und die Doku.
 
 Jede Funktion lässt sich auch verlinken: `/?funktion=` mit `ebenen`, `klima`, `sonne`, `arten`, `touren`, `3d`,
-`gletscher`, `fahrt`, `video` oder `pro`. Die Navigation oben führt zu *So geht's*, *Funktionen*, *Karte* und
-zur **Doku** (diese Website, Adresse über `DOKU_URL`); der Footer verlinkt Doku, Funktionen, die Klima-Quellen und
-den Quellcode.
+`gletscher`, `fahrt`, `video` oder `pro`. Die Navigation oben führt zu *So geht's*, *Funktionen*, *Karte*,
+*Landschaft im Wandel* und zur **Doku** (diese Website, Adresse über `DOKU_URL`); der Footer verlinkt Doku, Funktionen,
+die Klima-Quellen, den Quellcode, den STAC-Katalog und *Daten holen*.
 
 ## Fotos erfassen und verorten
 
