@@ -148,6 +148,9 @@ Als Nächstes:
   Gletschermodellen.
 - **Die Fotos dazu**: Spots im Schnitt zeigen und beim Zeitraffer ihre Fotos einblenden, wenn ein Zeitpunkt
   erreicht ist (die beiden Perspektiven verbinden).
+- **Von oben mit echten Daten**: Abflüsse aus Hydro-CH2018 für die Rhone und ihre Seitenbäche, Baumarten aus dem
+  Landesforstinventar, Bodenfeuchte und Bewässerung aus den Messnetzen; Jahreszeiten im Zeitraffer (Schneeschmelze,
+  Niedrigwasser im Spätsommer).
 - **Für Schulen**: Arbeitsblätter zu den sieben Zeitpunkten, Druckansicht, Stimme wahlweise in der dritten Person.
 
 ## Bereits umgesetzt
@@ -176,6 +179,8 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
   OSM, Landeskarte und Luftbild; Panel *Ebenen* mit Wald und Waldbrand, Bevölkerung, Bodennutzung, Verkehr von
   geo.admin.ch, Baumkataster Zürich, SITG Genf, EFFIS und NASA FIRMS, mit *Was ist hier?*; Baumkataster Zürich auch
   als Baumart-Vorschlag
+- Landschaft im Wandel, Ansicht *Von oben*: das Rhonetal von 1900 bis 2100 aus der Vogelperspektive, animiert, mit
+  Wasser, Wald, Nahrung und Temperatur und Quellen pro Thema
 - Landschaft im Wandel: zweite Perspektive aus Sicht der Natur als eigene Seite, Zeitraffer im Schnitt von der Eiszeit
   bis 2100 mit Stimme des Tals, Wirkkräften und drei Wegen, *Daten holen*; auf der Startseite zwei Perspektiven
   nebeneinander

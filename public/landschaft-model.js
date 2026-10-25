@@ -45,6 +45,13 @@
     meteoswiss: { label: 'MeteoSchweiz: Klimawandel Schweiz', url: 'https://www.meteoschweiz.admin.ch/klima/klimawandel.html' },
     aletsch2100: { label: 'Jouvet, Huss (2019): Future retreat of Great Aletsch Glacier. Journal of Glaciology 65', url: 'https://folia.unifr.ch/unifr/documents/308133' },
     ch2025: { label: 'Klimaszenarien CH2025 (MeteoSchweiz, ETH Zürich, NCCS)', url: 'https://www.nccs.admin.ch/' },
+    ch2018: { label: 'NCCS: Klimaszenarien CH2018, Kernaussagen', url: 'https://www.nccs.admin.ch/nccs/de/home/klimawandel-und-auswirkungen/schweizer-klimaszenarien/kernaussagen.html' },
+    hydro: { label: 'BAFU: Abflüsse im Wandel (Hydro-CH2018)', url: 'https://www.bafu.admin.ch/de/abfluesse-im-wandel' },
+    peakwater: { label: 'Huss, Hock (2018): Global-scale hydrological response to future glacier mass loss. Nature Climate Change 8', url: 'https://folia.unifr.ch/unifr/documents/306551' },
+    suonen: { label: 'SRF: Suonen im Wallis – Bäuerin bewässert Tag und Nacht ihre Wiesen', url: 'https://www.srf.ch/news/schweiz/suonen-im-wallis-baeuerin-bewaessert-tag-und-nacht-ihre-wiesen-und-zwar-von-hand' },
+    pine: { label: 'Rigling et al. (2013): Driving factors of a vegetation shift from Scots pine to pubescent oak in dry Alpine forests. Global Change Biology 19', url: 'https://air.unimi.it/handle/2434/564256' },
+    pfynwald: { label: 'WSL: Die Forschungsplattform Pfynwald', url: 'https://wsl.ch/de/ueber-die-wsl/versuchsanlagen-und-labors/flaechen-im-wald/pfynwald.html' },
+    agroscope: { label: 'SRF: Klimawandel und Landwirtschaft – mehr Schädlinge, höhere Temperaturen, weniger Wasser (mit Agroscope)', url: 'https://www.srf.ch/news/schweiz/klimawandel-und-landwirtschaft-mehr-schaedlinge-hoehere-temperaturen-weniger-wasser' },
   };
 
   /**
@@ -241,8 +248,124 @@
     };
   }
 
+  /* ---------- Von oben: the Rhone valley below the glacier, 1900 to 2100 ---------- */
+
+  /** What the view from above shows. All values 0 … 1 are schematic indices for the drawing. */
+  const THEMES = {
+    wasser: {
+      label: 'Wasser',
+      facts: [
+        ['Die Gletscher der Alpen liefern um heute so viel Schmelzwasser wie kaum je. Danach nimmt es ab, weil das Eis fehlt.', 'peakwater'],
+        ['Im Winter fliesst mehr Wasser ab, im Sommer und Herbst weniger; übers Jahr rund 10 % weniger.', 'hydro'],
+        ['Die Suonen, die alten Wasserleiten des Wallis, führen mit dem Gletscherschwund weniger Wasser.', 'suonen'],
+      ],
+    },
+    wald: {
+      label: 'Wald',
+      facts: [
+        ['Im Rhonetal, einem der trockensten Täler der Alpen, sterben viele Waldföhren, vor allem unter 1000 m. Die Flaumeiche verjüngt sich dort besser.', 'pine'],
+        ['Am meisten setzt den Föhren der trockene Boden zu, trockene Luft kommt dazu.', 'pfynwald'],
+      ],
+    },
+    nahrung: {
+      label: 'Nahrung',
+      facts: [
+        ['Die Vegetationszeit wird wärmer und trockener: Gemüse, Mais, Zuckerrüben und Kartoffeln leiden, Wiesen geben weniger Futter.', 'agroscope'],
+        ['In langen Trockenperioden braucht die Landwirtschaft ein Vielfaches an Wasser. Reben und Wiesen im Wallis hängen an den Suonen.', 'suonen'],
+      ],
+    },
+    temperatur: {
+      label: 'Temperatur',
+      facts: [
+        ['Ohne Klimaschutz werden die Sommer bis Mitte Jahrhundert 2,5 bis 4,5 °C wärmer, die heissesten Tage 2 bis 5,5 °C.', 'ch2018'],
+        ['Trockenere Sommer, mehr Hitzetage, schneearme Winter. Mit konsequentem Klimaschutz liesse sich bis Mitte Jahrhundert etwa die Hälfte davon vermeiden.', 'ch2018'],
+      ],
+    },
+  };
+
+  const OBEN_STEPS = 100;
+  const OBEN_MAX = OBEN_STEPS * 4;
+  const OBEN_TODAY = OBEN_STEPS * 2;
+  const G_1900 = 0.1;
+  const G_1960 = 0.3;
+
+  /**
+   * Five moments, each with the schematic state of the valley: glacier, summer water (river and Suonen),
+   * drought, the low forest (living pines, oaks, dead pines), fields (green) and irrigation, heat.
+   */
+  function obenStops(scenario = 'mid') {
+    const s = SCENARIOS[scenario] || SCENARIOS.mid;
+    const fut = {
+      low: [
+        { glacier: 0.45, water: 0.85, suonen: 0.7, drought: 0.45, pine: 0.65, oak: 0.35, dead: 0.2, fields: 0.72, irrigation: 0.65, heat: 0.5 },
+        { glacier: 0.35, water: 0.8, suonen: 0.65, drought: 0.45, pine: 0.6, oak: 0.45, dead: 0.15, fields: 0.72, irrigation: 0.65, heat: 0.5 },
+      ],
+      mid: [
+        { glacier: 0.4, water: 0.8, suonen: 0.6, drought: 0.55, pine: 0.55, oak: 0.45, dead: 0.3, fields: 0.65, irrigation: 0.75, heat: 0.6 },
+        { glacier: 0.15, water: 0.65, suonen: 0.4, drought: 0.7, pine: 0.35, oak: 0.65, dead: 0.35, fields: 0.55, irrigation: 0.9, heat: 0.8 },
+      ],
+      high: [
+        { glacier: 0.35, water: 0.75, suonen: 0.5, drought: 0.65, pine: 0.45, oak: 0.55, dead: 0.4, fields: 0.55, irrigation: 0.85, heat: 0.75 },
+        { glacier: 0.01, water: 0.5, suonen: 0.2, drought: 0.9, pine: 0.15, oak: 0.85, dead: 0.5, fields: 0.35, irrigation: 1, heat: 1 },
+      ],
+    }[scenario] || [];
+    return [
+      {
+        id: '1900', label: '1900', kind: 'Beobachtet', global: G_1900,
+        glacier: 0.95, water: 1, suonen: 1, drought: 0.1, pine: 1, oak: 0.05, dead: 0, fields: 0.9, irrigation: 0.3, heat: 0.05,
+        voice: 'Mein Gletscher reicht weit hinunter, die Suonen führen den ganzen Sommer Wasser. Unten am Hang stehen dichte Föhrenwälder.',
+      },
+      {
+        id: '1960', label: '1960', kind: 'Beobachtet', global: G_1960,
+        glacier: 0.85, water: 1, suonen: 0.95, drought: 0.15, pine: 1, oak: 0.08, dead: 0, fields: 0.9, irrigation: 0.4, heat: 0.1,
+        voice: 'Im Talboden wachsen Obst und Gemüse, die Reben ziehen sich den sonnigen Hang hinauf. Noch ist Wasser genug da.',
+      },
+      {
+        id: 'today', label: 'heute', kind: 'Beobachtet', global: G_TODAY,
+        glacier: 0.6, water: 0.95, suonen: 0.8, drought: 0.4, pine: 0.75, oak: 0.25, dead: 0.25, fields: 0.75, irrigation: 0.6, heat: 0.4,
+        voice: 'Mein Gletscher gibt so viel Schmelzwasser wie kaum je, doch er schwindet. Unten im Tal sterben in trockenen Sommern viele Föhren, junge Flaumeichen wachsen nach.',
+      },
+      {
+        id: '2050', label: '2050', kind: s.long, global: s.g2050, ...fut[0],
+        voice: {
+          low: 'Mein Eis wird kleiner, aber es bleibt Wasser für die Suonen. Föhren und Eichen teilen sich den Hang.',
+          mid: 'Im Spätsommer wird das Wasser knapp. Die Bauern bewässern mehr, die Eiche gewinnt unten am Hang.',
+          high: 'Die Sommer sind heiss und lang. Das Gletscherwasser nimmt ab, die Äcker brauchen Wasser, das fehlt.',
+        }[scenario],
+      },
+      {
+        id: '2100', label: '2100', kind: s.long, global: s.g2100, ...fut[1],
+        voice: {
+          low: 'Ich bin wärmer als früher, aber ich habe mich eingependelt. Ein Rest Gletscher speist meine Bäche.',
+          mid: 'Mein Gletscher ist fast fort, im Sommer führen Bäche und Suonen wenig Wasser. Unten wächst ein Eichenwald.',
+          high: 'Kein Gletscher mehr, der im Sommer Wasser gibt. Die Föhren sind unten verschwunden, die Felder vertrocknen ohne Bewässerung.',
+        }[scenario],
+      },
+    ];
+  }
+
+  /** The view from above at slider position `pos` (0 … 400) on the pathway `scenario`. */
+  function oben(pos, scenario = 'mid') {
+    const list = obenStops(scenario);
+    const p = Math.max(0, Math.min(OBEN_MAX, Number(pos) || 0));
+    const i = Math.min(list.length - 2, Math.floor(p / OBEN_STEPS));
+    const t = (p - i * OBEN_STEPS) / OBEN_STEPS;
+    const a = list[i]; const b = list[i + 1];
+    const mix = (k) => a[k] + (b[k] - a[k]) * t;
+    const near = t < 0.5 ? a : b;
+    const out = { pos: p, stop: near, scenario, future: p > OBEN_TODAY };
+    for (const k of ['global', 'glacier', 'water', 'suonen', 'drought', 'pine', 'oak', 'dead', 'fields', 'irrigation', 'heat']) out[k] = mix(k);
+    // Summer warming against today, by the same rule as the climate dossier (twice the global warming).
+    out.warming = SWISS_FACTOR * (out.global - G_TODAY);
+    return out;
+  }
+
+  /** One index over the five moments, for the small charts of the themes. */
+  const obenSeries = (key, scenario = 'mid') => obenStops(scenario).map((s) => ({ id: s.id, label: s.label, value: s[key] }));
+
   return {
     SCENARIOS, FORCES, SOURCES, STEPS, MAX_POS, TODAY_POS, TREELINE_TODAY, BELT,
-    stops, at, section, climbFor, elevation, fmt,
+    THEMES, OBEN_STEPS, OBEN_MAX, OBEN_TODAY,
+    stops, at, section, climbFor, elevation, fmt, obenStops, oben, obenSeries,
   };
 }));

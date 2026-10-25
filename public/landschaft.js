@@ -233,11 +233,13 @@ npm run stac -- ./myforrest-stac ${location.origin}`;
 
   function showView() {
     const id = (location.hash.replace('#', '') || 'zeitraffer');
-    const view = ['zeitraffer', 'wege', 'daten'].includes(id) ? id : 'zeitraffer';
+    const view = ['zeitraffer', 'oben', 'wege', 'daten'].includes(id) ? id : 'zeitraffer';
     for (const s of document.querySelectorAll('.ln-view')) s.hidden = s.id !== view;
     for (const a of document.querySelectorAll('.ln-tabs a[data-view]')) a.setAttribute('aria-current', a.dataset.view === view ? 'page' : 'false');
     if (view !== 'zeitraffer' && state.playing) stop();
+    if (view !== 'oben') window.LandschaftOben?.stop();
     if (view === 'zeitraffer') renderLapse();
+    if (view === 'oben') window.LandschaftOben?.render();
   }
   window.addEventListener('hashchange', showView);
   renderWege();

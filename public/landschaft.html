@@ -21,6 +21,7 @@
     </a>
     <nav class="ln-tabs" aria-label="Landschaft im Wandel">
       <a href="#zeitraffer" data-view="zeitraffer">Zeitraffer</a>
+      <a href="#oben" data-view="oben">Von oben</a>
       <a href="#wege" data-view="wege">Drei Wege</a>
       <a href="#daten" data-view="daten">Daten holen</a>
       <a href="./?funktion=klima">Klima-Dossier</a>
@@ -84,6 +85,64 @@
       </div>
     </section>
 
+    <!-- ---------- Von oben ---------- -->
+    <section id="oben" class="ln-view ln-lapse" aria-label="Von oben" hidden>
+      <aside class="ln-side">
+        <figure class="ln-voice">
+          <figcaption>Das Tal erzählt · <span id="lo-when-small"></span></figcaption>
+          <blockquote id="lo-voice" aria-live="polite"></blockquote>
+        </figure>
+        <section aria-labelledby="lo-theme-title">
+          <h2 id="lo-theme-title" class="ln-label">Was sich verändert</h2>
+          <div id="lo-cards" class="lo-cards"></div>
+        </section>
+      </aside>
+
+      <div class="ln-stage">
+        <div class="ln-scene lo-scene">
+          <svg id="lo-map" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid slice" role="img" aria-labelledby="lo-map-title"><title id="lo-map-title">Das Rhonetal von oben</title></svg>
+          <div class="ln-when">
+            <span id="lo-when"></span>
+            <span id="lo-kind"></span>
+          </div>
+          <div id="lo-thermo" class="lo-thermo" aria-live="polite"></div>
+          <ul class="ln-legend lo-legend" aria-label="Legende">
+            <li><span class="sw dot" style="background:#6f9a4f"></span>Waldföhre</li>
+            <li><span class="sw dot" style="background:#9c9a45"></span>Flaumeiche</li>
+            <li><span class="sw dot" style="background:#9a948a"></span>abgestorben</li>
+            <li><span class="sw dot" style="background:#244a31"></span>Fichte</li>
+            <li><span class="sw" style="background:#5d9a44"></span>Acker, gut versorgt</li>
+            <li><span class="sw" style="background:#c9a75a"></span>Acker, trocken</li>
+            <li><span class="sw dot ring"></span>Bewässerung</li>
+            <li><span class="sw line" style="border-color:#5aa3d6"></span>Suone (Wasserleite)</li>
+          </ul>
+          <p class="ln-badge">Von oben, schematisch</p>
+        </div>
+
+        <div class="ln-time">
+          <div class="ln-time-row">
+            <button type="button" id="lo-play" class="ln-play" aria-label="Zeitraffer abspielen"></button>
+            <div class="ln-slider">
+              <label class="sr-only" for="lo-pos">Zeitpunkt</label>
+              <input type="range" id="lo-pos" min="0" max="400" step="1" value="200">
+              <div id="lo-stops" class="ln-stops five"></div>
+            </div>
+          </div>
+          <div class="ln-time-row">
+            <span class="ln-label inline">Zeigen</span>
+            <div id="lo-themes" class="ln-chips" role="group" aria-label="Thema hervorheben"></div>
+          </div>
+          <div class="ln-time-row">
+            <span class="ln-label inline">Ab heute: wie stark der Mensch weiter einwirkt</span>
+            <div id="lo-scenarios" class="ln-chips" role="group" aria-label="Wie stark der Mensch weiter einwirkt"></div>
+          </div>
+          <p class="ln-note">Das Rhonetal unterhalb des Aletschgletschers von oben: Gletscher und Suonen am sonnigen Hang,
+            Reben, Äcker und Dorf im Talboden, Föhren und Eichen am Schattenhang. Gezeichnet als Schema; die Aussagen links
+            stützen sich auf die genannten Quellen.</p>
+        </div>
+      </div>
+    </section>
+
     <!-- ---------- Drei Wege ---------- -->
     <section id="wege" class="ln-view ln-page" aria-labelledby="ln-wege-title" hidden>
       <div class="ln-page-head">
@@ -141,6 +200,7 @@
   </main>
 
   <script src="landschaft-model.js"></script>
+  <script src="landschaft-oben.js"></script>
   <script src="landschaft.js"></script>
 </body>
 </html>
