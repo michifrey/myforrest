@@ -77,20 +77,49 @@ test('Landschaft im Wandel is a page of its own, linked from the start page and 
     const page = await fetch(`${base}/landschaft.html`);
     assert.equal(page.status, 200);
     const html = await page.text();
-    for (const file of ['landschaft-model.js', 'landschaft.js', 'landschaft.css']) {
+    for (const file of ['landschaft-model.js', 'landschaft-oben.js', 'landschaft.js', 'landschaft.css']) {
       assert.ok(html.includes(file), file);
       assert.equal((await fetch(`${base}/${file}`)).status, 200, file);
     }
-    for (const id of ['zeitraffer', 'wege', 'daten']) assert.ok(html.includes(`id="${id}"`), id);
+    for (const id of ['zeitraffer', 'oben', 'wege', 'daten']) assert.ok(html.includes(`id="${id}"`), id);
     const start = await (await fetch(`${base}/`)).text();
     assert.ok(start.includes('href="landschaft.html"'));
     assert.ok(start.includes('id="perspektiven"'));
     const sw = await (await fetch(`${base}/sw.js`)).text();
-    for (const file of ['landschaft.html', 'landschaft.js', 'landschaft-model.js', 'landschaft.css']) assert.ok(sw.includes(`'${file}'`), file);
+    for (const file of ['landschaft.html', 'landschaft.js', 'landschaft-oben.js', 'landschaft-model.js', 'landschaft.css']) assert.ok(sw.includes(`'${file}'`), file);
   } finally {
     await app.locals.idle();
     server.close();
     app.locals.db.close();
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
+});
+
+test('Landschaft im Wandel von oben: water, forest, food and heat change together, by the pathway from today on', () => {
+  for (const scenario of Object.keys(M.SCENARIOS)) {
+    const stops = M.obenStops(scenario);
+    assert.deepEqual(stops.map((s) => s.id), ['1900', '1960', 'today', '2050', '2100']);
+    for (const s of stops) {
+      assert.ok(s.voice.length > 20, `${s.id}: the valley's own words`);
+      for (const k of ['glacier', 'water', 'suonen', 'drought', 'pine', 'oak', 'dead', 'fields', 'irrigation', 'heat']) {
+        assert.ok(s[k] >= 0 && s[k] <= 1, `${scenario} ${s.id} ${k}`);
+      }
+    }
+    // Since 1900 the glacier only shrinks, the pines only decline.
+    for (let k = 1; k < stops.length; k++) {
+      assert.ok(stops[k].glacier <= stops[k - 1].glacier, `${scenario}: glacier`);
+      assert.ok(stops[k].pine <= stops[k - 1].pine, `${scenario}: pines`);
+    }
+  }
+  const y2100 = Object.keys(M.SCENARIOS).map((s) => M.oben(M.OBEN_MAX, s));
+  assert.ok(y2100[0].water > y2100[1].water && y2100[1].water > y2100[2].water, 'more emissions, less summer water');
+  assert.ok(y2100[0].pine > y2100[2].pine && y2100[0].fields > y2100[2].fields && y2100[0].heat < y2100[2].heat);
+  // Warming against today by the dossier's rule: twice the global warming.
+  assert.equal(M.oben(M.OBEN_TODAY).warming, 0);
+  assert.ok(Math.abs(M.oben(M.OBEN_MAX, 'high').warming - 2 * (4.4 - 1.2)) < 1e-9);
+  assert.ok(M.oben(0).warming < 0);
+  for (const [, t] of Object.entries(M.THEMES)) {
+    assert.ok(t.facts.length && t.facts.every(([text, src]) => text && M.SOURCES[src]?.url));
+  }
+  assert.deepEqual(M.obenSeries('water', 'high').map((p) => p.id), ['1900', '1960', 'today', '2050', '2100']);
 });

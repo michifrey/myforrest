@@ -23,7 +23,7 @@
 
 importScripts('offline-queue.js');
 
-const SHELL_VERSION = 'v25';
+const SHELL_VERSION = 'v26';
 const DATA_VERSION = 'v1';
 const CACHE = {
   shell: `myforrest-shell-${SHELL_VERSION}`,
@@ -78,6 +78,7 @@ const PRECACHE = [
   'landschaft.css',
   'landschaft.js',
   'landschaft-model.js',
+  'landschaft-oben.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',

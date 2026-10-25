@@ -66,6 +66,33 @@ sich etwa doppelt so stark wie die Welt, und 0,55 °C entsprechen rund 100 m Hö
 höchstens rund 2 m pro Jahr an. So ist zu sehen, wie zwischen der Waldgrenze nach Klima und dem Wald eine Lücke
 entsteht, wenn die Erwärmung schnell geht.
 
+## Von oben
+
+![Von oben: das Rhonetal unterhalb des Aletschgletschers heute, mit Wasser, Wald, Nahrung und Temperatur](screenshots/landschaft-oben.jpg)
+
+Die zweite Ansicht zeigt das Rhonetal unterhalb des Aletschgletschers aus der Vogelperspektive, von 1900 bis 2100.
+Oben liegt der Gletscher, von dem ein Bach zur Rhone hinunterfliesst. Am sonnigen Hang führen die **Suonen**, die
+alten Wasserleiten des Wallis, Wasser zu den Reben. Im Talboden liegen Äcker und das Dorf. Am Schattenhang stehen
+unten Waldföhren und Flaumeichen, oben Fichten. Alles ist animiert: Das Wasser fliesst in Rhone, Bach und Suonen, die
+Bewässerung pulsiert und über dem Talboden flimmert die Hitze.
+
+Vier Themen verändern sich gemeinsam; *Zeigen* hebt eines hervor und blendet die anderen ab:
+
+| Thema | Was die Animation zeigt | Was die Quellen sagen |
+|-------|-------------------------|-----------------------|
+| **Wasser** | Der Gletscher schrumpft (gestrichelt sein Stand um 1900), Rhone und Bach werden im Sommer schmaler und langsamer, die Suonen fallen eine nach der anderen trocken. | Die Gletscher der Alpen liefern um heute so viel Schmelzwasser wie kaum je, danach weniger (Huss und Hock 2018). Im Winter fliesst mehr, im Sommer und Herbst weniger ab, übers Jahr rund 10 % weniger (BAFU, Hydro-CH2018). Die Suonen führen mit dem Gletscherschwund weniger Wasser (SRF). |
+| **Wald** | Unten am Schattenhang sterben Föhren ab (grau), Flaumeichen (olivgrün) wachsen nach. | Im Rhonetal sterben viele Waldföhren, vor allem unter 1000 m; die Flaumeiche verjüngt sich dort besser (Rigling et al. 2013). Am meisten setzt den Föhren der trockene Boden zu (WSL, Pfynwald). |
+| **Nahrung** | Äcker und Reben werden von grün zu ocker, es braucht immer mehr Bewässerung. | Wärmere und trockenere Vegetationszeit: Gemüse, Mais, Zuckerrüben und Kartoffeln leiden, Wiesen geben weniger Futter (Agroscope). Reben und Wiesen im Wallis hängen an den Suonen. |
+| **Temperatur** | Die Hitze über dem Talboden nimmt zu; die Anzeige nennt die Erwärmung der Schweiz gegenüber heute. | Ohne Klimaschutz werden die Sommer bis Mitte Jahrhundert 2,5 bis 4,5 °C wärmer, die heissesten Tage 2 bis 5,5 °C; mit konsequentem Klimaschutz liesse sich etwa die Hälfte vermeiden (CH2018). |
+
+![Von oben 2100, wenn der Mensch stark weiter einwirkt: kein Gletscher, trockene Äcker, Eichen statt Föhren](screenshots/landschaft-oben-2100.jpg)
+
+Links erzählt das Tal wieder in der Ich-Form. Darunter steht pro Thema der Zustand («Im Sommer knapp», «Föhren
+sterben, Eichen wachsen nach») mit einer kleinen Kurve über die fünf Zeitpunkte und den Aussagen mit Quellen. Ab heute
+gelten dieselben drei Wege wie im Zeitraffer. Die Erwärmung gegenüber heute folgt der Faustregel des Klima-Dossiers
+(doppelt so viel wie die Welt). Die Zeichnung ist ein Schema: Die Grössen von Gletscher, Wasser, Wald und Äckern sind
+Einschätzungen aus den Quellen, keine gemessenen Werte.
+
 ## Drei Wege
 
 ![Drei Wege: das Tal 2100, wenn der Mensch wenig, mittel oder stark weiter einwirkt](screenshots/landschaft-wege.jpg)
@@ -105,7 +132,10 @@ am Ende der Seite zeigen, worauf sie sich stützen.
   Überblenden zwischen zwei Zeitpunkten und die Geometrie des Schnitts.
 - `public/landschaft.js` zeichnet den Schnitt als SVG, die Ansichten *Zeitraffer*, *Drei Wege* und *Daten holen*
   (Adressen `#zeitraffer`, `#wege`, `#daten`) und die Quellen; `public/landschaft.css` gestaltet die Seite.
-- Mit `prefers-reduced-motion` springt der Zeitraffer in grösseren Schritten statt flüssig.
+- `public/landschaft-oben.js` zeichnet die Ansicht *Von oben* (`#oben`); ihre fünf Zeitpunkte und Themen stehen im
+  Modell (`obenStops`, `oben`, `THEMES`).
+- Mit `prefers-reduced-motion` springt der Zeitraffer in grösseren Schritten statt flüssig, und Wasser, Bewässerung
+  und Hitze bewegen sich nicht.
 
 ## Quellen
 
@@ -118,3 +148,10 @@ am Ende der Seite zeigen, worauf sie sich stützen.
 - MeteoSchweiz: [Klimawandel Schweiz](https://www.meteoschweiz.admin.ch/klima/klimawandel.html)
 - Jouvet, G., Huss, M. (2019): [Future retreat of Great Aletsch Glacier](https://folia.unifr.ch/unifr/documents/308133). Journal of Glaciology 65
 - [Klimaszenarien CH2025](https://www.nccs.admin.ch/) (MeteoSchweiz, ETH Zürich, NCCS)
+- NCCS: [Klimaszenarien CH2018, Kernaussagen](https://www.nccs.admin.ch/nccs/de/home/klimawandel-und-auswirkungen/schweizer-klimaszenarien/kernaussagen.html)
+- BAFU: [Abflüsse im Wandel](https://www.bafu.admin.ch/de/abfluesse-im-wandel) (Hydro-CH2018)
+- Huss, M., Hock, R. (2018): [Global-scale hydrological response to future glacier mass loss](https://folia.unifr.ch/unifr/documents/306551). Nature Climate Change 8
+- Rigling, A. et al. (2013): [Driving factors of a vegetation shift from Scots pine to pubescent oak in dry Alpine forests](https://air.unimi.it/handle/2434/564256). Global Change Biology 19
+- WSL: [Die Forschungsplattform Pfynwald](https://wsl.ch/de/ueber-die-wsl/versuchsanlagen-und-labors/flaechen-im-wald/pfynwald.html)
+- SRF: [Klimawandel und Landwirtschaft – mehr Schädlinge, höhere Temperaturen, weniger Wasser](https://www.srf.ch/news/schweiz/klimawandel-und-landwirtschaft-mehr-schaedlinge-hoehere-temperaturen-weniger-wasser) (mit Agroscope)
+- SRF: [Suonen im Wallis](https://www.srf.ch/news/schweiz/suonen-im-wallis-baeuerin-bewaessert-tag-und-nacht-ihre-wiesen-und-zwar-von-hand)

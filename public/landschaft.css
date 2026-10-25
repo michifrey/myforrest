@@ -125,6 +125,34 @@ button { font: inherit; }
 .ln-sources summary { cursor: pointer; font-weight: 800; min-height: 44px; display: flex; align-items: center; }
 .ln-sources ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
 
+/* ---------- Von oben ---------- */
+.lo-scene { background: #3f5e3c; }
+#oben .ln-when { left: 14px; }
+.lo-legend { top: auto; bottom: 14px; }
+.sw.ring { border: 2px solid #bfe3ff; background: transparent; }
+.lo-dim { opacity: 0.28; transition: opacity 0.3s; }
+.lo-labels text { fill: #fff; font: 700 13px var(--font-body); paint-order: stroke; stroke: rgb(18 32 26 / 0.7); stroke-width: 3px; }
+.lo-flow { animation: lo-flow var(--lo-speed, 2s) linear infinite; }
+@keyframes lo-flow { to { stroke-dashoffset: -56; } }
+.lo-spray { animation: lo-spray 2.4s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes lo-spray { from { transform: scale(0.4); opacity: 1; } to { transform: scale(1.8); opacity: 0; } }
+.lo-shimmer { animation: lo-shimmer 3.2s ease-in-out infinite alternate; }
+@keyframes lo-shimmer { from { filter: blur(6px); } to { filter: blur(14px); } }
+.lo-thermo { position: absolute; left: 14px; top: 118px; display: flex; flex-direction: column; gap: 2px; max-width: 260px; padding: 10px 14px; border-radius: 12px; background: rgb(18 32 26 / 0.86); font-size: 0.75rem; color: var(--ln-soft); }
+.lo-thermo-value { font: 600 1.6rem/1 var(--font-display); color: #ff9a7c; }
+.lo-cards { display: grid; gap: 10px; }
+.lo-card { padding: 12px 14px; border-radius: 12px; background: var(--ln-surface); border: 1px solid var(--ln-line); border-left: 4px solid var(--lo-color); }
+.lo-card.on { border-color: var(--lo-color); }
+.lo-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.lo-card h3 { margin: 0; font-size: 0.95rem; }
+.lo-spark { width: 120px; height: 30px; flex: none; }
+.lo-status { margin: 4px 0 0; font-weight: 700; font-size: 0.9rem; color: var(--ln-text); }
+.lo-card ul { margin: 6px 0 0; padding-left: 16px; display: grid; gap: 4px; font-size: 0.82rem; color: var(--ln-soft); }
+.ln-stops.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (prefers-reduced-motion: reduce) {
+  .lo-flow, .lo-spray, .lo-shimmer { animation: none; }
+}
+
 @media (max-width: 720px) {
   .ln-head { padding: 10px 16px; }
   .ln-place { margin: 0; }
@@ -132,6 +160,10 @@ button { font: inherit; }
   .ln-stage { order: 1; }
   .ln-scene { min-height: 0; aspect-ratio: 1000 / 560; }
   .ln-legend { display: none; }
+  #oben .ln-scene { aspect-ratio: 4 / 3; }
+  .lo-thermo { top: auto; bottom: 10px; left: 10px; max-width: 200px; padding: 6px 10px; }
+  .lo-thermo span:last-child { display: none; }
+  .lo-thermo-value { font-size: 1.2rem; }
   .ln-when { left: 10px; top: 10px; padding: 8px 12px; }
   .ln-when span:first-child { font-size: 1.6rem; }
   .ln-badge { display: none; }

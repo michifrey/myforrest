@@ -590,6 +590,13 @@ mehreren, heute bei Wärme und Eis die stärkste. Ab heute wählt man, **wie sta
 mittel, stark nach den Emissionspfaden des IPCC). Die Waldgrenze nach Klima steigt nach der Faustregel des
 Klima-Dossiers, der Wald selbst folgt langsamer.
 
+![Von oben: das Rhonetal heute mit Wasser, Wald, Nahrung und Temperatur](docs/screenshots/landschaft-oben.jpg)
+
+**Von oben** zeigt das Rhonetal unterhalb des Gletschers aus der Vogelperspektive, von 1900 bis 2100, animiert:
+Gletscher, Rhone und Suonen führen im Sommer weniger Wasser, unten am Hang sterben Föhren und Flaumeichen wachsen
+nach, Äcker und Reben brauchen mehr Bewässerung, über dem Talboden flimmert die Hitze. *Zeigen* hebt ein Thema
+hervor (Wasser, Wald, Nahrung, Temperatur), mit Zustand, Verlauf und Quellen (CH2018, Hydro-CH2018, WSL, Agroscope).
+
 ![Drei Wege: das Tal 2100 je nach menschlichem Einfluss](docs/screenshots/landschaft-wege.jpg)
 
 **Drei Wege** stellt das Tal 2050 oder 2100 dreimal nebeneinander. **Daten holen** sammelt die offenen Daten
@@ -702,7 +709,7 @@ jedes Dokument hier im Repository und auf der Website.
 |----------|--------|
 | [Funktionen im Detail](docs/funktionen.md) · [Website](https://michifrey.github.io/myforrest/funktionen/) | Alle Funktionen mit Verfahren, Schwellenwerten und Grenzen |
 | [Klima im Wandel](docs/klimawandel.md) · [Website](https://michifrey.github.io/myforrest/klimawandel/) | Klima der Region neben den Fotos, Szenarien CH2025 und Katalog der offenen Klimadaten |
-| [Landschaft im Wandel](docs/landschaft.md) · [Website](https://michifrey.github.io/myforrest/landschaft/) | Die Perspektive der Natur: Zeitraffer im Schnitt von der Eiszeit bis 2100, Wirkkräfte, drei Wege, Quellen |
+| [Landschaft im Wandel](docs/landschaft.md) · [Website](https://michifrey.github.io/myforrest/landschaft/) | Die Perspektive der Natur: Zeitraffer im Schnitt von der Eiszeit bis 2100, das Tal von oben mit Wasser, Wald, Nahrung und Temperatur, Wirkkräfte, drei Wege, Quellen |
 | [Android-App](docs/android.md) · [Website](https://michifrey.github.io/myforrest/android/) | Fahrtmodus und Aufzeichnung im Hintergrund, Installieren, selbst bauen und signieren |
 | [Tech-Onboarding](docs/tech-onboarding.md) · [Website](https://michifrey.github.io/myforrest/tech-onboarding/) | Selbst hosten: Voraussetzungen, Speicherplatz, Lizenzen, Ports, Zertifikate, ausgehende Verbindungen, Checkliste |
 | [Installation und Konfiguration](docs/installation.md) · [Website](https://michifrey.github.io/myforrest/installation/) | Voraussetzungen, HTTPS fürs Handy, Umgebungsvariablen, externer Detektor, Phänologie-Daten |
