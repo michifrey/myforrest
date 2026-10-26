@@ -53,6 +53,16 @@ h1, h2, h3 { margin: 0; }
 .ln-legend { display: block; max-width: 100%; margin-top: 6px; background: #fff; border-radius: 4px; }
 .ln-themes select { width: 100%; min-height: 40px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; padding: 0 8px; }
 
+/* The «Zeitreise»: year, play button, slider. */
+.ln-zeit { margin: 8px 0 4px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+.ln-zeit-row { display: flex; align-items: center; gap: 12px; }
+.ln-zeit-year { font: 600 1.8rem/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.ln-zeit input { width: 100%; margin-top: 8px; accent-color: var(--accent); }
+.ln-zeit-scale { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--muted); }
+.ln-play { width: 44px; height: 44px; flex: none; border: none; border-radius: 999px; background: var(--accent); cursor: pointer; position: relative; }
+.ln-play::before { content: ''; position: absolute; left: 17px; top: 13px; border-style: solid; border-width: 9px 0 9px 14px; border-color: transparent transparent transparent var(--accent-text); }
+.ln-play.playing::before { left: 15px; top: 14px; width: 14px; height: 16px; border: none; background: linear-gradient(90deg, var(--accent-text) 0 5px, transparent 5px 9px, var(--accent-text) 9px 14px); }
+
 /* ---------- Bericht ---------- */
 .ln-report { max-width: 980px; margin: 0 auto; padding: 28px 20px 48px; }
 .ln-report-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 16px; }

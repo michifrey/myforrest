@@ -24,6 +24,16 @@ async function routeTiles(ctx) {
     if (!tileCache.has(key)) tileCache.set(key, await tiles.mercatorTile(z, x, y, 'osm'));
     await route.fulfill({ body: tileCache.get(key), contentType: 'image/png' });
   }));
+  // The «Zeitreise» of swisstopo: the placeholder map, sepia for the old editions.
+  await ctx.route(/ch\.swisstopo\.zeitreihen\/default\/(\d{8})\/3857\/(\d+)\/(\d+)\/(\d+)\.png/, safe(async (route) => {
+    const [, time, z, x, y] = route.request().url().match(/\/(\d{8})\/3857\/(\d+)\/(\d+)\/(\d+)\.png/);
+    const key = `m${z}/${x}/${y}`;
+    if (!tileCache.has(key)) tileCache.set(key, await tiles.mercatorTile(Number(z), Number(x), Number(y), 'osm'));
+    const year = Number(time.slice(0, 4));
+    const sharp = require('sharp');
+    const body = year < 1990 ? await sharp(tileCache.get(key)).modulate({ saturation: 0.25 }).tint({ r: 214, g: 190, b: 150 }).png().toBuffer() : tileCache.get(key);
+    await route.fulfill({ body, contentType: 'image/png' });
+  }));
   // swisstopo in Web Mercator (Landschaft im Wandel): the same placeholder map as OpenStreetMap.
   await ctx.route(/wmts\.geo\.admin\.ch\/.*\/3857\/(\d+)\/(\d+)\/(\d+)\.jpeg/, safe(async (route) => {
     const [, z, x, y] = route.request().url().match(/\/3857\/(\d+)\/(\d+)\/(\d+)\.jpeg/).map(Number);

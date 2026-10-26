@@ -44,17 +44,78 @@
   let themeLayer = null;
   let marker = null;
 
-  function showTimeline(id) {
+  /* The «Zeitreise»: the Landeskarte of one year, a slider over the years and a play button. */
+  const zeit = { index: 0, timer: null };
+  const zeitTiles = (z, time) => z.tiles.replace('{time}', time);
+  function stopPlaying() {
+    clearInterval(zeit.timer);
+    zeit.timer = null;
+    $('ln-zeit-play')?.setAttribute('aria-label', 'Jahre abspielen');
+    $('ln-zeit-play')?.classList.remove('playing');
+  }
+  function setYear(stop, index) {
+    const years = stop.zeitreise.years;
+    zeit.index = Math.max(0, Math.min(years.length - 1, index));
+    const y = years[zeit.index];
+    timeLayer?.setUrl(zeitTiles(stop.zeitreise, y.time));
+    $('ln-zeit-year').textContent = String(y.year);
+    $('ln-zeit-range').value = String(zeit.index);
+    // The year in the address, so the view can be shared.
+    const q = new URLSearchParams(state.place ? { lat: state.place.lat, lon: state.place.lon } : {});
+    q.set('jahr', y.year);
+    history.replaceState(null, '', `#karte?${q}`);
+  }
+  function zeitControls(stop) {
+    const years = stop.zeitreise.years;
+    const play = () => {
+      if (zeit.timer) return stopPlaying();
+      if (zeit.index >= years.length - 1) setYear(stop, 0);
+      $('ln-zeit-play').setAttribute('aria-label', 'Anhalten');
+      $('ln-zeit-play').classList.add('playing');
+      // One year every 1.2 s: time for the tiles of the next year to arrive.
+      zeit.timer = setInterval(() => {
+        if (zeit.index >= years.length - 1) stopPlaying(); else setYear(stop, zeit.index + 1);
+      }, 1200);
+      return undefined;
+    };
+    return el('div', { class: 'ln-zeit' }, [
+      el('div', { class: 'ln-zeit-row' }, [
+        el('button', { type: 'button', id: 'ln-zeit-play', class: 'ln-play', 'aria-label': 'Jahre abspielen', on: { click: play } }),
+        el('output', { id: 'ln-zeit-year', for: 'ln-zeit-range', class: 'ln-zeit-year' }),
+      ]),
+      el('label', { class: 'sr-only', for: 'ln-zeit-range', text: 'Jahr' }),
+      el('input', {
+        type: 'range', id: 'ln-zeit-range', min: '0', max: String(years.length - 1), step: '1', value: String(zeit.index),
+        on: { input: (e) => { stopPlaying(); setYear(stop, Number(e.target.value)); } },
+      }),
+      el('div', { class: 'ln-zeit-scale' }, [el('span', { text: String(years[0].year) }), el('span', { text: String(years[years.length - 1].year) })]),
+    ]);
+  }
+
+  function showTimeline(id, { year = null } = {}) {
     state.timeline = id;
+    stopPlaying();
     const stop = state.maps?.timeline.find((t) => t.id === id);
     timeLayer?.remove();
-    timeLayer = stop?.layer ? wms(stop.layer, Number($('ln-opacity').value)).addTo(map) : null;
+    timeLayer = null;
+    if (stop?.layer) timeLayer = wms(stop.layer, Number($('ln-opacity').value)).addTo(map);
+    if (stop?.zeitreise) {
+      const years = stop.zeitreise.years;
+      // Start at the year asked for (link), else around 1900.
+      const want = year ?? 1900;
+      zeit.index = years.reduce((best, y, i) => (Math.abs(y.year - want) < Math.abs(years[best].year - want) ? i : best), 0);
+      timeLayer = L.tileLayer(zeitTiles(stop.zeitreise, years[zeit.index].time), {
+        maxZoom: 19, maxNativeZoom: 18, bounds: CH, opacity: Number($('ln-opacity').value), attribution: stop.zeitreise.attribution,
+      }).addTo(map);
+    }
     for (const b of $('ln-timeline').querySelectorAll('button')) b.setAttribute('aria-checked', String(b.dataset.id === id));
     $('ln-time-info').replaceChildren(...(stop ? [
       el('strong', { text: `${stop.title} · ${stop.when}` }),
       el('p', { text: stop.text }),
+      stop.zeitreise ? zeitControls(stop) : null,
       stop.layer ? el('img', { src: stop.layer.legend, alt: `Legende: ${stop.title}`, loading: 'lazy', class: 'ln-legend', on: { error: (e) => e.target.remove() } }) : null,
     ].filter(Boolean) : []));
+    if (stop?.zeitreise) setYear(stop, zeit.index);
   }
 
   function showTheme(value) {
@@ -90,7 +151,9 @@
       el('div', { id: 'ln-theme-legend' }),
       state.maps.themes.some((t) => t.layers.length) ? null : el('p', { class: 'ln-muted', text: 'Keine Themenkarten verfügbar.' }),
     ].filter(Boolean));
-    showTimeline(state.maps.timeline.some((t) => t.id === state.timeline) ? state.timeline : 'heute');
+    const year = Number(new URLSearchParams(location.hash.split('?')[1] || '').get('jahr'));
+    if (year && state.maps.timeline.some((t) => t.id === 'zeitreise')) showTimeline('zeitreise', { year });
+    else showTimeline(state.maps.timeline.some((t) => t.id === state.timeline) ? state.timeline : 'heute');
   }
 
   function setPlace(lat, lon, { pan = false } = {}) {
