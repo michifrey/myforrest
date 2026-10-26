@@ -372,23 +372,9 @@ input[type="checkbox"] { accent-color: var(--accent); width: 1.05rem; height: 1.
 .persp-nature { background: #12201a; color: #eef0e6; }
 .persp-nature .eyebrow { color: #f2b48f; }
 .persp-nature p { color: #c9d0c2; }
-.persp-nature blockquote { margin: 0.2rem 0 0; font: italic 400 1.15rem/1.4 var(--font-display); color: #eef0e6; }
-.persp-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 0.3rem; }
-.persp-strip.five { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
-.persp-strip span { aspect-ratio: 4 / 3; border-radius: 10px; }
-.persp-strip.five span { aspect-ratio: 1; border-radius: 8px; }
-.persp-us .persp-strip span:nth-child(1) { background: linear-gradient(180deg, #b9c8a6 0%, #5f7f5a 55%, #355739 100%); }
-.persp-us .persp-strip span:nth-child(2) { background: linear-gradient(180deg, #c9cfa6 0%, #8a8a4f 55%, #5c5a32 100%); }
-.persp-us .persp-strip span:nth-child(3) { background: linear-gradient(180deg, #d8c99a 0%, #a07a42 55%, #6b4b2a 100%); }
-/* A section of the valley in five moments: ice from above, forest from below. */
-.persp-nature .persp-strip span:nth-child(1) { background: linear-gradient(180deg, #e9f1f6 0 86%, #5b5146 86% 100%); }
-.persp-nature .persp-strip span:nth-child(2) { background: linear-gradient(180deg, #cfd6d2 0 14%, #e9f1f6 14% 22%, #9fae7a 22% 34%, #3c6b4a 34% 100%); }
-.persp-nature .persp-strip span:nth-child(3) { background: linear-gradient(180deg, #e9f1f6 0 48%, #9fae7a 48% 56%, #3c6b4a 56% 100%); }
-.persp-nature .persp-strip span:nth-child(4) { background: linear-gradient(180deg, #cfd6d2 0 18%, #e9f1f6 18% 34%, #9fae7a 34% 44%, #3c6b4a 44% 100%); }
-.persp-nature .persp-strip span:nth-child(5) { background: linear-gradient(180deg, #cfd6d2 0 14%, #9fae7a 14% 32%, #4f7a46 32% 100%); }
-.persp-labels { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; font-size: 0.78rem; text-align: center; }
-.persp-labels.three { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; color: var(--muted); }
-.persp-nature .persp-labels { color: #a9b3a4; }
+.persp-list { margin: 0.2rem 0 0; padding-left: 1.1rem; display: grid; gap: 0.4rem; }
+.persp-nature .persp-list { color: #c9d0c2; }
+.persp-nature .persp-list strong { color: #eef0e6; }
 .persp-cta { display: flex; flex-wrap: wrap; gap: 0.7rem; margin-top: auto; padding-top: 0.6rem; }
 .persp-cta .btn { padding: 0.8rem 1.3rem; font-weight: 700; text-decoration: none; }
 .btn.persp-outline { background: transparent; border-color: var(--accent); color: var(--accent); }

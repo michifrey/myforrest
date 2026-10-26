@@ -36,8 +36,8 @@ jeder Seite führt *Diese Seite bearbeiten* direkt zur Datei auf GitHub; daraus 
 
     ---
 
-    Die zweite Perspektive, aus Sicht der Natur: Das Tal erzählt im Schnitt, wie Eis und Wald sich von der letzten
-    Eiszeit bis 2100 verändern, mit den Wirkkräften und drei Wegen, wie stark der Mensch weiter einwirkt.
+    Die zweite Perspektive, aus Sicht der Natur: amtliche Karten von der letzten Eiszeit bis zu den
+    Waldhöhenstufen 2085 und ein Bericht pro Ort zu Klima, Gletschern und Wasser, Wald, Landwirtschaft und Boden.
 
     [Landschaft im Wandel](landschaft.md)
 

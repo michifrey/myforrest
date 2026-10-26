@@ -371,6 +371,11 @@ const DEMO_WMS_LAYERS = [
   ['ch.meteoschweiz.klimanormwerte-temperatur_aktuelle_periode', 'Klimanormwerte Temperatur 1991–2020 (Demo)'],
   ['ch.bafu.wald-vegetationshoehenstufen_1975', 'Vegetationshöhenstufen heute (Demo)'],
   ['ch.bafu.wald-vegetationshoehenstufen_2085_trocken', 'Vegetationshöhenstufen 2085, trockeneres Klima (Demo)'],
+  // Landschaft im Wandel: maps through time and one more forest scenario.
+  ['ch.bafu.wald-vegetationshoehenstufen_2085_weniger_trocken', 'Vegetationshöhenstufen 2085, weniger trockenes Klima (Demo)'],
+  ['ch.swisstopo.geologie-eiszeit-lgm-raster', 'Letzteiszeitliches Maximum (LGM) (Demo)'],
+  ['ch.swisstopo.hiks-dufour', 'Dufourkarte Erstausgabe (Demo)'],
+  ['ch.swisstopo.hiks-siegfried', 'Siegfriedkarte (Demo)'],
   // Panel «Ebenen»: one demo layer per theme.
   ['ch.bafu.gefahren-waldbrand_warnung', 'Waldbrandgefahr (Demo)'],
   ['ch.bafu.landesforstinventar-vegetationshoehenmodell', 'Vegetationshöhenmodell (Demo)'],
@@ -421,7 +426,7 @@ async function demoWms(url) {
   const [x0, y0, x1, y1] = get('BBOX').split(',').map(Number);
   const w = Number(get('WIDTH')); const h = Number(get('HEIGHT'));
   const layer = get('LAYERS');
-  const shift = layer.endsWith('2085_trocken') ? 600 : 0;
+  const shift = layer.endsWith('2085_trocken') ? 600 : layer.endsWith('2085_weniger_trocken') ? 350 : 0;
   const R = 6378137;
   const px = Buffer.alloc(w * h * 4);
   for (let j = 0; j < h; j += 2) {
@@ -462,6 +467,14 @@ async function demoWms(url) {
         const hit = STREET_TREES.some((t) => Math.hypot((t.lat - lat) * 111320, (t.lon - lon) * 75500) < Math.max(4, mpp * 2.2));
         c = hit ? [40, 120, 50] : null;
         alpha = 255;
+      } else if (layer.includes('eiszeit-lgm')) {
+        c = [236, 243, 248];
+        alpha = 215;
+      } else if (layer.includes('hiks-')) {
+        // An old map: sepia, with contour lines every 50 m.
+        const line = Math.abs(((z % 50) + 50) % 50) < 3;
+        c = line ? [150, 105, 60] : layer.includes('dufour') ? [214, 196, 160] : [222, 210, 178];
+        alpha = line ? 200 : 150;
       } else if (layer.includes('klimanormwerte')) {
         const t = Math.max(0, Math.min(1, (11 - (z - 400) * 0.0055 - 4) / 7));
         c = [Math.round(60 + 190 * t), Math.round(120 + 40 * (1 - Math.abs(t - 0.5) * 2)), Math.round(220 - 180 * t)];
@@ -508,6 +521,14 @@ function demoIdentify(url) {
   for (const n of names) {
     if (n.includes('waldbrand')) results.push({ layerBodId: n, layerName: 'Waldbrandgefahr (Demo)', attributes: { gefahrenstufe: lon < 8.585 ? 3 : 2, beschreibung: lon < 8.585 ? 'erhebliche Gefahr' : 'mässige Gefahr', region: 'Zürich (Demo)' } });
     if (n.includes('bevoelkerung')) results.push({ layerBodId: n, layerName: 'Bevölkerung pro Hektare (Demo)', attributes: { einwohner: residents(lat, lon), jahr: 2024 } });
+    if (n.includes('vegetationshoehenstufen')) {
+      // A warmer climate: the belt of a lower place.
+      const z = elevation(lat, lon) - (n.endsWith('2085_trocken') ? 600 : n.endsWith('2085_weniger_trocken') ? 350 : 0);
+      const stufe = z < 600 ? 'kollin' : z < 1000 ? 'submontan' : z < 1400 ? 'obermontan' : z < 1800 ? 'subalpin' : 'hochsubalpin';
+      const label = n.endsWith('_1975') ? 'Vegetationshöhenstufen heute (Demo)' : n.endsWith('2085_trocken') ? 'Vegetationshöhenstufen 2085, trocken (Demo)' : 'Vegetationshöhenstufen 2085, weniger trocken (Demo)';
+      results.push({ layerBodId: n, layerName: label, attributes: { hoehenstufe: stufe } });
+    }
+    if (n.includes('klimanormwerte')) results.push({ layerBodId: n, layerName: 'Klimanormwerte Temperatur 1991–2020 (Demo)', attributes: { jahresmittel: `${(11 - (elevation(lat, lon) - 400) * 0.0055).toFixed(1)} °C` } });
     if (n.includes('arealstatistik')) results.push({ layerBodId: n, layerName: 'Arealstatistik: Bodennutzung (Demo)', attributes: { nutzung: AREAL[tiles.classAt(lat, lon)][1], erhebung: '2013/18' } });
   }
   return Response.json({ results });

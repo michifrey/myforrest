@@ -1377,7 +1377,7 @@ function createApp({
 
   require('./routes/species')(app, { db, spotRadiusM, visibleSql: accounts.visibleSql });
   // Map layers from external sources for the panel «Ebenen» (src/routes/layers.js).
-  require('./routes/layers')(app, { fetchImpl: layersFetch, ...layersOptions });
+  const layersApi = require('./routes/layers')(app, { fetchImpl: layersFetch, ...layersOptions });
   // Tree species near a spot from a public tree inventory (src/treeinventory.js; by default Geneva, SITG).
   // Geneva (or BAUMINVENTAR_URL) first, then the tree register of the city of Zürich (BAUMKATASTER_ZUERICH=, empty = off).
   const zurichUrl = treeInventoryZurich ?? process.env.BAUMKATASTER_ZUERICH ?? require('./treeinventory').ZURICH.url;
@@ -1429,11 +1429,14 @@ function createApp({
   for (const { id } of db.prepare('SELECT id FROM spots WHERE landscape IS NULL AND (? OR elevation >= ?)').all(glaciers.enabled() ? 1 : 0, mountainMinM > 0 ? mountainMinM : 1e9)) {
     classifySpot(id);
   }
+  const glamos = createGlamos({ files: glamosFiles });
   const landscapes = require('./routes/landscapes')(app, {
-    db, glaciers, glamos: createGlamos({ files: glamosFiles }), archives: createArchives({ files: archiveFiles, fetchImpl: archiveFetch }),
+    db, glaciers, glamos, archives: createArchives({ files: archiveFiles, fetchImpl: archiveFetch }),
     processUpload, tmpDir, vegetation, accounts, classifySpot, spotJson, idParam,
   });
   require('./routes/wikimedia')(app, { wikimedia, landscapes, idParam });
+  // Landschaft im Wandel (landschaft.html): maps through time and a report per place.
+  require('./routes/landschaft')(app, { db, layers: layersApi, glaciers, glamos });
   Object.assign(tours, require('./routes/tracks')(app, {
     db, spotRadiusM, satelliteAlerts: vegetation.alerts, routerUrl, routerFetch, routerProfile, accounts, wildlife, elevation: elevationService, push,
     weather,

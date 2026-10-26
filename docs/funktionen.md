@@ -23,7 +23,7 @@ Einen kürzeren Überblick mit Screenshots gibt das [README](https://github.com/
 
 Gleich unter dem Hero stehen **zwei Perspektiven** nebeneinander: *Wald im Wandel*, mit unseren Augen (die Karte mit
 den Spots, Foto beitragen), und *Landschaft im Wandel*, aus Sicht der Natur (eigene Seite `/landschaft.html` mit
-Zeitraffer und offenen Daten, siehe [Landschaft im Wandel](landschaft.md)).
+amtlichen Karten durch die Zeit, Bericht pro Ort und offenen Daten, siehe [Landschaft im Wandel](landschaft.md)).
 
 ![Abschnitt Funktionen der Startseite](screenshots/funktionen.jpg)
 
