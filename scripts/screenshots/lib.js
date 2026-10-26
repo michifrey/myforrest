@@ -24,18 +24,22 @@ async function routeTiles(ctx) {
     if (!tileCache.has(key)) tileCache.set(key, await tiles.mercatorTile(z, x, y, 'osm'));
     await route.fulfill({ body: tileCache.get(key), contentType: 'image/png' });
   }));
-  // The «Zeitreise» of swisstopo: the placeholder map, sepia for the old editions.
-  await ctx.route(/ch\.swisstopo\.zeitreihen\/default\/(\d{8})\/3857\/(\d+)\/(\d+)\/(\d+)\.png/, safe(async (route) => {
-    const [, time, z, x, y] = route.request().url().match(/\/(\d{8})\/3857\/(\d+)\/(\d+)\/(\d+)\.png/);
+  // The «Zeitreise» of swisstopo and its aerial images: the placeholder map, sepia for old map editions, black and
+  // white for old flights.
+  await ctx.route(/ch\.swisstopo\.(zeitreihen|swissimage-product)\/default\/(\d{4,8})\/3857\/(\d+)\/(\d+)\/(\d+)\.(png|jpeg)/, safe(async (route) => {
+    const [, layer, time, z, x, y] = route.request().url().match(/ch\.swisstopo\.(zeitreihen|swissimage-product)\/default\/(\d{4,8})\/3857\/(\d+)\/(\d+)\/(\d+)\./);
     const key = `m${z}/${x}/${y}`;
     if (!tileCache.has(key)) tileCache.set(key, await tiles.mercatorTile(Number(z), Number(x), Number(y), 'osm'));
     const year = Number(time.slice(0, 4));
     const sharp = require('sharp');
-    const body = year < 1990 ? await sharp(tileCache.get(key)).modulate({ saturation: 0.25 }).tint({ r: 214, g: 190, b: 150 }).png().toBuffer() : tileCache.get(key);
+    let body = tileCache.get(key);
+    if (layer === 'zeitreihen' && year < 1990) body = await sharp(body).modulate({ saturation: 0.25 }).tint({ r: 214, g: 190, b: 150 }).png().toBuffer();
+    if (layer === 'swissimage-product' && year < 1990) body = await sharp(body).grayscale().linear(1.2, -20).png().toBuffer();
     await route.fulfill({ body, contentType: 'image/png' });
   }));
-  // swisstopo in Web Mercator (Landschaft im Wandel): the same placeholder map as OpenStreetMap.
-  await ctx.route(/wmts\.geo\.admin\.ch\/.*\/3857\/(\d+)\/(\d+)\/(\d+)\.jpeg/, safe(async (route) => {
+  // swisstopo in Web Mercator (Landschaft im Wandel): the same placeholder map as OpenStreetMap (not the aerial images
+  // above, which are JPEG too).
+  await ctx.route(/wmts\.geo\.admin\.ch\/(?!1\.0\.0\/ch\.swisstopo\.swissimage-product\/).*\/3857\/(\d+)\/(\d+)\/(\d+)\.jpeg/, safe(async (route) => {
     const [, z, x, y] = route.request().url().match(/\/3857\/(\d+)\/(\d+)\/(\d+)\.jpeg/).map(Number);
     const key = `m${z}/${x}/${y}`;
     if (!tileCache.has(key)) tileCache.set(key, await tiles.mercatorTile(z, x, y, 'osm'));

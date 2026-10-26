@@ -14,7 +14,7 @@ Die zweite Perspektive ist eine eigene Seite, `/landschaft.html`, mit drei Teile
 ![Startseite: die zwei Perspektiven nebeneinander](screenshots/perspektiven.jpg)
 
 > Die Screenshots zeigen den Demo-Datensatz: Statt der Karten von swisstopo und BAFU zeichnet der Demo-Server
-> Platzhalter im selben Format (die Zeitreise vor 1990 in Sepia). Im Betrieb kommen die Karten von geo.admin.ch.
+> Platzhalter im selben Format (die Zeitreise vor 1990 in Sepia, Luftbilder vor 1990 schwarz-weiss). Im Betrieb kommen die Karten von geo.admin.ch.
 
 ## Karte
 
@@ -29,6 +29,7 @@ Deckkraft lässt sich einstellen, darunter stehen Erklärung und Legende:
 | um 1850 | Dufourkarte (1845–1865), am Ende der Kleinen Eiszeit | swisstopo, `ch.swisstopo.hiks-dufour` |
 | um 1900 | Siegfriedkarte (1870–1949) | swisstopo, `ch.swisstopo.hiks-siegfried` |
 | Jahr für Jahr | Zeitreise der Landeskarte: die Karte, wie sie im gewählten Jahr galt | swisstopo, `ch.swisstopo.zeitreihen` (WMTS mit Zeit) |
+| Flug für Flug | Historische Luftbilder (SWISSIMAGE Zeitreise, seit 1926) | swisstopo, `ch.swisstopo.swissimage-product` (WMTS mit Zeit) |
 | heute | Landeskarte | swisstopo, `ch.swisstopo.pixelkarte-grau` |
 | heute | Höhenstufen des Waldes | BAFU, `ch.bafu.wald-vegetationshoehenstufen_1975` |
 | um 2085, weniger trocken | Höhenstufen 2070–2099 bei mittleren Emissionen (RCP4.5) | BAFU, `ch.bafu.wald-vegetationshoehenstufen_2085_weniger_trocken` |
@@ -44,6 +45,14 @@ Vor 1964 decken die Karten die Schweiz nicht überall ab. Das Jahr steht in der 
 lässt sich ein Ausschnitt mit Jahr teilen.
 
 ![Zeitreise der Landeskarte: die Karte von 1900, mit Regler und Abspielknopf](screenshots/landschaft-zeitreise.jpg)
+
+**Historische Luftbilder.** Die Orthofotos von swisstopo (SWISSIMAGE Zeitreise) aus den Befliegungen seit 1926, mit
+demselben Regler: Er springt von Flugjahr zu Flugjahr, die Jahre kommen ebenfalls aus den WMTS-Capabilities. Die
+Schweiz wurde in Flugblöcken beflogen, nicht jedes Jahr überall; jede Kachel zeigt den Flug, der den grössten Teil
+liefert, an den Rändern der Blöcke mischen sich die Jahre. Der Link hält Ansicht und Jahr fest
+(`#karte?…&ansicht=luftbild&jahr=1956`).
+
+![Historische Luftbilder: das Luftbild von 1956, mit Regler über die Flugjahre](screenshots/landschaft-luftbild.jpg)
 
 ![Karte: die modellierten Höhenstufen des Waldes um 2085 bei hohen Emissionen](screenshots/landschaft-2085.jpg)
 
@@ -87,7 +96,7 @@ unter [Offene Geodaten](funktionen.md#offene-geodaten-für-gis-und-geoportale).
 ## Technik
 
 - `src/routes/landschaft.js`: `GET /api/landschaft/karten` (Karten durch die Zeit und Ebenen pro Thema, aus der
-  Ebenenliste von geo.admin.ch; die Jahre der Zeitreise aus den WMTS-Capabilities) und `GET /api/landschaft/bericht?lat=&lon=` (Identify pro Thema, Gletscher aus den
+  Ebenenliste von geo.admin.ch; die Jahre der Zeitreise und der Luftbilder aus den WMTS-Capabilities) und `GET /api/landschaft/bericht?lat=&lon=` (Identify pro Thema, Gletscher aus den
   Inventaren mit GLAMOS, Fotos, Befunde und Neophyten im Umkreis). Die Ebenenliste und der Identify-Dienst kommen aus
   `src/routes/layers.js` (Panel *Ebenen*).
 - `public/landschaft.html`, `landschaft.js`, `landschaft.css`: Leaflet mit den Kacheln von swisstopo und den WMS von
@@ -97,6 +106,7 @@ unter [Offene Geodaten](funktionen.md#offene-geodaten-für-gis-und-geoportale).
 ## Quellen
 
 - swisstopo: [Die Schweiz während des letzteiszeitlichen Maximums (LGM) 1:500 000](https://opendata.swiss/de/dataset/die-schweiz-wahrend-des-letzteiszeitlichen-maximums-lgm-1-500000)
+- swisstopo: [SWISSIMAGE Zeitreise](https://www.swisstopo.admin.ch/de/orthobilder-swissimage-10-cm) (historische Orthofotos seit 1926)
 - swisstopo: [Dufourkarte](https://www.swisstopo.admin.ch/) und [Siegfriedkarte](https://www.swisstopo.admin.ch/en/siegfried-map), Landeskarte
 - BAFU: [Vegetationshöhenstufen 2085 (trocken und weniger trocken)](https://ckan.opendata.swiss/en/dataset/vegetationshohenstufen-modelliert-fur-2085-mit-weniger-trockener-klimazukunft)
 - MeteoSchweiz: Klimanormwerte und homogene Messreihen; Klimaszenarien CH2025 (MeteoSchweiz, ETH Zürich, NCCS)

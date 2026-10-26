@@ -576,7 +576,7 @@ Kronendach des SITG, und Orte dort verweisen auf das 3D-Modell [Genève 3D](http
 Die zweite Perspektive ist eine eigene Seite (`/landschaft.html`): was mit der Landschaft selbst geschieht, aus
 amtlichen Karten und Daten. Die **Karte** legt Karten aus anderen Zeiten über die heutige Landeskarte: die letzte
 Eiszeit, die Dufourkarte um 1850, die Siegfriedkarte um 1900, die **Zeitreise der Landeskarte** Jahr für Jahr (mit
-Regler und Abspielknopf) und die Höhenstufen des Waldes heute und um 2085 (BAFU, trocken und weniger trocken). Dazu lassen sich Themenkarten von geo.admin.ch zu Klima, Gletschern und Wasser, Wald,
+Regler und Abspielknopf), die **historischen Luftbilder** von swisstopo seit 1926 und die Höhenstufen des Waldes heute und um 2085 (BAFU, trocken und weniger trocken). Dazu lassen sich Themenkarten von geo.admin.ch zu Klima, Gletschern und Wasser, Wald,
 Landwirtschaft und Boden einblenden.
 
 ![Bericht für einen Ort: Klima, Gletscher und Wasser, Wald, Landwirtschaft und Boden](docs/screenshots/landschaft-bericht.jpg)

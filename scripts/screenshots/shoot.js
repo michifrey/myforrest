@@ -94,8 +94,17 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
       range.value = '3';
       range.dispatchEvent(new Event('input'));
     });
-    await settle(page, 2500);
+    await settle(page, 6000);
     await page.screenshot({ path: out('landschaft-zeitreise.jpg'), ...jpg });
+    // The aerial images of 1956.
+    await stop('luftbild');
+    await page.evaluate(() => {
+      const range = document.getElementById('ln-zeit-range');
+      range.value = '3';
+      range.dispatchEvent(new Event('input'));
+    });
+    await settle(page, 6000);
+    await page.screenshot({ path: out('landschaft-luftbild.jpg'), ...jpg });
     await page.goto(`${BASE}/landschaft.html#bericht?lat=47.37&lon=8.54`);
     await page.waitForSelector('.ln-section', { timeout: 120000 });
     await settle(page, 2500);
