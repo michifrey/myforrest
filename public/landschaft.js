@@ -45,8 +45,99 @@
   let marker = null;
 
   /* The «Zeitreise»: the Landeskarte of one year, a slider over the years and a play button. */
-  const zeit = { index: 0, timer: null };
+  const zeit = { index: 0, timer: null, compare: null };
   const zeitTiles = (z, time) => z.tiles.replace('{time}', time);
+  const nearest = (years, want) => years.reduce((best, y, i) => (Math.abs(y.year - want) < Math.abs(years[best].year - want) ? i : best), 0);
+  const zeitLayer = (stop, time, zIndex = 1) => L.tileLayer(zeitTiles(stop.zeitreise, time), {
+    maxZoom: 19, maxNativeZoom: 18, bounds: CH, opacity: Number($('ln-opacity').value), attribution: stop.zeitreise.attribution, zIndex,
+  });
+
+  /* Two years side by side: a second year over the first, cut at a divider that can be dragged across the map
+     (left the year of the slider, right the comparison year). */
+  const swipe = { layer: null, index: 0, ratio: 0.5, el: null };
+  function clipSwipe() {
+    const container = swipe.layer?.getContainer();
+    if (!container) return;
+    const nw = map.containerPointToLayerPoint([0, 0]);
+    const se = map.containerPointToLayerPoint(map.getSize());
+    const x = nw.x + map.getSize().x * swipe.ratio;
+    container.style.clip = `rect(${nw.y}px, ${se.x}px, ${se.y}px, ${x}px)`;
+    swipe.el.style.left = `${swipe.ratio * 100}%`;
+    swipe.el.querySelector('[role="slider"]').setAttribute('aria-valuenow', String(Math.round(swipe.ratio * 100)));
+  }
+  function swipeElement() {
+    const handle = el('div', {
+      class: 'ln-swipe-handle', role: 'slider', tabindex: '0', 'aria-label': 'Trennlinie zwischen den zwei Jahren',
+      'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': '50',
+      on: {
+        keydown: (e) => {
+          const step = { ArrowLeft: -0.05, ArrowRight: 0.05 }[e.key];
+          if (!step) return;
+          e.preventDefault();
+          swipe.ratio = Math.max(0, Math.min(1, swipe.ratio + step));
+          clipSwipe();
+        },
+      },
+    });
+    const node = el('div', { class: 'ln-swipe' }, [
+      el('span', { class: 'ln-swipe-year left' }), el('span', { class: 'ln-swipe-year right' }), handle,
+    ]);
+    L.DomEvent.disableClickPropagation(node);
+    handle.addEventListener('pointerdown', (e) => {
+      handle.setPointerCapture(e.pointerId);
+      const move = (ev) => {
+        const r = map.getContainer().getBoundingClientRect();
+        swipe.ratio = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+        clipSwipe();
+      };
+      const up = () => { handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); };
+      handle.addEventListener('pointermove', move);
+      handle.addEventListener('pointerup', up);
+    });
+    map.getContainer().append(node);
+    return node;
+  }
+  function swipeYears(stop) {
+    if (!swipe.el) return;
+    const years = stop.zeitreise.years;
+    swipe.el.querySelector('.left').textContent = String(years[zeit.index].year);
+    swipe.el.querySelector('.right').textContent = String(years[swipe.index].year);
+  }
+  function stopCompare() {
+    swipe.layer?.remove();
+    swipe.layer = null;
+    swipe.el?.remove();
+    swipe.el = null;
+  }
+  function setCompareYear(stop, index) {
+    const years = stop.zeitreise.years;
+    swipe.index = Math.max(0, Math.min(years.length - 1, index));
+    swipe.layer.setUrl(zeitTiles(stop.zeitreise, years[swipe.index].time));
+    $('ln-vergleich-year').textContent = String(years[swipe.index].year);
+    $('ln-vergleich-range').value = String(swipe.index);
+    swipeYears(stop);
+    zeitHash(stop);
+  }
+  function startCompare(stop, index) {
+    stopCompare();
+    swipe.layer = zeitLayer(stop, stop.zeitreise.years[0].time, 2).addTo(map);
+    swipe.el = swipeElement();
+    setCompareYear(stop, index);
+    clipSwipe();
+  }
+  map.on('move zoom resize viewreset', clipSwipe);
+  // Tiles drawn after a zoom get a new container position: clip again once they are there.
+  map.on('zoomend', () => setTimeout(clipSwipe, 0));
+
+  function zeitHash(stop) {
+    // The view, the year and the comparison year in the address, so the view can be shared.
+    const years = stop.zeitreise.years;
+    const q = new URLSearchParams(state.place ? { lat: state.place.lat, lon: state.place.lon } : {});
+    q.set('ansicht', stop.id);
+    q.set('jahr', years[zeit.index].year);
+    if (swipe.layer) q.set('vergleich', years[swipe.index].year);
+    history.replaceState(null, '', `#karte?${q}`);
+  }
   function stopPlaying() {
     clearInterval(zeit.timer);
     zeit.timer = null;
@@ -60,11 +151,8 @@
     timeLayer?.setUrl(zeitTiles(stop.zeitreise, y.time));
     $('ln-zeit-year').textContent = String(y.year);
     $('ln-zeit-range').value = String(zeit.index);
-    // The year in the address, so the view can be shared.
-    const q = new URLSearchParams(state.place ? { lat: state.place.lat, lon: state.place.lon } : {});
-    q.set('ansicht', stop.id);
-    q.set('jahr', y.year);
-    history.replaceState(null, '', `#karte?${q}`);
+    swipeYears(stop);
+    zeitHash(stop);
   }
   function zeitControls(stop) {
     const years = stop.zeitreise.years;
@@ -90,12 +178,36 @@
         on: { input: (e) => { stopPlaying(); setYear(stop, Number(e.target.value)); } },
       }),
       el('div', { class: 'ln-zeit-scale' }, [el('span', { text: String(years[0].year) }), el('span', { text: String(years[years.length - 1].year) })]),
+      el('label', { class: 'ln-row ln-vergleich-toggle', for: 'ln-vergleich' }, [
+        el('input', {
+          type: 'checkbox', id: 'ln-vergleich',
+          on: {
+            change: (e) => {
+              $('ln-vergleich-box').hidden = !e.target.checked;
+              if (e.target.checked) startCompare(stop, years.length - 1); else { stopCompare(); zeitHash(stop); }
+            },
+          },
+        }),
+        'Mit einem zweiten Jahr vergleichen',
+      ]),
+      el('div', { id: 'ln-vergleich-box', class: 'ln-vergleich', hidden: true }, [
+        el('div', { class: 'ln-zeit-row' }, [
+          el('span', { class: 'ln-muted small', text: 'rechts der Linie' }),
+          el('output', { id: 'ln-vergleich-year', for: 'ln-vergleich-range', class: 'ln-zeit-year' }),
+        ]),
+        el('label', { class: 'sr-only', for: 'ln-vergleich-range', text: 'Vergleichsjahr' }),
+        el('input', {
+          type: 'range', id: 'ln-vergleich-range', min: '0', max: String(years.length - 1), step: '1', value: String(years.length - 1),
+          on: { input: (e) => setCompareYear(stop, Number(e.target.value)) },
+        }),
+      ]),
     ]);
   }
 
-  function showTimeline(id, { year = null } = {}) {
+  function showTimeline(id, { year = null, compare = null } = {}) {
     state.timeline = id;
     stopPlaying();
+    stopCompare();
     const stop = state.maps?.timeline.find((t) => t.id === id);
     timeLayer?.remove();
     timeLayer = null;
@@ -104,10 +216,8 @@
       const years = stop.zeitreise.years;
       // Start at the year asked for (link), else around 1900 (maps) or 1950 (aerial images).
       const want = year ?? (id === 'luftbild' ? 1950 : 1900);
-      zeit.index = years.reduce((best, y, i) => (Math.abs(y.year - want) < Math.abs(years[best].year - want) ? i : best), 0);
-      timeLayer = L.tileLayer(zeitTiles(stop.zeitreise, years[zeit.index].time), {
-        maxZoom: 19, maxNativeZoom: 18, bounds: CH, opacity: Number($('ln-opacity').value), attribution: stop.zeitreise.attribution,
-      }).addTo(map);
+      zeit.index = nearest(years, want);
+      timeLayer = zeitLayer(stop, years[zeit.index].time).addTo(map);
     }
     for (const b of $('ln-timeline').querySelectorAll('button')) b.setAttribute('aria-checked', String(b.dataset.id === id));
     $('ln-time-info').replaceChildren(...(stop ? [
@@ -117,6 +227,11 @@
       stop.layer ? el('img', { src: stop.layer.legend, alt: `Legende: ${stop.title}`, loading: 'lazy', class: 'ln-legend', on: { error: (e) => e.target.remove() } }) : null,
     ].filter(Boolean) : []));
     if (stop?.zeitreise) setYear(stop, zeit.index);
+    if (stop?.zeitreise && compare) {
+      $('ln-vergleich').checked = true;
+      $('ln-vergleich-box').hidden = false;
+      startCompare(stop, nearest(stop.zeitreise.years, compare));
+    }
   }
 
   function showTheme(value) {
@@ -127,7 +242,7 @@
     const layer = state.maps?.themes.find((x) => x.id === t)?.layers[Number(i)];
     $('ln-theme-legend').replaceChildren();
     if (!layer) return;
-    themeLayer = wms(layer, 0.75).addTo(map);
+    themeLayer = wms(layer, 0.75).setZIndex(3).addTo(map);
     $('ln-theme-legend').append(el('img', { src: layer.legend, alt: `Legende: ${layer.title}`, loading: 'lazy', class: 'ln-legend', on: { error: (e) => e.target.remove() } }));
   }
 
@@ -155,7 +270,7 @@
     const q = new URLSearchParams(location.hash.split('?')[1] || '');
     const year = Number(q.get('jahr'));
     const view = q.get('ansicht') || 'zeitreise';
-    if (year && state.maps.timeline.some((t) => t.id === view && t.zeitreise)) showTimeline(view, { year });
+    if (year && state.maps.timeline.some((t) => t.id === view && t.zeitreise)) showTimeline(view, { year, compare: Number(q.get('vergleich')) || null });
     else showTimeline(state.maps.timeline.some((t) => t.id === state.timeline) ? state.timeline : 'heute');
   }
 
@@ -170,7 +285,10 @@
     $('ln-to-report').hidden = false;
   }
   map.on('click', (e) => setPlace(e.latlng.lat, e.latlng.lng));
-  $('ln-opacity').addEventListener('input', (e) => timeLayer?.setOpacity(Number(e.target.value)));
+  $('ln-opacity').addEventListener('input', (e) => {
+    timeLayer?.setOpacity(Number(e.target.value));
+    swipe.layer?.setOpacity(Number(e.target.value));
+  });
 
   /* ---------- Bericht ---------- */
 

@@ -61,6 +61,21 @@ h1, h2, h3 { margin: 0; }
 .ln-zeit-scale { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--muted); }
 .ln-play { width: 44px; height: 44px; flex: none; border: none; border-radius: 999px; background: var(--accent); cursor: pointer; position: relative; }
 .ln-play::before { content: ''; position: absolute; left: 17px; top: 13px; border-style: solid; border-width: 9px 0 9px 14px; border-color: transparent transparent transparent var(--accent-text); }
+.ln-vergleich-toggle { margin-top: 10px; color: var(--text); font-weight: 600; }
+.ln-vergleich-toggle input { flex: none; width: 18px; height: 18px; }
+.ln-vergleich { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--border); }
+.ln-vergleich input { width: 100%; margin-top: 6px; accent-color: var(--accent); }
+
+/* The divider of the comparison: a line over the map, a handle to drag, the two years at the top. */
+.ln-swipe { position: absolute; top: 0; bottom: 0; left: 50%; width: 0; z-index: 450; pointer-events: none; }
+.ln-swipe::before { content: ''; position: absolute; top: 0; bottom: 0; left: -1.5px; width: 3px; background: #fff; box-shadow: 0 0 4px rgb(0 0 0 / 0.45); }
+.ln-swipe-handle { position: absolute; top: 50%; left: -20px; width: 40px; height: 40px; margin-top: -20px; border-radius: 999px; background: #fff; box-shadow: 0 1px 6px rgb(0 0 0 / 0.4); cursor: ew-resize; pointer-events: auto; touch-action: none; }
+.ln-swipe-handle::before, .ln-swipe-handle::after { content: ''; position: absolute; top: 14px; border-style: solid; border-color: transparent; }
+.ln-swipe-handle::before { left: 7px; border-width: 6px 8px 6px 0; border-right-color: #2f5d34; }
+.ln-swipe-handle::after { right: 7px; border-width: 6px 0 6px 8px; border-left-color: #2f5d34; }
+.ln-swipe-year { position: absolute; top: 12px; padding: 3px 10px; border-radius: 6px; background: rgb(255 255 255 / 0.92); color: #1b2a1f; font: 600 1.1rem/1.2 var(--font-display); font-variant-numeric: tabular-nums; white-space: nowrap; box-shadow: 0 1px 4px rgb(0 0 0 / 0.25); }
+.ln-swipe-year.left { right: 12px; }
+.ln-swipe-year.right { left: 12px; }
 .ln-play.playing::before { left: 15px; top: 14px; width: 14px; height: 16px; border: none; background: linear-gradient(90deg, var(--accent-text) 0 5px, transparent 5px 9px, var(--accent-text) 9px 14px); }
 
 /* ---------- Bericht ---------- */

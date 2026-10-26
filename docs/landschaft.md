@@ -54,6 +54,13 @@ liefert, an den Rändern der Blöcke mischen sich die Jahre. Der Link hält Ansi
 
 ![Historische Luftbilder: das Luftbild von 1956, mit Regler über die Flugjahre](screenshots/landschaft-luftbild.jpg)
 
+**Zwei Jahre nebeneinander.** Bei der Zeitreise und den Luftbildern legt *Mit einem zweiten Jahr vergleichen* ein
+zweites Jahr über das erste (zu Beginn das neueste). Eine Linie teilt die Karte: links das Jahr des oberen Reglers,
+rechts das Vergleichsjahr; die Linie lässt sich mit der Maus, dem Finger oder den Pfeiltasten verschieben, wie
+Vorher/Nachher bei den Fotos. Beide Jahre stehen oben auf der Karte und im Link (`…&jahr=1956&vergleich=2023`).
+
+![Zwei Jahre nebeneinander: das Luftbild von 1956 links der Linie, 2023 rechts](screenshots/landschaft-vergleich.jpg)
+
 ![Karte: die modellierten Höhenstufen des Waldes um 2085 bei hohen Emissionen](screenshots/landschaft-2085.jpg)
 
 **Themen.** Eine Themenkarte lässt sich darüberlegen, nach den vier Themen des Berichts: *Klima* (Klimanormwerte der
