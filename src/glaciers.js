@@ -42,6 +42,19 @@ function distanceToRing(ring, lat, lon) {
   return best;
 }
 
+/** Area (km²) of a polygon ([outer, ...holes], [lon, lat]): the outer ring less its holes, in a local plane. */
+function polygonAreaKm2(poly) {
+  const lat0 = poly[0].reduce((s, p) => s + p[1], 0) / poly[0].length;
+  const kx = Math.cos(toRad(lat0)) * 6371 * (Math.PI / 180);
+  const ky = 6371 * (Math.PI / 180);
+  const ring = (r) => {
+    let a = 0;
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += (r[j][0] * kx) * (r[i][1] * ky) - (r[i][0] * kx) * (r[j][1] * ky);
+    return Math.abs(a) / 2;
+  };
+  return Math.max(0, ring(poly[0]) - poly.slice(1).reduce((s, h) => s + ring(h), 0));
+}
+
 /** Inside a polygon ([outer, ...holes]): inside the outer ring and in none of its holes. */
 const insidePolygon = (poly, lat, lon) => insideRing(poly[0], lat, lon) && !poly.slice(1).some((h) => insideRing(h, lat, lon));
 
@@ -82,6 +95,7 @@ function parseGlaciers(text, { year: fileYear = null } = {}) {
       id: idKey ? String(props[idKey]).trim() : null,
       year: yearOf(props) ?? fileYear,
       polygons,
+      areaKm2: polygons.reduce((sum, p) => sum + polygonAreaKm2(p), 0),
       bbox: [Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)],
     });
   }
@@ -132,7 +146,8 @@ function createGlaciers({ files = process.env.GLETSCHER_GEOJSON || '' } = {}) {
   /**
    * What the inventories say about a place:
    *   { name, latestYear, distanceM (to the glacier of the latest inventory, 0 = on the ice),
-   *     history: [{ year, ice, name }] per inventory year, oldest first }
+   *     history: [{ year, ice, name }] per inventory year, oldest first,
+   *     areas: [{ year, km2 }] of that glacier per inventory year (matched by SGI id or name), oldest first }
    * or null when no glacier lies within `radiusM` in any inventory.
    */
   function at(lat, lon, { radiusM = 5000 } = {}) {
@@ -155,12 +170,19 @@ function createGlaciers({ files = process.env.GLETSCHER_GEOJSON || '' } = {}) {
     // SGI id (for the GLAMOS series): from the glacier named, in any inventory that has one.
     const id = (closest && closest.d <= radiusM ? closest.g.id : null)
       || candidates.find((g) => g.id && g.name === named)?.id || null;
+    // The area of the glacier per inventory: its outlines of that year (same SGI id, else same name).
+    const same = (g) => (id && g.id ? g.id === id : g.name === named);
+    const areas = ys.filter((y) => y !== null).map((year) => {
+      const parts = all().filter((g) => g.year === year && same(g));
+      return parts.length ? { year, km2: Math.round(parts.reduce((s, g) => s + g.areaKm2, 0) * 1000) / 1000 } : null;
+    }).filter(Boolean);
     return {
       name: named,
       id,
       latestYear,
       distanceM: closest ? Math.round(closest.d) : null,
       history,
+      areas,
     };
   }
 
@@ -192,4 +214,4 @@ function createGlaciers({ files = process.env.GLETSCHER_GEOJSON || '' } = {}) {
   return { all, years, at, isGlacierPlace, geojson, enabled: () => list.length > 0 };
 }
 
-module.exports = { createGlaciers, parseGlaciers, distanceToRing, insidePolygon, NEAR_M };
+module.exports = { createGlaciers, parseGlaciers, distanceToRing, insidePolygon, polygonAreaKm2, NEAR_M };

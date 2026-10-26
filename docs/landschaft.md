@@ -63,6 +63,14 @@ Vorher/Nachher bei den Fotos. Beide Jahre stehen oben auf der Karte und im Link 
 
 ![Karte: die modellierten Höhenstufen des Waldes um 2085 bei hohen Emissionen](screenshots/landschaft-2085.jpg)
 
+**Gletscher.** Sind auf dem Server Gletscherinventare hinterlegt (`GLETSCHER_GEOJSON`, z. B. GLAMOS SGI 1850, 1973,
+2010 und 2016), zeigt *Umrisse der Gletscherinventare* ihre Umrisse über jeder Karte der Zeitleiste: ein Blauton pro
+Inventar, die alten hell und gestrichelt, das neuste kräftig. Ein Jahr in der Legende zeigt dieses Inventar allein.
+Die Umrisse erscheinen ab Zoomstufe 9; über dem Luftbild von 1956 sieht man, wo das Eis damals lag und wie weit es
+seither zurückging. Ohne Inventare fehlt der Abschnitt.
+
+![Gletscher: die Umrisse der Inventare 1850, 1973 und 2016 über dem Luftbild von 1956](screenshots/landschaft-gletscher.jpg)
+
 **Themen.** Eine Themenkarte lässt sich darüberlegen, nach den vier Themen des Berichts: *Klima* (Klimanormwerte der
 MeteoSchweiz, Klimaszenarien), *Gletscher und Wasser* (Gletscher, Abfluss, Niedrigwasser, Trockenheit), *Wald*
 (Höhenstufen heute und 2085, Waldmischungsgrad und Vegetationshöhe aus dem Landesforstinventar) und *Landwirtschaft und
@@ -82,13 +90,16 @@ Der Bericht fasst zusammen, was die Quellen an einem Ort sagen, mit Lage auf der
 | Abschnitt | Inhalt | Quellen |
 |-----------|--------|---------|
 | **Klima** | Erwärmung der letzten zehn Jahre gegenüber 1961–1990 und Trend seit 1940, Kennzahlen früher und heute (Jahres- und Sommertemperatur, Hitzetage, Tropennächte, Frosttage, Neuschnee, Sommerregen, Trockenphasen), die Szenarien +1,5, +2 und +3 °C weltweit mit Jahresmittel, Hitzetagen, Sommerregen und Höhenverschiebung, die Klimanormwerte am Ort | [Klima-Dossier](klimawandel.md): ERA5, homogene Messreihen der MeteoSchweiz, CH2025, IPCC AR6; Karten der MeteoSchweiz |
-| **Gletscher und Wasser** | Gletscher in der Nähe aus den Inventaren (Eis am Ort pro Inventarjahr, Abstand zum heutigen Eis), Längenänderung der Zunge (GLAMOS), Neuschnee, Sommer- und Winterregen, Trockenphasen, Angaben der Wasserkarten | Gletscherinventare und GLAMOS (wenn auf dem Server hinterlegt), ERA5, geo.admin.ch |
+| **Gletscher und Wasser** | Gletscher in der Nähe aus den Inventaren (Eis am Ort pro Inventarjahr, Fläche des Gletschers pro Inventar und Abnahme seit dem ersten, Abstand zum heutigen Eis), Längenänderung der Zunge (GLAMOS), Neuschnee, Sommer- und Winterregen, Trockenphasen, Angaben der Wasserkarten | Gletscherinventare und GLAMOS (wenn auf dem Server hinterlegt), ERA5, geo.admin.ch |
 | **Wald** | Höhenstufe heute und um 2085 in beiden Szenarien, Waldmischungsgrad und Vegetationshöhe, was die Szenarien für den Wald heissen (Höhenstufen, Fichte und Borkenkäfer, Trockenheit, Winter, wer profitiert), Baumarten der Spots | BAFU (Höhenstufen, Landesforstinventar), Klima-Dossier |
 | **Landwirtschaft und Boden** | Bodennutzung (Arealstatistik) und weitere Bodenkarten, Vegetationstage, Sommerregen, Trockenphasen und Hitzetage früher und heute | BFS, BLW, ERA5 |
 | **Was MyForrest sah** | Fotos und Spots im Umkreis von 5 km, Zeitraum, Befunde (Borkenkäfer, Sturm, Trockenschaden …) und Neophyten | Fotos und Funde von MyForrest (ohne ausgeblendete und geschützte) |
 | **Quellen** | Alle verwendeten Datensätze und Kartenebenen mit Kennung | |
 
-Die Karten fragt der Server über den Identify-Dienst von geo.admin.ch an der Stelle ab, alle Themen gleichzeitig;
+![Gletscher und Wasser: Fläche pro Inventar und Längenänderung der Zunge (Demo-Gletscher)](screenshots/landschaft-gletscher-bericht.jpg)
+
+Die Fläche zählt alle Umrisse eines Inventars mit derselben SGI-Kennung, ohne Kennung mit demselben Namen (ohne
+Felsinseln). Die Karten fragt der Server über den Identify-Dienst von geo.admin.ch an der Stelle ab, alle Themen gleichzeitig;
 Kennungen ohne Aussage (ID, Geometrie) lässt er weg. Steht in einem Thema nichts, sagt der Bericht das.
 
 ## Daten holen
@@ -103,7 +114,7 @@ unter [Offene Geodaten](funktionen.md#offene-geodaten-für-gis-und-geoportale).
 ## Technik
 
 - `src/routes/landschaft.js`: `GET /api/landschaft/karten` (Karten durch die Zeit und Ebenen pro Thema, aus der
-  Ebenenliste von geo.admin.ch; die Jahre der Zeitreise und der Luftbilder aus den WMTS-Capabilities) und `GET /api/landschaft/bericht?lat=&lon=` (Identify pro Thema, Gletscher aus den
+  Ebenenliste von geo.admin.ch; die Jahre der Zeitreise und der Luftbilder aus den WMTS-Capabilities, die Jahre der Gletscherinventare) und `GET /api/landschaft/bericht?lat=&lon=` (Identify pro Thema, Gletscher aus den
   Inventaren mit GLAMOS, Fotos, Befunde und Neophyten im Umkreis). Die Ebenenliste und der Identify-Dienst kommen aus
   `src/routes/layers.js` (Panel *Ebenen*).
 - `public/landschaft.html`, `landschaft.js`, `landschaft.css`: Leaflet mit den Kacheln von swisstopo und den WMS von

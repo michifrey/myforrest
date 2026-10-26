@@ -1,6 +1,6 @@
 'use strict';
 // Takes the README screenshots from the demo server (see README.md here).
-// Usage: node shoot.js [hero funktionen landschaft map standort spot baeume ebenen gebaeude3d klima satellite sun schatten species vektor tourschatten wikimedia touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher mobile]
+// Usage: node shoot.js [hero funktionen landschaft map standort spot baeume ebenen gebaeude3d klima satellite sun schatten species vektor tourschatten wikimedia touren walk wegnetz uebergang schutz konto profil timelapse compare upload gletscher landschaft-gletscher mobile]
 // «mapillary» needs the demo server started with DEMO_MAPILLARY=1 (a Mapillary stand-in, see README.md).
 // «gletscher» uses the glacier demo server (BASE_GLETSCHER, default http://localhost:3124; see README.md).
 const path = require('path');
@@ -682,6 +682,36 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.evaluate(() => { document.querySelector('#panel').scrollTop -= 80; });
     await settle(page, 2000);
     await page.locator('#panel').screenshot({ path: out('gebirge.jpg'), ...jpg });
+    await gctx.close();
+  }
+
+  if (want('landschaft-gletscher')) {
+    // Landschaft im Wandel with the glacier inventories of the glacier demo server: the outlines over the aerial
+    // image of 1956, and the area per inventory in the report.
+    const GB = process.env.BASE_GLETSCHER || 'http://localhost:3124';
+    const gctx = await desktop(browser);
+    const page = await gctx.newPage();
+    page.on('console', (m) => m.type() === 'error' && console.log('console:', m.text()));
+    await page.goto(`${GB}/landschaft.html#karte?lat=46.592&lon=8.4&ansicht=luftbild&jahr=1956`);
+    await settle(page, 2500);
+    await page.click('#ln-glacier-toggle');
+    await page.click('.leaflet-control-zoom-in');
+    await settle(page, 800);
+    await page.click('.leaflet-control-zoom-in');
+    await settle(page, 6000);
+    // Scroll the panel only (not the page) to the glacier section.
+    await page.evaluate(() => {
+      const panel = document.querySelector('.ln-panel');
+      panel.scrollTop = document.getElementById('ln-glaciers').offsetTop - panel.offsetTop - 360;
+      window.scrollTo(0, 0);
+    });
+    await settle(page, 800);
+    await page.screenshot({ path: out('landschaft-gletscher.jpg'), ...jpg });
+    await page.goto(`${GB}/landschaft.html#bericht?lat=46.6&lon=8.4`);
+    await page.waitForSelector('.ln-section', { timeout: 120000 });
+    await settle(page, 2500);
+    const section = page.locator('.ln-section', { has: page.locator('h2', { hasText: 'Gletscher und Wasser' }) });
+    await section.screenshot({ path: out('landschaft-gletscher-bericht.jpg'), ...jpg });
     await gctx.close();
   }
 

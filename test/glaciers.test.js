@@ -50,6 +50,11 @@ test('glacier inventories: years from properties or file names, LV95, holes, whe
     // ~3 km of latitude per 0.027°: the 2016 tongue ends 0.003° (≈ 334 m) north.
     assert.ok(Math.abs(info.distanceM - 334) < 5, String(info.distanceM));
     assert.ok(g.isGlacierPlace(SPOT.lat, SPOT.lon));
+    // The area per inventory (1973 without its rock island; 2016 from LV95), matched by name.
+    const kx = 111.19 * Math.cos((46.61 * Math.PI) / 180);
+    const expected = [[1850, 0.04 * 111.19 * 0.02 * kx], [1973, 0.03 * 111.19 * 0.01 * kx - 0.002 * 111.19 * 0.004 * kx], [2016, 0.017 * 111.19 * 0.006 * kx]];
+    assert.deepEqual(info.areas.map((a) => a.year), [1850, 1973, 2016]);
+    for (const [i, [, km2]] of expected.entries()) assert.ok(Math.abs(info.areas[i].km2 - km2) < 0.02, `${info.areas[i].year}: ${info.areas[i].km2} ≠ ${km2}`);
     // The rock island of 1973 was free of ice.
     assert.deepEqual(g.at(46.611, 8.4).history.map((h) => h.ice), [true, false, true]);
     // Far from any glacier: nothing.
