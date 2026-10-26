@@ -144,8 +144,8 @@ Als Nächstes:
 - **Mit dem echten Dienst prüfen**: die Ebenen der Karten und Themen gegen die aktuelle Ebenenliste von geo.admin.ch
   prüfen (gebaut nach den Kennungen von swisstopo und BAFU, getestet mit einer nachgebauten Liste) und die
   Identify-Antworten der Themenkarten im Bericht lesbar beschriften (Codes der Höhenstufen und der Arealstatistik).
-- **Zeitreise von swisstopo**: die Landeskarte Jahr für Jahr seit 1864 (WMTS mit Zeit-Dimension) und historische
-  Luftbilder als feinere Zeitachse.
+- **Historische Luftbilder**: die Luftbilder von swisstopo (SWISSIMAGE Zeitreise) neben der Zeitreise der Landeskarte,
+  und zwei Jahre nebeneinander mit Regler (wie Vorher/Nachher bei den Fotos).
 - **Gletscherumrisse auf der Karte**: die Inventare 1850, 1973, 2010 und 2016 direkt als Ebene, mit Fläche pro Jahr im
   Bericht.
 - **Wasser und Landwirtschaft vertiefen**: Abflüsse aus Hydro-CH2018, Bodenfeuchte und Trockenheit aus den Messnetzen,
@@ -178,6 +178,7 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
   OSM, Landeskarte und Luftbild; Panel *Ebenen* mit Wald und Waldbrand, Bevölkerung, Bodennutzung, Verkehr von
   geo.admin.ch, Baumkataster Zürich, SITG Genf, EFFIS und NASA FIRMS, mit *Was ist hier?*; Baumkataster Zürich auch
   als Baumart-Vorschlag
+- Landschaft im Wandel: Zeitreise der Landeskarte von swisstopo, Jahr für Jahr mit Regler, Abspielen und Jahr im Link
 - Landschaft im Wandel: zweite Perspektive aus Sicht der Natur als eigene Seite, mit amtlichen Karten durch die Zeit
   (Eiszeit, Dufour, Siegfried, Landeskarte, Waldhöhenstufen heute und 2085), Themenkarten von geo.admin.ch und einem
   druckbaren Bericht pro Ort (Klima, Gletscher und Wasser, Wald, Landwirtschaft und Boden, Beobachtungen), *Daten holen*;

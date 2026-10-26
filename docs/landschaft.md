@@ -14,7 +14,7 @@ Die zweite Perspektive ist eine eigene Seite, `/landschaft.html`, mit drei Teile
 ![Startseite: die zwei Perspektiven nebeneinander](screenshots/perspektiven.jpg)
 
 > Die Screenshots zeigen den Demo-Datensatz: Statt der Karten von swisstopo und BAFU zeichnet der Demo-Server
-> Platzhalter im selben Format. Im Betrieb kommen die Karten von geo.admin.ch.
+> Platzhalter im selben Format (die Zeitreise vor 1990 in Sepia). Im Betrieb kommen die Karten von geo.admin.ch.
 
 ## Karte
 
@@ -28,6 +28,7 @@ Deckkraft lässt sich einstellen, darunter stehen Erklärung und Legende:
 | vor rund 24 000 Jahren | Grösste Ausdehnung der Gletscher in der letzten Eiszeit | swisstopo, `ch.swisstopo.geologie-eiszeit-lgm-raster` |
 | um 1850 | Dufourkarte (1845–1865), am Ende der Kleinen Eiszeit | swisstopo, `ch.swisstopo.hiks-dufour` |
 | um 1900 | Siegfriedkarte (1870–1949) | swisstopo, `ch.swisstopo.hiks-siegfried` |
+| Jahr für Jahr | Zeitreise der Landeskarte: die Karte, wie sie im gewählten Jahr galt | swisstopo, `ch.swisstopo.zeitreihen` (WMTS mit Zeit) |
 | heute | Landeskarte | swisstopo, `ch.swisstopo.pixelkarte-grau` |
 | heute | Höhenstufen des Waldes | BAFU, `ch.bafu.wald-vegetationshoehenstufen_1975` |
 | um 2085, weniger trocken | Höhenstufen 2070–2099 bei mittleren Emissionen (RCP4.5) | BAFU, `ch.bafu.wald-vegetationshoehenstufen_2085_weniger_trocken` |
@@ -35,6 +36,14 @@ Deckkraft lässt sich einstellen, darunter stehen Erklärung und Legende:
 
 Der Server sucht die Ebenen in der Ebenenliste von geo.admin.ch (WMS, einmal am Tag gelesen, wie das Panel *Ebenen*
 der Karte). Fehlt eine Ebene, fehlt nur ihr Zeitpunkt.
+
+**Zeitreise der Landeskarte.** Die Landeskarten von swisstopo, wie sie im gewählten Jahr galten, seit dem 19.
+Jahrhundert: Ein Regler wählt das Jahr, ▶ spielt die Jahre ab (eines alle 1,2 Sekunden, damit die Kacheln nachkommen).
+Welche Jahre es gibt, liest der Server einmal am Tag aus den WMTS-Capabilities von geo.admin.ch (`ZEITREISE_WMTS_URL`).
+Vor 1964 decken die Karten die Schweiz nicht überall ab. Das Jahr steht in der Adresse (`#karte?…&jahr=1900`), so
+lässt sich ein Ausschnitt mit Jahr teilen.
+
+![Zeitreise der Landeskarte: die Karte von 1900, mit Regler und Abspielknopf](screenshots/landschaft-zeitreise.jpg)
 
 ![Karte: die modellierten Höhenstufen des Waldes um 2085 bei hohen Emissionen](screenshots/landschaft-2085.jpg)
 
@@ -78,7 +87,7 @@ unter [Offene Geodaten](funktionen.md#offene-geodaten-für-gis-und-geoportale).
 ## Technik
 
 - `src/routes/landschaft.js`: `GET /api/landschaft/karten` (Karten durch die Zeit und Ebenen pro Thema, aus der
-  Ebenenliste von geo.admin.ch) und `GET /api/landschaft/bericht?lat=&lon=` (Identify pro Thema, Gletscher aus den
+  Ebenenliste von geo.admin.ch; die Jahre der Zeitreise aus den WMTS-Capabilities) und `GET /api/landschaft/bericht?lat=&lon=` (Identify pro Thema, Gletscher aus den
   Inventaren mit GLAMOS, Fotos, Befunde und Neophyten im Umkreis). Die Ebenenliste und der Identify-Dienst kommen aus
   `src/routes/layers.js` (Panel *Ebenen*).
 - `public/landschaft.html`, `landschaft.js`, `landschaft.css`: Leaflet mit den Kacheln von swisstopo und den WMS von

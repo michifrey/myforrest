@@ -182,6 +182,7 @@ Die feste Adresse lässt sich als Variable `APP_URL` in die Android-App bauen, d
 | `BASISKARTE_QUELLE` | OpenFreeMap, OpenMapTiles, OSM | Quellenangabe der Grundkarte, falls der Stil keine nennt |
 | `DOKU_URL` | `https://michifrey.github.io/myforrest/` | Adresse der Doku-Website für die Links auf der Startseite (Navigation, Funktionen, Footer); leer = keine Links |
 | `EBENEN_WMS_URL` | `https://wms.geo.admin.ch/` | Kartendienst für die Themen des Panels [Ebenen](funktionen.md#ebenen-karten-aus-offiziellen-quellen); leer = keine Ebenen von geo.admin.ch |
+| `ZEITREISE_WMTS_URL` | WMTS-Capabilities von geo.admin.ch (EPSG:3857) | Woher die Jahre der *Zeitreise der Landeskarte* in [Landschaft im Wandel](landschaft.md) kommen (einmal am Tag gelesen); leer = keine Zeitreise |
 | `EBENEN_IDENTIFY_URL` | Identify-Dienst von geo.admin.ch | Für *Was ist hier?* bei Ebenen von geo.admin.ch |
 | `EBENEN_REGIONAL` | Baumkataster Zürich, SITG Genf, EFFIS | Regionale WMS-Dienste als JSON-Liste `[{ "url", "group", "bbox": [W, S, O, N], "attribution" }]`; alle ihre Ebenen erscheinen, wenn die Karte im Gebiet steht |
 | `FIRMS_MAP_KEY` | – | Schlüssel von [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/api/map_key/): aktive Feuer (MODIS, VIIRS) als Ebene |

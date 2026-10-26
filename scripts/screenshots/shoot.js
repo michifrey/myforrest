@@ -87,6 +87,15 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.screenshot({ path: out('landschaft.jpg'), ...jpg });
     await stop('wald-2085-t');
     await page.screenshot({ path: out('landschaft-2085.jpg'), ...jpg });
+    // The «Zeitreise»: the Landeskarte of 1900.
+    await stop('zeitreise');
+    await page.evaluate(() => {
+      const range = document.getElementById('ln-zeit-range');
+      range.value = '3';
+      range.dispatchEvent(new Event('input'));
+    });
+    await settle(page, 2500);
+    await page.screenshot({ path: out('landschaft-zeitreise.jpg'), ...jpg });
     await page.goto(`${BASE}/landschaft.html#bericht?lat=47.37&lon=8.54`);
     await page.waitForSelector('.ln-section', { timeout: 120000 });
     await settle(page, 2500);

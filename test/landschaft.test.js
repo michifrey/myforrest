@@ -22,7 +22,7 @@ ${[
   ].map(([n, t]) => `<Layer queryable="1"><Name>${n}</Name><Title>${t}</Title></Layer>`).join('\n')}
 </Layer></Capability></WMS_Capabilities>`;
 
-async function withServer(fn) {
+async function withServer(fn, { wmts = null } = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'myforrest-landschaft-'));
   const identified = [];
   const layersFetch = async (url) => {
@@ -36,11 +36,13 @@ async function withServer(fn) {
       return Response.json({ results });
     }
     if (url.startsWith('https://wms.example/')) return new Response(CAPS);
+    if (wmts && url === 'https://wmts.example/WMTSCapabilities.xml') return new Response(wmts);
     return new Response('', { status: 503 });
   };
   const app = createApp({
     dataDir, weatherFetch: async () => new Response('offline', { status: 503 }), tileOptions: { precompute: false },
     layersFetch, layersOptions: { geoadminUrl: 'https://wms.example/', identifyUrl: 'https://identify.example/identify', regional: [] },
+    landschaftOptions: { zeitreiseUrl: 'https://wmts.example/WMTSCapabilities.xml' },
   });
   const server = app.listen(0);
   await new Promise((r) => server.once('listening', r));
@@ -116,5 +118,27 @@ test('Landschaft im Wandel is a page of its own, linked from the start page and 
     const sw = await (await fetch(`${base}/sw.js`)).text();
     for (const file of ['landschaft.html', 'landschaft.js', 'landschaft.css']) assert.ok(sw.includes(`'${file}'`), file);
     assert.ok(!sw.includes('landschaft-model.js') && !sw.includes('landschaft-oben.js'));
+  });
+});
+
+test('Landschaft im Wandel: the «Zeitreise» of the Landeskarte with the years of the WMTS capabilities', async () => {
+  const wmts = `<?xml version="1.0"?><Capabilities xmlns:ows="http://www.opengis.net/ows/1.1"><Contents>
+<Layer><ows:Title>Landeskarte</ows:Title><ows:Identifier>ch.swisstopo.pixelkarte-farbe</ows:Identifier>
+<Dimension><ows:Identifier>Time</ows:Identifier><Default>current</Default><Value>current</Value></Dimension></Layer>
+<Layer><ows:Title>Zeitreise</ows:Title><ows:Identifier>ch.swisstopo.zeitreihen</ows:Identifier>
+<Dimension><ows:Identifier>Time</ows:Identifier><Default>20211231</Default><Value>20211231</Value><Value>18641231</Value><Value>19501231</Value><Value>19501231</Value></Dimension></Layer>
+</Contents></Capabilities>`;
+  await withServer(async (base) => {
+    const d = await (await fetch(`${base}/api/landschaft/karten`)).json();
+    assert.deepEqual(d.timeline.map((t) => t.id), ['eiszeit', 'dufour', 'zeitreise', 'heute', 'wald-heute', 'wald-2085-t']);
+    const z = d.timeline.find((t) => t.id === 'zeitreise');
+    assert.equal(z.when, '1864–2021');
+    assert.deepEqual(z.zeitreise.years, [{ year: 1864, time: '18641231' }, { year: 1950, time: '19501231' }, { year: 2021, time: '20211231' }], 'sorted, once each');
+    assert.equal(z.zeitreise.tiles, 'https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.zeitreihen/default/{time}/3857/{z}/{x}/{y}.png');
+  }, { wmts });
+  // Without capabilities there is no «Zeitreise», the rest stays.
+  await withServer(async (base) => {
+    const d = await (await fetch(`${base}/api/landschaft/karten`)).json();
+    assert.ok(!d.timeline.some((t) => t.id === 'zeitreise'));
   });
 });

@@ -6,7 +6,7 @@
  * inventories and GLAMOS series of this server, and the spots in the region. The climate part of the report comes
  * from the climate dossier (/api/klima), which the page asks for itself.
  *
- *   GET /api/landschaft/karten               the maps through time and the layers per theme
+ *   GET /api/landschaft/karten               the maps through time (with the years of swisstopo's «Zeitreise») and the layers per theme
  *   GET /api/landschaft/bericht?lat&lon      what the layers, the inventories and the spots say about a place
  */
 
@@ -23,6 +23,10 @@ const TIMELINE = [
   {
     id: 'siegfried', match: /^ch\.swisstopo\.hiks-siegfried$/, when: 'um 1900', title: 'Siegfriedkarte',
     text: 'Topographischer Atlas der Schweiz (1870–1949): Gletscher, Wald und Siedlungen vor dem grossen Wandel des 20. Jahrhunderts.',
+  },
+  {
+    id: 'zeitreise', zeitreise: true, when: 'Jahr für Jahr', title: 'Zeitreise der Landeskarte',
+    text: 'Die Landeskarten von swisstopo, wie sie im gewählten Jahr galten: Gletscher, Wald, Siedlungen und Strassen Jahr für Jahr. Vor 1964 decken sie die Schweiz nicht überall ab.',
   },
   { id: 'heute', base: true, when: 'heute', title: 'Landeskarte', text: 'Die aktuelle Landeskarte von swisstopo.' },
   {
@@ -67,20 +71,62 @@ const { TAGS } = require('../tags');
 
 const RADIUS_KM = 5;
 
+// swisstopo's «Zeitreise»: the Landeskarte of each year as WMTS tiles; the years are in the WMTS capabilities.
+const ZEITREISE_LAYER = 'ch.swisstopo.zeitreihen';
+const ZEITREISE_CAPABILITIES = 'https://wmts.geo.admin.ch/EPSG/3857/1.0.0/WMTSCapabilities.xml';
+const ZEITREISE_TILES = `https://wmts.geo.admin.ch/1.0.0/${ZEITREISE_LAYER}/default/{time}/3857/{z}/{x}/{y}.png`;
+const DAY = 24 * 3600000;
+
+/** The time values (YYYYMMDD) of a WMTS layer in capabilities, oldest first. */
+function wmtsTimes(xml, layer) {
+  for (const block of xml.split(/<Layer>/).slice(1)) {
+    const id = block.match(/<ows:Identifier>([^<]*)<\/ows:Identifier>/)?.[1];
+    if (id !== layer) continue;
+    const dim = block.match(/<Dimension>([\s\S]*?)<\/Dimension>/)?.[1] || '';
+    return [...new Set([...dim.matchAll(/<Value>(\d{8})<\/Value>/g)].map((m) => m[1]))].sort();
+  }
+  return [];
+}
+
 function pick(layers, theme) {
   const hits = layers.filter((l) => theme.match.test(l.name));
   const rank = (l) => { const i = theme.prefer.indexOf(l.name); return i < 0 ? 99 : i; };
   return hits.sort((a, b) => rank(a) - rank(b) || a.title.localeCompare(b.title, 'de')).slice(0, theme.max);
 }
 
-module.exports = function registerLandschaft(app, { db, layers, glaciers = null, glamos = null }) {
+module.exports = function registerLandschaft(app, {
+  db, layers, glaciers = null, glamos = null, fetchImpl = fetch, now = () => Date.now(),
+  zeitreiseUrl = (process.env.ZEITREISE_WMTS_URL ?? ZEITREISE_CAPABILITIES) || null,
+}) {
+  let zeitreise = { at: 0, times: [] };
+  /** The years of the «Zeitreise», read once a day; the last good list when the service does not answer. */
+  async function zeitreiseTimes() {
+    if (!zeitreiseUrl || (zeitreise.times.length && now() - zeitreise.at < DAY)) return zeitreise.times;
+    try {
+      const r = await fetchImpl(zeitreiseUrl, { signal: AbortSignal.timeout(40000) });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const times = wmtsTimes(await r.text(), ZEITREISE_LAYER);
+      if (times.length) zeitreise = { at: now(), times };
+    } catch { /* keep what we had */ }
+    return zeitreise.times;
+  }
+
   const hasCol = (table, col) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
   const layerJson = (l) => ({ name: l.name, title: l.title, url: l.url, attribution: l.attribution, legend: l.legend });
 
   app.get('/api/landschaft/karten', async (req, res) => {
-    const all = await layers.geoadminLayers();
+    const [all, times] = await Promise.all([layers.geoadminLayers(), zeitreiseTimes()]);
     const timeline = [];
     for (const t of TIMELINE) {
+      if (t.zeitreise) {
+        if (!times.length) continue;
+        const years = times.map((time) => ({ year: Number(time.slice(0, 4)), time }));
+        timeline.push({
+          id: t.id, when: `${years[0].year}–${years[years.length - 1].year}`, title: t.title, text: t.text, base: false,
+          zeitreise: { tiles: ZEITREISE_TILES, layer: ZEITREISE_LAYER, years, attribution: '© swisstopo, Zeitreise' },
+        });
+        continue;
+      }
       const layer = t.base ? null : all.find((l) => t.match.test(l.name));
       if (!t.base && !layer) continue;
       timeline.push({ id: t.id, when: t.when, title: t.title, text: t.text, base: Boolean(t.base), ...(layer ? { layer: layerJson(layer) } : {}) });
@@ -136,4 +182,5 @@ module.exports = function registerLandschaft(app, { db, layers, glaciers = null,
 };
 
 module.exports.TIMELINE = TIMELINE;
+module.exports.wmtsTimes = wmtsTimes;
 module.exports.THEMES = THEMES;

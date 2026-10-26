@@ -573,12 +573,15 @@ const app = createApp({
   // The base map «MyForrest» from demo vector tiles, and the panel «Ebenen» from the demo WMS and identify.
   basemapStyle: `http://localhost:${Number(process.env.PORT) || 3123}/demo-vt/style.json`,
   basemapAttribution: 'Demo-Vektorkacheln im Format von OpenMapTiles',
-  layersFetch: async (url) => (url.startsWith('http://demo.invalid/identify') ? demoIdentify(url) : demoWms(url)),
+  layersFetch: async (url, opts) => (url.startsWith('http://demo.invalid/identify') ? demoIdentify(url)
+    : url.includes('/demo-wmts/') ? fetch(url, opts) : demoWms(url)),
   layersOptions: {
     geoadminUrl: `http://localhost:${Number(process.env.PORT) || 3123}/demo-wms`,
     identifyUrl: 'http://demo.invalid/identify',
     regional: [{ url: `http://localhost:${Number(process.env.PORT) || 3123}/demo-wms?src=zh`, group: 'Bäume Stadt Zürich', bbox: [8.44, 47.32, 8.63, 47.44], attribution: 'Demo im Format des Baumkatasters der Stadt Zürich' }],
   },
+  // Landschaft im Wandel: the years of the «Zeitreise» from a demo WMTS capabilities document.
+  landschaftOptions: { zeitreiseUrl: `http://localhost:${Number(process.env.PORT) || 3123}/demo-wmts/WMTSCapabilities.xml` },
   klimaOptions: { cellsPerDay: 500, wmsUrl: `http://localhost:${Number(process.env.PORT) || 3123}/demo-wms`, wmsFetch: demoWms, wmsGenf: '' },
 });
 app.get('/demo-3d/:kind/:file', (req, res) => {
@@ -593,6 +596,13 @@ app.get('/demo-vt/style.json', (req, res) => res.json(vectorDemo.style(`http://l
 app.get('/demo-vt/:z/:x/:y.pbf', (req, res) => {
   res.set('access-control-allow-origin', '*');
   res.type('application/x-protobuf').send(vectorDemo.tile(Number(req.params.z), Number(req.params.x), Number(req.params.y)));
+});
+// The years of the demo «Zeitreise»: every tenth year since 1870 and the last edition.
+app.get('/demo-wmts/WMTSCapabilities.xml', (req, res) => {
+  const years = [...Array.from({ length: 15 }, (_, i) => 1870 + i * 10), 2021];
+  res.type('text/xml').send(`<?xml version="1.0"?><Capabilities xmlns:ows="http://www.opengis.net/ows/1.1"><Contents><Layer>
+<ows:Title>Zeitreise (Demo)</ows:Title><ows:Identifier>ch.swisstopo.zeitreihen</ows:Identifier>
+<Dimension><ows:Identifier>Time</ows:Identifier>${years.map((y) => `<Value>${y}1231</Value>`).join('')}</Dimension></Layer></Contents></Capabilities>`);
 });
 app.get('/demo-wms', async (req, res) => {
   const r = await demoWms(`http://x/demo-wms?${new URLSearchParams(req.query)}`);

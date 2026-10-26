@@ -148,6 +148,8 @@ function createApp({
   treeInventoryFetch = fetch, treeInventoryOptions = {}, treeInventoryZurich = undefined,
   // Layers of the panel «Ebenen» (routes/layers.js): fetch and { geoadminUrl, identifyUrl, regional, firmsKey }.
   layersFetch = fetch, layersOptions = {},
+  // Landschaft im Wandel (routes/landschaft.js): { zeitreiseUrl } (the WMTS capabilities with the years).
+  landschaftOptions = {},
   // Reverse proxies whose X-Forwarded-For counts (Express 'trust proxy'), so rate limits see the client's
   // address instead of the proxy's. Off by default: otherwise anyone could fake the header.
   trustProxy = parseTrustProxy(process.env.TRUST_PROXY),
@@ -1436,7 +1438,7 @@ function createApp({
   });
   require('./routes/wikimedia')(app, { wikimedia, landscapes, idParam });
   // Landschaft im Wandel (landschaft.html): maps through time and a report per place.
-  require('./routes/landschaft')(app, { db, layers: layersApi, glaciers, glamos });
+  require('./routes/landschaft')(app, { db, layers: layersApi, glaciers, glamos, fetchImpl: layersFetch, ...landschaftOptions });
   Object.assign(tours, require('./routes/tracks')(app, {
     db, spotRadiusM, satelliteAlerts: vegetation.alerts, routerUrl, routerFetch, routerProfile, accounts, wildlife, elevation: elevationService, push,
     weather,
