@@ -1,125 +1,120 @@
 'use strict';
 
+// Landschaft im Wandel: official maps through time, layers per theme, and the report per place.
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const M = require('../public/landschaft-model');
 const { createApp } = require('../src/app');
 
-test('Landschaft im Wandel: seven stops with sources, from the ice age to 2100', () => {
-  for (const scenario of Object.keys(M.SCENARIOS)) {
-    const stops = M.stops(scenario);
-    assert.deepEqual(stops.map((s) => s.id), ['lgm', 'dryas', 'holocene', '1850', 'today', '2050', '2100']);
-    for (const s of stops) {
-      assert.ok(typeof s.voice === 'string' && s.voice.length > 20, `${s.id}: the valley's own words`);
-      assert.ok(s.facts.length >= 2 && s.facts.every((f) => typeof f === 'string' && f), `${s.id}: facts`);
-      assert.ok(s.sources.length && s.sources.every((k) => M.SOURCES[k]?.url), `${s.id}: sources`);
-      assert.equal(s.forces.length, M.FORCES.length, `${s.id}: one level per force`);
-      assert.ok(s.forces.every((v) => Number.isInteger(v) && v >= 0 && v <= 3));
-    }
-    // The ice age fills the valley; there are no greenhouse gases from humans before 1850.
-    assert.equal(stops[0].ice, 1);
-    assert.ok(stops.slice(0, 3).every((s) => s.forces[6] === 0));
-    // Today the human greenhouse gases are the strongest force.
-    assert.equal(stops[4].forces[6], 3);
-  }
-});
+const CAPS = `<?xml version="1.0"?><WMS_Capabilities><Service><Title>WMS BGDI</Title></Service><Capability><Layer><Title>WMS BGDI</Title>
+${[
+    ['ch.swisstopo.hiks-dufour', 'Dufourkarte Erstausgabe'],
+    ['ch.swisstopo.geologie-eiszeit-lgm-raster', 'Letzteiszeitliches Maximum (LGM)'],
+    ['ch.bafu.wald-vegetationshoehenstufen_1975', 'Vegetationshöhenstufen'],
+    ['ch.bafu.wald-vegetationshoehenstufen_2085_trocken', 'Vegetationshöhenstufen 2085 trocken'],
+    ['ch.bafu.landesforstinventar-waldmischungsgrad', 'Waldmischungsgrad'],
+    ['ch.meteoschweiz.klimanormwerte-temperatur_aktuelle_periode', 'Klimanormwerte Temperatur'],
+    ['ch.bfs.arealstatistik', 'Arealstatistik'],
+    ['ch.swisstopo.pixelkarte-farbe', 'Landeskarte'],
+  ].map(([n, t]) => `<Layer queryable="1"><Name>${n}</Name><Title>${t}</Title></Layer>`).join('\n')}
+</Layer></Capability></WMS_Capabilities>`;
 
-test('Landschaft im Wandel: the three pathways differ only from today on, in the expected order', () => {
-  const at2100 = Object.keys(M.SCENARIOS).map((s) => M.at(M.MAX_POS, s));
-  assert.ok(at2100[0].ice > at2100[1].ice && at2100[1].ice > at2100[2].ice, 'more emissions, less ice');
-  assert.ok(at2100[0].treeline < at2100[1].treeline && at2100[1].treeline < at2100[2].treeline, 'more emissions, higher climate treeline');
-  // The climate climbs by the rule of docs/klimawandel.md: twice the global warming, 0.55 °C per 100 m.
-  assert.equal(M.climbFor(2.7), Math.round(((2 * (2.7 - 1.2)) / 0.55) * 100 / 10) * 10);
-  for (const st of at2100) {
-    assert.ok(st.future);
-    assert.ok(st.forestline <= st.treeline, 'the forest follows the climate more slowly');
-    assert.ok(st.forestline - M.TREELINE_TODAY <= 150 + 1e-9, 'at most about 2 m per year from today');
-  }
-  for (const pos of [0, 150, 300, M.TODAY_POS]) {
-    const [a, b, c] = Object.keys(M.SCENARIOS).map((s) => M.at(pos, s));
-    assert.deepEqual([a.ice, a.treeline], [b.ice, b.treeline]);
-    assert.deepEqual([b.ice, b.treeline], [c.ice, c.treeline]);
-    assert.ok(!a.future);
-  }
-  // Between two stops everything is blended, the words come from the nearer stop.
-  const mid = M.at(350, 'mid');
-  assert.ok(mid.ice < 0.85 && mid.ice > 0.45);
-  assert.equal(M.at(340, 'mid').stop.id, '1850');
-  assert.equal(M.at(360, 'mid').stop.id, 'today');
-  assert.equal(M.at(-5).pos, 0);
-  assert.equal(M.at(9999).pos, M.MAX_POS);
-});
-
-test('Landschaft im Wandel: the section draws ice, belts and trees where they belong', () => {
-  const iceAge = M.section(M.at(0));
-  assert.ok(iceAge.glacier.length > 100, 'the ice age fills the section');
-  assert.equal(iceAge.trees.length, 0, 'no forest under the ice');
-  const today = M.section(M.at(M.TODAY_POS));
-  assert.ok(today.glacier && today.trees.length > 5);
-  assert.ok(today.belts.every((b) => Object.values(M.BELT).includes(b.color)));
-  // Trees only below the forest line (y grows downwards, so their base lies below the line).
-  assert.ok(today.trees.every((t) => t.y + 4 >= today.treelineY - 1));
-  const gone = M.section({ ...M.at(M.MAX_POS, 'high'), ice: 0 });
-  assert.equal(gone.glacier, null);
-  assert.ok(today.places.some((p) => p.label.startsWith('Jungfrau')));
-});
-
-test('Landschaft im Wandel is a page of its own, linked from the start page and cached for offline use', async () => {
+async function withServer(fn) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'myforrest-landschaft-'));
-  const app = createApp({ dataDir, tileOptions: { precompute: false } });
+  const identified = [];
+  const layersFetch = async (url) => {
+    if (url.startsWith('https://identify.example/')) {
+      const names = new URL(url).searchParams.get('layers').replace(/^all:/, '').split(',');
+      identified.push(names);
+      const results = [];
+      if (names.includes('ch.bafu.wald-vegetationshoehenstufen_1975')) results.push({ layerBodId: 'ch.bafu.wald-vegetationshoehenstufen_1975', layerName: 'Vegetationshöhenstufen', attributes: { id: 7, hoehenstufe: 'obermontan' } });
+      if (names.includes('ch.bafu.wald-vegetationshoehenstufen_2085_trocken')) results.push({ layerBodId: 'ch.bafu.wald-vegetationshoehenstufen_2085_trocken', layerName: 'Vegetationshöhenstufen 2085 trocken', attributes: { hoehenstufe: 'submontan' } });
+      if (names.includes('ch.bfs.arealstatistik')) results.push({ layerBodId: 'ch.bfs.arealstatistik', layerName: 'Arealstatistik', attributes: { nutzung: 'Wald' } });
+      return Response.json({ results });
+    }
+    if (url.startsWith('https://wms.example/')) return new Response(CAPS);
+    return new Response('', { status: 503 });
+  };
+  const app = createApp({
+    dataDir, weatherFetch: async () => new Response('offline', { status: 503 }), tileOptions: { precompute: false },
+    layersFetch, layersOptions: { geoadminUrl: 'https://wms.example/', identifyUrl: 'https://identify.example/identify', regional: [] },
+  });
   const server = app.listen(0);
   await new Promise((r) => server.once('listening', r));
-  const base = `http://127.0.0.1:${server.address().port}`;
   try {
-    const page = await fetch(`${base}/landschaft.html`);
-    assert.equal(page.status, 200);
-    const html = await page.text();
-    for (const file of ['landschaft-model.js', 'landschaft-oben.js', 'landschaft.js', 'landschaft.css']) {
-      assert.ok(html.includes(file), file);
-      assert.equal((await fetch(`${base}/${file}`)).status, 200, file);
-    }
-    for (const id of ['zeitraffer', 'oben', 'wege', 'daten']) assert.ok(html.includes(`id="${id}"`), id);
-    const start = await (await fetch(`${base}/`)).text();
-    assert.ok(start.includes('href="landschaft.html"'));
-    assert.ok(start.includes('id="perspektiven"'));
-    const sw = await (await fetch(`${base}/sw.js`)).text();
-    for (const file of ['landschaft.html', 'landschaft.js', 'landschaft-oben.js', 'landschaft-model.js', 'landschaft.css']) assert.ok(sw.includes(`'${file}'`), file);
+    await fn(`http://127.0.0.1:${server.address().port}`, app.locals.db, identified);
   } finally {
     await app.locals.idle();
     server.close();
     app.locals.db.close();
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
+}
+
+test('Landschaft im Wandel: maps through time where the layers exist, layers per theme', async () => {
+  await withServer(async (base) => {
+    const d = await (await fetch(`${base}/api/landschaft/karten`)).json();
+    // Siegfried and the 2085 «less dry» map are missing in these capabilities, so they are left out.
+    assert.deepEqual(d.timeline.map((t) => t.id), ['eiszeit', 'dufour', 'heute', 'wald-heute', 'wald-2085-t']);
+    const heute = d.timeline.find((t) => t.id === 'heute');
+    assert.ok(heute.base && !heute.layer, 'today is the Landeskarte underneath');
+    const dufour = d.timeline.find((t) => t.id === 'dufour');
+    assert.deepEqual([dufour.layer.name, dufour.layer.url], ['ch.swisstopo.hiks-dufour', 'https://wms.example/']);
+    assert.match(dufour.layer.legend, /GetLegendGraphic.*LAYER=ch\.swisstopo\.hiks-dufour/);
+    const themes = Object.fromEntries(d.themes.map((t) => [t.id, t.layers.map((l) => l.name)]));
+    assert.deepEqual(themes.wald, ['ch.bafu.wald-vegetationshoehenstufen_1975', 'ch.bafu.wald-vegetationshoehenstufen_2085_trocken', 'ch.bafu.landesforstinventar-waldmischungsgrad']);
+    assert.deepEqual(themes.boden, ['ch.bfs.arealstatistik']);
+    assert.deepEqual(themes.klima, ['ch.meteoschweiz.klimanormwerte-temperatur_aktuelle_periode']);
+    assert.deepEqual(themes.wasser, []);
+  });
 });
 
-test('Landschaft im Wandel von oben: water, forest, food and heat change together, by the pathway from today on', () => {
-  for (const scenario of Object.keys(M.SCENARIOS)) {
-    const stops = M.obenStops(scenario);
-    assert.deepEqual(stops.map((s) => s.id), ['1900', '1960', 'today', '2050', '2100']);
-    for (const s of stops) {
-      assert.ok(s.voice.length > 20, `${s.id}: the valley's own words`);
-      for (const k of ['glacier', 'water', 'suonen', 'drought', 'pine', 'oak', 'dead', 'fields', 'irrigation', 'heat']) {
-        assert.ok(s[k] >= 0 && s[k] <= 1, `${scenario} ${s.id} ${k}`);
-      }
+test('Landschaft im Wandel: the report asks the layers of each theme at the place and adds what MyForrest saw', async () => {
+  await withServer(async (base, db, identified) => {
+    const now = Date.now();
+    const spot = db.prepare('INSERT INTO spots (lat, lon, created_at) VALUES (46.4, 8.0, ?)').run(now).lastInsertRowid;
+    for (const [year, tag] of [[2021, 'borkenkaefer'], [2024, null]]) {
+      const photo = db.prepare(`INSERT INTO photos (spot_id, file, taken_at, lat, lon, location_source, created_at) VALUES (?, ?, ?, 46.4, 8.0, 'exif', ?)`)
+        .run(spot, `p${year}.jpg`, Date.UTC(year, 5, 1), now).lastInsertRowid;
+      if (tag) db.prepare('INSERT INTO photo_tags (photo_id, tag) VALUES (?, ?)').run(photo, tag);
     }
-    // Since 1900 the glacier only shrinks, the pines only decline.
-    for (let k = 1; k < stops.length; k++) {
-      assert.ok(stops[k].glacier <= stops[k - 1].glacier, `${scenario}: glacier`);
-      assert.ok(stops[k].pine <= stops[k - 1].pine, `${scenario}: pines`);
+    // Far away: not in the report.
+    const far = db.prepare('INSERT INTO spots (lat, lon, created_at) VALUES (47.4, 8.5, ?)').run(now).lastInsertRowid;
+    db.prepare(`INSERT INTO photos (spot_id, file, taken_at, lat, lon, location_source, created_at) VALUES (?, 'far.jpg', ?, 47.4, 8.5, 'exif', ?)`).run(far, now, now);
+
+    const r = await (await fetch(`${base}/api/landschaft/bericht?lat=46.4&lon=8.001`)).json();
+    const wald = r.themes.find((t) => t.id === 'wald');
+    assert.deepEqual(wald.items.map((i) => [i.title, i.attributes]), [
+      ['Vegetationshöhenstufen', [['hoehenstufe', 'obermontan']]],
+      ['Vegetationshöhenstufen 2085 trocken', [['hoehenstufe', 'submontan']]],
+    ], 'ids are left out');
+    assert.deepEqual(r.themes.find((t) => t.id === 'boden').items[0].attributes, [['nutzung', 'Wald']]);
+    assert.deepEqual(r.themes.find((t) => t.id === 'wasser').items, []);
+    assert.ok(identified.some((names) => names.includes('ch.meteoschweiz.klimanormwerte-temperatur_aktuelle_periode')));
+    assert.equal(r.glacier, null, 'no inventories on this server');
+    assert.deepEqual([r.observed.photos, r.observed.spots, r.observed.firstYear, r.observed.lastYear], [2, 1, 2021, 2024]);
+    assert.deepEqual(r.observed.tags, [{ tag: 'borkenkaefer', label: 'Borkenkäfer', spots: 1 }]);
+
+    assert.equal((await fetch(`${base}/api/landschaft/bericht?lat=x&lon=8`)).status, 400);
+  });
+});
+
+test('Landschaft im Wandel is a page of its own, linked from the start page and cached for offline use', async () => {
+  await withServer(async (base) => {
+    const html = await (await fetch(`${base}/landschaft.html`)).text();
+    for (const id of ['karte', 'bericht', 'daten']) assert.ok(html.includes(`id="${id}"`), id);
+    for (const file of ['landschaft.js', 'landschaft.css', 'vendor/leaflet/leaflet.js']) {
+      assert.ok(html.includes(file), file);
+      assert.equal((await fetch(`${base}/${file}`)).status, 200, file);
     }
-  }
-  const y2100 = Object.keys(M.SCENARIOS).map((s) => M.oben(M.OBEN_MAX, s));
-  assert.ok(y2100[0].water > y2100[1].water && y2100[1].water > y2100[2].water, 'more emissions, less summer water');
-  assert.ok(y2100[0].pine > y2100[2].pine && y2100[0].fields > y2100[2].fields && y2100[0].heat < y2100[2].heat);
-  // Warming against today by the dossier's rule: twice the global warming.
-  assert.equal(M.oben(M.OBEN_TODAY).warming, 0);
-  assert.ok(Math.abs(M.oben(M.OBEN_MAX, 'high').warming - 2 * (4.4 - 1.2)) < 1e-9);
-  assert.ok(M.oben(0).warming < 0);
-  for (const [, t] of Object.entries(M.THEMES)) {
-    assert.ok(t.facts.length && t.facts.every(([text, src]) => text && M.SOURCES[src]?.url));
-  }
-  assert.deepEqual(M.obenSeries('water', 'high').map((p) => p.id), ['1900', '1960', 'today', '2050', '2100']);
+    const start = await (await fetch(`${base}/`)).text();
+    assert.ok(start.includes('href="landschaft.html"'));
+    assert.ok(start.includes('id="perspektiven"'));
+    const sw = await (await fetch(`${base}/sw.js`)).text();
+    for (const file of ['landschaft.html', 'landschaft.js', 'landschaft.css']) assert.ok(sw.includes(`'${file}'`), file);
+    assert.ok(!sw.includes('landschaft-model.js') && !sw.includes('landschaft-oben.js'));
+  });
 });

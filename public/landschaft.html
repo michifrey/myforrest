@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Landschaft im Wandel · MyForrest</title>
-  <meta name="description" content="Aus Sicht der Natur: Das Tal erzählt, wie es sich von der letzten Eiszeit bis 2100 verändert. Der Mensch ist eine Kraft unter mehreren.">
-  <meta name="theme-color" content="#12201a">
+  <meta name="description" content="Amtliche Karten durch die Zeit und ein Bericht pro Ort: Klima, Gletscher und Wasser, Wald, Landwirtschaft und Boden.">
+  <meta name="theme-color" content="#16301f">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2316301f' d='M12 2 5 12h4l-4 6h6v4h2v-4h6l-4-6h4z'/%3E%3C/svg%3E">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="vendor/fonts/fraunces/full.css">
-  <link rel="stylesheet" href="vendor/fonts/fraunces/full-italic.css">
   <link rel="stylesheet" href="vendor/fonts/manrope/index.css">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="landschaft.css">
 </head>
 <body>
@@ -20,166 +20,75 @@
       MyForrest <span>Landschaft im Wandel</span>
     </a>
     <nav class="ln-tabs" aria-label="Landschaft im Wandel">
-      <a href="#zeitraffer" data-view="zeitraffer">Zeitraffer</a>
-      <a href="#oben" data-view="oben">Von oben</a>
-      <a href="#wege" data-view="wege">Drei Wege</a>
+      <a href="#karte" data-view="karte">Karte</a>
+      <a href="#bericht" data-view="bericht">Bericht</a>
       <a href="#daten" data-view="daten">Daten holen</a>
-      <a href="./?funktion=klima">Klima-Dossier</a>
     </nav>
-    <p class="ln-place">Grosser Aletschgletscher, Wallis</p>
   </header>
 
   <main>
-    <!-- ---------- Zeitraffer ---------- -->
-    <section id="zeitraffer" class="ln-view ln-lapse" aria-label="Zeitraffer">
-      <aside class="ln-side">
-        <figure class="ln-voice">
-          <figcaption>Das Tal erzählt · <span id="ln-when-small"></span></figcaption>
-          <blockquote id="ln-voice" aria-live="polite"></blockquote>
-        </figure>
-        <ul id="ln-facts" class="ln-facts"></ul>
-        <section aria-labelledby="ln-forces-title">
-          <h2 id="ln-forces-title" class="ln-label">Was gerade auf mich wirkt</h2>
-          <ul id="ln-forces" class="ln-forces"></ul>
-          <p class="ln-note">Der Mensch ist eine Kraft unter mehreren. Seit 1850 wird er stärker, bei Wärme und Eis
-            ist er heute die stärkste. Die Stärken sind eine Einschätzung.</p>
+    <!-- ---------- Karte ---------- -->
+    <section id="karte" class="ln-view ln-mapview" aria-label="Karte">
+      <div id="ln-map" class="ln-map" aria-label="Karte der Schweiz"></div>
+      <aside class="ln-panel">
+        <section aria-labelledby="ln-time-title">
+          <h2 id="ln-time-title">Karten durch die Zeit</h2>
+          <p class="ln-muted">Amtliche Karten von swisstopo und BAFU über der heutigen Landeskarte.</p>
+          <div id="ln-timeline" class="ln-timeline" role="radiogroup" aria-labelledby="ln-time-title"></div>
+          <label class="ln-row" for="ln-opacity">Deckkraft <input type="range" id="ln-opacity" min="0" max="1" step="0.05" value="0.85"></label>
+          <div id="ln-time-info" class="ln-info" aria-live="polite"></div>
         </section>
+        <section aria-labelledby="ln-themes-title">
+          <h2 id="ln-themes-title">Themen</h2>
+          <div id="ln-themes" class="ln-themes"></div>
+        </section>
+        <section aria-labelledby="ln-place-title">
+          <h2 id="ln-place-title">Ort</h2>
+          <p id="ln-place" class="ln-muted">Ein Klick in die Karte wählt den Ort für den Bericht.</p>
+          <a id="ln-to-report" class="ln-btn" href="#bericht" hidden>Bericht für diesen Ort</a>
+        </section>
+        <p id="ln-status" class="ln-muted small" aria-live="polite"></p>
       </aside>
-
-      <div class="ln-stage">
-        <div class="ln-scene">
-          <svg id="ln-section" viewBox="0 0 1000 560" role="img" aria-labelledby="ln-section-title"><title id="ln-section-title">Schnitt durch das Tal</title></svg>
-          <div class="ln-when">
-            <span id="ln-when"></span>
-            <span id="ln-kind"></span>
-          </div>
-          <ul class="ln-legend" aria-label="Legende">
-            <li><span class="sw" style="background:#e9f1f6"></span>Eis</li>
-            <li><span class="sw line" style="border-color:#e9f1f6"></span>Gletscher 1850</li>
-            <li><span class="sw" style="background:#cfd6d2"></span>Fels und Schnee</li>
-            <li><span class="sw" style="background:#9fae7a"></span>Alpweiden und Rasen</li>
-            <li><span class="sw" style="background:#2f5b3c"></span>Nadelwald</li>
-            <li><span class="sw" style="background:#6f9a4f"></span>Laub- und Mischwald</li>
-            <li><span class="sw line thick" style="border-color:#f2b48f"></span>Waldgrenze nach Klima</li>
-            <li><span class="sw dot" style="background:#b98be6"></span>Neue Arten im Tal</li>
-          </ul>
-          <p class="ln-badge">Schnitt schematisch, nicht massstäblich</p>
-        </div>
-
-        <div class="ln-time">
-          <div class="ln-time-row">
-            <button type="button" id="ln-play" class="ln-play" aria-label="Zeitraffer abspielen"></button>
-            <div class="ln-slider">
-              <label class="sr-only" for="ln-pos">Zeitpunkt</label>
-              <input type="range" id="ln-pos" min="0" max="600" step="1" value="400">
-              <div id="ln-stops" class="ln-stops"></div>
-            </div>
-          </div>
-          <div class="ln-time-row">
-            <span class="ln-label inline">Ab heute: wie stark der Mensch weiter einwirkt</span>
-            <div id="ln-scenarios" class="ln-chips" role="group" aria-label="Wie stark der Mensch weiter einwirkt"></div>
-          </div>
-          <p class="ln-note">Zeitachse gestaucht: Jahrtausende links, Jahrzehnte rechts. Die Waldgrenze nach Klima folgt
-            0,55 °C pro 100 m; der Wald selbst wandert langsamer (Annahme: höchstens rund 2 m pro Jahr).</p>
-        </div>
-      </div>
     </section>
 
-    <!-- ---------- Von oben ---------- -->
-    <section id="oben" class="ln-view ln-lapse" aria-label="Von oben" hidden>
-      <aside class="ln-side">
-        <figure class="ln-voice">
-          <figcaption>Das Tal erzählt · <span id="lo-when-small"></span></figcaption>
-          <blockquote id="lo-voice" aria-live="polite"></blockquote>
-        </figure>
-        <section aria-labelledby="lo-theme-title">
-          <h2 id="lo-theme-title" class="ln-label">Was sich verändert</h2>
-          <div id="lo-cards" class="lo-cards"></div>
-        </section>
-      </aside>
-
-      <div class="ln-stage">
-        <div class="ln-scene lo-scene">
-          <svg id="lo-map" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid slice" role="img" aria-labelledby="lo-map-title"><title id="lo-map-title">Das Rhonetal von oben</title></svg>
-          <div class="ln-when">
-            <span id="lo-when"></span>
-            <span id="lo-kind"></span>
-          </div>
-          <div id="lo-thermo" class="lo-thermo" aria-live="polite"></div>
-          <ul class="ln-legend lo-legend" aria-label="Legende">
-            <li><span class="sw dot" style="background:#6f9a4f"></span>Waldföhre</li>
-            <li><span class="sw dot" style="background:#9c9a45"></span>Flaumeiche</li>
-            <li><span class="sw dot" style="background:#9a948a"></span>abgestorben</li>
-            <li><span class="sw dot" style="background:#244a31"></span>Fichte</li>
-            <li><span class="sw" style="background:#5d9a44"></span>Acker, gut versorgt</li>
-            <li><span class="sw" style="background:#c9a75a"></span>Acker, trocken</li>
-            <li><span class="sw dot ring"></span>Bewässerung</li>
-            <li><span class="sw line" style="border-color:#5aa3d6"></span>Suone (Wasserleite)</li>
-          </ul>
-          <p class="ln-badge">Von oben, schematisch</p>
-        </div>
-
-        <div class="ln-time">
-          <div class="ln-time-row">
-            <button type="button" id="lo-play" class="ln-play" aria-label="Zeitraffer abspielen"></button>
-            <div class="ln-slider">
-              <label class="sr-only" for="lo-pos">Zeitpunkt</label>
-              <input type="range" id="lo-pos" min="0" max="400" step="1" value="200">
-              <div id="lo-stops" class="ln-stops five"></div>
-            </div>
-          </div>
-          <div class="ln-time-row">
-            <span class="ln-label inline">Zeigen</span>
-            <div id="lo-themes" class="ln-chips" role="group" aria-label="Thema hervorheben"></div>
-          </div>
-          <div class="ln-time-row">
-            <span class="ln-label inline">Ab heute: wie stark der Mensch weiter einwirkt</span>
-            <div id="lo-scenarios" class="ln-chips" role="group" aria-label="Wie stark der Mensch weiter einwirkt"></div>
-          </div>
-          <p class="ln-note">Das Rhonetal unterhalb des Aletschgletschers von oben: Gletscher und Suonen am sonnigen Hang,
-            Reben, Äcker und Dorf im Talboden, Föhren und Eichen am Schattenhang. Gezeichnet als Schema; die Aussagen links
-            stützen sich auf die genannten Quellen.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- ---------- Drei Wege ---------- -->
-    <section id="wege" class="ln-view ln-page" aria-labelledby="ln-wege-title" hidden>
-      <div class="ln-page-head">
+    <!-- ---------- Bericht ---------- -->
+    <section id="bericht" class="ln-view ln-report" aria-labelledby="ln-report-title" hidden>
+      <header class="ln-report-head">
         <div>
-          <p class="ln-eyebrow">Drei Wege</p>
-          <h1 id="ln-wege-title">Wie ich <span id="ln-wege-year">2100</span> aussehe, je nachdem, wie stark der Mensch weiter einwirkt</h1>
-          <p class="ln-lede">Sonne, Erdbahn und mein eigener Rhythmus wirken weiter wie bisher. Was sich unterscheidet, ist
-            der Mensch: wie viel Treibhausgas noch dazukommt.</p>
+          <p class="ln-eyebrow">Bericht · Landschaft im Wandel</p>
+          <h1 id="ln-report-title">Ort wählen</h1>
+          <p id="ln-report-meta" class="ln-muted"></p>
         </div>
-        <div id="ln-wege-years" class="ln-chips" role="group" aria-label="Zeitpunkt"></div>
+        <div class="ln-report-actions">
+          <a class="ln-btn ghost" href="#karte">Anderen Ort wählen</a>
+          <button type="button" id="ln-print" class="ln-btn">Drucken / PDF</button>
+        </div>
+      </header>
+      <div id="ln-report-map" class="ln-report-map" aria-label="Lage des Orts"></div>
+      <div id="ln-report-body" class="ln-report-body" aria-live="polite">
+        <p class="ln-muted">Auf der Karte einen Ort wählen; der Bericht fasst zusammen, was amtliche Karten, Messreihen,
+          Klimaszenarien, Gletscherinventare und die Beobachtungen von MyForrest dort sagen.</p>
       </div>
-      <div id="ln-wege-cards" class="ln-cards"></div>
-      <p class="ln-note">Globale Werte: IPCC AR6, beste Schätzung (2041–2060 und 2081–2100). Die Schweiz erwärmt sich etwa
-        doppelt so stark, 0,55 °C entsprechen rund 100 m. Am eigenen Ort gelten die Klimaszenarien CH2025:
-        <a href="./?funktion=klima">Klima-Dossier öffnen</a>.</p>
     </section>
 
     <!-- ---------- Daten holen ---------- -->
     <section id="daten" class="ln-view ln-page" aria-labelledby="ln-daten-title" hidden>
       <div class="ln-page-head">
-        <div>
-          <p class="ln-eyebrow">Daten holen</p>
-          <h1 id="ln-daten-title">Offene Daten, ohne Konto und ohne Server</h1>
-          <p class="ln-lede">Spots, Fotos, Pflanzenfunde und Ausbreitungsfronten, in WGS84 oder LV95. Geschützte Funde
-            fehlen. Lizenz CC BY-SA 4.0.</p>
-        </div>
+        <p class="ln-eyebrow">Daten holen</p>
+        <h1 id="ln-daten-title">Offene Daten, ohne Konto und ohne Server</h1>
+        <p class="ln-lede">Spots, Fotos, Pflanzenfunde und Ausbreitungsfronten, in WGS84 oder LV95. Geschützte Funde
+          fehlen. Lizenz CC BY-SA 4.0.</p>
       </div>
       <div id="ln-audience" class="ln-chips" role="tablist" aria-label="Wofür"></div>
       <div id="ln-offers" class="ln-offers"></div>
-      <h2 class="ln-label">Datensätze</h2>
+      <h2>Datensätze</h2>
       <div class="ln-table">
         <table>
           <thead><tr><th scope="col">Collection</th><th scope="col">Inhalt</th><th scope="col">GeoParquet</th><th scope="col">GeoJSON</th><th scope="col">OGC API</th></tr></thead>
           <tbody id="ln-rows"></tbody>
         </table>
       </div>
-      <p class="ln-note">Alles zusammen: <a href="/api/export/myforrest.gpkg" download>GeoPackage (LV95)</a> ·
+      <p class="ln-muted">Alles zusammen: <a href="/api/export/myforrest.gpkg" download>GeoPackage (LV95)</a> ·
         <a href="/api/export/myforrest.pmtiles">Vektorkacheln als PMTiles</a> ·
         <a href="/api/metadata/geocat.xml">Metadaten für geocat.ch</a> · <a href="/vektorkarte.html">Vektorkarte</a></p>
       <div class="ln-stac">
@@ -192,15 +101,9 @@
         <pre id="ln-code"></pre>
       </div>
     </section>
-
-    <details class="ln-sources">
-      <summary>Quellen</summary>
-      <ul id="ln-sources"></ul>
-    </details>
   </main>
 
-  <script src="landschaft-model.js"></script>
-  <script src="landschaft-oben.js"></script>
+  <script src="vendor/leaflet/leaflet.js"></script>
   <script src="landschaft.js"></script>
 </body>
 </html>

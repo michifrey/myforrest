@@ -73,45 +73,27 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.locator('#perspektiven').screenshot({ path: out('perspektiven.jpg'), ...jpg });
     await page.close();
 
+    // Landschaft im Wandel: the Dufour map over the demo forest, the forest belts 2085, the report of a place.
     page = await ctx.newPage();
-    const at = async (pos, scenario = 'mid') => {
-      await page.evaluate(([p, s]) => {
-        document.querySelector(`#ln-scenarios button[data-id="${s}"]`).click();
-        const range = document.getElementById('ln-pos');
-        range.value = String(p);
-        range.dispatchEvent(new Event('input'));
-      }, [pos, scenario]);
-      await settle(page, 300);
+    const place = '#karte?lat=47.37&lon=8.54';
+    const stop = async (id) => {
+      await page.click(`#ln-timeline button[data-id="${id}"]`);
+      await settle(page, 2500);
     };
-    await page.goto(`${BASE}/landschaft.html`);
-    await settle(page, 1500);
-    await at(400);
+    await page.goto(`${BASE}/landschaft.html${place}`);
+    await settle(page, 2500);
+    await page.evaluate(() => { window.scrollTo(0, 0); });
+    await stop('dufour');
     await page.screenshot({ path: out('landschaft.jpg'), ...jpg });
-    await at(0);
-    await page.screenshot({ path: out('landschaft-eiszeit.jpg'), ...jpg });
-    await at(600, 'high');
-    await page.screenshot({ path: out('landschaft-2100.jpg'), ...jpg });
-    // «Von oben»: the valley today and in 2100 when humans keep acting strongly.
-    const oben = async (pos, scenario) => {
-      await page.evaluate(([p, s]) => {
-        document.querySelector(`#lo-scenarios button[data-id="${s}"]`).click();
-        const range = document.getElementById('lo-pos');
-        range.value = String(p);
-        range.dispatchEvent(new Event('input'));
-      }, [pos, scenario]);
-      await settle(page, 600);
-    };
-    await page.goto(`${BASE}/landschaft.html#oben`);
+    await stop('wald-2085-t');
+    await page.screenshot({ path: out('landschaft-2085.jpg'), ...jpg });
+    await page.goto(`${BASE}/landschaft.html#bericht?lat=47.37&lon=8.54`);
+    await page.waitForSelector('.ln-section', { timeout: 120000 });
+    await settle(page, 2500);
+    await page.locator('#bericht').screenshot({ path: out('landschaft-bericht.jpg'), ...jpg });
+    await page.goto(`${BASE}/landschaft.html#daten`);
     await settle(page, 1200);
-    await oben(200, 'mid');
-    await page.screenshot({ path: out('landschaft-oben.jpg'), ...jpg });
-    await oben(400, 'high');
-    await page.screenshot({ path: out('landschaft-oben-2100.jpg'), ...jpg });
-    for (const view of ['wege', 'daten']) {
-      await page.goto(`${BASE}/landschaft.html#${view}`);
-      await settle(page, 1200);
-      await page.locator(`#${view}`).screenshot({ path: out(`landschaft-${view}.jpg`), ...jpg });
-    }
+    await page.locator('#daten').screenshot({ path: out('landschaft-daten.jpg'), ...jpg });
     await page.close();
   }
 

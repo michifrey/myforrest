@@ -146,10 +146,9 @@ public/drive-select.js  Fahrtmodus: welche der Bilder einer Fahrt behalten werde
 public/basemap.js    Grundkarte «MyForrest»: Vektorkarte (MapLibre in Leaflet) in den Farben der App, Wechsel zu OSM, Landeskarte, Luftbild
 public/layers.js     Panel «Ebenen»: Karten aus offiziellen Quellen nach Thema, Deckkraft, Legende, «Was ist hier?»
 public/features.js   Startseite, Abschnitt «Funktionen»: Kacheln öffnen ihr Panel, Fahrtmodus, Upload oder PRO; ?funktion=…; Doku-Links
-public/landschaft.html, landschaft.js, landschaft.css  Landschaft im Wandel: eigene Seite aus Sicht der Natur (Zeitraffer im Schnitt, Drei Wege, Daten holen)
-public/landschaft-oben.js  Landschaft im Wandel, Ansicht «Von oben»: das Tal aus der Vogelperspektive mit Wasser, Wald, Nahrung und Temperatur (SVG, animiert)
-public/landschaft-model.js  Modell dazu: Zeitpunkte mit Stimme, Aussagen und Quellen, Wirkkräfte, drei Wege, Geometrie des Schnitts (auch in Node getestet)
+public/landschaft.html, landschaft.js, landschaft.css  Landschaft im Wandel: amtliche Karten durch die Zeit, Themenkarten, Bericht pro Ort (druckbar), Daten holen
 src/routes/layers.js Ebenen-Katalog aus den Capabilities von geo.admin.ch und regionalen Diensten, Abfrage per Identify/GetFeatureInfo
+src/routes/landschaft.js  Landschaft im Wandel: Karten durch die Zeit und Ebenen pro Thema aus dem Katalog, Bericht pro Ort (Identify, Gletscher, Beobachtungen)
 public/map3d.js      3D-Karte: Spots, Route und Gletscher auf dem Gelände mit MapLibre (erst beim Öffnen geladen); Gebäude und Bäume von swisstopo als 3D Tiles über deck.gl
 public/forecast.js   Wetter im Spot: Niederschlagsradar (MeteoSchweiz, sonst DWD; letzte zwei Stunden) und Vorhersage für Stunden und Tage
 public/spotprofile.js  Licht & Wald im Spot: Horizont, Sonnenbogen und Baumarten in ihrer Jahreszeit (Canvas, Jahreszeit auch in Node getestet)

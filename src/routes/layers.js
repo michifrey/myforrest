@@ -77,7 +77,7 @@ module.exports = function registerLayers(app, {
       attribution: 'NASA FIRMS (MODIS, VIIRS)', match: /fires_(viirs|modis)/i,
     }] : []),
   ];
-  let cache = { at: 0, groups: null, errors: [], byId: new Map() };
+  let cache = { at: 0, groups: null, errors: [], byId: new Map(), all: [] };
 
   async function capabilities(url) {
     const sep = url.includes('?') ? '&' : '?';
@@ -92,6 +92,8 @@ module.exports = function registerLayers(app, {
     const groups = new Map();
     const errors = [];
     const byId = new Map();
+    // Every layer of geo.admin.ch, for other pages that pick their own (routes/landschaft.js).
+    const all = [];
     const add = (groupId, title, layer) => {
       if (!groups.has(groupId)) groups.set(groupId, { id: groupId, title, layers: [] });
       const g = groups.get(groupId);
@@ -109,6 +111,7 @@ module.exports = function registerLayers(app, {
         continue;
       }
       if (src.geoadmin) {
+        all.push(...caps.layers.map((l) => ({ url: src.url, name: l.name, title: l.title, attribution: src.attribution, legend: legendOf(src, l.name) })));
         for (const g of GROUPS) {
           const hits = caps.layers.filter((l) => g.match.test(l.name));
           const rank = (l) => { const i = g.prefer.indexOf(l.name); return i < 0 ? 99 : i; };
@@ -128,7 +131,7 @@ module.exports = function registerLayers(app, {
     }
     const order = ['wald', 'bevoelkerung', 'nutzung', 'verkehr'];
     const list = [...groups.values()].sort((a, b) => ((order.indexOf(a.id) + 1 || 99) - (order.indexOf(b.id) + 1 || 99)) || a.title.localeCompare(b.title, 'de'));
-    return { at: now(), groups: list, errors, byId };
+    return { at: now(), groups: list, errors, byId, all };
   }
 
   let loading = null;
@@ -165,21 +168,9 @@ module.exports = function registerLayers(app, {
     const layers = String(req.query.layers || '').split(',').map((id) => c.byId.get(id)).filter(Boolean).slice(0, 6);
     const items = [];
     const geo = layers.filter((l) => l.identify === 'geoadmin');
-    if (geo.length && identifyUrl) {
-      const d = 0.002;
-      const q = new URLSearchParams({
-        geometry: `${lon},${lat}`, geometryType: 'esriGeometryPoint', sr: '4326', tolerance: '5', returnGeometry: 'false', lang: 'de',
-        layers: `all:${geo.map((l) => l.name).join(',')}`, mapExtent: `${lon - d},${lat - d},${lon + d},${lat + d}`, imageDisplay: '400,400,96',
-      });
-      try {
-        const r = await fetchImpl(`${identifyUrl}?${q}`, { signal: AbortSignal.timeout(15000) });
-        const body = r.ok ? await r.json() : { results: [] };
-        for (const f of body.results || []) {
-          const layer = geo.find((l) => l.name === (f.layerBodId || f.layerId)) || geo[0];
-          const attributes = clean(f.attributes || f.properties);
-          if (attributes.length) items.push({ id: layer.id, title: f.layerName || layer.title, attributes });
-        }
-      } catch { /* no answer: nothing to say */ }
+    for (const hit of await identify(lat, lon, geo.map((l) => l.name))) {
+      const layer = geo.find((l) => l.name === hit.name) || geo[0];
+      items.push({ id: layer.id, title: hit.title || layer.title, attributes: hit.attributes });
     }
     for (const l of layers.filter((x) => x.identify === 'wms')) {
       // A 101 × 101 pixel GetMap window of ~200 m around the point, asking for its middle pixel.
@@ -203,5 +194,30 @@ module.exports = function registerLayers(app, {
     res.json({ lat, lon, items });
   });
 
-  return { catalogue };
+  /**
+   * What geo.admin.ch layers (by name) say at a point, through its identify service:
+   * [{ name, title, attributes: [[key, value]] }]; nothing when it does not answer.
+   */
+  async function identify(lat, lon, names) {
+    if (!names.length || !identifyUrl) return [];
+    const d = 0.002;
+    const q = new URLSearchParams({
+      geometry: `${lon},${lat}`, geometryType: 'esriGeometryPoint', sr: '4326', tolerance: '5', returnGeometry: 'false', lang: 'de',
+      layers: `all:${names.join(',')}`, mapExtent: `${lon - d},${lat - d},${lon + d},${lat + d}`, imageDisplay: '400,400,96',
+    });
+    try {
+      const r = await fetchImpl(`${identifyUrl}?${q}`, { signal: AbortSignal.timeout(15000) });
+      const body = r.ok ? await r.json() : { results: [] };
+      return (body.results || []).map((f) => ({
+        name: f.layerBodId || f.layerId || names[0], title: f.layerName || null, attributes: clean(f.attributes || f.properties),
+      })).filter((x) => x.attributes.length);
+    } catch {
+      return []; // no answer: nothing to say
+    }
+  }
+
+  /** All layers of geo.admin.ch from its capabilities (cached with the panel's catalogue). */
+  const geoadminLayers = async () => (await catalogue()).all || [];
+
+  return { catalogue, identify, geoadminLayers };
 };

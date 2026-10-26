@@ -25,8 +25,8 @@ eigener gezeichneter Szene, Farbstimmung und Überschrift; die Knöpfe unter der
 ![Die vier Landschaften der Startseite: Wald, Gletscher, Gebirge und Wüste](docs/screenshots/hero-landschaften.jpg)
 
 Gleich darunter stehen **zwei Perspektiven** auf dieselbe Landschaft nebeneinander: *Wald im Wandel*, mit unseren
-Augen, gemeinsam und von unten nach oben, Foto für Foto; und *Landschaft im Wandel*, aus Sicht der Natur, in der das
-Tal selbst erzählt (Abschnitt 16). Die Navigation führt mit *Landschaft im Wandel* direkt dorthin.
+Augen, gemeinsam und von unten nach oben, Foto für Foto; und *Landschaft im Wandel*, aus Sicht der Natur, mit
+amtlichen Karten durch die Zeit und einem Bericht pro Ort (Abschnitt 16). Die Navigation führt mit *Landschaft im Wandel* direkt dorthin.
 
 ![Startseite: die zwei Perspektiven nebeneinander](docs/screenshots/perspektiven.jpg)
 
@@ -571,37 +571,21 @@ Kronendach des SITG, und Orte dort verweisen auf das 3D-Modell [Genève 3D](http
 
 ### 16. Landschaft im Wandel
 
-![Zeitraffer: der Schnitt vom Jungfraugipfel bis zur Rhone, das Tal erzählt, die Wirkkräfte](docs/screenshots/landschaft.jpg)
+![Karte: die Dufourkarte um 1850 über der heutigen Landeskarte](docs/screenshots/landschaft.jpg)
 
-Die zweite Perspektive ist eine eigene Seite (`/landschaft.html`): Nicht der Mensch schaut auf die Landschaft, die
-Landschaft erzählt selbst. Statt einer Karte von oben zeigt ein **Schnitt** das Tal von der Seite, vom Gipfel der
-Jungfrau bis zur Rhone, mit Eis, Fels, Alpweiden und Wald. Ein **Zeitraffer** läuft von der letzten Eiszeit vor
-24 000 Jahren über die Jüngere Dryas, das Wärmeoptimum vor 7000 Jahren, 1850 und heute bis 2100. Dazu spricht das Tal
-in der Ich-Form («Ich liege unter Eis, Hunderte Meter dick»), mit den Aussagen und Quellen dahinter.
+Die zweite Perspektive ist eine eigene Seite (`/landschaft.html`): was mit der Landschaft selbst geschieht, aus
+amtlichen Karten und Daten. Die **Karte** legt Karten aus anderen Zeiten über die heutige Landeskarte: die letzte
+Eiszeit, die Dufourkarte um 1850, die Siegfriedkarte um 1900 und die Höhenstufen des Waldes heute und um 2085 (BAFU,
+trocken und weniger trocken). Dazu lassen sich Themenkarten von geo.admin.ch zu Klima, Gletschern und Wasser, Wald,
+Landwirtschaft und Boden einblenden.
 
-<p>
-  <img src="docs/screenshots/landschaft-eiszeit.jpg" width="49%" alt="Vor 24 000 Jahren: das Tal unter Eis">
-  <img src="docs/screenshots/landschaft-2100.jpg" width="49%" alt="2100, wenn der Mensch stark weiter einwirkt: das Eis fast weg">
-</p>
+![Bericht für einen Ort: Klima, Gletscher und Wasser, Wald, Landwirtschaft und Boden](docs/screenshots/landschaft-bericht.jpg)
 
-Sieben **Wirkkräfte** zeigen, was gerade auf das Tal wirkt: Erdbahn und Sonne, Vulkane, Eigenrhythmus des Klimas, Eis
-und Wasser, wandernde Arten und der Mensch mit Rodung und Weide und mit Treibhausgasen. Der Mensch ist eine Kraft unter
-mehreren, heute bei Wärme und Eis die stärkste. Ab heute wählt man, **wie stark der Mensch weiter einwirkt** (wenig,
-mittel, stark nach den Emissionspfaden des IPCC). Die Waldgrenze nach Klima steigt nach der Faustregel des
-Klima-Dossiers, der Wald selbst folgt langsamer.
-
-![Von oben: das Rhonetal heute mit Wasser, Wald, Nahrung und Temperatur](docs/screenshots/landschaft-oben.jpg)
-
-**Von oben** zeigt das Rhonetal unterhalb des Gletschers aus der Vogelperspektive, von 1900 bis 2100, animiert:
-Gletscher, Rhone und Suonen führen im Sommer weniger Wasser, unten am Hang sterben Föhren und Flaumeichen wachsen
-nach, Äcker und Reben brauchen mehr Bewässerung, über dem Talboden flimmert die Hitze. *Zeigen* hebt ein Thema
-hervor (Wasser, Wald, Nahrung, Temperatur), mit Zustand, Verlauf und Quellen (CH2018, Hydro-CH2018, WSL, Agroscope).
-
-![Drei Wege: das Tal 2100 je nach menschlichem Einfluss](docs/screenshots/landschaft-wege.jpg)
-
-**Drei Wege** stellt das Tal 2050 oder 2100 dreimal nebeneinander. **Daten holen** sammelt die offenen Daten
-(GeoParquet, GeoJSON, GeoPackage, PMTiles, STAC) mit Angeboten für Gemeinde und Forst, Schulen und GIS. Der Schnitt ist
-schematisch; Zeitpunkte, Quellen und Annahmen: [Landschaft im Wandel](docs/landschaft.md).
+Ein Klick in die Karte wählt einen Ort für den **Bericht**: Klima (Erwärmung, Kennzahlen, Szenarien +1,5, +2 und +3 °C
+aus dem Klima-Dossier), Gletscher und Wasser (Inventare, GLAMOS), Wald (Höhenstufen heute und 2085, Landesforstinventar,
+was die Szenarien für den Wald heissen), Landwirtschaft und Boden (Arealstatistik) und was MyForrest dort sah, mit allen
+Quellen, zum Drucken oder als PDF. **Daten holen** sammelt die offenen Daten (GeoParquet, GeoJSON, GeoPackage, PMTiles,
+STAC). Ebenen, Abfragen und Quellen: [Landschaft im Wandel](docs/landschaft.md).
 
 ## Was MyForrest kann
 
@@ -637,9 +621,9 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   homogenen Messreihen der MeteoSchweiz seit 1864, einer Zeitachse mit den Beobachtungen der Spots, Aussagen, die
   beides verbinden, einem Ausblick bis 2050 aus Klimamodellen, drei Szenarien (+1,5, +2, +3 °C, CH2025) und was sie
   für den Wald bedeuten; dazu ein Klima-Raster und offizielle Karten von geo.admin.ch auf der Karte.
-- **[Landschaft im Wandel](docs/landschaft.md)**: die zweite Perspektive, aus Sicht der Natur: ein Tal im Schnitt von
-  der letzten Eiszeit bis 2100, das in der Ich-Form erzählt, mit Wirkkräften (der Mensch eine unter mehreren), drei
-  Wegen je nach menschlichem Einfluss und allen offenen Daten an einem Ort.
+- **[Landschaft im Wandel](docs/landschaft.md)**: die zweite Perspektive, aus Sicht der Natur: amtliche Karten durch
+  die Zeit (Eiszeit, Dufour, Siegfried, Landeskarte, Waldhöhenstufen 2085), Themenkarten und ein druckbarer Bericht pro
+  Ort zu Klima, Gletschern und Wasser, Wald, Landwirtschaft und Boden.
 - **[Kartenmodi](docs/funktionen.md#kartenmodi)**: Sonnenstand, Schatten und Einstrahlung inklusive
   Geländehorizont sowie Hotspots und Ausbreitungsfronten von Neophyten; **[3D-Karte](docs/funktionen.md#3d-karte)**
   mit den Spots auf dem Gelände.
@@ -709,7 +693,7 @@ jedes Dokument hier im Repository und auf der Website.
 |----------|--------|
 | [Funktionen im Detail](docs/funktionen.md) · [Website](https://michifrey.github.io/myforrest/funktionen/) | Alle Funktionen mit Verfahren, Schwellenwerten und Grenzen |
 | [Klima im Wandel](docs/klimawandel.md) · [Website](https://michifrey.github.io/myforrest/klimawandel/) | Klima der Region neben den Fotos, Szenarien CH2025 und Katalog der offenen Klimadaten |
-| [Landschaft im Wandel](docs/landschaft.md) · [Website](https://michifrey.github.io/myforrest/landschaft/) | Die Perspektive der Natur: Zeitraffer im Schnitt von der Eiszeit bis 2100, das Tal von oben mit Wasser, Wald, Nahrung und Temperatur, Wirkkräfte, drei Wege, Quellen |
+| [Landschaft im Wandel](docs/landschaft.md) · [Website](https://michifrey.github.io/myforrest/landschaft/) | Die Perspektive der Natur: amtliche Karten durch die Zeit, Themenkarten und ein Bericht pro Ort, mit Ebenen und Quellen |
 | [Android-App](docs/android.md) · [Website](https://michifrey.github.io/myforrest/android/) | Fahrtmodus und Aufzeichnung im Hintergrund, Installieren, selbst bauen und signieren |
 | [Tech-Onboarding](docs/tech-onboarding.md) · [Website](https://michifrey.github.io/myforrest/tech-onboarding/) | Selbst hosten: Voraussetzungen, Speicherplatz, Lizenzen, Ports, Zertifikate, ausgehende Verbindungen, Checkliste |
 | [Installation und Konfiguration](docs/installation.md) · [Website](https://michifrey.github.io/myforrest/installation/) | Voraussetzungen, HTTPS fürs Handy, Umgebungsvariablen, externer Detektor, Phänologie-Daten |

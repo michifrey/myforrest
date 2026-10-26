@@ -24,6 +24,13 @@ async function routeTiles(ctx) {
     if (!tileCache.has(key)) tileCache.set(key, await tiles.mercatorTile(z, x, y, 'osm'));
     await route.fulfill({ body: tileCache.get(key), contentType: 'image/png' });
   }));
+  // swisstopo in Web Mercator (Landschaft im Wandel): the same placeholder map as OpenStreetMap.
+  await ctx.route(/wmts\.geo\.admin\.ch\/.*\/3857\/(\d+)\/(\d+)\/(\d+)\.jpeg/, safe(async (route) => {
+    const [, z, x, y] = route.request().url().match(/\/3857\/(\d+)\/(\d+)\/(\d+)\.jpeg/).map(Number);
+    const key = `m${z}/${x}/${y}`;
+    if (!tileCache.has(key)) tileCache.set(key, await tiles.mercatorTile(z, x, y, 'osm'));
+    await route.fulfill({ body: tileCache.get(key), contentType: 'image/png' });
+  }));
   await ctx.route(/wmts\.geo\.admin\.ch\/.*\/2056\/(\d+)\/(\d+)\/(\d+)\.jpeg/, safe(async (route) => {
     const [, z, x, y] = route.request().url().match(/\/2056\/(\d+)\/(\d+)\/(\d+)\.jpeg/).map(Number);
     const key = `l${z}/${x}/${y}`;
