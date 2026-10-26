@@ -105,6 +105,11 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     });
     await settle(page, 6000);
     await page.screenshot({ path: out('landschaft-luftbild.jpg'), ...jpg });
+    // Two years side by side: 1956 left, the newest flight right of the divider.
+    await page.click('#ln-vergleich');
+    for (let i = 0; i < 4; i += 1) await page.press('.ln-swipe-handle', 'ArrowRight');
+    await settle(page, 6000);
+    await page.screenshot({ path: out('landschaft-vergleich.jpg'), ...jpg });
     await page.goto(`${BASE}/landschaft.html#bericht?lat=47.37&lon=8.54`);
     await page.waitForSelector('.ln-section', { timeout: 120000 });
     await settle(page, 2500);
