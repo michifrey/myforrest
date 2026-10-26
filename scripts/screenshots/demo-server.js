@@ -597,12 +597,18 @@ app.get('/demo-vt/:z/:x/:y.pbf', (req, res) => {
   res.set('access-control-allow-origin', '*');
   res.type('application/x-protobuf').send(vectorDemo.tile(Number(req.params.z), Number(req.params.x), Number(req.params.y)));
 });
-// The years of the demo «Zeitreise»: every tenth year since 1870 and the last edition.
+// The years of the demo «Zeitreise» (every tenth year since 1870 and the last edition) and of the demo aerial
+// images (a flight every few years since 1926).
 app.get('/demo-wmts/WMTSCapabilities.xml', (req, res) => {
   const years = [...Array.from({ length: 15 }, (_, i) => 1870 + i * 10), 2021];
+  const flights = [1926, 1934, 1946, 1956, 1967, 1976, 1988, 1998, 2004, 2010, 2016, 2023];
   res.type('text/xml').send(`<?xml version="1.0"?><Capabilities xmlns:ows="http://www.opengis.net/ows/1.1"><Contents><Layer>
 <ows:Title>Zeitreise (Demo)</ows:Title><ows:Identifier>ch.swisstopo.zeitreihen</ows:Identifier>
-<Dimension><ows:Identifier>Time</ows:Identifier>${years.map((y) => `<Value>${y}1231</Value>`).join('')}</Dimension></Layer></Contents></Capabilities>`);
+<Dimension><ows:Identifier>Time</ows:Identifier>${years.map((y) => `<Value>${y}1231</Value>`).join('')}</Dimension></Layer>
+<Layer><ows:Title>SWISSIMAGE Zeitreise (Demo)</ows:Title><ows:Identifier>ch.swisstopo.swissimage-product</ows:Identifier>
+<Dimension><ows:Identifier>Time</ows:Identifier><Value>current</Value>${flights.map((y) => `<Value>${y}</Value>`).join('')}</Dimension>
+<ResourceURL format="image/jpeg" resourceType="tile" template="https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage-product/default/{Time}/{TileMatrixSet}/{TileMatrix}/{TileCol}/{TileRow}.jpeg"/></Layer>
+</Contents></Capabilities>`);
 });
 app.get('/demo-wms', async (req, res) => {
   const r = await demoWms(`http://x/demo-wms?${new URLSearchParams(req.query)}`);

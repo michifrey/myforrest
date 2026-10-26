@@ -121,20 +121,28 @@ test('Landschaft im Wandel is a page of its own, linked from the start page and 
   });
 });
 
-test('Landschaft im Wandel: the «Zeitreise» of the Landeskarte with the years of the WMTS capabilities', async () => {
+test('Landschaft im Wandel: the «Zeitreise» of the Landeskarte and the aerial images, with the years of the WMTS capabilities', async () => {
   const wmts = `<?xml version="1.0"?><Capabilities xmlns:ows="http://www.opengis.net/ows/1.1"><Contents>
 <Layer><ows:Title>Landeskarte</ows:Title><ows:Identifier>ch.swisstopo.pixelkarte-farbe</ows:Identifier>
 <Dimension><ows:Identifier>Time</ows:Identifier><Default>current</Default><Value>current</Value></Dimension></Layer>
 <Layer><ows:Title>Zeitreise</ows:Title><ows:Identifier>ch.swisstopo.zeitreihen</ows:Identifier>
 <Dimension><ows:Identifier>Time</ows:Identifier><Default>20211231</Default><Value>20211231</Value><Value>18641231</Value><Value>19501231</Value><Value>19501231</Value></Dimension></Layer>
+<Layer><ows:Title>SWISSIMAGE Zeitreise</ows:Title><ows:Identifier>ch.swisstopo.swissimage-product</ows:Identifier>
+<Dimension><ows:Identifier>Time</ows:Identifier><Default>current</Default><Value>current</Value><Value>1946</Value><Value>19260101</Value><Value>19461231</Value><Value>2023</Value></Dimension>
+<ResourceURL format="image/jpeg" resourceType="tile" template="https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage-product/default/{Time}/{TileMatrixSet}/{TileMatrix}/{TileCol}/{TileRow}.jpeg"/></Layer>
 </Contents></Capabilities>`;
   await withServer(async (base) => {
     const d = await (await fetch(`${base}/api/landschaft/karten`)).json();
-    assert.deepEqual(d.timeline.map((t) => t.id), ['eiszeit', 'dufour', 'zeitreise', 'heute', 'wald-heute', 'wald-2085-t']);
+    assert.deepEqual(d.timeline.map((t) => t.id), ['eiszeit', 'dufour', 'zeitreise', 'luftbild', 'heute', 'wald-heute', 'wald-2085-t']);
     const z = d.timeline.find((t) => t.id === 'zeitreise');
     assert.equal(z.when, '1864–2021');
     assert.deepEqual(z.zeitreise.years, [{ year: 1864, time: '18641231' }, { year: 1950, time: '19501231' }, { year: 2021, time: '20211231' }], 'sorted, once each');
     assert.equal(z.zeitreise.tiles, 'https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.zeitreihen/default/{time}/3857/{z}/{x}/{y}.png');
+    // The aerial images: the tile address from the capabilities, one entry per year (the last flight of a year).
+    const l = d.timeline.find((t) => t.id === 'luftbild');
+    assert.equal(l.when, '1926–2023');
+    assert.deepEqual(l.zeitreise.years, [{ year: 1926, time: '19260101' }, { year: 1946, time: '19461231' }, { year: 2023, time: '2023' }]);
+    assert.equal(l.zeitreise.tiles, 'https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage-product/default/{time}/3857/{z}/{x}/{y}.jpeg');
   }, { wmts });
   // Without capabilities there is no «Zeitreise», the rest stays.
   await withServer(async (base) => {

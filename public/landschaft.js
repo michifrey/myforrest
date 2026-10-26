@@ -62,6 +62,7 @@
     $('ln-zeit-range').value = String(zeit.index);
     // The year in the address, so the view can be shared.
     const q = new URLSearchParams(state.place ? { lat: state.place.lat, lon: state.place.lon } : {});
+    q.set('ansicht', stop.id);
     q.set('jahr', y.year);
     history.replaceState(null, '', `#karte?${q}`);
   }
@@ -101,8 +102,8 @@
     if (stop?.layer) timeLayer = wms(stop.layer, Number($('ln-opacity').value)).addTo(map);
     if (stop?.zeitreise) {
       const years = stop.zeitreise.years;
-      // Start at the year asked for (link), else around 1900.
-      const want = year ?? 1900;
+      // Start at the year asked for (link), else around 1900 (maps) or 1950 (aerial images).
+      const want = year ?? (id === 'luftbild' ? 1950 : 1900);
       zeit.index = years.reduce((best, y, i) => (Math.abs(y.year - want) < Math.abs(years[best].year - want) ? i : best), 0);
       timeLayer = L.tileLayer(zeitTiles(stop.zeitreise, years[zeit.index].time), {
         maxZoom: 19, maxNativeZoom: 18, bounds: CH, opacity: Number($('ln-opacity').value), attribution: stop.zeitreise.attribution,
@@ -151,8 +152,10 @@
       el('div', { id: 'ln-theme-legend' }),
       state.maps.themes.some((t) => t.layers.length) ? null : el('p', { class: 'ln-muted', text: 'Keine Themenkarten verfügbar.' }),
     ].filter(Boolean));
-    const year = Number(new URLSearchParams(location.hash.split('?')[1] || '').get('jahr'));
-    if (year && state.maps.timeline.some((t) => t.id === 'zeitreise')) showTimeline('zeitreise', { year });
+    const q = new URLSearchParams(location.hash.split('?')[1] || '');
+    const year = Number(q.get('jahr'));
+    const view = q.get('ansicht') || 'zeitreise';
+    if (year && state.maps.timeline.some((t) => t.id === view && t.zeitreise)) showTimeline(view, { year });
     else showTimeline(state.maps.timeline.some((t) => t.id === state.timeline) ? state.timeline : 'heute');
   }
 

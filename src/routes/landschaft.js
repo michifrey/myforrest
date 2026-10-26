@@ -6,7 +6,8 @@
  * inventories and GLAMOS series of this server, and the spots in the region. The climate part of the report comes
  * from the climate dossier (/api/klima), which the page asks for itself.
  *
- *   GET /api/landschaft/karten               the maps through time (with the years of swisstopo's «Zeitreise») and the layers per theme
+ *   GET /api/landschaft/karten               the maps through time (with the years of swisstopo's «Zeitreise» of the
+ *                                            Landeskarte and of the aerial images) and the layers per theme
  *   GET /api/landschaft/bericht?lat&lon      what the layers, the inventories and the spots say about a place
  */
 
@@ -25,8 +26,12 @@ const TIMELINE = [
     text: 'Topographischer Atlas der Schweiz (1870–1949): Gletscher, Wald und Siedlungen vor dem grossen Wandel des 20. Jahrhunderts.',
   },
   {
-    id: 'zeitreise', zeitreise: true, when: 'Jahr für Jahr', title: 'Zeitreise der Landeskarte',
+    id: 'zeitreise', wmts: 'ch.swisstopo.zeitreihen', ext: 'png', title: 'Zeitreise der Landeskarte',
     text: 'Die Landeskarten von swisstopo, wie sie im gewählten Jahr galten: Gletscher, Wald, Siedlungen und Strassen Jahr für Jahr. Vor 1964 decken sie die Schweiz nicht überall ab.',
+  },
+  {
+    id: 'luftbild', wmts: 'ch.swisstopo.swissimage-product', ext: 'jpeg', title: 'Historische Luftbilder',
+    text: 'SWISSIMAGE Zeitreise: die Orthofotos von swisstopo aus den Befliegungen seit 1926. Jede Kachel zeigt den Flug, der den grössten Teil liefert; an den Rändern der Flugblöcke mischen sich die Jahre.',
   },
   { id: 'heute', base: true, when: 'heute', title: 'Landeskarte', text: 'Die aktuelle Landeskarte von swisstopo.' },
   {
@@ -71,22 +76,30 @@ const { TAGS } = require('../tags');
 
 const RADIUS_KM = 5;
 
-// swisstopo's «Zeitreise»: the Landeskarte of each year as WMTS tiles; the years are in the WMTS capabilities.
-const ZEITREISE_LAYER = 'ch.swisstopo.zeitreihen';
+// swisstopo's «Zeitreise» (the Landeskarte of each year) and the aerial images of each flight: WMTS layers with a
+// time dimension; their years and tile addresses are in the WMTS capabilities.
 const ZEITREISE_CAPABILITIES = 'https://wmts.geo.admin.ch/EPSG/3857/1.0.0/WMTSCapabilities.xml';
-const ZEITREISE_TILES = `https://wmts.geo.admin.ch/1.0.0/${ZEITREISE_LAYER}/default/{time}/3857/{z}/{x}/{y}.png`;
 const DAY = 24 * 3600000;
 
-/** The time values (YYYYMMDD) of a WMTS layer in capabilities, oldest first. */
-function wmtsTimes(xml, layer) {
+/**
+ * A WMTS layer with a time dimension in capabilities: its time values (YYYY or YYYYMMDD, oldest first) and the tile
+ * address as a Leaflet template ({time}, {z}, {x}, {y}); null when the layer is not there.
+ */
+function wmtsLayer(xml, layer) {
   for (const block of xml.split(/<Layer>/).slice(1)) {
     const id = block.match(/<ows:Identifier>([^<]*)<\/ows:Identifier>/)?.[1];
     if (id !== layer) continue;
     const dim = block.match(/<Dimension>([\s\S]*?)<\/Dimension>/)?.[1] || '';
-    return [...new Set([...dim.matchAll(/<Value>(\d{8})<\/Value>/g)].map((m) => m[1]))].sort();
+    const times = [...new Set([...dim.matchAll(/<Value>(\d{4}(?:\d{4})?)<\/Value>/g)].map((m) => m[1]))].sort();
+    const raw = block.match(/<ResourceURL[^>]*resourceType="tile"[^>]*template="([^"]+)"/)?.[1]
+      || block.match(/<ResourceURL[^>]*template="([^"]+)"[^>]*resourceType="tile"/)?.[1] || null;
+    const template = raw && raw.replace(/&amp;/g, '&').replace('{Time}', '{time}').replace('{TileMatrixSet}', '3857')
+      .replace('{TileMatrix}', '{z}').replace('{TileCol}', '{x}').replace('{TileRow}', '{y}');
+    return { times, template };
   }
-  return [];
+  return null;
 }
+const yearOf = (time) => Number(String(time).slice(0, 4));
 
 function pick(layers, theme) {
   const hits = layers.filter((l) => theme.match.test(l.name));
@@ -98,32 +111,41 @@ module.exports = function registerLandschaft(app, {
   db, layers, glaciers = null, glamos = null, fetchImpl = fetch, now = () => Date.now(),
   zeitreiseUrl = (process.env.ZEITREISE_WMTS_URL ?? ZEITREISE_CAPABILITIES) || null,
 }) {
-  let zeitreise = { at: 0, times: [] };
-  /** The years of the «Zeitreise», read once a day; the last good list when the service does not answer. */
-  async function zeitreiseTimes() {
-    if (!zeitreiseUrl || (zeitreise.times.length && now() - zeitreise.at < DAY)) return zeitreise.times;
+  let wmts = { at: 0, layers: {} };
+  /** The time layers of the timeline from the WMTS capabilities, read once a day; the last good ones when it fails. */
+  async function timeLayers() {
+    if (!zeitreiseUrl || (Object.keys(wmts.layers).length && now() - wmts.at < DAY)) return wmts.layers;
     try {
       const r = await fetchImpl(zeitreiseUrl, { signal: AbortSignal.timeout(40000) });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const times = wmtsTimes(await r.text(), ZEITREISE_LAYER);
-      if (times.length) zeitreise = { at: now(), times };
+      const xml = await r.text();
+      const found = {};
+      for (const t of TIMELINE.filter((x) => x.wmts)) {
+        const l = wmtsLayer(xml, t.wmts);
+        if (l?.times.length) found[t.wmts] = l;
+      }
+      if (Object.keys(found).length) wmts = { at: now(), layers: found };
     } catch { /* keep what we had */ }
-    return zeitreise.times;
+    return wmts.layers;
   }
 
   const hasCol = (table, col) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
   const layerJson = (l) => ({ name: l.name, title: l.title, url: l.url, attribution: l.attribution, legend: l.legend });
 
   app.get('/api/landschaft/karten', async (req, res) => {
-    const [all, times] = await Promise.all([layers.geoadminLayers(), zeitreiseTimes()]);
+    const [all, timed] = await Promise.all([layers.geoadminLayers(), timeLayers()]);
     const timeline = [];
     for (const t of TIMELINE) {
-      if (t.zeitreise) {
-        if (!times.length) continue;
-        const years = times.map((time) => ({ year: Number(time.slice(0, 4)), time }));
+      if (t.wmts) {
+        const w = timed[t.wmts];
+        if (!w) continue;
+        // One entry per year (aerial images list several flights of a year: the last one counts).
+        const byYear = new Map(w.times.map((time) => [yearOf(time), time]));
+        const years = [...byYear].map(([year, time]) => ({ year, time }));
+        const tiles = w.template || `https://wmts.geo.admin.ch/1.0.0/${t.wmts}/default/{time}/3857/{z}/{x}/{y}.${t.ext}`;
         timeline.push({
           id: t.id, when: `${years[0].year}–${years[years.length - 1].year}`, title: t.title, text: t.text, base: false,
-          zeitreise: { tiles: ZEITREISE_TILES, layer: ZEITREISE_LAYER, years, attribution: '© swisstopo, Zeitreise' },
+          zeitreise: { tiles, layer: t.wmts, years, attribution: '© swisstopo' },
         });
         continue;
       }
@@ -182,5 +204,5 @@ module.exports = function registerLandschaft(app, {
 };
 
 module.exports.TIMELINE = TIMELINE;
-module.exports.wmtsTimes = wmtsTimes;
+module.exports.wmtsLayer = wmtsLayer;
 module.exports.THEMES = THEMES;
