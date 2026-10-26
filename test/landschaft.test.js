@@ -22,7 +22,7 @@ ${[
   ].map(([n, t]) => `<Layer queryable="1"><Name>${n}</Name><Title>${t}</Title></Layer>`).join('\n')}
 </Layer></Capability></WMS_Capabilities>`;
 
-async function withServer(fn, { wmts = null } = {}) {
+async function withServer(fn, { wmts = null, glacierFiles = '' } = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'myforrest-landschaft-'));
   const identified = [];
   const layersFetch = async (url) => {
@@ -42,7 +42,7 @@ async function withServer(fn, { wmts = null } = {}) {
   const app = createApp({
     dataDir, weatherFetch: async () => new Response('offline', { status: 503 }), tileOptions: { precompute: false },
     layersFetch, layersOptions: { geoadminUrl: 'https://wms.example/', identifyUrl: 'https://identify.example/identify', regional: [] },
-    landschaftOptions: { zeitreiseUrl: 'https://wmts.example/WMTSCapabilities.xml' },
+    landschaftOptions: { zeitreiseUrl: 'https://wmts.example/WMTSCapabilities.xml' }, glacierFiles,
   });
   const server = app.listen(0);
   await new Promise((r) => server.once('listening', r));
@@ -71,6 +71,7 @@ test('Landschaft im Wandel: maps through time where the layers exist, layers per
     assert.deepEqual(themes.boden, ['ch.bfs.arealstatistik']);
     assert.deepEqual(themes.klima, ['ch.meteoschweiz.klimanormwerte-temperatur_aktuelle_periode']);
     assert.deepEqual(themes.wasser, []);
+    assert.equal(d.glaciers, null, 'no inventories on this server');
   });
 });
 
@@ -149,4 +150,29 @@ test('Landschaft im Wandel: the «Zeitreise» of the Landeskarte and the aerial 
     const d = await (await fetch(`${base}/api/landschaft/karten`)).json();
     assert.ok(!d.timeline.some((t) => t.id === 'zeitreise'));
   });
+});
+
+test('Landschaft im Wandel: the glacier inventories as outlines on the map and their area per year in the report', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'myforrest-landschaft-gl-'));
+  const box = (lat0, lat1) => [[8.39, lat0], [8.41, lat0], [8.41, lat1], [8.39, lat1], [8.39, lat0]];
+  const files = [[1850, 46.59], [2016, 46.61]].map(([year, lat0]) => {
+    const file = path.join(dir, `sgi_${year}.geojson`);
+    fs.writeFileSync(file, JSON.stringify({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: { name: 'Testgletscher' }, geometry: { type: 'Polygon', coordinates: [box(lat0, 46.63)] } }] }));
+    return file;
+  });
+  try {
+    await withServer(async (base) => {
+      const d = await (await fetch(`${base}/api/landschaft/karten`)).json();
+      assert.deepEqual(d.glaciers, { years: [1850, 2016] });
+      const r = await (await fetch(`${base}/api/landschaft/bericht?lat=46.6&lon=8.4`)).json();
+      assert.equal(r.glacier.name, 'Testgletscher');
+      assert.deepEqual(r.glacier.areas.map((a) => a.year), [1850, 2016]);
+      // 2016 covers half the latitude of 1850: half the area.
+      assert.ok(Math.abs(r.glacier.areas[1].km2 / r.glacier.areas[0].km2 - 0.5) < 0.01);
+      const html = await (await fetch(`${base}/landschaft.html`)).text();
+      assert.ok(html.includes('id="ln-glacier-toggle"'));
+    }, { glacierFiles: files.join(',') });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

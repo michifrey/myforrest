@@ -7,7 +7,8 @@
  * from the climate dossier (/api/klima), which the page asks for itself.
  *
  *   GET /api/landschaft/karten               the maps through time (with the years of swisstopo's «Zeitreise» of the
- *                                            Landeskarte and of the aerial images) and the layers per theme
+ *                                            Landeskarte and of the aerial images), the layers per theme and the
+ *                                            years of the glacier inventories (outlines from /api/glaciers)
  *   GET /api/landschaft/bericht?lat&lon      what the layers, the inventories and the spots say about a place
  */
 
@@ -154,7 +155,13 @@ module.exports = function registerLandschaft(app, {
       timeline.push({ id: t.id, when: t.when, title: t.title, text: t.text, base: Boolean(t.base), ...(layer ? { layer: layerJson(layer) } : {}) });
     }
     res.set('Cache-Control', 'public, max-age=3600');
-    res.json({ timeline, themes: THEMES.map((t) => ({ id: t.id, title: t.title, layers: pick(all, t).map(layerJson) })) });
+    // The glacier inventories of this server (outlines from /api/glaciers), when there are any.
+    const glacierYears = glaciers?.enabled() ? glaciers.years() : [];
+    res.json({
+      timeline,
+      themes: THEMES.map((t) => ({ id: t.id, title: t.title, layers: pick(all, t).map(layerJson) })),
+      glaciers: glacierYears.length ? { years: glacierYears } : null,
+    });
   });
 
   /** Spots, photos, damage and neophytes within the radius: what people saw there. */

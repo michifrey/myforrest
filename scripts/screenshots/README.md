@@ -27,7 +27,7 @@ node --disable-warning=ExperimentalWarning scripts/screenshots/seed.js
 node scripts/screenshots/shoot.js         # alle Bilder, oder z. B. «shoot.js map spot»
 ```
 
-Die Gletscher- und Gebirge-Bilder (`gletscher*.jpg` inkl. `gletscher-archiv.jpg`, `gebirge.jpg`) kommen aus einem zweiten Demo-Server, damit die Wald-Karte unverändert
+Die Gletscher- und Gebirge-Bilder (`gletscher*.jpg` inkl. `gletscher-archiv.jpg`, `gebirge.jpg`, dazu `landschaft-gletscher*.jpg`) kommen aus einem zweiten Demo-Server, damit die Wald-Karte unverändert
 bleibt:
 
 ```bash
@@ -36,7 +36,7 @@ DEMO_DIR=scripts/screenshots/.demo-gletscher DEMO_GLETSCHER=1 PORT=3124 \
   node --disable-warning=ExperimentalWarning scripts/screenshots/demo-server.js &
 DEMO_DIR=scripts/screenshots/.demo-gletscher node --disable-warning=ExperimentalWarning scripts/screenshots/seed-gletscher.js
 sleep 15                                      # Höhen der Spots (Gebirge-Erkennung) im Hintergrund
-node scripts/screenshots/shoot.js gletscher   # BASE_GLETSCHER, Standard http://localhost:3124
+node scripts/screenshots/shoot.js gletscher landschaft-gletscher   # BASE_GLETSCHER, Standard http://localhost:3124
 ```
 
 Die Mapillary-Bilder (`durchgehen-mapillary.jpg`, `mapillary.jpg`, `mapillary-karte.jpg`) brauchen den Demo-Server

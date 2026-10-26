@@ -267,12 +267,60 @@
       el('div', { id: 'ln-theme-legend' }),
       state.maps.themes.some((t) => t.layers.length) ? null : el('p', { class: 'ln-muted', text: 'Keine Themenkarten verfügbar.' }),
     ].filter(Boolean));
+    $('ln-glaciers').hidden = !state.maps.glaciers;
     const q = new URLSearchParams(location.hash.split('?')[1] || '');
     const year = Number(q.get('jahr'));
     const view = q.get('ansicht') || 'zeitreise';
     if (year && state.maps.timeline.some((t) => t.id === view && t.zeitreise)) showTimeline(view, { year, compare: Number(q.get('vergleich')) || null });
     else showTimeline(state.maps.timeline.some((t) => t.id === state.timeline) ? state.timeline : 'heute');
   }
+
+  /* Glacier outlines of the inventories on this server (/api/glaciers), over every map of the timeline: one colour
+     per inventory, the old ones light and dashed, the newest dark. A year in the legend shows that inventory alone. */
+  const ICE = [47, 134, 180];
+  const glacier = { shown: false, only: null, layer: L.layerGroup(), timer: null };
+  function iceShade(year) {
+    const years = state.maps?.glaciers?.years || [];
+    const t = years.length > 1 ? Math.max(0, years.indexOf(year)) / (years.length - 1) : 1;
+    const k = 0.35 + 0.65 * t;
+    const [r, g, b] = ICE.map((c) => Math.round(c * k + 255 * (1 - k)));
+    return { color: `rgb(${r} ${g} ${b})`, t };
+  }
+  function glacierLegend(message = '') {
+    $('ln-glacier-legend').replaceChildren(...[
+      ...(glacier.shown ? state.maps.glaciers.years.map((y) => el('button', {
+        type: 'button', 'aria-pressed': String(glacier.only === y), style: `--swatch: ${iceShade(y).color}`, text: String(y),
+        title: glacier.only === y ? 'Alle Inventare zeigen' : `Nur das Inventar ${y} zeigen`,
+        on: { click: () => { glacier.only = glacier.only === y ? null : y; refreshGlaciers(); } },
+      })) : []),
+      message ? el('span', { class: 'ln-muted small', text: message }) : null,
+    ].filter(Boolean));
+  }
+  async function refreshGlaciers() {
+    if (!glacier.shown) return;
+    if (map.getZoom() < 9) { glacier.layer.clearLayers(); glacierLegend('Zum Anzeigen hineinzoomen'); return; }
+    const b = map.getBounds();
+    const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((v) => v.toFixed(4)).join(',');
+    const fc = await api(`/api/glaciers?bbox=${bbox}${glacier.only ? `&year=${glacier.only}` : ''}`).catch(() => null);
+    if (!fc || !glacier.shown) return;
+    glacier.layer.clearLayers();
+    // Oldest first, so the smaller recent outlines lie on top.
+    for (const f of [...fc.features].sort((a, c) => (a.properties.year ?? 0) - (c.properties.year ?? 0))) {
+      const { color, t } = iceShade(f.properties.year);
+      L.geoJSON(f, {
+        style: { color, weight: t === 1 ? 2.2 : 1.6, dashArray: t === 1 ? null : '5 4', fillColor: color, fillOpacity: 0.1 + 0.2 * t },
+      }).bindTooltip(`${f.properties.name} · Stand ${f.properties.year ?? 'unbekannt'}`, { sticky: true }).addTo(glacier.layer);
+    }
+    glacierLegend(fc.features.length ? '' : 'Keine Gletscher in diesem Ausschnitt');
+  }
+  function showGlaciers(on) {
+    glacier.shown = on;
+    if (on) glacier.layer.addTo(map); else glacier.layer.remove();
+    glacierLegend();
+    refreshGlaciers();
+  }
+  $('ln-glacier-toggle').addEventListener('change', (e) => showGlaciers(e.target.checked));
+  map.on('moveend', () => { clearTimeout(glacier.timer); glacier.timer = setTimeout(refreshGlaciers, 250); });
 
   function setPlace(lat, lon, { pan = false } = {}) {
     state.place = { lat: Math.round(lat * 1e5) / 1e5, lon: Math.round(lon * 1e5) / 1e5 };
@@ -301,6 +349,19 @@
   ]));
   const theme = (r, id) => r.themes.find((t) => t.id === id) || { items: [], layers: [] };
   const change = (d, key) => d?.climate?.changes?.find((c) => c.key === key);
+
+  /** The area of the glacier per inventory, with the change since the first one. */
+  function areaTable(areas) {
+    const first = areas[0].km2;
+    return el('table', {}, [
+      el('thead', {}, el('tr', {}, [el('th', { text: 'Inventar' }), el('th', { text: 'Fläche' }), el('th', { text: `seit ${areas[0].year}` })])),
+      el('tbody', {}, areas.map((a, i) => el('tr', {}, [
+        el('td', { text: String(a.year) }),
+        el('td', { text: `${fmt(a.km2, a.km2 < 10 ? 2 : 1)} km²` }),
+        el('td', { text: i && first > 0 ? `${signed(((a.km2 - first) / first) * 100, 0)} %` : '–' }),
+      ]))),
+    ]);
+  }
 
   function changeRows(d, keys) {
     const rows = keys.map((k) => change(d, k)).filter((c) => c && Number.isFinite(c.delta));
@@ -359,6 +420,7 @@
         el('h3', { text: g.name || 'Gletscher in der Nähe' }),
         el('p', { text: g.distanceM === 0 ? `Der Ort liegt auf dem Eis des Inventars ${g.latestYear}.` : Number.isFinite(g.distanceM) ? `Abstand zum Eis des Inventars ${g.latestYear}: ${fmt(g.distanceM)} m.` : '' }),
         g.history?.length ? el('p', { text: `Eis am Ort: ${g.history.map((h) => `${h.year ?? '?'} ${h.ice ? 'ja' : 'nein'}`).join(' · ')}` }) : null,
+        g.areas?.length ? areaTable(g.areas) : null,
         g.length ? el('p', { text: `Längenänderung der Zunge (GLAMOS) ${g.length.firstYear}–${g.length.lastYear}: ${signed(g.length.total, 0)} m${Number.isFinite(g.length.recentRate) ? `, zuletzt ${signed(g.length.recentRate, 1)} m pro Jahr` : ''}.` }) : null,
       ]) : null,
       changeRows(d, ['snowDays', 'summerP', 'winterP', 'dryRun']),
