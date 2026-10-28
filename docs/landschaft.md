@@ -18,10 +18,51 @@ Die zweite Perspektive ist eine eigene Seite, `/landschaft.html`, mit drei Teile
 
 ## Karte
 
-![Karte: die Dufourkarte um 1850 über der heutigen Landeskarte, rechts die Karten durch die Zeit](screenshots/landschaft.jpg)
+![Karte: die Dufourkarte um 1850 über der grauen Landeskarte, links das Menü mit den aktiven Karten und dem Katalog, rechts die Info zur Karte](screenshots/landschaft.jpg)
 
-**Karten durch die Zeit.** Über der heutigen Landeskarte (grau) liegt eine amtliche Karte aus einer anderen Zeit; die
-Deckkraft lässt sich einstellen, darunter stehen Erklärung und Legende:
+Die Karte ist aufgebaut wie [map.geo.admin.ch](https://map.geo.admin.ch/):
+
+- Das Suchfeld steht in der Kopfzeile.
+- Die Karte füllt die Seite.
+- Links liegt das Menü über der Karte, mit *Menü ausblenden* lässt es sich zuklappen. Es hat drei Teile:
+  - **Aktive Karten**: was gerade über dem Hintergrund liegt, die oberste Karte zuoberst.
+  - **Karten anzeigen**: der Katalog, in Ordnern wie der Themenkatalog von geo.admin.ch.
+  - **Ort und Bericht**.
+- Unten rechts wählt man den Hintergrund, unten in der Mitte erscheint bei Karten mit Jahren die Zeitleiste.
+
+**Karten anzeigen.** Ein Häkchen im Katalog legt eine Karte über die anderen, ein zweites Häkchen nimmt sie wieder weg.
+Es lassen sich beliebig viele Karten kombinieren, etwa die Siegfriedkarte halb durchsichtig über den Höhenstufen 2085.
+Die Ordner:
+
+- *Karten durch die Zeit*
+- die vier Themen des Berichts: *Klima*, *Gletscher und Wasser*, *Wald* sowie *Landwirtschaft und Boden*
+
+Eine Zahl am Ordner zeigt, wie viele seiner Karten aktiv sind. ⓘ öffnet oben rechts die Info zur Karte mit Erklärung,
+Legende und einem Link auf dieselbe Ebene in map.geo.admin.ch.
+
+**Aktive Karten.** Jede Karte hat eine eigene Zeile:
+
+- Das Häkchen blendet die Karte aus und wieder ein; sie bleibt dabei in der Liste.
+- ⓘ zeigt die Info zur Karte.
+- ✕ entfernt die Karte.
+- Das Zahnrad öffnet die Einstellungen:
+  - **Deckkraft**, in Prozent.
+  - **Jahr**, bei der Zeitreise und den Luftbildern.
+  - **Nach oben / Nach unten** ändert die Reihenfolge.
+  - **Vergleichen**: Eine Linie teilt die Karte, links liegt alles ohne diese Karte, rechts mit ihr. Die Linie lässt
+    sich mit Maus, Finger oder Pfeiltasten verschieben.
+
+![Zwei aktive Karten: die Siegfriedkarte mit 50 % Deckkraft über den Höhenstufen 2085, die Einstellungen geöffnet, unten rechts die Wahl des Hintergrunds](screenshots/landschaft-ebenen.jpg)
+
+**Hintergrund.** Unten rechts zeigt ein Bild den aktuellen Hintergrund. Ein Klick darauf öffnet die Auswahl, wie bei
+map.geo.admin.ch:
+
+- *Landeskarte* (farbig)
+- *Landeskarte grau*, der Standard, weil sich darauf alte Karten und Themen am besten lesen lassen
+- *Luftbild* (SWISSIMAGE)
+- *Kein Hintergrund*
+
+Diese Karten stehen im Katalog:
 
 | Zeit | Karte | Quelle (Ebene von geo.admin.ch) |
 |------|-------|---------------------------------|
@@ -30,66 +71,98 @@ Deckkraft lässt sich einstellen, darunter stehen Erklärung und Legende:
 | um 1900 | Siegfriedkarte (1870–1949) | swisstopo, `ch.swisstopo.hiks-siegfried` |
 | Jahr für Jahr | Zeitreise der Landeskarte: die Karte, wie sie im gewählten Jahr galt | swisstopo, `ch.swisstopo.zeitreihen` (WMTS mit Zeit) |
 | Flug für Flug | Historische Luftbilder (SWISSIMAGE Zeitreise, seit 1926) | swisstopo, `ch.swisstopo.swissimage-product` (WMTS mit Zeit) |
-| heute | Landeskarte | swisstopo, `ch.swisstopo.pixelkarte-grau` |
 | heute | Höhenstufen des Waldes | BAFU, `ch.bafu.wald-vegetationshoehenstufen_1975` |
 | um 2085, weniger trocken | Höhenstufen 2070–2099 bei mittleren Emissionen (RCP4.5) | BAFU, `ch.bafu.wald-vegetationshoehenstufen_2085_weniger_trocken` |
 | um 2085, trocken | Höhenstufen 2070–2099 bei hohen Emissionen (RCP8.5) | BAFU, `ch.bafu.wald-vegetationshoehenstufen_2085_trocken` |
 
-Der Server sucht die Ebenen in der Ebenenliste von geo.admin.ch (WMS, einmal am Tag gelesen, wie das Panel *Ebenen*
-der Karte). Fehlt eine Ebene, fehlt nur ihr Zeitpunkt.
+Dazu kommen die Ordner der vier Themen:
 
-**Zeitreise der Landeskarte.** Die Landeskarten von swisstopo, wie sie im gewählten Jahr galten, seit dem 19.
-Jahrhundert: Ein Regler wählt das Jahr, ▶ spielt die Jahre ab (eines alle 1,2 Sekunden, damit die Kacheln nachkommen).
-Welche Jahre es gibt, liest der Server einmal am Tag aus den WMTS-Capabilities von geo.admin.ch (`ZEITREISE_WMTS_URL`).
-Vor 1964 decken die Karten die Schweiz nicht überall ab. Das Jahr steht in der Adresse (`#karte?…&jahr=1900`), so
-lässt sich ein Ausschnitt mit Jahr teilen.
+- *Klima*: Klimanormwerte der MeteoSchweiz, Klimaszenarien.
+- *Gletscher und Wasser*: Gletscher, Abfluss, Niedrigwasser, Trockenheit, dazu die Gletscherinventare dieses Servers.
+- *Wald*: Höhenstufen heute und 2085, Waldmischungsgrad und Vegetationshöhe aus dem Landesforstinventar.
+- *Landwirtschaft und Boden*: Arealstatistik, Fruchtfolgeflächen, landwirtschaftliche Zonen.
 
-![Zeitreise der Landeskarte: die Karte von 1900, mit Regler und Abspielknopf](screenshots/landschaft-zeitreise.jpg)
+Der Server sucht alle Ebenen nach Namen in der Ebenenliste von geo.admin.ch. Er liest sie einmal am Tag (WMS), wie das
+Panel *Ebenen* der Karte. Es erscheint, was geo.admin.ch anbietet; fehlt eine Ebene, fehlt nur ihr Eintrag.
 
-**Historische Luftbilder.** Die Orthofotos von swisstopo (SWISSIMAGE Zeitreise) aus den Befliegungen seit 1926, mit
-demselben Regler: Er springt von Flugjahr zu Flugjahr, die Jahre kommen ebenfalls aus den WMTS-Capabilities. Die
-Schweiz wurde in Flugblöcken beflogen, nicht jedes Jahr überall; jede Kachel zeigt den Flug, der den grössten Teil
-liefert, an den Rändern der Blöcke mischen sich die Jahre. Der Link hält Ansicht und Jahr fest
-(`#karte?…&ansicht=luftbild&jahr=1956`).
+**Zeitleiste.** Liegt eine Karte mit Jahren oben, erscheint unten auf der Karte die Zeitleiste:
 
-![Historische Luftbilder: das Luftbild von 1956, mit Regler über die Flugjahre](screenshots/landschaft-luftbild.jpg)
+- Mit dem Regler wählt man das Jahr.
+- ▶ spielt die Jahre ab, eines alle 1,2 Sekunden, damit die Kacheln nachkommen.
+- Liegen beide Karten mit Jahren oben, gilt die Zeitleiste für die obere; das Jahr der anderen steht in deren
+  Einstellungen.
 
-**Zwei Jahre nebeneinander.** Bei der Zeitreise und den Luftbildern legt *Mit einem zweiten Jahr vergleichen* ein
-zweites Jahr über das erste (zu Beginn das neueste). Eine Linie teilt die Karte: links das Jahr des oberen Reglers,
-rechts das Vergleichsjahr; die Linie lässt sich mit der Maus, dem Finger oder den Pfeiltasten verschieben, wie
-Vorher/Nachher bei den Fotos. Beide Jahre stehen oben auf der Karte und im Link (`…&jahr=1956&vergleich=2023`).
+Welche Jahre es gibt, liest der Server einmal am Tag aus den WMTS-Capabilities von geo.admin.ch
+(`ZEITREISE_WMTS_URL`).
+
+- **Zeitreise der Landeskarte:** die Landeskarten von swisstopo seit dem 19. Jahrhundert, wie sie im gewählten Jahr
+  galten. Vor 1964 decken sie die Schweiz nicht überall ab.
+- **Historische Luftbilder:** die Orthofotos von swisstopo (SWISSIMAGE Zeitreise) aus den Befliegungen seit 1926. Der
+  Regler springt von Flugjahr zu Flugjahr. Die Schweiz wurde in Flugblöcken beflogen, nicht jedes Jahr überall: Jede
+  Kachel zeigt den Flug, der den grössten Teil liefert, an den Rändern der Blöcke mischen sich die Jahre.
+
+![Zeitreise der Landeskarte: die Karte von 1900, unten die Zeitleiste mit Regler und Abspielknopf](screenshots/landschaft-zeitreise.jpg)
+
+![Historische Luftbilder: das Luftbild von 1956, mit der Zeitleiste über die Flugjahre](screenshots/landschaft-luftbild.jpg)
+
+**Zwei Jahre nebeneinander.** In der Zeitleiste legt *Mit einem zweiten Jahr vergleichen* ein zweites Jahr derselben
+Karte daneben, zu Beginn das neueste:
+
+- Eine Linie teilt die Karte, links liegt das Jahr der Zeitleiste, rechts das Vergleichsjahr.
+- Das Vergleichsjahr wählt man neben dem Häkchen.
+- Beide Jahre stehen auf der Karte und im Link (`…&vergleich=2023`).
 
 ![Zwei Jahre nebeneinander: das Luftbild von 1956 links der Linie, 2023 rechts](screenshots/landschaft-vergleich.jpg)
 
 ![Karte: die modellierten Höhenstufen des Waldes um 2085 bei hohen Emissionen](screenshots/landschaft-2085.jpg)
 
-**Gletscher.** Sind auf dem Server Gletscherinventare hinterlegt (`GLETSCHER_GEOJSON`, z. B. GLAMOS SGI 1850, 1973,
-2010 und 2016), zeigt *Umrisse der Gletscherinventare* ihre Umrisse über jeder Karte der Zeitleiste: ein Blauton pro
-Inventar, die alten hell und gestrichelt, das neuste kräftig. Ein Jahr in der Legende zeigt dieses Inventar allein.
-Die Umrisse erscheinen ab Zoomstufe 9; über dem Luftbild von 1956 sieht man, wo das Eis damals lag und wie weit es
-seither zurückging. Ohne Inventare fehlt der Abschnitt.
+**Gletscher.** Diesen Eintrag gibt es nur, wenn auf dem Server Gletscherinventare hinterlegt sind
+(`GLETSCHER_GEOJSON`, z. B. GLAMOS SGI 1850, 1973, 2010 und 2016). Dann steht im Ordner *Gletscher und Wasser* der
+Eintrag *Gletscherinventare*:
 
-![Gletscher: die Umrisse der Inventare 1850, 1973 und 2016 über dem Luftbild von 1956](screenshots/landschaft-gletscher.jpg)
+- Er zeigt die Umrisse der Inventare, ein Blauton pro Inventar: die alten hell und gestrichelt, das neuste kräftig.
+- In den Einstellungen zeigt ein Jahr dieses Inventar allein.
+- Die Umrisse erscheinen ab Zoomstufe 9.
 
-**Themen.** Eine Themenkarte lässt sich darüberlegen, nach den vier Themen des Berichts: *Klima* (Klimanormwerte der
-MeteoSchweiz, Klimaszenarien), *Gletscher und Wasser* (Gletscher, Abfluss, Niedrigwasser, Trockenheit), *Wald*
-(Höhenstufen heute und 2085, Waldmischungsgrad und Vegetationshöhe aus dem Landesforstinventar) und *Landwirtschaft und
-Boden* (Arealstatistik, Fruchtfolgeflächen, landwirtschaftliche Zonen). Auch diese Ebenen sucht der Server nach Namen;
-es erscheint, was geo.admin.ch anbietet.
+Über dem Luftbild von 1956 sieht man, wo das Eis damals lag und wie weit es seither zurückging.
 
-**Ort.** Das Suchfeld oben in der Karte findet Gemeinden, Bezirke, Kantone, Postleitzahlen, Orts- und Flurnamen und
-Adressen (Suchdienst von geo.admin.ch, über den Server, `ORTSSUCHE_URL`); Pfeiltasten und Enter wählen einen Treffer.
-Koordinaten gehen auch, ohne Dienst, in den Formaten von map.geo.admin.ch: WGS84 als Dezimalgrad (`46.6, 8.4`) oder
-mit Minuten und Sekunden (`47°22′40″N 8°32′25″E`), LV95 (`2'600'000 1'200'000`), LV03 (`600'000 200'000`) und MGRS
-(`32T MT 65298 47262`). Ein Klick in die Karte wählt ebenfalls einen Ort. *Bericht für diesen Ort* öffnet den
-Bericht, mit dem Namen des Orts als Titel. Die Adresse `landschaft.html#bericht?lat=…&lon=…&ort=…` (bzw. `#karte?…`)
-lässt sich teilen.
+![Gletscher: die Umrisse der Inventare 1850, 1973 und 2016 über dem Luftbild von 1956, links die Jahre der Inventare in den Einstellungen](screenshots/landschaft-gletscher.jpg)
 
-**Mit map.geo.admin.ch.** *Diese Karte in map.geo.admin.ch öffnen* zeigt die gewählte Karte der Zeitleiste dort,
-mit Jahr (`ch.swisstopo.zeitreihen@year=1900`, `ch.swisstopo.swissimage-product@year=1956`), Deckkraft, Themenkarte
-und dem gewählten Ort unter dem Fadenkreuz. Umgekehrt öffnet `landschaft.html?layers=ch.swisstopo.zeitreihen@year=1950`
-(mit `center` und `z` wie bei map.geo.admin.ch) die passende Karte der Zeitleiste im gewählten Jahr; eine Ebene eines
-Themas legt sich als Themenkarte darüber.
+**Ort.** Das Suchfeld in der Kopfzeile findet über den Suchdienst von geo.admin.ch (über den Server, `ORTSSUCHE_URL`):
+
+- Gemeinden, Bezirke, Kantone und Postleitzahlen,
+- Orts- und Flurnamen,
+- Adressen.
+
+Pfeiltasten und Enter wählen einen Treffer. Koordinaten findet es auch ohne den Dienst, in den Formaten von
+map.geo.admin.ch:
+
+| Format | Beispiel |
+|--------|----------|
+| WGS84 als Dezimalgrad | `46.6, 8.4` |
+| WGS84 mit Minuten und Sekunden | `47°22′40″N 8°32′25″E` |
+| LV95 | `2'600'000 1'200'000` |
+| LV03 | `600'000 200'000` |
+| MGRS | `32T MT 65298 47262` |
+
+Ein Klick in die Karte wählt ebenfalls einen Ort. *Bericht für diesen Ort* öffnet den Bericht, mit dem Namen des Orts
+als Titel.
+
+**Teilen und map.geo.admin.ch.** Die Adresse hält die ganze Ansicht fest:
+
+- `lat`, `lon` und `ort` für den Ort,
+- `layers` für die aktiven Karten, in der Schreibweise von map.geo.admin.ch, die unterste zuerst, mit Jahr, `f` für
+  ausgeblendet und Deckkraft: `#karte?lat=…&lon=…&layers=ch.bafu.wald-vegetationshoehenstufen_2085_trocken;ch.swisstopo.hiks-siegfried,,0.5`,
+- `bg` für den Hintergrund,
+- `vergleich` für das Vergleichsjahr.
+
+*Link kopieren* legt diese Adresse in die Zwischenablage. Ältere Links mit `ansicht=…&jahr=…` öffnen weiterhin die
+passende Karte.
+
+*In map.geo.admin.ch öffnen* zeigt dieselben Karten dort, mit Jahr, Sichtbarkeit, Deckkraft, Hintergrund und dem
+gewählten Ort unter dem Fadenkreuz; die Gletscherinventare dieses Servers kennt map.geo.admin.ch nicht. Umgekehrt
+öffnet `landschaft.html?layers=ch.swisstopo.zeitreihen@year=1950` die passenden Karten hier, auch mit `center`, `z`
+und `bgLayer` wie bei map.geo.admin.ch.
 
 ![Ortssuche: Treffer für «Zürichb» unter dem Suchfeld der Karte](screenshots/landschaft-suche.jpg)
 

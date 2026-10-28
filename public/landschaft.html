@@ -19,6 +19,11 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 5 12h4l-4 6h6v4h2v-4h6l-4-6h4z"/></svg>
       MyForrest <span>Landschaft im Wandel</span>
     </a>
+    <form id="ln-search" class="ln-search" role="search" autocomplete="off">
+      <label class="sr-only" for="ln-search-q">Ort suchen</label>
+      <input type="search" id="ln-search-q" placeholder="Ort, Adresse oder Koordinaten suchen" aria-controls="ln-search-results" aria-autocomplete="list">
+      <ul id="ln-search-results" class="ln-search-results" role="listbox" aria-label="Gefundene Orte" hidden></ul>
+    </form>
     <nav class="ln-tabs" aria-label="Landschaft im Wandel">
       <a href="#karte" data-view="karte">Karte</a>
       <a href="#bericht" data-view="bericht">Bericht</a>
@@ -29,39 +34,36 @@
   <main>
     <!-- ---------- Karte ---------- -->
     <section id="karte" class="ln-view ln-mapview" aria-label="Karte">
-      <div class="ln-mapwrap">
-        <div id="ln-map" class="ln-map" aria-label="Karte der Schweiz"></div>
-        <form id="ln-search" class="ln-search" role="search" autocomplete="off">
-          <label class="sr-only" for="ln-search-q">Ort suchen</label>
-          <input type="search" id="ln-search-q" placeholder="Ort, Adresse oder Koordinaten" aria-controls="ln-search-results" aria-autocomplete="list">
-          <ul id="ln-search-results" class="ln-search-results" role="listbox" aria-label="Gefundene Orte" hidden></ul>
-        </form>
-      </div>
-      <aside class="ln-panel">
-        <section aria-labelledby="ln-time-title">
-          <h2 id="ln-time-title">Karten durch die Zeit</h2>
-          <p class="ln-muted">Amtliche Karten von swisstopo und BAFU über der heutigen Landeskarte.</p>
-          <div id="ln-timeline" class="ln-timeline" role="radiogroup" aria-labelledby="ln-time-title"></div>
-          <label class="ln-row" for="ln-opacity">Deckkraft <input type="range" id="ln-opacity" min="0" max="1" step="0.05" value="0.85"></label>
-          <div id="ln-time-info" class="ln-info" aria-live="polite"></div>
-          <a id="ln-geoadmin" class="ln-geoadmin small" href="https://map.geo.admin.ch/" target="_blank" rel="noopener">Diese Karte in map.geo.admin.ch öffnen</a>
-        </section>
-        <section id="ln-glaciers" aria-labelledby="ln-glaciers-title" hidden>
-          <h2 id="ln-glaciers-title">Gletscher</h2>
-          <label class="ln-row ln-check" for="ln-glacier-toggle"><input type="checkbox" id="ln-glacier-toggle"> Umrisse der Gletscherinventare</label>
-          <div id="ln-glacier-legend" class="ln-glacier-legend" aria-live="polite"></div>
-        </section>
-        <section aria-labelledby="ln-themes-title">
-          <h2 id="ln-themes-title">Themen</h2>
-          <div id="ln-themes" class="ln-themes"></div>
-        </section>
-        <section aria-labelledby="ln-place-title">
-          <h2 id="ln-place-title">Ort</h2>
-          <p id="ln-place" class="ln-muted">Ort oben in der Karte suchen oder in die Karte klicken; daraus wird der Bericht.</p>
-          <a id="ln-to-report" class="ln-btn" href="#bericht" hidden>Bericht für diesen Ort</a>
-        </section>
-        <p id="ln-status" class="ln-muted small" aria-live="polite"></p>
+      <div id="ln-map" class="ln-map" aria-label="Karte der Schweiz"></div>
+      <aside id="ln-menu" class="ln-menu" aria-label="Menü der Karte">
+        <button type="button" id="ln-menu-toggle" class="ln-menu-toggle" aria-expanded="true" aria-controls="ln-menu-body"><span class="ln-chevron" aria-hidden="true"></span><span>Menü ausblenden</span></button>
+        <div id="ln-menu-body" class="ln-menu-body">
+          <details class="ln-section-box" open>
+            <summary>Aktive Karten <span id="ln-active-count" class="ln-count">0</span></summary>
+            <ul id="ln-active" class="ln-active"></ul>
+          </details>
+          <details class="ln-section-box" open>
+            <summary>Karten anzeigen</summary>
+            <p class="ln-muted small ln-pad">Amtliche Karten von swisstopo, BAFU und MeteoSchweiz, über dem Hintergrund.</p>
+            <div id="ln-catalog" class="ln-catalog"></div>
+          </details>
+          <details class="ln-section-box" open>
+            <summary>Ort und Bericht</summary>
+            <div class="ln-pad">
+              <p id="ln-place" class="ln-muted">Ort oben suchen oder in die Karte klicken; daraus wird der Bericht.</p>
+              <a id="ln-to-report" class="ln-btn" href="#bericht" hidden>Bericht für diesen Ort</a>
+            </div>
+          </details>
+          <div class="ln-menu-foot">
+            <button type="button" id="ln-share" class="ln-link">Link kopieren</button>
+            <a id="ln-geoadmin" class="ln-link" href="https://map.geo.admin.ch/" target="_blank" rel="noopener">In map.geo.admin.ch öffnen</a>
+          </div>
+          <p id="ln-status" class="ln-muted small ln-pad" aria-live="polite"></p>
+        </div>
       </aside>
+      <section id="ln-info" class="ln-infobox" aria-label="Info zur Karte" aria-live="polite" hidden></section>
+      <div id="ln-timebar" class="ln-timebar" aria-label="Zeitreise" role="group" hidden></div>
+      <div id="ln-bg" class="ln-bg"></div>
     </section>
 
     <!-- ---------- Bericht ---------- -->

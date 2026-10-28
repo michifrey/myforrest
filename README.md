@@ -578,13 +578,20 @@ Kronendach des SITG, und Orte dort verweisen auf das 3D-Modell [Genève 3D](http
 
 ### 16. Landschaft im Wandel
 
-![Karte: die Dufourkarte um 1850 über der heutigen Landeskarte](docs/screenshots/landschaft.jpg)
+![Karte: die Dufourkarte um 1850 über der grauen Landeskarte, links das Menü mit aktiven Karten und Katalog](docs/screenshots/landschaft.jpg)
 
 Die zweite Perspektive ist eine eigene Seite (`/landschaft.html`): was mit der Landschaft selbst geschieht, aus
 amtlichen Karten und Daten. Die **Karte** legt Karten aus anderen Zeiten über die heutige Landeskarte: die letzte
 Eiszeit, die Dufourkarte um 1850, die Siegfriedkarte um 1900, die **Zeitreise der Landeskarte** Jahr für Jahr (mit
 Regler und Abspielknopf), die **historischen Luftbilder** von swisstopo seit 1926 (beide auch als **zwei Jahre nebeneinander** mit verschiebbarer Linie) und die Höhenstufen des Waldes heute und um 2085 (BAFU, trocken und weniger trocken). Darüber liegen auf Wunsch die **Gletscherumrisse** der Inventare (mit der Fläche pro Inventar im Bericht). Dazu lassen sich Themenkarten von geo.admin.ch zu Klima, Gletschern und Wasser, Wald,
-Landwirtschaft und Boden einblenden.
+Landwirtschaft und Boden einblenden. Die Karte ist aufgebaut wie map.geo.admin.ch:
+
+- Ein Menü listet unter **Aktive Karten** alles, was gerade gezeigt wird. Pro Karte kann man sie ein- und
+  ausblenden, die Deckkraft einstellen, sie nach oben oder unten schieben, die Info mit Legende öffnen, sie mit der
+  Karte ohne sie vergleichen oder sie entfernen.
+- Unter **Karten anzeigen** steht der Katalog in Ordnern; beliebig viele Karten lassen sich übereinanderlegen.
+- Unten rechts wählt man den **Hintergrund**, unten in der Mitte erscheint bei Karten mit Jahren die **Zeitleiste**.
+- Die ganze Ansicht steht im Link, in der Schreibweise von map.geo.admin.ch.
 
 ![Bericht für einen Ort: Klima, Gletscher und Wasser, Wald, Landwirtschaft und Boden](docs/screenshots/landschaft-bericht.jpg)
 
