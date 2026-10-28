@@ -538,6 +538,9 @@
     const stand = `Stand ${new Date().toLocaleDateString('de-CH', { day: 'numeric', month: 'long', year: 'numeric' })}`;
     $('ln-report-meta').textContent = name ? `${coords({ lat, lon })} · ${stand}` : stand;
     $('ln-report-body').replaceChildren(el('p', { class: 'ln-muted', text: 'Daten werden zusammengestellt …' }));
+    // The same report as a PDF made on the server (fixed layout, map excerpts per theme).
+    $('ln-pdf').href = `/api/landschaft/bericht.pdf?${new URLSearchParams({ lat, lon, ...(name ? { ort: name } : {}) })}`;
+    $('ln-pdf').hidden = false;
     if (!reportMap) {
       reportMap = L.map('ln-report-map', { zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, attributionControl: true });
       swisstopo('ch.swisstopo.pixelkarte-farbe').addTo(reportMap);

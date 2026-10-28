@@ -377,6 +377,15 @@ module.exports = function registerKlima(app, {
     }
     if (!at) return res.status(400).json({ error: 'lat und lon (oder spot) angeben' });
     const radiusKm = Math.min(MAX_RADIUS_KM, Math.max(1, Number(req.query.radius) || DEFAULT_RADIUS_KM));
+    res.json(await dossier(req, at, { spotId, radiusKm }));
+  });
+
+  /**
+   * The climate dossier of a place (or a spot): climate then and now, scenarios, what they mean for the forest, the
+   * spots and observations in the region. Also used by the PDF report of «Landschaft im Wandel».
+   */
+  async function dossier(req, at, { spotId = null, radiusKm = DEFAULT_RADIUS_KM } = {}) {
+    at = { ...at };
     if (!Number.isFinite(at.elevation) && elevation) {
       try { at.elevation = await elevation.lookup(at.lat, at.lon); } catch { at.elevation = null; }
     }
@@ -406,7 +415,7 @@ module.exports = function registerKlima(app, {
     const levels = klima.scenarioLevels(projection, ch2025Of(scenarios));
     // For a spot its own trees, else those of the spots in the region.
     const species = speciesOf(spotId ? [{ id: spotId }] : spots);
-    res.json({
+    return {
       centre: { lat: at.lat, lon: at.lon, elevation: elev },
       spot: spotId,
       radiusKm,
@@ -431,8 +440,8 @@ module.exports = function registerKlima(app, {
         models: modelList.length ? 'CMIP6 HighResMIP über die Klima-API von Open-Meteo (CC BY 4.0)' : null,
         station: station ? (station.source === 'meteoschweiz' ? 'Homogene Messreihen, Quelle: MeteoSchweiz' : 'Eigene Messreihe (CSV)') : null,
       },
-    });
-  });
+    };
+  }
 
   /* ---------- Climate map ---------- */
 
@@ -644,5 +653,5 @@ module.exports = function registerKlima(app, {
     return res.status(400).json({ error: 'Parameter "format" (nbcn, stations oder ch2025) fehlt' });
   });
 
-  return { era5, syncNbcn };
+  return { era5, syncNbcn, dossier };
 };

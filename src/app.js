@@ -574,7 +574,7 @@ function createApp({
   const terrain = require('./routes/terrain')(app, { dataDir, url: terrainUrl, fetchImpl: terrainFetch });
   const radarCh = require('./routes/radar-ch')(app, { dataDir, url: mchRadarUrl, fetchImpl: mchRadarFetch });
   // Climate change in the region: ERA5 since 1940, MeteoSchweiz series, projections and the spots' observations.
-  require('./routes/klima')(app, { db, fetchImpl: weatherFetch, elevation: elevationService, accounts, models: klimaModels, background, ...klimaOptions });
+  const klimaApi = require('./routes/klima')(app, { db, fetchImpl: weatherFetch, elevation: elevationService, accounts, models: klimaModels, background, ...klimaOptions });
 
   app.get('/api/config', (req, res) => {
     res.json({
@@ -1438,7 +1438,7 @@ function createApp({
   });
   require('./routes/wikimedia')(app, { wikimedia, landscapes, idParam });
   // Landschaft im Wandel (landschaft.html): maps through time and a report per place.
-  require('./routes/landschaft')(app, { db, layers: layersApi, glaciers, glamos, fetchImpl: layersFetch, ...landschaftOptions });
+  require('./routes/landschaft')(app, { db, layers: layersApi, glaciers, glamos, klima: klimaApi, fetchImpl: layersFetch, ...landschaftOptions });
   Object.assign(tours, require('./routes/tracks')(app, {
     db, spotRadiusM, satelliteAlerts: vegetation.alerts, routerUrl, routerFetch, routerProfile, accounts, wildlife, elevation: elevationService, push,
     weather,
