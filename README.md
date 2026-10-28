@@ -581,7 +581,7 @@ Landwirtschaft und Boden einblenden.
 
 ![Bericht für einen Ort: Klima, Gletscher und Wasser, Wald, Landwirtschaft und Boden](docs/screenshots/landschaft-bericht.jpg)
 
-Ein Klick in die Karte wählt einen Ort für den **Bericht**: Klima (Erwärmung, Kennzahlen, Szenarien +1,5, +2 und +3 °C
+Die **Ortssuche** (Gemeinde, Ort, Adresse oder Koordinaten) oder ein Klick in die Karte wählt einen Ort für den **Bericht**: Klima (Erwärmung, Kennzahlen, Szenarien +1,5, +2 und +3 °C
 aus dem Klima-Dossier), Gletscher und Wasser (Inventare, GLAMOS), Wald (Höhenstufen heute und 2085, Landesforstinventar,
 was die Szenarien für den Wald heissen), Landwirtschaft und Boden (Arealstatistik) und was MyForrest dort sah, mit allen
 Quellen, zum Drucken oder als PDF. **Daten holen** sammelt die offenen Daten (GeoParquet, GeoJSON, GeoPackage, PMTiles,

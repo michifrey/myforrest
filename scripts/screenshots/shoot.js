@@ -110,7 +110,16 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     for (let i = 0; i < 4; i += 1) await page.press('.ln-swipe-handle', 'ArrowRight');
     await settle(page, 6000);
     await page.screenshot({ path: out('landschaft-vergleich.jpg'), ...jpg });
-    await page.goto(`${BASE}/landschaft.html#bericht?lat=47.37&lon=8.54`);
+    // The search: a place by name instead of a click.
+    await page.goto(`${BASE}/landschaft.html#karte?lat=47.37&lon=8.54`);
+    await page.reload();
+    await settle(page, 2500);
+    await page.fill('#ln-search-q', 'Zürichb');
+    await page.waitForSelector('#ln-search-results li[role="option"]', { timeout: 10000 });
+    await settle(page, 1500);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: out('landschaft-suche.jpg'), ...jpg });
+    await page.goto(`${BASE}/landschaft.html#bericht?lat=47.37&lon=8.54&ort=${encodeURIComponent('Zürich (ZH)')}`);
     await page.waitForSelector('.ln-section', { timeout: 120000 });
     await settle(page, 2500);
     await page.locator('#bericht').screenshot({ path: out('landschaft-bericht.jpg'), ...jpg });

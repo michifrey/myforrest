@@ -574,14 +574,17 @@ const app = createApp({
   basemapStyle: `http://localhost:${Number(process.env.PORT) || 3123}/demo-vt/style.json`,
   basemapAttribution: 'Demo-Vektorkacheln im Format von OpenMapTiles',
   layersFetch: async (url, opts) => (url.startsWith('http://demo.invalid/identify') ? demoIdentify(url)
-    : url.includes('/demo-wmts/') ? fetch(url, opts) : demoWms(url)),
+    : url.includes('/demo-wmts/') || url.includes('/demo-search/') ? fetch(url, opts) : demoWms(url)),
   layersOptions: {
     geoadminUrl: `http://localhost:${Number(process.env.PORT) || 3123}/demo-wms`,
     identifyUrl: 'http://demo.invalid/identify',
     regional: [{ url: `http://localhost:${Number(process.env.PORT) || 3123}/demo-wms?src=zh`, group: 'Bäume Stadt Zürich', bbox: [8.44, 47.32, 8.63, 47.44], attribution: 'Demo im Format des Baumkatasters der Stadt Zürich' }],
   },
   // Landschaft im Wandel: the years of the «Zeitreise» from a demo WMTS capabilities document.
-  landschaftOptions: { zeitreiseUrl: `http://localhost:${Number(process.env.PORT) || 3123}/demo-wmts/WMTSCapabilities.xml` },
+  landschaftOptions: {
+    zeitreiseUrl: `http://localhost:${Number(process.env.PORT) || 3123}/demo-wmts/WMTSCapabilities.xml`,
+    searchUrl: `http://localhost:${Number(process.env.PORT) || 3123}/demo-search/SearchServer`,
+  },
   klimaOptions: { cellsPerDay: 500, wmsUrl: `http://localhost:${Number(process.env.PORT) || 3123}/demo-wms`, wmsFetch: demoWms, wmsGenf: '' },
 });
 app.get('/demo-3d/:kind/:file', (req, res) => {
@@ -609,6 +612,19 @@ app.get('/demo-wmts/WMTSCapabilities.xml', (req, res) => {
 <Dimension><ows:Identifier>Time</ows:Identifier><Value>current</Value>${flights.map((y) => `<Value>${y}</Value>`).join('')}</Dimension>
 <ResourceURL format="image/jpeg" resourceType="tile" template="https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage-product/default/{Time}/{TileMatrixSet}/{TileMatrix}/{TileCol}/{TileRow}.jpeg"/></Layer>
 </Contents></Capabilities>`);
+});
+// The search of geo.admin.ch (SearchServer) with a few places around the demo forest, in its answer format.
+const DEMO_PLACES = [
+  ['gg25', '<b>Zürich</b> (ZH)', 47.3769, 8.5417],
+  ['district', 'Bezirk <b>Zürich</b>', 47.38, 8.53],
+  ['sn25', '<b>Zürichberg</b> - Zürich', 47.3794, 8.5672],
+  ['gazetteer', '<b>Zürichbergwald</b> - Zürich', 47.3856, 8.5781],
+  ['address', '<b>Zürichstrasse</b> 12 8134 Adliswil', 47.312, 8.526],
+];
+app.get('/demo-search/SearchServer', (req, res) => {
+  const q = String(req.query.searchText || '').toLowerCase();
+  res.json({ results: DEMO_PLACES.filter(([, label]) => label.replace(/<[^>]*>/g, '').toLowerCase().includes(q))
+    .map(([origin, label, lat, lon]) => ({ attrs: { origin, label, lat, lon } })) });
 });
 app.get('/demo-wms', async (req, res) => {
   const r = await demoWms(`http://x/demo-wms?${new URLSearchParams(req.query)}`);

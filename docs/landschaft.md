@@ -77,8 +77,13 @@ MeteoSchweiz, Klimaszenarien), *Gletscher und Wasser* (Gletscher, Abfluss, Niedr
 Boden* (Arealstatistik, Fruchtfolgeflächen, landwirtschaftliche Zonen). Auch diese Ebenen sucht der Server nach Namen;
 es erscheint, was geo.admin.ch anbietet.
 
-**Ort.** Ein Klick in die Karte wählt den Ort; *Bericht für diesen Ort* öffnet den Bericht. Die Adresse
-`landschaft.html#bericht?lat=…&lon=…` (bzw. `#karte?lat=…&lon=…`) lässt sich teilen.
+**Ort.** Das Suchfeld oben in der Karte findet Gemeinden, Bezirke, Kantone, Postleitzahlen, Orts- und Flurnamen und
+Adressen (Suchdienst von geo.admin.ch, über den Server, `ORTSSUCHE_URL`); Pfeiltasten und Enter wählen einen Treffer.
+Koordinaten gehen auch, ohne Dienst: WGS84 (`46.6, 8.4`) oder LV95 (`2'600'000 1'200'000`). Ein Klick in die Karte
+wählt ebenfalls einen Ort. *Bericht für diesen Ort* öffnet den Bericht, mit dem Namen des Orts als Titel. Die Adresse
+`landschaft.html#bericht?lat=…&lon=…&ort=…` (bzw. `#karte?…`) lässt sich teilen.
+
+![Ortssuche: Treffer für «Zürichb» unter dem Suchfeld der Karte](screenshots/landschaft-suche.jpg)
 
 ## Bericht
 
@@ -114,7 +119,7 @@ unter [Offene Geodaten](funktionen.md#offene-geodaten-für-gis-und-geoportale).
 ## Technik
 
 - `src/routes/landschaft.js`: `GET /api/landschaft/karten` (Karten durch die Zeit und Ebenen pro Thema, aus der
-  Ebenenliste von geo.admin.ch; die Jahre der Zeitreise und der Luftbilder aus den WMTS-Capabilities, die Jahre der Gletscherinventare) und `GET /api/landschaft/bericht?lat=&lon=` (Identify pro Thema, Gletscher aus den
+  Ebenenliste von geo.admin.ch; die Jahre der Zeitreise und der Luftbilder aus den WMTS-Capabilities, die Jahre der Gletscherinventare) `GET /api/landschaft/suche?q=` (Ortssuche über den SearchServer von geo.admin.ch, Koordinaten direkt) und `GET /api/landschaft/bericht?lat=&lon=` (Identify pro Thema, Gletscher aus den
   Inventaren mit GLAMOS, Fotos, Befunde und Neophyten im Umkreis). Die Ebenenliste und der Identify-Dienst kommen aus
   `src/routes/layers.js` (Panel *Ebenen*).
 - `public/landschaft.html`, `landschaft.js`, `landschaft.css`: Leaflet mit den Kacheln von swisstopo und den WMS von

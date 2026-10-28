@@ -29,7 +29,14 @@
   <main>
     <!-- ---------- Karte ---------- -->
     <section id="karte" class="ln-view ln-mapview" aria-label="Karte">
-      <div id="ln-map" class="ln-map" aria-label="Karte der Schweiz"></div>
+      <div class="ln-mapwrap">
+        <div id="ln-map" class="ln-map" aria-label="Karte der Schweiz"></div>
+        <form id="ln-search" class="ln-search" role="search" autocomplete="off">
+          <label class="sr-only" for="ln-search-q">Ort suchen</label>
+          <input type="search" id="ln-search-q" placeholder="Ort, Adresse oder Koordinaten" aria-controls="ln-search-results" aria-autocomplete="list">
+          <ul id="ln-search-results" class="ln-search-results" role="listbox" aria-label="Gefundene Orte" hidden></ul>
+        </form>
+      </div>
       <aside class="ln-panel">
         <section aria-labelledby="ln-time-title">
           <h2 id="ln-time-title">Karten durch die Zeit</h2>
@@ -49,7 +56,7 @@
         </section>
         <section aria-labelledby="ln-place-title">
           <h2 id="ln-place-title">Ort</h2>
-          <p id="ln-place" class="ln-muted">Ein Klick in die Karte wählt den Ort für den Bericht.</p>
+          <p id="ln-place" class="ln-muted">Ort oben in der Karte suchen oder in die Karte klicken; daraus wird der Bericht.</p>
           <a id="ln-to-report" class="ln-btn" href="#bericht" hidden>Bericht für diesen Ort</a>
         </section>
         <p id="ln-status" class="ln-muted small" aria-live="polite"></p>

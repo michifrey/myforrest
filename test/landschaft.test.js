@@ -176,3 +176,55 @@ test('Landschaft im Wandel: the glacier inventories as outlines on the map and t
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('Landschaft im Wandel: places by name from the search service of geo.admin.ch, or by coordinates', async () => {
+  const asked = [];
+  const searchFetch = async (url) => {
+    asked.push(url);
+    const q = new URL(url).searchParams.get('searchText');
+    if (q === 'kaputt') return new Response('', { status: 500 });
+    return Response.json({ results: [
+      { attrs: { origin: 'gg25', label: '<b>Zürich</b> (ZH)', lat: 47.37, lon: 8.54 } },
+      { attrs: { origin: 'address', label: 'Zürichstrasse 1 <b>8001 Zürich</b>', lat: 47.371, lon: 8.541 } },
+      { attrs: { origin: 'gg25', label: 'ohne Lage' } },
+    ] });
+  };
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'myforrest-landschaft-suche-'));
+  const app = createApp({
+    dataDir, weatherFetch: async () => new Response('offline', { status: 503 }), tileOptions: { precompute: false },
+    layersFetch: searchFetch, layersOptions: { geoadminUrl: null, identifyUrl: null, regional: [] },
+    landschaftOptions: { zeitreiseUrl: null, searchUrl: 'https://search.example/SearchServer' },
+  });
+  const server = app.listen(0);
+  await new Promise((r) => server.once('listening', r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const get = async (q) => (await fetch(`${base}/api/landschaft/suche?q=${encodeURIComponent(q)}`)).json();
+  try {
+    const r = await get('Zürich');
+    assert.deepEqual(r.results, [
+      { label: 'Zürich (ZH)', kind: 'Gemeinde', lat: 47.37, lon: 8.54 },
+      { label: 'Zürichstrasse 1 8001 Zürich', kind: 'Adresse', lat: 47.371, lon: 8.541 },
+    ], 'labels as text, hits without a place left out');
+    const p = new URL(asked[0]).searchParams;
+    assert.deepEqual([p.get('type'), p.get('sr')], ['locations', '4326']);
+    await get('zürich');
+    assert.equal(asked.length, 1, 'the same search again comes from the cache');
+    // Coordinates need no service: WGS84 (either order) and LV95 with separators.
+    const c = (await get('46.6, 8.4')).results[0];
+    assert.deepEqual([c.kind, c.lat, c.lon], ['Koordinaten', 46.6, 8.4]);
+    assert.deepEqual((await get('8.4 46.6')).results[0].lat, 46.6);
+    const lv = (await get("2'600'000 1'200'000")).results[0];
+    assert.ok(Math.abs(lv.lat - 46.951) < 0.001 && Math.abs(lv.lon - 7.4386) < 0.001, `${lv.lat} ${lv.lon}`);
+    assert.equal(asked.length, 1);
+    // The service failing: no hits, a message.
+    const broken = await get('kaputt');
+    assert.deepEqual(broken.results, []);
+    assert.match(broken.error, /nicht verfügbar/);
+    assert.equal((await fetch(`${base}/api/landschaft/suche?q=a`)).status, 400);
+  } finally {
+    await app.locals.idle();
+    server.close();
+    app.locals.db.close();
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  }
+});
