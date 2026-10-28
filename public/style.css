@@ -2168,3 +2168,24 @@ html.basemap-vector .leaflet-tile-pane { filter: none; }
 .measure-box { position: fixed; z-index: 1000; left: 50%; bottom: 1.2rem; transform: translateX(-50%); max-width: min(420px, calc(100% - 2rem)); padding: 0.7rem 0.9rem; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgb(0 0 0 / 0.2); }
 .measure-box p { margin: 0.15rem 0; }
 .measure-tools { display: flex; gap: 0.4rem; margin-top: 0.4rem; }
+
+/* ---------- Ebenen: compare, other services and files, short link ---------- */
+.layer-tools { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
+.layer-tools .k-row { flex: 1; }
+.layer-tools button[aria-pressed="true"] { color: var(--accent); font-weight: 700; }
+.layers-import select, .layers-import input[type="url"], .layers-import input[type="search"] { width: 100%; min-width: 0; margin: 0.3rem 0; }
+.layers-import #layers-import-list ul { max-height: 260px; overflow-y: auto; }
+.layers-import .layers-file { display: grid; grid-template-columns: 1fr; gap: 0.3rem; margin-top: 0.6rem; }
+.layers-import .layers-file input { max-width: 100%; }
+.layers-qr { display: flex; gap: 0.8rem; align-items: flex-start; margin: 0 0 0.8rem; font-size: 0.85rem; }
+.layers-qr a[target] { word-break: break-all; }
+.layers-qr-code { flex: none; background: #fff; border-radius: 8px; border: 1px solid var(--border); padding: 4px; }
+.map-swipe { position: absolute; top: 0; bottom: 0; left: 50%; width: 0; z-index: 650; pointer-events: none; }
+.map-swipe::before { content: ''; position: absolute; top: 0; bottom: 0; left: -1.5px; width: 3px; background: #fff; box-shadow: 0 0 4px rgb(0 0 0 / 0.45); }
+.map-swipe-handle { position: absolute; top: 50%; left: -20px; width: 40px; height: 40px; margin-top: -20px; border-radius: 999px; background: #fff; box-shadow: 0 1px 6px rgb(0 0 0 / 0.4); cursor: ew-resize; pointer-events: auto; touch-action: none; }
+.map-swipe-handle::before, .map-swipe-handle::after { content: ''; position: absolute; top: 14px; border-style: solid; border-color: transparent; }
+.map-swipe-handle::before { left: 7px; border-width: 6px 8px 6px 0; border-right-color: #2f5d34; }
+.map-swipe-handle::after { right: 7px; border-width: 6px 0 6px 8px; border-left-color: #2f5d34; }
+.map-swipe-label { position: absolute; top: calc(50% + 30px); padding: 3px 10px; border-radius: 6px; background: rgb(255 255 255 / 0.92); color: #1b2a1f; font-weight: 700; font-size: 0.85rem; white-space: nowrap; box-shadow: 0 1px 4px rgb(0 0 0 / 0.25); max-width: 40vw; overflow: hidden; text-overflow: ellipsis; }
+.map-swipe-label.left { right: 12px; }
+.map-swipe-label.right { left: 12px; }

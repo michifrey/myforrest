@@ -1440,6 +1440,8 @@ function createApp({
   require('./routes/wikimedia')(app, { wikimedia, landscapes, idParam });
   // Landschaft im Wandel (landschaft.html): maps through time and a report per place.
   require('./routes/landschaft')(app, { db, layers: layersApi, glaciers, glamos, klima: klimaApi, fetchImpl: layersFetch, ...landschaftOptions });
+  // Short links with a QR code for shared map views (routes/shortlinks.js).
+  require('./routes/shortlinks')(app, { db, json: smallJson });
   Object.assign(tours, require('./routes/tracks')(app, {
     db, spotRadiusM, satelliteAlerts: vegetation.alerts, routerUrl, routerFetch, routerProfile, accounts, wildlife, elevation: elevationService, push,
     weather,
