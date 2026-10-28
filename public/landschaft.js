@@ -9,7 +9,7 @@
 
   const $ = (id) => document.getElementById(id);
   const CH = L.latLngBounds([45.7, 5.7], [47.95, 10.7]);
-  const state = { maps: null, place: null, report: null, timeline: 'heute', theme: '', audience: 'gemeinde' };
+  const state = { maps: null, place: null, report: null, ready: false, audience: 'gemeinde' };
 
   function el(tag, attrs = {}, children = []) {
     const node = document.createElement(tag);
@@ -32,42 +32,399 @@
   const swisstopo = (layer) => L.tileLayer(`https://wmts.geo.admin.ch/1.0.0/${layer}/default/current/3857/{z}/{x}/{y}.jpeg`, {
     maxZoom: 19, maxNativeZoom: 18, bounds: CH, attribution: '© <a href="https://www.swisstopo.admin.ch/">swisstopo</a>',
   });
-  const wms = (layer, opacity) => L.tileLayer.wms(layer.url, {
-    layers: layer.name, format: 'image/png', transparent: true, version: '1.3.0', opacity, attribution: layer.attribution || '© geo.admin.ch',
-  });
 
   /* ---------- Karte ---------- */
 
-  const map = L.map('ln-map', { zoomControl: true, maxBounds: CH.pad(0.3) }).setView([46.8, 8.2], 8);
-  swisstopo('ch.swisstopo.pixelkarte-grau').addTo(map);
-  let timeLayer = null;
-  let themeLayer = null;
+  /*
+   * The map as on map.geo.admin.ch: a background (Landeskarte, grey Landeskarte, aerial image or none) and any number
+   * of maps over it, chosen in the catalog («Karten anzeigen») and listed under «Aktive Karten», where each can be
+   * hidden, made more transparent, moved up or down, compared with a slider, explained («i») or removed. Maps with
+   * years (the «Zeitreise» and the aerial images) get the time slider at the bottom of the map.
+   */
+  const map = L.map('ln-map', { zoomControl: false, maxBounds: CH.pad(0.3) }).setView([46.8, 8.2], 8);
+  L.control.zoom({ position: 'topright' }).addTo(map);
+  L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
   let marker = null;
 
-  /* The «Zeitreise»: the Landeskarte of one year, a slider over the years and a play button. */
-  const zeit = { index: 0, timer: null, compare: null };
-  const zeitTiles = (z, time) => z.tiles.replace('{time}', time);
-  const nearest = (years, want) => years.reduce((best, y, i) => (Math.abs(y.year - want) < Math.abs(years[best].year - want) ? i : best), 0);
-  const zeitLayer = (stop, time, zIndex = 1) => L.tileLayer(zeitTiles(stop.zeitreise, time), {
-    maxZoom: 19, maxNativeZoom: 18, bounds: CH, opacity: Number($('ln-opacity').value), attribution: stop.zeitreise.attribution, zIndex,
-  });
+  const BACKGROUNDS = [
+    { id: 'ch.swisstopo.pixelkarte-farbe', title: 'Landeskarte' },
+    { id: 'ch.swisstopo.pixelkarte-grau', title: 'Landeskarte grau' },
+    { id: 'ch.swisstopo.swissimage', title: 'Luftbild' },
+    { id: 'void', title: 'Kein Hintergrund' },
+  ];
+  // The tile of each background over central Switzerland, as its picture in the chooser.
+  const bgThumb = (id) => (id === 'void' ? null : `https://wmts.geo.admin.ch/1.0.0/${id}/default/current/3857/8/133/90.jpeg`);
+  const bg = { id: 'ch.swisstopo.pixelkarte-grau', layer: null, open: false };
 
-  /* Two years side by side: a second year over the first, cut at a divider that can be dragged across the map
-     (left the year of the slider, right the comparison year). */
-  const swipe = { layer: null, index: 0, ratio: 0.5, el: null };
+  /** Every map that can be shown, by key: { key, title, when, text, kind ('wms', 'zeit', 'glacier'), layer, zeitreise, link, opacity }. */
+  const catalog = new Map();
+  /** The catalog's folders: { id, title, keys }. */
+  let groups = [];
+  /** The maps shown, the top one first: { key, visible, opacity, year, open }. */
+  const active = [];
+  const leaf = new Map(); // key → Leaflet layer
+  const panes = new Map(); // key → name of the pane of that map (one per map, so order and opacity are the pane's)
+  const DEFAULT_OPACITY = { wms: 0.85, zeit: 0.85, glacier: 1, theme: 0.75 };
+
+  function paneOf(key) {
+    if (!panes.has(key)) {
+      const name = `ln-pane-${panes.size}`;
+      map.createPane(name);
+      panes.set(key, name);
+    }
+    return panes.get(key);
+  }
+  const yearsOf = (item) => item.zeitreise?.years || [];
+  const nearest = (years, want) => years.reduce((best, y, i) => (Math.abs(y.year - want) < Math.abs(years[best].year - want) ? i : best), 0);
+  const zeitUrl = (item, year) => {
+    const years = yearsOf(item);
+    return item.zeitreise.tiles.replace('{time}', years[nearest(years, year)].time);
+  };
+  const wms = (layer, pane) => L.tileLayer.wms(layer.url, {
+    layers: layer.name, format: 'image/png', transparent: true, version: '1.3.0', pane, attribution: layer.attribution || '© geo.admin.ch',
+  });
+  function makeLayer(item, entry) {
+    const pane = paneOf(item.key);
+    if (item.kind === 'zeit') {
+      return L.tileLayer(zeitUrl(item, entry.year), { maxZoom: 19, maxNativeZoom: 18, bounds: CH, pane, attribution: item.zeitreise.attribution });
+    }
+    if (item.kind === 'glacier') return glacier.layer;
+    return wms(item.layer, pane);
+  }
+
+  function setBackground(id) {
+    bg.id = BACKGROUNDS.some((b) => b.id === id) ? id : 'ch.swisstopo.pixelkarte-grau';
+    bg.layer?.remove();
+    bg.layer = bg.id === 'void' ? null : swisstopo(bg.id).addTo(map);
+    map.getContainer().classList.toggle('ln-void', bg.id === 'void');
+    renderBackgrounds();
+    writeHash();
+  }
+  function renderBackgrounds() {
+    const current = BACKGROUNDS.find((b) => b.id === bg.id);
+    const thumb = (b) => el('span', { class: `ln-bg-thumb${b.id === 'void' ? ' void' : ''}`, style: bgThumb(b.id) ? `background-image:url(${bgThumb(b.id)})` : null });
+    $('ln-bg').replaceChildren(
+      el('div', { id: 'ln-bg-list', class: 'ln-bg-list', role: 'radiogroup', 'aria-label': 'Hintergrund', hidden: !bg.open },
+        BACKGROUNDS.map((b) => el('button', {
+          type: 'button', role: 'radio', 'aria-checked': String(b.id === bg.id), class: 'ln-bg-choice',
+          on: { click: () => { bg.open = false; setBackground(b.id); } },
+        }, [thumb(b), el('span', { text: b.title })]))),
+      el('button', {
+        type: 'button', class: 'ln-bg-current', 'aria-expanded': String(bg.open), 'aria-controls': 'ln-bg-list', title: 'Hintergrund wählen',
+        on: { click: () => { bg.open = !bg.open; renderBackgrounds(); } },
+      }, [thumb(current), el('span', { text: current.title })]),
+    );
+  }
+
+  /* ----- Active maps ----- */
+
+  function addMap(key, { visible = true, opacity = null, year = null, top = true } = {}) {
+    const item = catalog.get(key);
+    if (!item || active.some((a) => a.key === key)) return;
+    const years = yearsOf(item);
+    // Start at the year asked for (link), else around 1900 (maps) or 1950 (aerial images).
+    const want = year ?? (/swissimage/.test(item.link) ? 1950 : 1900);
+    const entry = {
+      key, visible, opacity: opacity ?? item.opacity, year: years.length ? years[nearest(years, want)].year : null, open: false,
+    };
+    if (top) active.unshift(entry); else active.push(entry);
+    apply();
+  }
+  function removeMap(key) {
+    const i = active.findIndex((a) => a.key === key);
+    if (i < 0) return;
+    if (swipe.key === key) stopSwipe();
+    active.splice(i, 1);
+    if (info.key === key) showInfo(null);
+    apply();
+  }
+  function moveMap(key, by) {
+    const i = active.findIndex((a) => a.key === key);
+    const j = i + by;
+    if (i < 0 || j < 0 || j >= active.length) return;
+    [active[i], active[j]] = [active[j], active[i]];
+    apply();
+    document.querySelector(`[id="ln-act-${key}"]`)?.querySelector(by < 0 ? '[data-act="up"]' : '[data-act="down"]')?.focus();
+  }
+  function setYear(key, year) {
+    const entry = active.find((a) => a.key === key);
+    const item = catalog.get(key);
+    if (!entry || !item) return;
+    const years = yearsOf(item);
+    entry.year = years[nearest(years, year)].year;
+    leaf.get(key)?.setUrl(zeitUrl(item, entry.year));
+    // In place, so a slider being dragged stays the same element.
+    const row = document.querySelector(`[id="ln-act-${key}"]`);
+    if (row) {
+      row.querySelector('.ln-badge').textContent = String(entry.year);
+      row.querySelector('.ln-year select').value = String(entry.year);
+    }
+    if (timeEntry()?.key === key && $('ln-zeit-year')) {
+      $('ln-zeit-year').textContent = String(entry.year);
+      $('ln-zeit-range').value = String(years.findIndex((y) => y.year === entry.year));
+    }
+    swipeLabels();
+    writeHash();
+  }
+  /** The Leaflet side of the list: layers on or off, each pane at its place and with its opacity. */
+  function apply() {
+    const n = active.length;
+    active.forEach((a, i) => {
+      const item = catalog.get(a.key);
+      const pane = map.getPane(paneOf(a.key));
+      pane.style.zIndex = String(250 + (n - i) * 2); // tiles at 200, the place marker at 600
+      pane.style.opacity = String(a.opacity);
+      let layer = leaf.get(a.key);
+      if (!layer) { layer = makeLayer(item, a); leaf.set(a.key, layer); }
+      if (a.visible && !map.hasLayer(layer)) layer.addTo(map);
+      if (!a.visible && map.hasLayer(layer)) layer.remove();
+    });
+    for (const [key, layer] of leaf) {
+      if (active.some((a) => a.key === key)) continue;
+      layer.remove();
+      leaf.delete(key);
+    }
+    glacier.shown = active.some((a) => a.key === GLACIER && a.visible);
+    refreshGlaciers();
+    if (swipe.el) {
+      const target = active.find((a) => a.key === swipe.key);
+      if (!target?.visible) stopSwipe();
+      else if (swipe.layer) {
+        // The second year lies just above the map it is compared with.
+        const pane = map.getPane('ln-compare');
+        pane.style.zIndex = String(Number(map.getPane(paneOf(swipe.key)).style.zIndex) + 1);
+        pane.style.opacity = String(target.opacity);
+      }
+    }
+    renderActive();
+    renderCatalog();
+    renderTimebar();
+    clipSwipe();
+    writeHash();
+  }
+
+  const icon = (d) => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', d);
+    svg.append(path);
+    return svg;
+  };
+  const ICON = {
+    info: 'M11 10h2v7h-2zm0-4h2v2h-2zM12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16z',
+    gear: 'M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1L11 21h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z',
+    close: 'M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7l1.4-1.4 6.3 6.3 6.3-6.3z',
+    up: 'M12 7.5 5 14.5l1.4 1.4 5.6-5.6 5.6 5.6 1.4-1.4z',
+    down: 'M12 16.5 5 9.5l1.4-1.4 5.6 5.6 5.6-5.6 1.4 1.4z',
+    swipe: 'M11 2h2v20h-2zM4 8l-3 4 3 4zm16 0v8l3-4z',
+  };
+  const iconButton = (label, d, onClick, extra = {}) => el('button', { type: 'button', class: 'ln-icon', 'aria-label': label, title: label, on: { click: onClick }, ...extra }, [icon(d)]);
+
+  function renderActive() {
+    $('ln-active-count').textContent = String(active.length);
+    if (!active.length) {
+      $('ln-active').replaceChildren(el('li', { class: 'ln-empty', text: 'Noch keine Karte gewählt. Unter «Karten anzeigen» ankreuzen, was über dem Hintergrund liegen soll.' }));
+      return;
+    }
+    $('ln-active').replaceChildren(...active.map((a, i) => {
+      const item = catalog.get(a.key);
+      const id = `ln-act-${a.key}`;
+      const years = yearsOf(item);
+      const tools = el('div', { class: 'ln-layer-tools', id: `${id}-tools`, hidden: !a.open }, [
+        el('label', { class: 'ln-opacity' }, [
+          el('span', { text: 'Deckkraft' }),
+          el('input', {
+            type: 'range', min: '0', max: '1', step: '0.05', value: String(a.opacity),
+            on: {
+              input: (e) => {
+                a.opacity = Number(e.target.value);
+                map.getPane(paneOf(a.key)).style.opacity = String(a.opacity);
+                if (swipe.layer && swipe.key === a.key) map.getPane('ln-compare').style.opacity = String(a.opacity);
+                e.target.nextElementSibling.textContent = `${Math.round(a.opacity * 100)} %`;
+              },
+              change: () => writeHash(),
+            },
+          }),
+          el('output', { text: `${Math.round(a.opacity * 100)} %` }),
+        ]),
+        years.length ? el('label', { class: 'ln-year' }, [
+          el('span', { text: 'Jahr' }),
+          el('select', { on: { change: (e) => setYear(a.key, Number(e.target.value)) } },
+            years.map((y) => el('option', { value: String(y.year), text: String(y.year), selected: y.year === a.year }))),
+        ]) : null,
+        item.kind === 'glacier' ? el('div', { class: 'ln-glacier-legend', 'aria-live': 'polite' }) : null,
+        el('div', { class: 'ln-layer-buttons' }, [
+          el('button', { type: 'button', 'data-act': 'up', disabled: i === 0, on: { click: () => moveMap(a.key, -1) } }, [icon(ICON.up), 'Nach oben']),
+          el('button', { type: 'button', 'data-act': 'down', disabled: i === active.length - 1, on: { click: () => moveMap(a.key, 1) } }, [icon(ICON.down), 'Nach unten']),
+          item.kind === 'glacier' ? null : el('button', {
+            type: 'button', 'aria-pressed': String(swipe.key === a.key && !swipe.layer), disabled: !a.visible,
+            on: { click: () => (swipe.key === a.key && !swipe.layer ? stopSwipe() : startSwipe(a.key)) },
+          }, [icon(ICON.swipe), 'Vergleichen']),
+        ]),
+      ]);
+      return el('li', { id, class: `ln-layer${a.visible ? '' : ' hidden-layer'}` }, [
+        el('div', { class: 'ln-layer-row' }, [
+          el('label', { class: 'ln-layer-check' }, [
+            el('input', {
+              type: 'checkbox', checked: a.visible,
+              on: { change: (e) => { a.visible = e.target.checked; apply(); } },
+            }),
+            el('span', { class: 'ln-layer-title' }, [item.title, a.year ? el('span', { class: 'ln-badge', text: String(a.year) }) : null]),
+          ]),
+          iconButton(`Info zu ${item.title}`, ICON.info, () => showInfo(info.key === a.key ? null : a.key), { 'aria-pressed': String(info.key === a.key) }),
+          iconButton(`Einstellungen: ${item.title}`, ICON.gear, () => {
+            a.open = !a.open;
+            renderActive();
+            document.querySelector(`[id="${id}"] [aria-controls]`)?.focus();
+          }, { 'aria-expanded': String(a.open), 'aria-controls': `${id}-tools` }),
+          iconButton(`${item.title} entfernen`, ICON.close, () => removeMap(a.key)),
+        ]),
+        tools,
+      ]);
+    }));
+    glacierLegend();
+  }
+
+  /* ----- Catalog ----- */
+
+  const openGroups = new Set(['zeit']);
+  function renderCatalog() {
+    $('ln-catalog').replaceChildren(...groups.filter((g) => g.keys.length).map((g) => {
+      const on = g.keys.filter((k) => active.some((a) => a.key === k)).length;
+      const details = el('details', { class: 'ln-folder', open: openGroups.has(g.id) }, [
+        el('summary', {}, [el('span', { text: g.title }), on ? el('span', { class: 'ln-badge', text: String(on) }) : null]),
+        el('ul', {}, g.keys.map((key) => {
+          const item = catalog.get(key);
+          const checked = active.some((a) => a.key === key);
+          return el('li', { class: 'ln-entry' }, [
+            el('label', {}, [
+              el('input', { type: 'checkbox', checked, on: { change: (e) => (e.target.checked ? addMap(key) : removeMap(key)) } }),
+              el('span', {}, [el('span', { class: 'ln-entry-title', text: item.title }), item.when ? el('span', { class: 'ln-when', text: item.when }) : null]),
+            ]),
+            iconButton(`Info zu ${item.title}`, ICON.info, () => showInfo(info.key === key ? null : key)),
+          ]);
+        })),
+      ]);
+      details.addEventListener('toggle', () => (details.open ? openGroups.add(g.id) : openGroups.delete(g.id)));
+      return details;
+    }));
+  }
+
+  /* ----- Info about a map: what it shows, its legend, its source ----- */
+
+  const info = { key: null };
+  function showInfo(key) {
+    info.key = key;
+    const item = catalog.get(key);
+    const box = $('ln-info');
+    box.hidden = !item;
+    for (const b of document.querySelectorAll('.ln-layer .ln-icon[aria-pressed]')) b.setAttribute('aria-pressed', 'false');
+    if (!item) return;
+    const legend = item.layer?.legend;
+    box.replaceChildren(...[
+      el('header', {}, [el('h3', { text: item.title }), iconButton('Info schliessen', ICON.close, () => showInfo(null))]),
+      item.when ? el('p', { class: 'ln-when', text: item.when }) : null,
+      el('p', { text: item.text || '' }),
+      legend ? el('img', { src: legend, alt: `Legende: ${item.title}`, loading: 'lazy', class: 'ln-legend', on: { error: (e) => e.target.remove() } }) : null,
+      item.kind === 'glacier' ? null : el('a', {
+        href: GeoadminLink.link({ lat: map.getCenter().lat, lon: map.getCenter().lng, zoom: map.getZoom(), layers: [{ id: item.link, visible: true, params: {} }], bgLayer: 'ch.swisstopo.pixelkarte-grau' }),
+        target: '_blank', rel: 'noopener', class: 'small', text: 'In map.geo.admin.ch ansehen',
+      }),
+    ].filter(Boolean));
+    const pressed = document.querySelector(`[id="ln-act-${key}"]`)?.querySelector('.ln-icon[aria-pressed]');
+    pressed?.setAttribute('aria-pressed', 'true');
+  }
+
+  /* ----- Time slider: the years of the top map with years, a play button and two years side by side ----- */
+
+  const zeit = { timer: null };
+  const timeEntry = () => active.find((a) => a.visible && yearsOf(catalog.get(a.key)).length);
+  function stopPlaying() {
+    clearInterval(zeit.timer);
+    zeit.timer = null;
+  }
+  function play(entry) {
+    if (zeit.timer) { stopPlaying(); renderTimebar(); return; }
+    const years = yearsOf(catalog.get(entry.key));
+    if (entry.year >= years[years.length - 1].year) setYear(entry.key, years[0].year);
+    // One year every 1.2 s: time for the tiles of the next year to arrive.
+    zeit.timer = setInterval(() => {
+      const e = timeEntry();
+      const ys = e ? yearsOf(catalog.get(e.key)) : [];
+      const i = ys.findIndex((y) => y.year === e?.year);
+      if (!e || i < 0 || i >= ys.length - 1) { stopPlaying(); renderTimebar(); } else setYear(e.key, ys[i + 1].year);
+    }, 1200);
+    renderTimebar();
+  }
+  function renderTimebar() {
+    const entry = timeEntry();
+    const bar = $('ln-timebar');
+    bar.hidden = !entry;
+    if (!entry) { stopPlaying(); return; }
+    const item = catalog.get(entry.key);
+    const years = yearsOf(item);
+    const index = years.findIndex((y) => y.year === entry.year);
+    const comparing = swipe.key === entry.key && swipe.layer;
+    bar.replaceChildren(
+      el('button', {
+        type: 'button', class: `ln-play${zeit.timer ? ' playing' : ''}`, 'aria-label': zeit.timer ? 'Anhalten' : 'Jahre abspielen', on: { click: () => play(entry) },
+      }),
+      el('div', { class: 'ln-timebar-main' }, [
+        el('div', { class: 'ln-timebar-head' }, [
+          el('output', { id: 'ln-zeit-year', class: 'ln-zeit-year', text: String(entry.year) }),
+          el('span', { class: 'ln-muted small', text: item.title }),
+        ]),
+        el('label', { class: 'sr-only', for: 'ln-zeit-range', text: `Jahr: ${item.title}` }),
+        el('input', {
+          type: 'range', id: 'ln-zeit-range', min: '0', max: String(years.length - 1), step: '1', value: String(Math.max(0, index)),
+          on: { input: (e) => { stopPlaying(); setYear(entry.key, years[Number(e.target.value)].year); } },
+        }),
+        el('div', { class: 'ln-zeit-scale' }, [el('span', { text: String(years[0].year) }), el('span', { text: String(years[years.length - 1].year) })]),
+      ]),
+      el('div', { class: 'ln-timebar-compare' }, [
+        el('label', { class: 'ln-check' }, [
+          el('input', {
+            type: 'checkbox', id: 'ln-vergleich', checked: Boolean(comparing),
+            on: { change: (e) => (e.target.checked ? startYears(entry.key, years[years.length - 1].year) : stopSwipe()) },
+          }),
+          'Mit einem zweiten Jahr vergleichen',
+        ]),
+        comparing ? el('label', { class: 'ln-year' }, [
+          el('span', { text: 'rechts' }),
+          el('select', { id: 'ln-vergleich-year', on: { change: (e) => setCompareYear(Number(e.target.value)) } },
+            years.map((y) => el('option', { value: String(y.year), text: String(y.year), selected: y.year === swipe.year }))),
+        ]) : null,
+      ]),
+    );
+  }
+
+  /* ----- Comparing with a slider: a map against the map without it, or two years of a map ----- */
+
+  const swipe = { key: null, layer: null, year: null, ratio: 0.5, el: null };
+  map.createPane('ln-compare');
+  const swipePane = () => (swipe.layer ? map.getPane('ln-compare') : swipe.key ? map.getPane(paneOf(swipe.key)) : null);
   function clipSwipe() {
-    const container = swipe.layer?.getContainer();
-    if (!container) return;
+    const pane = swipePane();
+    if (!pane || !swipe.el) return;
     const nw = map.containerPointToLayerPoint([0, 0]);
     const se = map.containerPointToLayerPoint(map.getSize());
     const x = nw.x + map.getSize().x * swipe.ratio;
-    container.style.clip = `rect(${nw.y}px, ${se.x}px, ${se.y}px, ${x}px)`;
+    pane.style.clip = `rect(${nw.y}px, ${se.x}px, ${se.y}px, ${x}px)`;
     swipe.el.style.left = `${swipe.ratio * 100}%`;
     swipe.el.querySelector('[role="slider"]').setAttribute('aria-valuenow', String(Math.round(swipe.ratio * 100)));
   }
+  function swipeLabels() {
+    if (!swipe.el) return;
+    const item = catalog.get(swipe.key);
+    const entry = active.find((a) => a.key === swipe.key);
+    swipe.el.querySelector('.left').textContent = swipe.layer ? String(entry?.year ?? '') : 'ohne';
+    swipe.el.querySelector('.right').textContent = swipe.layer ? String(swipe.year) : item?.title || '';
+  }
   function swipeElement() {
     const handle = el('div', {
-      class: 'ln-swipe-handle', role: 'slider', tabindex: '0', 'aria-label': 'Trennlinie zwischen den zwei Jahren',
+      class: 'ln-swipe-handle', role: 'slider', tabindex: '0', 'aria-label': 'Trennlinie des Vergleichs',
       'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': '50',
       on: {
         keydown: (e) => {
@@ -97,153 +454,88 @@
     map.getContainer().append(node);
     return node;
   }
-  function swipeYears(stop) {
-    if (!swipe.el) return;
-    const years = stop.zeitreise.years;
-    swipe.el.querySelector('.left').textContent = String(years[zeit.index].year);
-    swipe.el.querySelector('.right').textContent = String(years[swipe.index].year);
-  }
-  function stopCompare() {
+  function stopSwipe() {
+    const pane = swipePane();
+    if (pane) pane.style.clip = '';
     swipe.layer?.remove();
-    swipe.layer = null;
     swipe.el?.remove();
-    swipe.el = null;
+    Object.assign(swipe, { key: null, layer: null, year: null, el: null });
+    renderActive();
+    renderTimebar();
+    writeHash();
   }
-  function setCompareYear(stop, index) {
-    const years = stop.zeitreise.years;
-    swipe.index = Math.max(0, Math.min(years.length - 1, index));
-    swipe.layer.setUrl(zeitTiles(stop.zeitreise, years[swipe.index].time));
-    $('ln-vergleich-year').textContent = String(years[swipe.index].year);
-    $('ln-vergleich-range').value = String(swipe.index);
-    swipeYears(stop);
-    zeitHash(stop);
-  }
-  function startCompare(stop, index) {
-    stopCompare();
-    swipe.layer = zeitLayer(stop, stop.zeitreise.years[0].time, 2).addTo(map);
+  /** The map `key` only right of the divider. */
+  function startSwipe(key) {
+    if (swipe.el) stopSwipe();
+    swipe.key = key;
     swipe.el = swipeElement();
-    setCompareYear(stop, index);
+    swipeLabels();
+    renderActive();
     clipSwipe();
+    writeHash();
+  }
+  /** Two years of the map `key`: its year left of the divider, `year` right of it. */
+  function startYears(key, year) {
+    if (swipe.el) stopSwipe();
+    const item = catalog.get(key);
+    swipe.key = key;
+    swipe.year = year;
+    swipe.layer = L.tileLayer(zeitUrl(item, year), { maxZoom: 19, maxNativeZoom: 18, bounds: CH, pane: 'ln-compare', attribution: item.zeitreise.attribution }).addTo(map);
+    swipe.el = swipeElement();
+    apply();
+    setCompareYear(year);
+  }
+  function setCompareYear(year) {
+    const item = catalog.get(swipe.key);
+    if (!item || !swipe.layer) return;
+    const years = yearsOf(item);
+    swipe.year = years[nearest(years, year)].year;
+    swipe.layer.setUrl(zeitUrl(item, swipe.year));
+    swipeLabels();
+    renderTimebar();
+    clipSwipe();
+    writeHash();
   }
   map.on('move zoom resize viewreset', clipSwipe);
   // Tiles drawn after a zoom get a new container position: clip again once they are there.
   map.on('zoomend', () => setTimeout(clipSwipe, 0));
 
-  function zeitHash(stop) {
-    // The view, the year and the comparison year in the address, so the view can be shared.
-    const years = stop.zeitreise.years;
-    const q = new URLSearchParams(state.place ? placeQuery() : {});
-    q.set('ansicht', stop.id);
-    q.set('jahr', years[zeit.index].year);
-    if (swipe.layer) q.set('vergleich', years[swipe.index].year);
-    history.replaceState(null, '', `#karte?${q}`);
-  }
-  function stopPlaying() {
-    clearInterval(zeit.timer);
-    zeit.timer = null;
-    $('ln-zeit-play')?.setAttribute('aria-label', 'Jahre abspielen');
-    $('ln-zeit-play')?.classList.remove('playing');
-  }
-  function setYear(stop, index) {
-    const years = stop.zeitreise.years;
-    zeit.index = Math.max(0, Math.min(years.length - 1, index));
-    const y = years[zeit.index];
-    timeLayer?.setUrl(zeitTiles(stop.zeitreise, y.time));
-    $('ln-zeit-year').textContent = String(y.year);
-    $('ln-zeit-range').value = String(zeit.index);
-    swipeYears(stop);
-    zeitHash(stop);
-  }
-  function zeitControls(stop) {
-    const years = stop.zeitreise.years;
-    const play = () => {
-      if (zeit.timer) return stopPlaying();
-      if (zeit.index >= years.length - 1) setYear(stop, 0);
-      $('ln-zeit-play').setAttribute('aria-label', 'Anhalten');
-      $('ln-zeit-play').classList.add('playing');
-      // One year every 1.2 s: time for the tiles of the next year to arrive.
-      zeit.timer = setInterval(() => {
-        if (zeit.index >= years.length - 1) stopPlaying(); else setYear(stop, zeit.index + 1);
-      }, 1200);
-      return undefined;
-    };
-    return el('div', { class: 'ln-zeit' }, [
-      el('div', { class: 'ln-zeit-row' }, [
-        el('button', { type: 'button', id: 'ln-zeit-play', class: 'ln-play', 'aria-label': 'Jahre abspielen', on: { click: play } }),
-        el('output', { id: 'ln-zeit-year', for: 'ln-zeit-range', class: 'ln-zeit-year' }),
-      ]),
-      el('label', { class: 'sr-only', for: 'ln-zeit-range', text: 'Jahr' }),
-      el('input', {
-        type: 'range', id: 'ln-zeit-range', min: '0', max: String(years.length - 1), step: '1', value: String(zeit.index),
-        on: { input: (e) => { stopPlaying(); setYear(stop, Number(e.target.value)); } },
-      }),
-      el('div', { class: 'ln-zeit-scale' }, [el('span', { text: String(years[0].year) }), el('span', { text: String(years[years.length - 1].year) })]),
-      el('label', { class: 'ln-row ln-vergleich-toggle', for: 'ln-vergleich' }, [
-        el('input', {
-          type: 'checkbox', id: 'ln-vergleich',
-          on: {
-            change: (e) => {
-              $('ln-vergleich-box').hidden = !e.target.checked;
-              if (e.target.checked) startCompare(stop, years.length - 1); else { stopCompare(); zeitHash(stop); }
-            },
-          },
-        }),
-        'Mit einem zweiten Jahr vergleichen',
-      ]),
-      el('div', { id: 'ln-vergleich-box', class: 'ln-vergleich', hidden: true }, [
-        el('div', { class: 'ln-zeit-row' }, [
-          el('span', { class: 'ln-muted small', text: 'rechts der Linie' }),
-          el('output', { id: 'ln-vergleich-year', for: 'ln-vergleich-range', class: 'ln-zeit-year' }),
-        ]),
-        el('label', { class: 'sr-only', for: 'ln-vergleich-range', text: 'Vergleichsjahr' }),
-        el('input', {
-          type: 'range', id: 'ln-vergleich-range', min: '0', max: String(years.length - 1), step: '1', value: String(years.length - 1),
-          on: { input: (e) => setCompareYear(stop, Number(e.target.value)) },
-        }),
-      ]),
-    ]);
-  }
+  /* ----- The catalog from /api/landschaft/karten ----- */
 
-  function showTimeline(id, { year = null, compare = null } = {}) {
-    state.timeline = id;
-    stopPlaying();
-    stopCompare();
-    const stop = state.maps?.timeline.find((t) => t.id === id);
-    timeLayer?.remove();
-    timeLayer = null;
-    if (stop?.layer) timeLayer = wms(stop.layer, Number($('ln-opacity').value)).addTo(map);
-    if (stop?.zeitreise) {
-      const years = stop.zeitreise.years;
-      // Start at the year asked for (link), else around 1900 (maps) or 1950 (aerial images).
-      const want = year ?? (id === 'luftbild' ? 1950 : 1900);
-      zeit.index = nearest(years, want);
-      timeLayer = zeitLayer(stop, years[zeit.index].time).addTo(map);
+  const GLACIER = 'gletscherinventare';
+  function buildCatalog(maps) {
+    catalog.clear();
+    const zeitKeys = [];
+    for (const t of maps.timeline) {
+      if (!t.layer && !t.zeitreise) continue; // the Landeskarte of today is a background
+      const key = t.zeitreise ? t.zeitreise.layer : t.layer.name;
+      catalog.set(key, {
+        key, title: t.title, when: t.when, text: t.text, kind: t.zeitreise ? 'zeit' : 'wms', layer: t.layer, zeitreise: t.zeitreise,
+        link: key, opacity: DEFAULT_OPACITY[t.zeitreise ? 'zeit' : 'wms'],
+      });
+      zeitKeys.push(key);
     }
-    for (const b of $('ln-timeline').querySelectorAll('button')) b.setAttribute('aria-checked', String(b.dataset.id === id));
-    $('ln-time-info').replaceChildren(...(stop ? [
-      el('strong', { text: `${stop.title} · ${stop.when}` }),
-      el('p', { text: stop.text }),
-      stop.zeitreise ? zeitControls(stop) : null,
-      stop.layer ? el('img', { src: stop.layer.legend, alt: `Legende: ${stop.title}`, loading: 'lazy', class: 'ln-legend', on: { error: (e) => e.target.remove() } }) : null,
-    ].filter(Boolean) : []));
-    if (stop?.zeitreise) setYear(stop, zeit.index);
-    if (stop?.zeitreise && compare) {
-      $('ln-vergleich').checked = true;
-      $('ln-vergleich-box').hidden = false;
-      startCompare(stop, nearest(stop.zeitreise.years, compare));
+    groups = [{ id: 'zeit', title: 'Karten durch die Zeit', keys: zeitKeys }];
+    for (const th of maps.themes) {
+      const keys = [];
+      for (const l of th.layers) {
+        if (!catalog.has(l.name)) {
+          catalog.set(l.name, {
+            key: l.name, title: l.title, when: null, text: l.abstract || `Themenkarte «${th.title}» von geo.admin.ch.`, kind: 'wms', layer: l, link: l.name, opacity: DEFAULT_OPACITY.theme,
+          });
+        }
+        keys.push(l.name);
+      }
+      groups.push({ id: th.id, title: th.title, keys });
     }
-  }
-
-  function showTheme(value) {
-    state.theme = value;
-    themeLayer?.remove();
-    themeLayer = null;
-    const [t, i] = value.split(':');
-    const layer = state.maps?.themes.find((x) => x.id === t)?.layers[Number(i)];
-    $('ln-theme-legend').replaceChildren();
-    if (!layer) return;
-    themeLayer = wms(layer, 0.75).setZIndex(3).addTo(map);
-    $('ln-theme-legend').append(el('img', { src: layer.legend, alt: `Legende: ${layer.title}`, loading: 'lazy', class: 'ln-legend', on: { error: (e) => e.target.remove() } }));
+    if (maps.glaciers) {
+      catalog.set(GLACIER, {
+        key: GLACIER, kind: 'glacier', title: 'Gletscherinventare', when: maps.glaciers.years.join(', '), link: GLACIER, opacity: DEFAULT_OPACITY.glacier,
+        text: 'Die Umrisse der Gletscher aus den Inventaren: eine Farbe pro Inventar, die alten hell und gestrichelt, das neuste dunkel. In den Einstellungen zeigt ein Jahr nur dieses Inventar.',
+      });
+      const water = groups.find((g) => g.id === 'wasser') || groups[groups.push({ id: 'wasser', title: 'Gletscher und Wasser', keys: [] }) - 1];
+      water.keys.unshift(GLACIER);
+    }
   }
 
   async function loadMaps() {
@@ -251,79 +543,88 @@
       state.maps = await api('/api/landschaft/karten');
     } catch (err) {
       $('ln-status').textContent = `Karten nicht verfügbar: ${err.message}`;
-      state.maps = { timeline: [{ id: 'heute', base: true, when: 'heute', title: 'Landeskarte', text: 'Die aktuelle Landeskarte von swisstopo.' }], themes: [] };
+      state.maps = { timeline: [], themes: [], glaciers: null };
     }
-    $('ln-timeline').replaceChildren(...state.maps.timeline.map((t) => el('button', {
-      type: 'button', role: 'radio', 'data-id': t.id, 'aria-checked': 'false', on: { click: () => showTimeline(t.id) },
-    }, [el('span', { class: 'ln-when', text: t.when }), el('span', { text: t.title })])));
-    const options = [el('option', { value: '', text: 'kein Thema' })];
-    for (const t of state.maps.themes) {
-      if (!t.layers.length) continue;
-      options.push(el('optgroup', { label: t.title }, t.layers.map((l, i) => el('option', { value: `${t.id}:${i}`, text: l.title }))));
-    }
-    $('ln-themes').replaceChildren(...[
-      el('label', { class: 'sr-only', for: 'ln-theme', text: 'Thema' }),
-      el('select', { id: 'ln-theme', on: { change: (e) => showTheme(e.target.value) } }, options),
-      el('div', { id: 'ln-theme-legend' }),
-      state.maps.themes.some((t) => t.layers.length) ? null : el('p', { class: 'ln-muted', text: 'Keine Themenkarten verfügbar.' }),
-    ].filter(Boolean));
-    $('ln-glaciers').hidden = !state.maps.glaciers;
+    buildCatalog(state.maps);
     const q = new URLSearchParams(location.hash.split('?')[1] || '');
-    const year = Number(q.get('jahr'));
-    const view = q.get('ansicht') || 'zeitreise';
-    if (year && state.maps.timeline.some((t) => t.id === view && t.zeitreise)) showTimeline(view, { year, compare: Number(q.get('vergleich')) || null });
-    else if (!fromGeoadmin()) showTimeline(state.maps.timeline.some((t) => t.id === state.timeline) ? state.timeline : 'heute');
+    setBackground(q.get('bg') || 'ch.swisstopo.pixelkarte-grau');
+    state.ready = true;
+    if (q.has('layers')) fromLayers(GeoadminLink.parseLayers(q.get('layers')));
+    else if (q.get('ansicht')) {
+      // Links of the earlier page: one map of the timeline (`ansicht`), its year and a comparison year.
+      const t = state.maps.timeline.find((x) => x.id === q.get('ansicht'));
+      const key = t && (t.zeitreise ? t.zeitreise.layer : t.layer?.name);
+      if (key) addMap(key, { year: Number(q.get('jahr')) || null });
+    } else fromGeoadmin();
+    const compare = Number(q.get('vergleich'));
+    const entry = timeEntry();
+    if (compare && entry) startYears(entry.key, compare);
+    apply();
   }
 
   /*
-   * Links in the syntax of map.geo.admin.ch (public/geoadmin-link.js): `?layers=ch.swisstopo.zeitreihen@year=1864`
-   * and the like open the matching map of the timeline (and a theme layer), `center` and `z` the place.
+   * The maps in the address in the syntax of map.geo.admin.ch (public/geoadmin-link.js), the bottom one first:
+   * `layers=ch.swisstopo.zeitreihen@year=1900,,0.85;ch.bafu.…,f`. Links of map.geo.admin.ch itself (`?layers=` in the
+   * query, with `center` and `z`) open the same maps here.
    */
-  const LAYER_STOPS = { 'ch.swisstopo.zeitreihen': 'zeitreise', 'ch.swisstopo.swissimage-product': 'luftbild' };
-  const stopLayers = (t) => (t.zeitreise ? Object.keys(LAYER_STOPS).filter((k) => LAYER_STOPS[k] === t.id) : t.layer ? [t.layer.name] : []);
+  function fromLayers(list) {
+    for (const l of list.filter((x) => !x.external)) {
+      const key = [...catalog.values()].find((i) => i.link === l.id)?.key;
+      if (key) addMap(key, { visible: l.visible, opacity: l.opacity, year: Number.isFinite(l.params.year) ? l.params.year : null });
+    }
+  }
   function fromGeoadmin() {
     const g = GeoadminLink.read(location.search);
     if (g.lat !== null) map.setView([g.lat, g.lon], Number.isFinite(g.zoom) ? Math.round(g.zoom) : 12);
-    let shown = false;
-    for (const l of g.layers.filter((x) => !x.external)) {
-      const stop = state.maps.timeline.find((t) => stopLayers(t).includes(l.id));
-      if (stop && !shown) {
-        showTimeline(stop.id, { year: Number.isFinite(l.params.year) ? l.params.year : null });
-        if (Number.isFinite(l.opacity)) { $('ln-opacity').value = String(l.opacity); timeLayer?.setOpacity(l.opacity); }
-        shown = true;
-        continue;
-      }
-      const t = state.maps.themes.find((x) => x.layers.some((y) => y.name === l.id));
-      if (t) {
-        const value = `${t.id}:${t.layers.findIndex((y) => y.name === l.id)}`;
-        $('ln-theme').value = value;
-        showTheme(value);
-      }
-    }
-    return shown;
+    if (g.bgLayer) setBackground(g.bgLayer);
+    fromLayers(g.layers);
   }
-  /** The map shown here, as a link of map.geo.admin.ch: the map of the timeline (with its year) and the theme. */
+  const linkLayers = () => [...active].reverse().map((a) => ({
+    id: catalog.get(a.key).link, visible: a.visible, opacity: a.opacity, params: a.year ? { year: a.year } : {},
+  }));
+  /** The view in the address: the place, the maps, the background and the comparison year, so it can be shared. */
+  function writeHash() {
+    if (!state.ready || !$('karte') || $('karte').hidden) return;
+    const q = new URLSearchParams(state.place ? placeQuery() : {});
+    if (active.length) q.set('layers', GeoadminLink.layersParam(linkLayers()));
+    if (bg.id !== 'ch.swisstopo.pixelkarte-grau') q.set('bg', bg.id);
+    if (swipe.layer) q.set('vergleich', String(swipe.year));
+    // The separators of the layers syntax stay readable (values carry their own %2C, %3B, %40).
+    const s = q.toString().replace(/%3B/g, ';').replace(/%2C/g, ',').replace(/%40/g, '@').replace(/%3D/g, '=');
+    history.replaceState(null, '', s ? `#karte?${s}` : '#karte');
+  }
+  /** The map shown here, as a link of map.geo.admin.ch (without the glacier inventories of this server). */
   function geoadminHref() {
-    const stop = state.maps?.timeline.find((t) => t.id === state.timeline);
-    const layers = [];
-    const opacity = Number($('ln-opacity').value);
-    if (stop?.zeitreise) {
-      const y = stop.zeitreise.years[zeit.index];
-      layers.push({ id: stopLayers(stop)[0], visible: true, opacity, params: { year: y.year } });
-    } else if (stop?.layer) layers.push({ id: stop.layer.name, visible: true, opacity, params: {} });
-    const [t, i] = (state.theme || '').split(':');
-    const theme = state.maps?.themes.find((x) => x.id === t)?.layers[Number(i)];
-    if (theme) layers.push({ id: theme.name, visible: true, opacity: 0.75, params: {} });
+    const layers = linkLayers().filter((l) => l.id !== GLACIER);
     // The chosen place in the middle, with the cross of map.geo.admin.ch on it.
     const c = state.place ? { lat: state.place.lat, lng: state.place.lon } : map.getCenter();
-    return `${GeoadminLink.link({ lat: c.lat, lon: c.lng, zoom: map.getZoom(), layers, bgLayer: 'ch.swisstopo.pixelkarte-grau' })}${state.place ? '&crosshair=marker' : ''}`;
+    return `${GeoadminLink.link({ lat: c.lat, lon: c.lng, zoom: map.getZoom(), layers, bgLayer: bg.id })}${state.place ? '&crosshair=marker' : ''}`;
   }
   $('ln-geoadmin').addEventListener('click', (e) => { e.currentTarget.href = geoadminHref(); });
+  $('ln-share').addEventListener('click', async () => {
+    writeHash();
+    try {
+      await navigator.clipboard.writeText(location.href);
+      $('ln-status').textContent = 'Link kopiert.';
+    } catch {
+      $('ln-status').textContent = `Link: ${location.href}`;
+    }
+  });
+  $('ln-menu-toggle').addEventListener('click', (e) => {
+    const open = e.currentTarget.getAttribute('aria-expanded') !== 'true';
+    e.currentTarget.setAttribute('aria-expanded', String(open));
+    e.currentTarget.lastChild.textContent = open ? 'Menü ausblenden' : 'Menü einblenden';
+    $('ln-menu').classList.toggle('collapsed', !open);
+  });
+  for (const id of ['ln-menu', 'ln-bg', 'ln-timebar', 'ln-info']) {
+    L.DomEvent.disableClickPropagation($(id));
+    L.DomEvent.disableScrollPropagation($(id));
+  }
 
-  /* Glacier outlines of the inventories on this server (/api/glaciers), over every map of the timeline: one colour
-     per inventory, the old ones light and dashed, the newest dark. A year in the legend shows that inventory alone. */
+  /* Glacier outlines of the inventories on this server (/api/glaciers): one colour per inventory, the old ones light
+     and dashed, the newest dark. A year in the settings shows that inventory alone. */
   const ICE = [47, 134, 180];
-  const glacier = { shown: false, only: null, layer: L.layerGroup(), timer: null };
+  const glacier = { shown: false, only: null, layer: L.layerGroup(), timer: null, message: '' };
   function iceShade(year) {
     const years = state.maps?.glaciers?.years || [];
     const t = years.length > 1 ? Math.max(0, years.indexOf(year)) / (years.length - 1) : 1;
@@ -331,13 +632,16 @@
     const [r, g, b] = ICE.map((c) => Math.round(c * k + 255 * (1 - k)));
     return { color: `rgb(${r} ${g} ${b})`, t };
   }
-  function glacierLegend(message = '') {
-    $('ln-glacier-legend').replaceChildren(...[
-      ...(glacier.shown ? state.maps.glaciers.years.map((y) => el('button', {
+  function glacierLegend(message = glacier.message) {
+    glacier.message = message;
+    const box = document.querySelector(`[id="ln-act-${GLACIER}"] .ln-glacier-legend`);
+    if (!box) return;
+    box.replaceChildren(...[
+      ...state.maps.glaciers.years.map((y) => el('button', {
         type: 'button', 'aria-pressed': String(glacier.only === y), style: `--swatch: ${iceShade(y).color}`, text: String(y),
         title: glacier.only === y ? 'Alle Inventare zeigen' : `Nur das Inventar ${y} zeigen`,
-        on: { click: () => { glacier.only = glacier.only === y ? null : y; refreshGlaciers(); } },
-      })) : []),
+        on: { click: () => { glacier.only = glacier.only === y ? null : y; glacierLegend(); refreshGlaciers(); } },
+      })),
       message ? el('span', { class: 'ln-muted small', text: message }) : null,
     ].filter(Boolean));
   }
@@ -349,23 +653,20 @@
     const fc = await api(`/api/glaciers?bbox=${bbox}${glacier.only ? `&year=${glacier.only}` : ''}`).catch(() => null);
     if (!fc || !glacier.shown) return;
     glacier.layer.clearLayers();
+    const pane = paneOf(GLACIER);
     // Oldest first, so the smaller recent outlines lie on top.
     for (const f of [...fc.features].sort((a, c) => (a.properties.year ?? 0) - (c.properties.year ?? 0))) {
       const { color, t } = iceShade(f.properties.year);
       L.geoJSON(f, {
-        style: { color, weight: t === 1 ? 2.2 : 1.6, dashArray: t === 1 ? null : '5 4', fillColor: color, fillOpacity: 0.1 + 0.2 * t },
+        pane, style: { color, weight: t === 1 ? 2.2 : 1.6, dashArray: t === 1 ? null : '5 4', fillColor: color, fillOpacity: 0.1 + 0.2 * t },
       }).bindTooltip(`${f.properties.name} · Stand ${f.properties.year ?? 'unbekannt'}`, { sticky: true }).addTo(glacier.layer);
     }
     glacierLegend(fc.features.length ? '' : 'Keine Gletscher in diesem Ausschnitt');
   }
-  function showGlaciers(on) {
-    glacier.shown = on;
-    if (on) glacier.layer.addTo(map); else glacier.layer.remove();
-    glacierLegend();
-    refreshGlaciers();
-  }
-  $('ln-glacier-toggle').addEventListener('change', (e) => showGlaciers(e.target.checked));
-  map.on('moveend', () => { clearTimeout(glacier.timer); glacier.timer = setTimeout(refreshGlaciers, 250); });
+  map.on('moveend', () => {
+    clearTimeout(glacier.timer);
+    glacier.timer = setTimeout(refreshGlaciers, 250);
+  });
 
   const coords = (p) => `${fmt(p.lat, 4)}° N, ${fmt(p.lon, 4)}° O`;
   /** The place for the report; `name` when it came from the search (it goes into the address and the report title). */
@@ -380,7 +681,7 @@
     $('ln-to-report').hidden = false;
   }
   const placeQuery = () => new URLSearchParams({ lat: state.place.lat, lon: state.place.lon, ...(state.place.name ? { ort: state.place.name } : {}) });
-  map.on('click', (e) => setPlace(e.latlng.lat, e.latlng.lng));
+  map.on('click', (e) => { setPlace(e.latlng.lat, e.latlng.lng); writeHash(); });
 
   /* Search by place name, address or coordinates (/api/landschaft/suche): the hits below the field, arrow keys and
      Enter to choose; the chosen place becomes the place of the report. */
@@ -412,8 +713,7 @@
     const zoom = { Kanton: 9, Bezirk: 10, Gemeinde: 12, Postleitzahl: 12, Koordinaten: 13, Adresse: 15, Parzelle: 16 }[h.kind] ?? 13;
     setPlace(h.lat, h.lon, { pan: true, zoom, name: h.kind === 'Koordinaten' ? null : h.label });
     // The place (and the year of the «Zeitreise») in the address, so the search result can be shared.
-    const stop = state.maps?.timeline.find((t) => t.id === state.timeline);
-    if (stop?.zeitreise) zeitHash(stop); else history.replaceState(null, '', `#karte?${placeQuery()}`);
+    writeHash();
     $('ln-search-q').value = h.label;
     search.results = [];
     search.active = -1;
@@ -442,10 +742,6 @@
   });
   L.DomEvent.disableClickPropagation($('ln-search'));
   L.DomEvent.disableScrollPropagation($('ln-search'));
-  $('ln-opacity').addEventListener('input', (e) => {
-    timeLayer?.setOpacity(Number(e.target.value));
-    swipe.layer?.setOpacity(Number(e.target.value));
-  });
 
   /* ---------- Bericht ---------- */
 
@@ -660,13 +956,14 @@ GROUP BY 1 ORDER BY 2 DESC;`;
     const [id, query] = location.hash.replace('#', '').split('?');
     const view = ['karte', 'bericht', 'daten'].includes(id) ? id : 'karte';
     for (const s of document.querySelectorAll('.ln-view')) s.hidden = s.id !== view;
+    document.body.dataset.view = view;
     for (const a of document.querySelectorAll('.ln-tabs a[data-view]')) a.setAttribute('aria-current', a.dataset.view === view ? 'page' : 'false');
     const q = new URLSearchParams(query || '');
     const lat = Number(q.get('lat'));
     const lon = Number(q.get('lon'));
     const hasPlace = q.has('lat') && Number.isFinite(lat) && Number.isFinite(lon);
     if (hasPlace) setPlace(lat, lon, { pan: view === 'karte', name: q.get('ort')?.slice(0, 120) || null });
-    if (view === 'karte') setTimeout(() => map.invalidateSize(), 0);
+    if (view === 'karte') { setTimeout(() => map.invalidateSize(), 0); writeHash(); }
     if (view === 'bericht' && state.place) {
       showReport(state.place.lat, state.place.lon, state.place.name);
     }

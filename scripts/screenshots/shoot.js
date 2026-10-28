@@ -73,37 +73,46 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.locator('#perspektiven').screenshot({ path: out('perspektiven.jpg'), ...jpg });
     await page.close();
 
-    // Landschaft im Wandel: the Dufour map over the demo forest, the forest belts 2085, the report of a place.
+    // Landschaft im Wandel, laid out as map.geo.admin.ch: maps from the catalog under «Aktive Karten» over the grey
+    // Landeskarte, the settings of a map, the background chooser, the time slider of the «Zeitreise».
     page = await ctx.newPage();
-    const place = '#karte?lat=47.37&lon=8.54';
-    const stop = async (id) => {
-      await page.click(`#ln-timeline button[data-id="${id}"]`);
-      await settle(page, 2500);
+    const place = 'lat=47.37&lon=8.54';
+    const open = async (hash, steps = async () => {}, wait = 2500) => {
+      await page.goto(`${BASE}/landschaft.html#karte?${place}${hash}`);
+      await page.reload();
+      await settle(page, wait);
+      await steps();
+      await settle(page, wait);
+      await page.evaluate(() => window.scrollTo(0, 0));
     };
-    await page.goto(`${BASE}/landschaft.html${place}`);
-    await settle(page, 2500);
-    await page.evaluate(() => { window.scrollTo(0, 0); });
-    await stop('dufour');
-    await page.screenshot({ path: out('landschaft.jpg'), ...jpg });
-    await stop('wald-2085-t');
-    await page.screenshot({ path: out('landschaft-2085.jpg'), ...jpg });
-    // The «Zeitreise»: the Landeskarte of 1900.
-    await stop('zeitreise');
-    await page.evaluate(() => {
-      const range = document.getElementById('ln-zeit-range');
-      range.value = '3';
-      range.dispatchEvent(new Event('input'));
+    const entry = (text) => page.locator('#ln-catalog .ln-entry', { hasText: text }).locator('input').first();
+    // The Dufour map with its settings and its info.
+    await open('&layers=ch.swisstopo.hiks-dufour', async () => {
+      await page.click('#ln-active .ln-icon[aria-controls]');
+      await page.click('#ln-active .ln-icon[aria-pressed]');
     });
-    await settle(page, 6000);
+    await page.screenshot({ path: out('landschaft.jpg'), ...jpg });
+    // Two maps on top of each other: the Siegfried map, half transparent, over the forest belts 2085; the backgrounds.
+    await open('', async () => {
+      await entry('Höhenstufen 2085 (RCP8.5)').check();
+      await entry('Siegfriedkarte').check();
+      await page.click('#ln-active .ln-icon[aria-controls]');
+      await page.evaluate(() => {
+        const range = document.querySelector('#ln-active .ln-opacity input');
+        range.value = '0.5';
+        range.dispatchEvent(new Event('input'));
+        range.dispatchEvent(new Event('change'));
+      });
+      await page.click('.ln-bg-current');
+    });
+    await page.screenshot({ path: out('landschaft-ebenen.jpg'), ...jpg });
+    await open('', async () => { await entry('Höhenstufen 2085 (RCP8.5)').check(); });
+    await page.screenshot({ path: out('landschaft-2085.jpg'), ...jpg });
+    // The «Zeitreise»: the Landeskarte of 1900, with the time slider.
+    await open('&layers=ch.swisstopo.zeitreihen@year=1900', async () => {}, 6000);
     await page.screenshot({ path: out('landschaft-zeitreise.jpg'), ...jpg });
     // The aerial images of 1956.
-    await stop('luftbild');
-    await page.evaluate(() => {
-      const range = document.getElementById('ln-zeit-range');
-      range.value = '3';
-      range.dispatchEvent(new Event('input'));
-    });
-    await settle(page, 6000);
+    await open('&layers=ch.swisstopo.swissimage-product@year=1956', async () => {}, 6000);
     await page.screenshot({ path: out('landschaft-luftbild.jpg'), ...jpg });
     // Two years side by side: 1956 left, the newest flight right of the divider.
     await page.click('#ln-vergleich');
@@ -774,20 +783,18 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     const gctx = await desktop(browser);
     const page = await gctx.newPage();
     page.on('console', (m) => m.type() === 'error' && console.log('console:', m.text()));
-    await page.goto(`${GB}/landschaft.html#karte?lat=46.592&lon=8.4&ansicht=luftbild&jahr=1956`);
+    await page.goto(`${GB}/landschaft.html#karte?lat=46.592&lon=8.4&layers=ch.swisstopo.swissimage-product@year=1956`);
     await settle(page, 2500);
-    await page.click('#ln-glacier-toggle');
+    // The inventories from the catalog («Gletscher und Wasser»), with their years in the settings.
+    await page.click('#ln-catalog summary:has-text("Gletscher und Wasser")');
+    await page.locator('#ln-catalog .ln-entry', { hasText: 'Gletscherinventare' }).locator('input').check();
     await page.click('.leaflet-control-zoom-in');
     await settle(page, 800);
     await page.click('.leaflet-control-zoom-in');
+    await settle(page, 800);
+    await page.click('#ln-active .ln-icon[aria-controls]');
     await settle(page, 6000);
-    // Scroll the panel only (not the page) to the glacier section.
-    await page.evaluate(() => {
-      const panel = document.querySelector('.ln-panel');
-      panel.scrollTop = document.getElementById('ln-glaciers').offsetTop - panel.offsetTop - 360;
-      window.scrollTo(0, 0);
-    });
-    await settle(page, 800);
+    await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: out('landschaft-gletscher.jpg'), ...jpg });
     await page.goto(`${GB}/landschaft.html#bericht?lat=46.6&lon=8.4`);
     await page.waitForSelector('.ln-section', { timeout: 120000 });

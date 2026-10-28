@@ -179,6 +179,10 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
   OSM, Landeskarte und Luftbild; Panel *Ebenen* mit Wald und Waldbrand, Bevölkerung, Bodennutzung, Verkehr von
   geo.admin.ch, Baumkataster Zürich, SITG Genf, EFFIS und NASA FIRMS, mit *Was ist hier?*; Baumkataster Zürich auch
   als Baumart-Vorschlag
+- Landschaft im Wandel: Karte aufgebaut wie map.geo.admin.ch: Menü mit «Aktive Karten» (Ein- und Ausblenden,
+  Deckkraft, Reihenfolge, Info mit Legende, Vergleichen, Entfernen) und dem Katalog «Karten anzeigen» in Ordnern,
+  beliebig viele Karten übereinander, Hintergrund wählbar (Landeskarte, grau, Luftbild, keiner), Zeitleiste für
+  Karten mit Jahren, die ganze Ansicht im Link
 - Landschaft im Wandel: Bericht als PDF vom Server (A4, festes Layout, Kartenausschnitte der Lage und pro Thema)
 - Landschaft im Wandel: Ortssuche nach Gemeinde, Ort, Adresse oder Koordinaten (WGS84, LV95), Ortsname im Bericht und im Link
 - Landschaft im Wandel: Gletscherumrisse der Inventare als Ebene über allen Karten, Fläche pro Inventar im Bericht

@@ -175,7 +175,7 @@ test('Landschaft im Wandel: the glacier inventories as outlines on the map and t
       // 2016 covers half the latitude of 1850: half the area.
       assert.ok(Math.abs(r.glacier.areas[1].km2 / r.glacier.areas[0].km2 - 0.5) < 0.01);
       const html = await (await fetch(`${base}/landschaft.html`)).text();
-      assert.ok(html.includes('id="ln-glacier-toggle"'));
+      assert.ok(html.includes('id="ln-catalog"') && html.includes('id="ln-active"'));
     }, { glacierFiles: files.join(',') });
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
