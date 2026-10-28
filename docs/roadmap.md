@@ -38,8 +38,7 @@ mit echten Dateien und Diensten; das steht jeweils als offener Punkt dabei.
   Kantone).
 - **Touren**: Abgleich mit Strava/Komoot per OAuth (braucht dort registrierte Apps); die Karte kühler Abschnitte
   mit Messnetzen in der Nähe vergleichen (z. B. Stadtklima-Messnetze), sobald es genug echte Touren gibt.
-- **Sonne und Schatten unterwegs**: das Tempo nach Steigung (z. B. Wanderzeit nach SchweizMobil) statt gleichmässig;
-  Bewölkung aus der Prognose für die nächsten Tage; den Wege-Magnet auf Wunsch schattige (oder sonnige) Wege
+- **Sonne und Schatten unterwegs**: Bewölkung aus der Prognose für die nächsten Tage; den Wege-Magnet auf Wunsch schattige (oder sonnige) Wege
   bevorzugen lassen; mit echten Höhen und Routen prüfen, wie gut Waldwege mit Lücken im Kronendach getroffen werden
   (bisher mit den Demo-Höhen im Format von swisstopo).
 - **Wikipedia, Wikidata & Commons**: mit den echten Diensten im Betrieb prüfen (gebaut nach der Dokumentation der
@@ -100,8 +99,8 @@ mit echten Dateien und Diensten; das steht jeweils als offener Punkt dabei.
 - **Metadaten**: Collection-Einträge und Objektkatalog gegen die Schemas und Schematron-Regeln von geocat.ch
   prüfen; den Weg zu opendata.swiss einmal mit einem echten Konto durchspielen.
 - **Cloud-native Daten**: den STAC-Ordner regelmässig auf einen echten Objektspeicher legen (Cron-Job nach
-  `npm run stac`) und bei Portolan eintragen; GeoParquet mit Bbox-Spalte (*covering*) und nach Ort sortierten
-  Zeilengruppen, damit DuckDB und GDAL bei grossen Datenmengen nur die nötigen Teile lesen.
+  `npm run stac`) und bei Portolan eintragen; das Lesen in Teilen (Bbox-Spalte und Zeilengruppen) mit DuckDB und GDAL
+  über HTTP an einer grossen Datei messen.
 - **Doku-Website**: die eigene Domain docs.myforrest.xyz einrichten (CNAME und `DOCS_URL`), sobald es die
   Domain gibt.
 - **Kacheln**: die LV95-Kacheln in einer Form, die QGIS direkt öffnet (GDAL liest Vektorkacheln in GeoPackage noch
@@ -120,9 +119,8 @@ Als Nächstes:
   MeteoSchweiz lesen statt als vorbereitetes CSV, für alle drei Erwärmungsstufen.
 - **Mehr Messdaten**: Raumanalysen der MeteoSchweiz (Gitter ab 1961) als Gegenprobe zu ERA5, Schneehöhen des SLF,
   Wassertemperaturen des BAFU, Permafrost (PERMOS) an Gebirge-Spots.
-- **Neue Verbindungen**: die Käfergenerationen pro Jahr neben die Borkenkäfer-Fotos legen; Ausbreitungstempo der
-  Neophyten gegenüber den Wintern; Klima-Analoga («wo ist es heute so warm wie hier um 2050?») aus dem Klima-Raster;
-  kühle Abschnitte aus Touren an Hitzetagen.
+- **Neue Verbindungen**: Ausbreitungstempo der Neophyten gegenüber den Wintern; kühle Abschnitte aus Touren an
+  Hitzetagen; die Klima-Analoga mit Regen und Hitzetagen statt nur dem Jahresmittel.
 - **Wald genauer**: die Wasserspeicherung des Bodens (Bodeneignungskarte) und die Exposition in die Einschätzung
   nehmen; die Empfehlung der Tree-App direkt verlinken, sobald sie Koordinaten in der Adresse annimmt; die Faustregeln
   mit Fachleuten von WSL oder kantonalen Forstdiensten prüfen.
@@ -214,6 +212,8 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 
 ### Wetter, Klima und Satellit
 
+- Klima im Wandel: Käfergenerationen pro Jahr in der Zeitachse neben den Spots mit Borkenkäfer-Befall; Klima-Analoga
+  («wo ist es heute so warm wie hier bei +2 °C?») aus den berechneten Zellen der Klimakarte
 - Sturmereignisse aus Böen mit Windwurf-Funden verknüpfen
 - Sturmwarnung aus der Böenprognose (ICON, einstellbar) per Push, nach dem Sturm die Bitte um ein Foto, wenn er wirklich kam
 - DWD-Phänologie als Referenz für den Beginn der Herbstfärbung
@@ -251,6 +251,7 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 
 ### Touren und Routing
 
+- Sonne und Schatten unterwegs: Tempo nach Steigung (Wanderfunktion nach Tobler) mit den Höhen des Geländes
 - Eigener Routing-Server: Waldprofil (Forststrassen und Rückegassen zuerst), Wildruhezonen in der Schutzzeit
   umgehen, BRouter-Image per GitHub-Workflow in der Registry
 - Wildruhezonen direkt von geo.admin.ch, pro Feld gespeichert und wöchentlich neu angefragt
@@ -263,6 +264,8 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 
 ### Geodienste und Betrieb
 
+- GeoParquet für grosse Dateien: Zeilen nach Ort sortiert (Hilbert-Kurve) in Zeilengruppen, Spalte `bbox` als
+  *covering* mit Minimum und Maximum pro Zeilengruppe
 - Doku-Website (Projekt-Wiki) aus `docs/*.md` mit Suche und *Seite bearbeiten*, über GitHub Pages, eigene Domain
   vorbereitet
 - PMTiles/MBTiles Kachel für Kachel geschrieben (auch sehr grosse Datenmengen), LV95-Kacheln als GeoPackage mit eigenem

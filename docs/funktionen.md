@@ -1452,7 +1452,10 @@ einbinden.
   - **GeoParquet**: `/api/export/parquet/<collection>.parquet` liefert eine Collection als GeoParquet 1.1
     (WGS84, mit `?crs=2056` in LV95), ohne GDAL oder Arrow direkt geschrieben: Spalten typisiert wie im
     GeoPackage, Geometrie als WKB, gzip-komprimiert. DuckDB, GeoPandas, QGIS/GDAL und Webkarten wie lonboard
-    lesen die Datei direkt, auch von einem Objektspeicher. `/api/export/geojson/<collection>.geojson` gibt
+    lesen die Datei direkt, auch von einem Objektspeicher. Für grosse Dateien sind die Zeilen nach Ort sortiert
+    (Hilbert-Kurve) und in Zeilengruppen zu 10 000 aufgeteilt; die Spalte `bbox` (xmin, ymin, xmax, ymax) ist als
+    *covering* der Geometrie eingetragen, mit Minimum und Maximum pro Zeilengruppe. So liest DuckDB oder GDAL über
+    HTTP nur die Zeilengruppen, die eine Abfrage berührt (`WHERE bbox.xmin < … AND bbox.xmax > …`). `/api/export/geojson/<collection>.geojson` gibt
     dieselben Daten als eine GeoJSON-Datei.
   - **STAC-Katalog**: `/stac/catalog.json` (STAC 1.1) führt zur Collection `myforrest` mit Zeitraum,
     Ausdehnung, Lizenz, GeoPackage, PMTiles und Metadaten für geocat.ch und von dort zu einem Item pro
@@ -1680,7 +1683,10 @@ eine kühle Runde, im Winter für eine sonnige.
   von Bäumen und Häusern, und was nach Sonnenuntergang liegt; ein Balken und ein Streifen vom Start zum Ziel zeigen
   es, die Route auf der Karte färbt sich gleich (gelb Sonne, violett Gelände, blau Bäume und Häuser, dunkel Nacht).
 - **Zeit unterwegs**: Jeder Punkt wird zu der Zeit gerechnet, zu der man ihn erreicht, aus Startzeit und Tempo
-  (vorgeschlagen nach der Aktivität: Joggen 9 km/h, Wandern 4, Biken 15, sonst 4,5; änderbar). Hat die Route
+  (vorgeschlagen nach der Aktivität: Joggen 9 km/h, Wandern 4, Biken 15, sonst 4,5; änderbar). Mit **Tempo nach
+  Steigung** (Standard) gilt das Tempo für die Ebene: bergauf geht es langsamer, leicht bergab (−5 %) am schnellsten,
+  steil bergab wieder langsamer, nach der Wanderfunktion von Tobler (1993) mit den Höhen des Geländes, gemittelt
+  über ±50 m. Bei 10 % Steigung sind das rund 72 % des Tempos in der Ebene. Hat die Route
   eigene Zeiten (Aufzeichnung, Import), rechnet *Zeiten der Aufzeichnung nehmen* mit diesen: Wo lag man damals in
   der Sonne?
 - **Startzeiten**: Eine Kurve zeigt den Schattenanteil für jede Startzeit des Tages, alle 15 Minuten von

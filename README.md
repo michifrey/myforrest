@@ -371,7 +371,8 @@ Upload auch Fotos ohne GPS verorten.
 
 **Sonne und Schatten unterwegs** sagt für Tag, Startzeit und Tempo, wo die Route in der Sonne liegt und wo im
 Schatten von Hügeln, Bäumen und Häusern, färbt sie danach ein und zeigt, welche Startzeit des Tages am meisten
-Schatten (im Hochsommer) oder am meisten Sonne (im Winter) bringt. Jeder Punkt alle 25 m bekommt dafür seinen eigenen
+Schatten (im Hochsommer) oder am meisten Sonne (im Winter) bringt. Das Tempo richtet sich nach der Steigung (bergauf
+langsamer, nach der Wanderfunktion von Tobler). Jeder Punkt alle 25 m bekommt dafür seinen eigenen
 Horizont aus Gelände, Baumkronen und Dächern ([Details](docs/funktionen.md#sonne-und-schatten-unterwegs)).
 
 Ein **Fotoauftrag** (rechts) bittet um ein Foto von einem Ort, etwa «Neue Lichtung am Waldweg, Blick nach
@@ -558,7 +559,9 @@ dem IPCC je nach Klimaschutz erreicht: Temperatur, Hitzetage, Frost, Schnee, Som
 Hang hinaufsteigt (bei +2 °C weltweit rund 350 m). Die Zahlen kommen aus den Szenarien CH2025, wo geladen, sonst aus
 den Klimamodellen, skaliert mit der globalen Erwärmung. **Was das für den Wald bedeutet** (rechts) schätzt pro
 Szenario ein, wie stark sich die Höhenstufen verschieben, wie es um Fichte und Borkenkäfer (Generationen pro Jahr aus
-der Wärmesumme) und um die Sommertrockenheit steht und welche Arten profitieren, mit den Baumarten der Spots.
+der Wärmesumme) und um die Sommertrockenheit steht und welche Arten profitieren, mit den Baumarten der Spots. Darunter
+nennt das Dossier **Klima-Analoga**: Orte der Klimakarte, an denen es heute schon so warm ist wie hier bei +1,5, +2
+oder +3 °C. In der Zeitachse stehen die Käfergenerationen jedes Jahres direkt über den Spots mit Borkenkäfer-Befall.
 
 ![Klima-Raster auf der Karte: Hitzetage bei +2 °C weltweit](docs/screenshots/klima-karte.jpg)
 
@@ -640,7 +643,8 @@ Ein kurzer Überblick. Alle Details, auch zu den verwendeten Verfahren, stehen u
   - Vektorkacheln (OGC API – Tiles, MVT) in Web Mercator und im Schweizer Kachelgitter LV95, vorberechnet
     und als PMTiles/MBTiles zum Herunterladen (Kachel für Kachel geschrieben, auch für sehr grosse Datenmengen),
     die LV95-Kacheln als GeoPackage.
-  - Cloud-native ohne Server: jede Collection als GeoParquet (WGS84 und LV95) mit einem STAC-Katalog, der sich
+  - Cloud-native ohne Server: jede Collection als GeoParquet (WGS84 und LV95, nach Ort sortiert, mit Bbox-Spalte
+    zum Lesen in Teilen) mit einem STAC-Katalog, der sich
     als Ordner auf einen Objektspeicher legen und in Registern wie Portolan eintragen lässt.
   - Zwei Vektorkarten: MapLibre in Web Mercator, OpenLayers auf der Landeskarte von swisstopo.
   - Metadaten für geocat.ch und opendata.swiss (GM03/ISO 19139), auch pro Collection, mit Objektkatalog

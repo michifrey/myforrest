@@ -98,6 +98,10 @@ eine Zeile.
 
 - **Sommer** und **Sommerregen**: Temperatur Juni–August in der Farbskala der Streifen und Niederschlag in % des
   Mittels 1991–2020, von braun (trocken) bis blaugrün (nass).
+- **Käfergenerationen**: wie viele Generationen des Buchdruckers die Wärme des Jahres erlaubte (Wärmesumme über
+  8,3 °C von April bis September, 557 °C-Tage pro Generation nach PHENIPS), je dunkler, desto mehr. Weiter unten
+  steht in der Zeile **Borkenkäfer**, an wie vielen Spots im selben Jahr Befall fotografiert wurde (Befund
+  *Borkenkäfer*): Jahre mit vielen Generationen und Befall direkt untereinander.
 - **Fotos**: Anzahl Fotos der Spots im Umkreis.
 - **Trockenheit & Hitze**: Hinweise des [Wetter-Kontexts](funktionen.md#wetter-kontext-und-auffälligkeiten)
   (Trockenheit, Wärme, frühe Laubverfärbung, Nadelverfärbung, Borkenkäfer-Risiko), pro Spot und Jahr einmal gezählt.
@@ -107,7 +111,8 @@ eine Zeile.
   desto grüner.
 - **Austrieb** und **Verfärbung der Buche**: an den bis zu drei nächsten Phänologie-Stationen (MeteoSchweiz, DWD),
   als Tage früher (−, grün) oder später (+) als im Mittel der gezeigten Jahre.
-- **Schneeschmelze** (Gebirge-Spots), **Eis im Spätsommer** (Gletscher-Spots) und **Neophyten**-Funde.
+- **Schneeschmelze** (Gebirge-Spots), **Eis im Spätsommer** (Gletscher-Spots), **Borkenkäfer** (Spots mit Befall)
+  und **Neophyten**-Funde.
 
 Jedes Feld nennt beim Überfahren die Werte. So fallen Muster auf, die keine Quelle allein zeigt: Im Demo-Datensatz
 etwa decken sich die Hitzesommer 2022 und 2025 mit den Hinweisen der Fotos, und die Buchen verfärben sich in den
@@ -171,6 +176,13 @@ Jede Karte nennt, wie viel wärmer es am Ort wird als 1991–2020, und die Kennz
 Tropennächte, Frosttage, Neuschnee, Sommerregen, Käfergenerationen und **wie weit das Klima den Hang hinaufsteigt**:
 Die Temperatur nimmt im Jahresmittel um rund 0,55 °C pro 100 m ab. +2 °C am Ort heissen also: Das Klima entspricht
 dem heutigen Klima rund 360 m tiefer.
+
+**Wo es heute schon so warm ist (Klima-Analoga).** Unter den Szenarien nennt das Dossier pro Stufe bis zu drei Orte
+der [Klimakarte](#klima-auf-der-karte), deren Jahresmittel 1991–2020 dem künftigen Jahresmittel des Orts
+entspricht (±0,4 °C; zuerst die beste Übereinstimmung in Schritten von 0,1 °C, dann die nächsten, mindestens 5 km
+entfernt), mit Höhe und Abstand. Ein Klick öffnet das Dossier dieses Orts. Gesucht wird in den Zellen, die die
+Klimakarte schon berechnet hat; sie wächst mit jedem Ansehen. Es zählt nur die Temperatur: Regen, Boden und
+Exposition können anders sein.
 
 **Woher die Zahlen kommen.** Sind die Szenarien CH2025 für einen Ort in der Nähe geladen, gelten deren Werte (die
 Karte sagt *Quelle: CH2025*). Sonst skaliert MyForrest die Klimamodelle (**Pattern Scaling**): Die Modelle zeigen
@@ -333,7 +345,7 @@ Die eigentliche Stärke liegt in der Verbindung: Klimadaten sagen, *was* sich ve
 | Wintertemperatur, Neuschnee | Schneeschmelze an Gebirge-Spots | Früher aper, Verbuschung der Alpweiden | **eingebaut** (Schneeschmelze) |
 | Sommertemperatur | Eis im Spätsommer, GLAMOS | Gletscherschwund pro Hitzesommer | **eingebaut** (Eisanteil) |
 | Mildere Winter, längere Vegetationszeit | Neophyten-Funde, Ausbreitung | Ausbreitungstempo gegenüber den Wintern | teilweise (Funde pro Jahr) |
-| Wärmesumme (Grad-Tage) | Borkenkäfer-Fotos | Käfergenerationen pro Jahr und Szenario (nach den Schwellen von PHENIPS) | **eingebaut** (Generationen); geplant: neben die Käfer-Fotos legen |
+| Wärmesumme (Grad-Tage) | Borkenkäfer-Fotos | Käfergenerationen pro Jahr und Szenario (nach den Schwellen von PHENIPS), in der Zeitachse neben den Spots mit Befall | **eingebaut** |
 | Szenarien (CH2025, Modelle) | Baumarten am Spot, Höhe | Welche Arten am Spot künftig unter Druck kommen, wie weit das Klima steigt; Verweis auf die Tree-App | **eingebaut** |
 | Klima-Analoga | Spots | «Wo ist es heute so warm wie hier um 2050?» – Spots dort als Blick in die Zukunft | geplant |
 | Hitzetage, Tropennächte | Kühle Abschnitte aus Touren | Wie viel kühler der Wald an Hitzetagen ist | geplant |

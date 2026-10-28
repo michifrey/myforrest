@@ -103,3 +103,23 @@ test('tile sampler and tiles near a route', () => {
   assert.ok(tiles.length >= 3 && tiles.length <= 12, tiles.join(' '));
   assert.ok(tiles.every((k) => /^\d+\/\d+$/.test(k)));
 });
+
+test('pace after the slope: slower uphill, fastest slightly downhill (Tobler), the flat speed unchanged', () => {
+  assert.equal(RouteSun.toblerRel(0), 1);
+  assert.ok(RouteSun.toblerRel(-0.05) > 1.18 && RouteSun.toblerRel(-0.05) < 1.2, 'gentle descent ~19 % faster');
+  assert.ok(RouteSun.toblerRel(0.2) < 0.5, '20 % uphill less than half the speed');
+  assert.ok(RouteSun.toblerRel(-0.3) < 1, 'steep descents are slow again');
+  const s = RouteSun.sample(eastward(1));
+  const flatTimes = RouteSun.timesOf(s, { start: 0, speedKmh: 4, slope: true });
+  assert.ok(Math.abs(flatTimes.at(-1) - 15 * 60000) < 1000, 'no heights: 1 km at 4 km/h is 15 min');
+  // 1 km rising 100 m: Tobler gives ~3,6 km/h at 10 % for 5 km/h on the flat.
+  const up = s.map((p) => ({ ...p, z: 400 + p.d * 0.1 }));
+  const upTime = RouteSun.timesOf(up, { start: 0, speedKmh: 5, slope: true }).at(-1);
+  assert.ok(Math.abs(upTime / 60000 - 60 / (5 * RouteSun.toblerRel(0.1))) < 0.5, `${upTime / 60000} min`);
+  assert.ok(upTime > 12 * 60000 * 1.3, 'uphill clearly slower than on the flat');
+  assert.ok(Math.abs(RouteSun.timesOf(up, { start: 0, speedKmh: 5 }).at(-1) - 12 * 60000) < 1, 'without slope: as before');
+  // The start times keep the longer duration.
+  const hz = RouteSun.horizons(up, { ground: flat });
+  const st = RouteSun.starts(up, hz, { from: NOON, to: NOON, speedKmh: 5, slope: true });
+  assert.ok(Math.abs(st.list[0].end - NOON - upTime) < 1);
+});

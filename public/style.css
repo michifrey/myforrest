@@ -2021,6 +2021,10 @@ html.klima-open { overflow: hidden; }
 .k-n.pheno.late { color: var(--damage); font-weight: 600; }
 .k-n.snow, .k-n.ice { color: var(--ice); }
 .k-n.neo { color: var(--neo); }
+.k-n.beetle-seen { color: #8b5a2b; }
+.k-analogs { margin-top: 1rem; }
+.k-analogs ul { margin: 0.4rem 0 0; padding-left: 1.1rem; display: grid; gap: 0.3rem; }
+.k-analogs button.link { padding: 0 0.1rem; font-size: inherit; color: var(--accent); }
 .k-divider { grid-column: 1 / -1; margin: 0.6rem 0 0.2rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); border-top: 1px dashed var(--border); padding-top: 0.5rem; }
 .k-synth { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr)); gap: 0.9rem; }
 .k-synth li { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: var(--radius); padding: 0.8rem 1rem; }
