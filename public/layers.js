@@ -10,18 +10,24 @@
  * `center` (LV95) and `z` in its syntax (public/geoadmin-link.js), so a link of map.geo.admin.ch opens here and
  * "In map.geo.admin.ch öffnen" opens the same view there. A right click (long press) on the map shows the place in
  * LV95, LV03, WGS84, UTM and MGRS with its height (public/coords.js).
+ *
+ * More as on map.geo.admin.ch: other WMS and WMTS (a list of providers or any address; the browser reads their
+ * capabilities, public/ows.js), KML, GPX and GeoJSON files as layers (public/filelayer.js, the file stays on the
+ * device), a slider that compares any layer with the map below it, and a short link with a QR code.
  * Uses the globals of app.js (map, api, el, $, state).
  */
 
 (function layersModule() {
   const STORE = 'myforrest-layers';
   const MAX = 8;
-  const L_ = { open: false, catalogue: null, active: new Map(), filter: '', found: [], seq: 0, timer: null };
+  const L_ = { open: false, catalogue: null, active: new Map(), filter: '', found: [], seq: 0, timer: null, service: null, swipe: null };
   const saved = (() => { try { return JSON.parse(localStorage.getItem(STORE)) || []; } catch { return []; } })();
   const save = () => {
     try {
-      localStorage.setItem(STORE, JSON.stringify([...L_.active.values()].map((a) => ({
+      // Files stay in this session only; services and geo.admin.ch layers come back.
+      localStorage.setItem(STORE, JSON.stringify([...L_.active.values()].filter((a) => a.layer.kind !== 'vector').map((a) => ({
         url: a.layer.url, name: a.layer.name, id: a.layer.id, title: a.layer.title, opacity: a.opacity, visible: a.visible, year: a.year,
+        ...(a.layer.capsUrl ? { capsUrl: a.layer.capsUrl, kind: a.layer.kind } : {}),
       }))));
     } catch { /* private mode */ }
   };
@@ -35,7 +41,30 @@
 
   /* ---------- Active layers ---------- */
 
+  const FILE_COLOUR = '#c0392b';
+  /** The style of a file layer at an opacity (points solid, areas light). */
+  const fileStyle = (opacity) => (f) => (f?.geometry?.type === 'Point'
+    ? { radius: 6, color: '#fff', weight: 2, fillColor: FILE_COLOUR, opacity, fillOpacity: opacity }
+    : { color: FILE_COLOUR, weight: 2.5, opacity, fillColor: FILE_COLOUR, fillOpacity: 0.25 * opacity });
+  function vectorLayer(l, a) {
+    return L.geoJSON(l.data, {
+      style: fileStyle(a.opacity),
+      pointToLayer: (f, ll) => L.circleMarker(ll, fileStyle(a.opacity)(f)),
+      onEachFeature: (f, layer) => {
+        const p = f.properties || {};
+        if (p.name || p.description) layer.bindPopup(el('div', {}, [p.name ? el('strong', { text: p.name }) : '', p.description ? el('p', { class: 'small', text: p.description }) : '']));
+      },
+    });
+  }
+  const setOpacity = (a) => (a.layer.kind === 'vector' ? a.tile.setStyle(fileStyle(a.opacity)) : a.tile.setOpacity(a.opacity));
+
   function tileOf(l, a) {
+    if (l.kind === 'vector') return vectorLayer(l, a);
+    if (l.kind === 'wmts') {
+      return L.tileLayer(Ows.tileUrl(l, a.year ? String(a.year) : null), {
+        opacity: a.opacity, attribution: l.attribution, className: 'ext-layer', minNativeZoom: l.minZoom, maxNativeZoom: l.maxZoom, maxZoom: 20,
+      });
+    }
     return L.tileLayer.wms(l.url, {
       layers: l.name, format: 'image/png', transparent: true, version: '1.3.0', opacity: a.opacity, attribution: l.attribution, className: 'ext-layer',
       // Layers with a time dimension: the year, as map.geo.admin.ch asks its WMS.
@@ -60,14 +89,16 @@
   function removeLayer(id) {
     const a = L_.active.get(id);
     if (!a) return;
+    if (L_.swipe?.id === id) setSwipe(null);
     if (map.hasLayer(a.tile)) map.removeLayer(a.tile);
     L_.active.delete(id);
     save();
   }
-  /** The first active layer on top: z-index by the order of the list. */
+  /** The first active layer on top: z-index by the order of the list (files above the tiles, in the same order). */
   function restack() {
     const list = [...L_.active.values()];
-    list.forEach((a, i) => a.tile.setZIndex(100 + list.length - i));
+    list.forEach((a, i) => a.tile.setZIndex?.(100 + list.length - i));
+    [...list].reverse().forEach((a) => { if (a.layer.kind === 'vector' && map.hasLayer(a.tile)) a.tile.bringToFront(); });
   }
   function move(id, step) {
     const list = [...L_.active.entries()];
@@ -93,8 +124,64 @@
     a.tile = tileOf(a.layer, a);
     if (on) a.tile.addTo(map);
     restack();
+    if (L_.swipe?.id === a.layer.id) clipSwipe();
     save();
   }
+
+  /* ---------- Compare: a layer only right of a divider, the map without it on the left ---------- */
+
+  function clipSwipe() {
+    const s = L_.swipe;
+    const a = s && L_.active.get(s.id);
+    const box = a?.tile.getContainer?.();
+    if (!box) return;
+    const nw = map.containerPointToLayerPoint([0, 0]);
+    const se = map.containerPointToLayerPoint(map.getSize());
+    box.style.clip = `rect(${nw.y}px, ${se.x}px, ${se.y}px, ${nw.x + map.getSize().x * s.ratio}px)`;
+    s.el.style.left = `${s.ratio * 100}%`;
+    s.el.querySelector('[role="slider"]').setAttribute('aria-valuenow', String(Math.round(s.ratio * 100)));
+  }
+  /** Compares the layer `id` (or none) against the map below it, with a divider to drag (mouse, finger, arrow keys). */
+  function setSwipe(id) {
+    if (L_.swipe) {
+      const old = L_.active.get(L_.swipe.id)?.tile.getContainer?.();
+      if (old) old.style.clip = '';
+      L_.swipe.el.remove();
+      L_.swipe = null;
+    }
+    const a = id && L_.active.get(id);
+    if (!a || !a.tile.getContainer) { renderActive(); return; }
+    if (!a.visible) setVisible(a, true);
+    const handle = el('div', { class: 'map-swipe-handle', role: 'slider', tabindex: '0', 'aria-label': `Trennlinie: rechts ${a.layer.title}, links ohne`, 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': '50' });
+    const node = el('div', { class: 'map-swipe' }, [
+      el('span', { class: 'map-swipe-label left', text: 'ohne' }), el('span', { class: 'map-swipe-label right', text: a.layer.title }), handle,
+    ]);
+    L.DomEvent.disableClickPropagation(node);
+    handle.addEventListener('keydown', (e) => {
+      const step = { ArrowLeft: -0.05, ArrowRight: 0.05 }[e.key];
+      if (!step) return;
+      e.preventDefault();
+      L_.swipe.ratio = Math.max(0, Math.min(1, L_.swipe.ratio + step));
+      clipSwipe();
+    });
+    handle.addEventListener('pointerdown', (e) => {
+      handle.setPointerCapture(e.pointerId);
+      const moveTo = (ev) => {
+        const r = map.getContainer().getBoundingClientRect();
+        L_.swipe.ratio = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+        clipSwipe();
+      };
+      const up = () => { handle.removeEventListener('pointermove', moveTo); handle.removeEventListener('pointerup', up); };
+      handle.addEventListener('pointermove', moveTo);
+      handle.addEventListener('pointerup', up);
+    });
+    map.getContainer().append(node);
+    L_.swipe = { id, ratio: 0.5, el: node };
+    clipSwipe();
+    renderActive();
+  }
+  map.on('move zoom resize viewreset', clipSwipe);
+  map.on('zoomend', () => setTimeout(clipSwipe, 0));
 
   function renderActive() {
     const box = $('layers-active');
@@ -102,7 +189,7 @@
     const list = [...L_.active.values()];
     box.replaceChildren(...list.map((a, i) => {
       const range = el('input', { type: 'range', min: '0.1', max: '1', step: '0.05', value: String(a.opacity), 'aria-label': `Deckkraft ${a.layer.title}` });
-      range.addEventListener('input', () => { a.opacity = Number(range.value); a.tile.setOpacity(a.opacity); save(); });
+      range.addEventListener('input', () => { a.opacity = Number(range.value); setOpacity(a); save(); });
       const legend = el('img', { src: a.layer.legend, alt: `Legende ${a.layer.title}`, loading: 'lazy', class: 'layer-legend' });
       legend.addEventListener('error', () => legend.remove());
       const eye = el('button', {
@@ -110,8 +197,15 @@
         'aria-label': `${a.layer.title} ${a.visible ? 'ausblenden' : 'einblenden'}`, text: a.visible ? '◉' : '○',
         onclick: () => { setVisible(a, !a.visible); renderActive(); },
       });
-      const year = el('input', { type: 'number', min: '1800', max: '2100', step: '1', value: a.year ? String(a.year) : '', placeholder: 'aktuell', 'aria-label': `Jahr ${a.layer.title}` });
-      year.addEventListener('change', () => setYear(a, Number(year.value) || null));
+      // The year: a choice of the service's time values when it lists them, else a number (geo.admin.ch).
+      const year = a.layer.time?.length
+        ? el('select', { 'aria-label': `Zeitstand ${a.layer.title}` }, [el('option', { value: '', text: a.layer.timeDefault ? `Standard (${a.layer.timeDefault})` : 'Standard' }), ...a.layer.time.map((t) => el('option', { value: t, text: t }))])
+        : el('input', { type: 'number', min: '1800', max: '2100', step: '1', value: a.year ? String(a.year) : '', placeholder: 'aktuell', 'aria-label': `Jahr ${a.layer.title}` });
+      if (a.layer.time?.length) year.value = a.year ? String(a.year) : '';
+      year.addEventListener('change', () => setYear(a, a.layer.time?.length ? (year.value || null) : (Number(year.value) || null)));
+      const timed = a.layer.geoadmin || a.layer.time?.length;
+      const comparing = L_.swipe?.id === a.layer.id;
+      const canCompare = a.layer.kind !== 'vector';
       return el('li', { class: a.visible ? '' : 'layer-off' }, [
         el('div', { class: 'layer-head' }, [
           eye,
@@ -122,12 +216,18 @@
           ]),
           el('button', { type: 'button', class: 'link small', text: 'entfernen', onclick: () => { removeLayer(a.layer.id); render(); } }),
         ]),
-        el('label', { class: 'small k-row' }, ['Deckkraft ', range]),
-        // geo.admin.ch layers with a time (zeitreihen, Arealstatistik …): the year of the map, shown when one is set.
-        a.layer.geoadmin && a.year ? el('label', { class: 'small k-row' }, ['Jahr ', year]) : '',
-        el('details', { class: 'small' }, [
-          el('summary', { text: a.layer.geoadmin && !a.year ? 'Legende und Jahr' : 'Legende' }),
-          a.layer.geoadmin && !a.year ? el('label', { class: 'small k-row', title: 'Für Ebenen mit Zeitreihe, z. B. Zeitreise oder Arealstatistik' }, ['Jahr ', year]) : '',
+        el('div', { class: 'small k-row layer-tools' }, [
+          el('label', { class: 'k-row' }, ['Deckkraft ', range]),
+          canCompare ? el('button', {
+            type: 'button', class: 'link small', 'aria-pressed': String(comparing), title: 'Mit einem Regler links ohne, rechts mit dieser Ebene',
+            text: comparing ? 'Vergleich beenden' : 'Vergleichen', onclick: () => setSwipe(comparing ? null : a.layer.id),
+          }) : '',
+        ]),
+        // Layers with a time (zeitreihen, Arealstatistik, services with a time dimension): the year, shown when one is set.
+        timed && a.year ? el('label', { class: 'small k-row' }, ['Jahr ', year]) : '',
+        a.layer.kind === 'vector' ? el('p', { class: 'muted small', text: `${a.layer.format}-Datei, ${a.layer.count} Objekt${a.layer.count === 1 ? '' : 'e'}; nur auf diesem Gerät` }) : el('details', { class: 'small' }, [
+          el('summary', { text: timed && !a.year ? 'Legende und Jahr' : 'Legende' }),
+          timed && !a.year ? el('label', { class: 'small k-row', title: 'Für Ebenen mit Zeitreihe, z. B. Zeitreise oder Arealstatistik' }, ['Jahr ', year]) : '',
           legend,
         ]),
       ]);
@@ -185,12 +285,15 @@
 
   /** The active layers for a link: geo.admin.ch by name, others as external WMS. */
   function linkLayers() {
-    return [...L_.active.values()].map((a) => ({
+    return [...L_.active.values()].filter((a) => a.layer.kind !== 'vector' || a.layer.sourceUrl).map((a) => ({
       id: a.layer.name,
       visible: a.visible,
       opacity: a.opacity,
       params: a.year ? { year: a.year } : {},
-      external: a.layer.geoadmin ? null : { type: 'WMS', url: a.layer.url, name: a.layer.name },
+      external: a.layer.geoadmin ? null
+        : a.layer.kind === 'wmts' ? { type: 'WMTS', url: a.layer.capsUrl, name: a.layer.name }
+          : a.layer.kind === 'vector' ? { type: a.layer.format === 'GPX' ? 'GPX' : 'KML', url: a.layer.sourceUrl, name: null }
+            : { type: 'WMS', url: a.layer.url, name: a.layer.name },
     }));
   }
   /** This view with its layers, in the address of MyForrest (the same parameters as map.geo.admin.ch). */
@@ -224,13 +327,19 @@
     }
     for (const x of s.layers) {
       let l = null;
-      if (x.external?.type === 'WMS') {
+      if (x.external?.type === 'WMTS') {
+        const caps = await readService(x.external.url).catch(() => null);
+        const found = caps?.layers.find((y) => y.name === x.external.name);
+        if (found) l = serviceLayer(caps, found);
+      } else if (x.external?.type === 'KML' || x.external?.type === 'GPX') {
+        l = await fileFromUrl(x.external.url).catch(() => null);
+      } else if (x.external?.type === 'WMS') {
         const host = (() => { try { return new URL(x.external.url).hostname; } catch { return 'WMS'; } })();
         l = allLayers().find((y) => y.url === x.external.url && y.name === x.external.name)
           || { id: `ext:${x.external.url}|${x.external.name}`, url: x.external.url, name: x.external.name, title: `${x.external.name} (${host})`, attribution: host, info: false, geoadmin: false };
       } else if (!x.external) l = byName.get(x.id);
       if (!l) { missing.push(x.external ? `${x.external.type} ${x.external.url}` : x.id); continue; }
-      addLayer(l, { opacity: x.opacity ?? 0.75, visible: x.visible, year: Number.isFinite(x.params.year) ? x.params.year : null });
+      addLayer(l, { opacity: x.opacity ?? 0.75, visible: x.visible, year: x.params.year ?? null });
     }
     render();
     $('layers-status').textContent = `Aus dem Link: ${L_.active.size} Ebene${L_.active.size === 1 ? '' : 'n'}${missing.length ? `; nicht verfügbar: ${missing.join(', ')}` : ''}.`;
@@ -251,11 +360,119 @@
       const extra = saved.filter((s) => String(s.id || '').startsWith('ga:'));
       const more = extra.length ? (await api(`/api/layers/geoadmin?ids=${encodeURIComponent(extra.map((s) => s.name).join(','))}`).catch(() => ({ layers: [] }))).layers : [];
       for (const s of saved) {
-        const l = allLayers().find((x) => x.url === s.url && x.name === s.name) || more.find((x) => x.name === s.name);
+        let l = allLayers().find((x) => x.url === s.url && x.name === s.name) || more.find((x) => x.name === s.name);
+        // Layers of another service: read its capabilities again.
+        if (!l && s.capsUrl) {
+          const caps = await readService(s.capsUrl).catch(() => null);
+          const found = caps?.layers.find((y) => y.name === s.name);
+          if (found) l = serviceLayer(caps, found);
+        }
         if (l) addLayer(l, { opacity: s.opacity, visible: s.visible !== false, year: s.year || null });
       }
     }
     render();
+  }
+
+  /* ---------- Other services and files ---------- */
+
+  /** Capabilities of a WMS or WMTS, read by the browser: { type, title, url, capsUrl, layers }. */
+  async function readService(raw) {
+    const { url } = Ows.capabilitiesUrl(raw);
+    let r;
+    try {
+      r = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    } catch (err) {
+      throw new Error(err.name === 'TimeoutError' ? 'Keine Antwort in 20 Sekunden' : 'Nicht erreichbar, oder der Dienst erlaubt keinen Zugriff aus dem Browser (CORS)');
+    }
+    if (!r.ok) throw new Error(`Der Dienst antwortete mit HTTP ${r.status}`);
+    return { ...Ows.parseCapabilities(await r.text(), url), capsUrl: url };
+  }
+  /** A layer of another service as an entry of the panel. */
+  function serviceLayer(caps, x) {
+    const host = (() => { try { return new URL(caps.capsUrl).hostname; } catch { return caps.title; } })();
+    return {
+      id: `${caps.type.toLowerCase()}:${caps.capsUrl}|${x.name}`, kind: caps.type === 'WMTS' ? 'wmts' : 'wms', geoadmin: false, info: false,
+      url: caps.type === 'WMS' ? caps.url : caps.capsUrl, capsUrl: caps.type === 'WMTS' ? caps.capsUrl : null, name: x.name,
+      title: x.title, attribution: `${caps.title} (${host})`, legend: x.legend, bbox: x.bbox || null,
+      template: x.template, minZoom: x.minZoom, maxZoom: x.maxZoom, time: x.time, timeDefault: x.timeDefault,
+    };
+  }
+  async function loadService(raw) {
+    const status = $('layers-import-status');
+    status.textContent = 'Dienst wird gelesen …';
+    try {
+      L_.service = await readService(raw);
+    } catch (err) {
+      L_.service = null;
+      status.textContent = `Nicht geladen: ${err.message}`;
+      renderService();
+      return;
+    }
+    status.textContent = `${L_.service.title}: ${L_.service.layers.length} Ebene${L_.service.layers.length === 1 ? '' : 'n'}${L_.service.type === 'WMTS' ? ' (nur in Web Mercator)' : ''}.`;
+    renderService();
+  }
+  function renderService(filter = '') {
+    const box = $('layers-import-list');
+    if (!box) return;
+    const c = L_.service;
+    if (!c) { box.replaceChildren(); return; }
+    const q = filter.toLowerCase();
+    const list = c.layers.filter((x) => !q || x.title.toLowerCase().includes(q) || x.name.toLowerCase().includes(q)).slice(0, 80);
+    const search = c.layers.length > 12 ? el('input', { type: 'search', placeholder: 'In diesem Dienst suchen', 'aria-label': 'In diesem Dienst suchen', value: filter }) : null;
+    search?.addEventListener('input', () => { renderService(search.value); search.focus(); });
+    box.replaceChildren(...[search, layerList(list.map((x) => serviceLayer(c, x)))].filter(Boolean));
+  }
+
+  /** A KML, GPX or GeoJSON as a layer (`sourceUrl` when it came from an address, so a link can carry it). */
+  function fileLayer(text, filename, sourceUrl = null) {
+    const f = FileLayer.toGeoJson(text, filename);
+    return {
+      id: `file:${sourceUrl || `${filename}:${Date.now()}`}`, kind: 'vector', geoadmin: false, info: false, name: f.name, title: f.name,
+      format: f.format, data: f.collection, bbox: null, fileBbox: f.bbox, count: f.collection.features.length, sourceUrl, attribution: `${f.format}: ${filename}`,
+    };
+  }
+  async function fileFromUrl(url) {
+    const r = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return fileLayer(await r.text(), new URL(url).pathname.split('/').pop() || url, url);
+  }
+  async function addFile(file) {
+    const status = $('layers-import-status');
+    try {
+      if (file.size > 20 * 1024 * 1024) throw new Error('Datei grösser als 20 MB');
+      const l = fileLayer(await file.text(), file.name);
+      if (addLayer(l, { opacity: 0.9 }) === false) return;
+      const b = l.fileBbox;
+      if (b) map.fitBounds([[b[1], b[0]], [b[3], b[2]]], { padding: [40, 40], maxZoom: 17 });
+      status.textContent = `${l.format}-Datei «${l.title}»: ${l.count} Objekt${l.count === 1 ? '' : 'e'}.`;
+      renderActive();
+    } catch (err) {
+      status.textContent = `Datei nicht gelesen: ${err.message}`;
+    }
+  }
+
+  /** A short link with a QR code for this view (routes/shortlinks.js), to print or send. */
+  async function shortLink() {
+    const box = $('layers-qr');
+    box.hidden = false;
+    box.replaceChildren(el('p', { class: 'muted small', text: 'Kurzlink wird erstellt …' }));
+    try {
+      const d = await api('/api/kurzlink', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: shareUrl() }) });
+      const local = [...L_.active.values()].some((a) => a.layer.kind === 'vector' && !a.layer.sourceUrl);
+      box.replaceChildren(
+        el('img', { src: d.qr, alt: `QR-Code für ${d.url}`, class: 'layers-qr-code', width: '160', height: '160' }),
+        el('div', {}, [
+          el('a', { href: d.url, target: '_blank', rel: 'noopener', text: d.url.replace(/^https?:\/\//, '') }),
+          el('div', { class: 'layers-share' }, [
+            el('button', { type: 'button', class: 'secondary small', text: 'Kopieren', onclick: (e) => copy(d.url, e.currentTarget) }),
+            el('a', { class: 'small', href: d.qr, download: `myforrest-${d.code}.svg`, text: 'QR-Code speichern' }),
+          ]),
+          local ? el('p', { class: 'muted small', text: 'Dateien von diesem Gerät sind nicht im Link.' }) : '',
+        ]),
+      );
+    } catch (err) {
+      box.replaceChildren(el('p', { class: 'small', text: `Kein Kurzlink: ${err.message}` }));
+    }
   }
 
   async function copy(text, button, done = 'Kopiert') {
@@ -263,6 +480,27 @@
     const before = button.textContent;
     button.textContent = done;
     setTimeout(() => { button.textContent = before; }, 1500);
+  }
+
+  /** «Weitere Karten und Dateien»: a service from the list or by address, or a file from the device. */
+  function importSection() {
+    const select = el('select', { id: 'layers-provider', 'aria-label': 'Anbieter' }, [
+      el('option', { value: '', text: 'Anbieter wählen …' }), ...Ows.PROVIDERS.map(([title, url]) => el('option', { value: url, text: title })),
+    ]);
+    const url = el('input', { type: 'url', id: 'layers-service-url', placeholder: 'oder Adresse eines WMS/WMTS', 'aria-label': 'Adresse eines WMS oder WMTS' });
+    select.addEventListener('change', () => { if (select.value) { url.value = select.value; loadService(select.value); } });
+    const file = el('input', { type: 'file', id: 'layers-file', accept: '.kml,.gpx,.geojson,.json,application/vnd.google-earth.kml+xml,application/gpx+xml,application/geo+json' });
+    file.addEventListener('change', () => { if (file.files[0]) addFile(file.files[0]); file.value = ''; });
+    return el('details', { class: 'layer-group layers-import', id: 'layers-import' }, [
+      el('summary', {}, [el('span', { text: 'Weitere Karten und Dateien' })]),
+      select,
+      el('form', { class: 'layers-paste', onsubmit: (e) => { e.preventDefault(); if (url.value.trim()) loadService(url.value.trim()); } }, [
+        url, el('button', { type: 'submit', class: 'secondary small', text: 'Laden' }),
+      ]),
+      el('div', { id: 'layers-import-list' }),
+      el('label', { class: 'small layers-file' }, [el('span', { text: 'Datei als Ebene (KML, GPX, GeoJSON), bleibt auf diesem Gerät:' }), file]),
+      el('p', { id: 'layers-import-status', class: 'muted small', 'aria-live': 'polite' }),
+    ]);
   }
 
   function buildPanel() {
@@ -286,11 +524,14 @@
       el('p', { id: 'layers-hint', class: 'small layers-hint', hidden: '', text: 'Ein Klick auf die Karte zeigt, was die Ebenen dort sagen; ein Rechtsklick (lange drücken) die Koordinaten.' }),
       el('div', { id: 'layers-share', class: 'layers-share', hidden: '' }, [
         share,
+        el('button', { type: 'button', class: 'link small', text: 'Kurzlink mit QR-Code', onclick: shortLink }),
         el('a', { class: 'small', target: '_blank', rel: 'noopener', text: 'In map.geo.admin.ch öffnen', href: '#', onclick: (e) => { e.currentTarget.href = geoadminUrl(); } }),
       ]),
+      el('div', { id: 'layers-qr', class: 'layers-qr', hidden: '', 'aria-live': 'polite' }),
       search,
       el('p', { id: 'layers-status', class: 'muted small', 'aria-live': 'polite' }),
       el('div', { id: 'layers-groups' }),
+      importSection(),
       el('form', { class: 'layers-paste', onsubmit: (e) => { e.preventDefault(); if (paste.value.trim()) applyLink(paste.value.trim()); } }, [
         paste, el('button', { type: 'submit', class: 'secondary small', text: 'Übernehmen' }),
       ]),

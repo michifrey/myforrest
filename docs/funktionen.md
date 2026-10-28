@@ -289,6 +289,34 @@ der LV95-Pyramide von map.geo.admin.ch (`z` 0–13) und Web Mercator umgerechnet
 
 ![Ein Link im Format von map.geo.admin.ch: Waldbrandgefahr zu 60 %, Bevölkerung, Arealstatistik ausgeblendet](screenshots/ebenen-link.jpg)
 
+**Weitere Karten und Dateien.** Unten im Panel lassen sich andere Kartendienste einbinden, wie mit *Import* auf
+map.geo.admin.ch: aus einer Liste (Waldgrenzen, Waldabstandslinien, Naturereigniskataster, Gefahrenkarten und weitere
+Dienste von geodienste.ch, Geoportale von Kantonen, Ökosysteme und Corine Land Cover der EEA, eine Auswahl aus der
+Liste des Kartenviewers von map.geo.admin.ch) oder über die Adresse eines beliebigen WMS oder WMTS. MyForrest liest
+die Capabilities, zeigt die Ebenen des Dienstes zur Auswahl (mit Suche bei vielen) und legt sie wie die anderen über
+die Karte. Von einem WMTS gehen die Ebenen in Web Mercator; Zeitstände eines Dienstes erscheinen als Auswahl. Die
+Capabilities liest der Browser direkt, der Server ruft keine eingegebenen Adressen ab; lässt ein Dienst das nicht zu
+(CORS), sagt das Panel es. Die eingebundenen Ebenen kommen mit dem Gerät und mit Links wieder (`WMS|…`, `WMTS|…`).
+
+Eine **Datei als Ebene**: KML (Punkte, Linien, Flächen mit Löchern, MultiGeometry, Tracks), GPX (Wegpunkte, Tracks,
+Routen) und GeoJSON, z. B. die Fläche eines Windwurfs aus dem Forstplan oder eine Route. Die Datei bleibt auf dem
+Gerät; Namen und Beschreibungen erscheinen beim Klick auf ein Objekt, die Karte zoomt auf die Datei.
+
+![Eine KML-Datei als Ebene: Windwurffläche, Wurzelteller, Rückegasse](screenshots/ebenen-datei.jpg)
+
+**Vergleichen.** Bei jeder Ebene (ausser Dateien) zeigt *Vergleichen* einen Regler: links die Karte ohne diese
+Ebene, rechts mit ihr. Die Linie lässt sich mit Maus, Finger oder Pfeiltasten verschieben, wie der Vergleich auf
+map.geo.admin.ch.
+
+![Vergleich mit Regler: links ohne, rechts mit der eingebundenen Ebene eines Kantons (Demo)](screenshots/ebenen-import.jpg)
+
+**Kurzlink mit QR-Code.** *Kurzlink mit QR-Code* macht aus der Ansicht mit ihren Ebenen eine kurze Adresse
+(`/k/hjgp5u`) und einen QR-Code zum Speichern (SVG), etwa für ein Plakat am Waldrand oder einen Bericht. Kurzlinks
+führen nur auf Seiten von MyForrest; dieselbe Ansicht bekommt immer denselben Code. Dateien vom Gerät sind nicht im
+Link.
+
+![Kurzlink mit QR-Code im Ebenen-Panel](screenshots/kurzlink.jpg)
+
 **Was ist hier?** Ein Klick auf die Karte fragt die eingeschalteten Ebenen ab und zeigt ihre Angaben an dieser
 Stelle: die Warnstufe der Waldbrandgefahr, die Einwohnerzahl der Hektare, die Bodennutzung, beim Baumkataster Art und
 Pflanzjahr des Baums. Bei Ebenen von geo.admin.ch fragt der Server dessen Identify-Dienst, bei den anderen
@@ -321,7 +349,9 @@ selbst. Weitere regionale Dienste, etwa das Geoportal eines Kantons, lassen sich
 ([Installation](installation.md#umgebungsvariablen)). Verkehr **in Echtzeit** (Staus) gibt es nicht als offene
 Daten der Schweiz; die Ebenen zeigen die Belastung im Mittel. (In den Screenshots liefert ein Demo-Dienst im Format
 von geo.admin.ch die Ebenen.) Links, Ebenensuche, Koordinaten und Zoom folgen dem quelloffenen Kartenviewer von
-map.geo.admin.ch ([web-mapviewer](https://github.com/geoadmin/web-mapviewer), BSD-3).
+map.geo.admin.ch ([web-mapviewer](https://github.com/geoadmin/web-mapviewer), BSD-3), ebenso die Liste der
+Anbieter und das Erkennen von WMS und WMTS an der Adresse; MGRS rechnet die Bibliothek *mgrs* (MIT), den QR-Code
+*qrcode* (MIT).
 
 ### Detailseite eines Spots
 

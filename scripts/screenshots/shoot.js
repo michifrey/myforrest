@@ -366,6 +366,41 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await link.mouse.click(560, 330);
     await settle(link, 800);
     await link.screenshot({ path: out('messen.jpg'), ...jpg });
+    await link.click('#measure-toggle');
+    // Another service (a canton's WMS, demo) as a layer, compared with the slider against the map below it.
+    await link.click('#layers-toggle');
+    await link.evaluate(() => { document.getElementById('layers-import').open = true; });
+    await link.fill('#layers-service-url', `${BASE}/demo-ows/wms`);
+    await link.click('#layers-import form button[type="submit"]');
+    await link.waitForSelector('#layers-import-list li input', { timeout: 30000 });
+    await link.click('#layers-import-list li input');
+    await settle(link, 2500);
+    await link.evaluate(() => [...document.querySelectorAll('#layers-active li')].find((li) => li.textContent.includes('Waldgrenzen'))
+      .querySelectorAll('.layer-tools button')[0].click());
+    await link.evaluate(() => { const p = document.getElementById('layerpanel'); p.scrollTop = document.getElementById('layers-import').offsetTop - 200; document.querySelector('#explore').scrollIntoView(); });
+    await settle(link, 2500);
+    await link.screenshot({ path: out('ebenen-import.jpg'), ...jpg });
+    // A KML file from the device: the windthrow area and two root plates.
+    await link.evaluate(() => [...document.querySelectorAll('#layers-active li')].find((li) => li.textContent.includes('Waldgrenzen'))
+      .querySelectorAll('.layer-tools button')[0].click());
+    const kml = path.join(WORK, 'windwurf.kml');
+    fs.writeFileSync(kml, `<?xml version="1.0"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Windwurf Waldrand</name>
+<Placemark><name>Windwurffläche</name><description>Fichten, Sturm vom Februar</description><Polygon><outerBoundaryIs><LinearRing><coordinates>8.5652,47.3738 8.5671,47.3741 8.5676,47.3729 8.5657,47.3725 8.5652,47.3738</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+<Placemark><name>Wurzelteller</name><Point><coordinates>8.5662,47.3734</coordinates></Point></Placemark>
+<Placemark><name>Wurzelteller</name><Point><coordinates>8.5668,47.3731</coordinates></Point></Placemark>
+<Placemark><name>Rückegasse</name><LineString><coordinates>8.5640,47.3720 8.5655,47.3727 8.5664,47.3733</coordinates></LineString></Placemark>
+</Document></kml>`);
+    await link.setInputFiles('#layers-file', kml);
+    await settle(link, 2500);
+    await link.evaluate(() => document.querySelector('#explore').scrollIntoView());
+    await settle(link, 800);
+    await link.screenshot({ path: out('ebenen-datei.jpg'), ...jpg });
+    // A short link with a QR code for this view.
+    await link.click('#layers-share button.link');
+    await link.waitForSelector('#layers-qr img', { timeout: 30000 });
+    await link.evaluate(() => { document.getElementById('layerpanel').scrollTop = document.getElementById('layers-share').offsetTop - 260; document.querySelector('#explore').scrollIntoView(); });
+    await settle(link, 1500);
+    await link.screenshot({ path: out('kurzlink.jpg'), ...jpg });
     await link.close();
   }
 

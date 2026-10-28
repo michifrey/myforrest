@@ -147,8 +147,8 @@ Als Nächstes:
   Bewässerung.
 - **Aus map.geo.admin.ch weiter übernehmen**: den Katalog `layersConfig` von geo.admin.ch statt der Suche in den
   Capabilities (mit den Zeitständen jeder Ebene, für einen Regler bei jeder Ebene mit Zeitreihe); externe WMS/WMTS
-  aus einer Liste geprüfter Anbieter (Waldreservate, Waldgrenzen, Naturgefahren der Kantone) einbinden; KML und GPX
-  als Ebene; den Vergleich mit Regler für jede Ebene; Kurzlink mit QR-Code. Die Höhe im Koordinaten-Popup und das Jahr
+  aus der Liste mit den echten Diensten prüfen (welche Anbieter Capabilities aus dem Browser erlauben, CORS); KMZ
+  (gezippte KML) als Ebene; Zeichnen auf der Karte mit Export als KML. Die Höhe im Koordinaten-Popup und das Jahr
   (`TIME`) der WMS-Ebenen mit den echten Diensten prüfen.
 - **Ortssuche mit dem echten Dienst prüfen** (gebaut nach dem Antwortformat des SearchServers von geo.admin.ch,
   getestet mit nachgebauten Antworten).
@@ -272,6 +272,8 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
 - Karte wie map.geo.admin.ch: Links mit `layers=…` in beiden Richtungen, Suche über alle Ebenen von geo.admin.ch,
   Ebenen ein/aus, Reihenfolge und Jahr; Koordinaten-Popup (LV95, LV03, WGS 84, UTM, MGRS, Höhe); Messen von
   Strecke, Richtung und Fläche; Koordinatensuche in allen diesen Formaten
+- Weitere Karten wie map.geo.admin.ch: andere WMS/WMTS aus einer Liste oder über die Adresse, KML, GPX und GeoJSON als
+  Ebene, Vergleich mit Regler für jede Ebene, Kurzlink mit QR-Code
 - GeoParquet für grosse Dateien: Zeilen nach Ort sortiert (Hilbert-Kurve) in Zeilengruppen, Spalte `bbox` als
   *covering* mit Minimum und Maximum pro Zeilengruppe
 - Doku-Website (Projekt-Wiki) aus `docs/*.md` mit Suche und *Seite bearbeiten*, über GitHub Pages, eigene Domain

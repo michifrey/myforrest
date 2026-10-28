@@ -646,6 +646,35 @@ app.get('/demo-search/SearchServer', (req, res) => {
   res.json({ results: DEMO_PLACES.filter(([, label]) => label.replace(/<[^>]*>/g, '').toLowerCase().includes(q))
     .map(([origin, label, lat, lon]) => ({ attrs: { origin, label, lat, lon } })) });
 });
+// Another service to import in the panel «Ebenen» (as a canton's geoportal): a WMS and a WMTS in Web Mercator,
+// with CORS like real geo services. The WMS draws through the demo WMS, the WMTS gives the demo base tiles in sepia.
+const OWS_BASE = `http://localhost:${Number(process.env.PORT) || 3123}/demo-ows`;
+app.get('/demo-ows/wms', (req, res) => {
+  res.set('access-control-allow-origin', '*');
+  if (!/getcapabilities/i.test(String(req.query.REQUEST || req.query.request || ''))) return res.redirect(`/demo-wms?${new URLSearchParams(req.query)}`);
+  res.type('text/xml').send(`<?xml version="1.0"?><WMS_Capabilities version="1.3.0" xmlns:xlink="http://www.w3.org/1999/xlink">
+<Service><Name>WMS</Name><Title>Geoportal Kanton (Demo)</Title></Service>
+<Capability><Request><GetMap><DCPType><HTTP><Get><OnlineResource xlink:href="${OWS_BASE}/wms?"/></Get></HTTP></DCPType></GetMap></Request>
+<Layer><Title>Wald</Title>
+<Layer queryable="1"><Name>ch.bafu.landesforstinventar-vegetationshoehenmodell</Name><Title>Waldgrenzen und Bestandeshöhe (Demo)</Title><Abstract>Statische Waldgrenzen mit der Höhe der Bestände</Abstract></Layer>
+<Layer><Name>ch.bfs.arealstatistik</Name><Title>Waldfunktionen (Demo)</Title></Layer>
+<Layer><Name>ch.bafu.gefahren-waldbrand_warnung</Name><Title>Naturgefahren: Waldbrand (Demo)</Title></Layer>
+</Layer></Capability></WMS_Capabilities>`);
+});
+app.get('/demo-ows/wmts/WMTSCapabilities.xml', (req, res) => {
+  res.set('access-control-allow-origin', '*');
+  res.type('text/xml').send(`<?xml version="1.0"?><Capabilities xmlns="http://www.opengis.net/wmts/1.0" xmlns:ows="http://www.opengis.net/ows/1.1" version="1.0.0">
+<ows:ServiceIdentification><ows:Title>Historische Karten Kanton (Demo)</ows:Title></ows:ServiceIdentification><Contents>
+<Layer><ows:Title>Michaeliskarte 1840 (Demo)</ows:Title><ows:Identifier>michaeliskarte</ows:Identifier><Style isDefault="true"><ows:Identifier>default</ows:Identifier></Style><Format>image/png</Format>
+<TileMatrixSetLink><TileMatrixSet>3857</TileMatrixSet></TileMatrixSetLink>
+<ResourceURL format="image/png" resourceType="tile" template="${OWS_BASE}/wmts/{TileMatrixSet}/{TileMatrix}/{TileCol}/{TileRow}.png"/></Layer>
+<TileMatrixSet><ows:Identifier>3857</ows:Identifier><ows:SupportedCRS>urn:ogc:def:crs:EPSG::3857</ows:SupportedCRS>${Array.from({ length: 19 }, (_, z) => `<TileMatrix><ows:Identifier>${z}</ows:Identifier></TileMatrix>`).join('')}</TileMatrixSet>
+</Contents></Capabilities>`);
+});
+app.get('/demo-ows/wmts/3857/:z/:x/:y.png', async (req, res) => {
+  const png = await tiles.mercatorTile(Number(req.params.z), Number(req.params.x), Number(req.params.y), 'osm');
+  res.set('access-control-allow-origin', '*').type('image/png').send(await sharp(png).modulate({ saturation: 0.2 }).tint({ r: 205, g: 180, b: 135 }).png().toBuffer());
+});
 app.get('/demo-wms', async (req, res) => {
   const r = await demoWms(`http://x/demo-wms?${new URLSearchParams(req.query)}`);
   res.type(r.headers.get('content-type')).send(Buffer.from(await r.arrayBuffer()));
