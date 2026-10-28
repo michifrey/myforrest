@@ -79,9 +79,17 @@ es erscheint, was geo.admin.ch anbietet.
 
 **Ort.** Das Suchfeld oben in der Karte findet Gemeinden, Bezirke, Kantone, Postleitzahlen, Orts- und Flurnamen und
 Adressen (Suchdienst von geo.admin.ch, über den Server, `ORTSSUCHE_URL`); Pfeiltasten und Enter wählen einen Treffer.
-Koordinaten gehen auch, ohne Dienst: WGS84 (`46.6, 8.4`) oder LV95 (`2'600'000 1'200'000`). Ein Klick in die Karte
-wählt ebenfalls einen Ort. *Bericht für diesen Ort* öffnet den Bericht, mit dem Namen des Orts als Titel. Die Adresse
-`landschaft.html#bericht?lat=…&lon=…&ort=…` (bzw. `#karte?…`) lässt sich teilen.
+Koordinaten gehen auch, ohne Dienst, in den Formaten von map.geo.admin.ch: WGS84 als Dezimalgrad (`46.6, 8.4`) oder
+mit Minuten und Sekunden (`47°22′40″N 8°32′25″E`), LV95 (`2'600'000 1'200'000`), LV03 (`600'000 200'000`) und MGRS
+(`32T MT 65298 47262`). Ein Klick in die Karte wählt ebenfalls einen Ort. *Bericht für diesen Ort* öffnet den
+Bericht, mit dem Namen des Orts als Titel. Die Adresse `landschaft.html#bericht?lat=…&lon=…&ort=…` (bzw. `#karte?…`)
+lässt sich teilen.
+
+**Mit map.geo.admin.ch.** *Diese Karte in map.geo.admin.ch öffnen* zeigt die gewählte Karte der Zeitleiste dort,
+mit Jahr (`ch.swisstopo.zeitreihen@year=1900`, `ch.swisstopo.swissimage-product@year=1956`), Deckkraft, Themenkarte
+und dem gewählten Ort unter dem Fadenkreuz. Umgekehrt öffnet `landschaft.html?layers=ch.swisstopo.zeitreihen@year=1950`
+(mit `center` und `z` wie bei map.geo.admin.ch) die passende Karte der Zeitleiste im gewählten Jahr; eine Ebene eines
+Themas legt sich als Themenkarte darüber.
 
 ![Ortssuche: Treffer für «Zürichb» unter dem Suchfeld der Karte](screenshots/landschaft-suche.jpg)
 

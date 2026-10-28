@@ -272,14 +272,46 @@ Der Knopf **Ebenen** öffnet ein Panel mit Karten aus offiziellen Quellen, nach 
 | **Waldbrände Europa** | Aktive Feuer und Brandflächen (EFFIS) | Copernicus |
 | **Aktive Feuer** (mit `FIRMS_MAP_KEY`) | Feuer der letzten 24 Stunden aus MODIS und VIIRS | NASA FIRMS |
 
-Bis zu vier Ebenen liegen zugleich über der Karte, jede mit eigener Deckkraft und Legende; ein Suchfeld findet
-Ebenen nach Namen (*Einwohner*, *Lärm*, *Schutzwald* …). Regionale Ebenen erscheinen nur, wenn die Karte in ihrem
-Gebiet steht. Die eingeschalteten Ebenen merkt sich das Gerät.
+Bis zu acht Ebenen liegen zugleich über der Karte, jede mit eigener Deckkraft und Legende, ein- und ausblendbar
+(◉/○) und mit ↑/↓ in der Reihenfolge verschiebbar (die oberste in der Liste liegt oben). Das Suchfeld findet die
+Ebenen der Themen und, ab drei Buchstaben, **jede Ebene von geo.admin.ch** (*Wanderwege*, *Haltestellen*,
+*Lärm* …), wie die Ebenensuche von map.geo.admin.ch. Ebenen von geo.admin.ch mit Zeitreihe (z. B. Zeitreise,
+Arealstatistik) nehmen unter *Legende und Jahr* ein Jahr an; der Kartendienst bekommt es als `TIME`. Regionale
+Ebenen erscheinen nur, wenn die Karte in ihrem Gebiet steht. Die eingeschalteten Ebenen merkt sich das Gerät.
+
+**Links wie map.geo.admin.ch.** *Link kopieren* gibt eine Adresse mit Ort, Zoom und Ebenen in der Syntax von
+map.geo.admin.ch: `?center=2683000,1248000&z=8&layers=ch.bfs.arealstatistik,f,0.5;ch.swisstopo.zeitreihen@year=1950`
+(`,f` ausgeblendet, die Zahl danach die Deckkraft, `@year=` das Jahr, `bgLayer=` die Grundkarte). Andere Dienste
+stehen darin als `WMS|Adresse|Ebene`. Umgekehrt öffnet MyForrest die Parameter eines Links von map.geo.admin.ch
+(einfach die Adresse hinten an MyForrest hängen oder unten im Panel einfügen), und *In map.geo.admin.ch öffnen* zeigt
+dieselbe Ansicht dort. Ebenen, die es nicht gibt, nennt das Panel. Der Zoom wird über die Meter pro Pixel zwischen
+der LV95-Pyramide von map.geo.admin.ch (`z` 0–13) und Web Mercator umgerechnet.
+
+![Ein Link im Format von map.geo.admin.ch: Waldbrandgefahr zu 60 %, Bevölkerung, Arealstatistik ausgeblendet](screenshots/ebenen-link.jpg)
 
 **Was ist hier?** Ein Klick auf die Karte fragt die eingeschalteten Ebenen ab und zeigt ihre Angaben an dieser
 Stelle: die Warnstufe der Waldbrandgefahr, die Einwohnerzahl der Hektare, die Bodennutzung, beim Baumkataster Art und
 Pflanzjahr des Baums. Bei Ebenen von geo.admin.ch fragt der Server dessen Identify-Dienst, bei den anderen
 GetFeatureInfo des Kartendienstes.
+
+**Koordinaten und Höhe.** Ein Rechtsklick (auf dem Handy: lange drücken) zeigt die Stelle in allen Systemen von
+map.geo.admin.ch: CH1903+/LV95, CH1903/LV03, WGS 84 als Dezimalgrad und in Grad, Minuten, Sekunden, UTM und MGRS, je
+mit Knopf zum Kopieren, dazu die **Höhe** (in der Schweiz aus swissALTI3D über den Höhendienst von geo.admin.ch, sonst
+aus dem Geländemodell von Open-Meteo) und einen Link zu dieser Stelle in map.geo.admin.ch (mit Fadenkreuz). LV95 und
+LV03 nach den Näherungsformeln von swisstopo (rund 1 m), UTM nach der Krüger-Reihe (auf den Zentimeter wie pyproj),
+MGRS mit der Bibliothek *mgrs* von proj4js.
+
+![Koordinaten einer Stelle in LV95, LV03, WGS 84, UTM und MGRS mit Höhe](screenshots/koordinaten.jpg)
+
+**Messen.** Der Knopf *Messen* misst auf der Karte: Klicks setzen Punkte, angezeigt werden die Strecke und Länge und
+Richtung des letzten Abschnitts (Azimut mit Himmelsrichtung); ein Klick auf den ersten Punkt schliesst die Linie zu
+einer **Fläche** mit Umfang (in m², Hektaren oder km²), etwa für eine Windwurffläche, einen Holzschlag oder den
+Rückgang einer Gletscherzunge. Doppelklick beendet, *Rückgängig* nimmt den letzten Punkt zurück, Escape schliesst.
+Strecken und Richtungen rechnet MyForrest auf dem Ellipsoid (WGS 84, Formel von Vincenty), Flächen auf der
+flächentreuen Kugel mit authalischer Breite; gegenüber pyproj weichen sie um weniger als 0,02 % ab. Während des
+Messens nehmen Spots keine Klicks an.
+
+![Messen: eine Fläche von 9,84 ha mit 1,26 km Umfang](screenshots/messen.jpg)
 
 ![Bodennutzung (Arealstatistik) und Strassenbäume des Baumkatasters über den Spots](screenshots/ebenen-nutzung.jpg)
 
@@ -288,7 +320,8 @@ an ihren Namen, bis zu 30 pro Thema, die nützlichsten zuerst; kommt dort eine n
 selbst. Weitere regionale Dienste, etwa das Geoportal eines Kantons, lassen sich mit `EBENEN_REGIONAL` eintragen
 ([Installation](installation.md#umgebungsvariablen)). Verkehr **in Echtzeit** (Staus) gibt es nicht als offene
 Daten der Schweiz; die Ebenen zeigen die Belastung im Mittel. (In den Screenshots liefert ein Demo-Dienst im Format
-von geo.admin.ch die Ebenen.)
+von geo.admin.ch die Ebenen.) Links, Ebenensuche, Koordinaten und Zoom folgen dem quelloffenen Kartenviewer von
+map.geo.admin.ch ([web-mapviewer](https://github.com/geoadmin/web-mapviewer), BSD-3).
 
 ### Detailseite eines Spots
 

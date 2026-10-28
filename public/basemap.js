@@ -14,7 +14,7 @@
 (function basemapModule() {
   const STORE = 'myforrest-basemap';
   const SWISS = L.latLngBounds([45.7, 5.7], [47.95, 10.7]);
-  const pref = (() => { try { return localStorage.getItem(STORE) || 'myforrest'; } catch { return 'myforrest'; } })();
+  let pref = (() => { try { return localStorage.getItem(STORE) || 'myforrest'; } catch { return 'myforrest'; } })();
   const osm = window.osmBase;
   const swisstopo = (layer, ext) => L.tileLayer(`https://wmts.geo.admin.ch/1.0.0/${layer}/default/current/3857/{z}/{x}/{y}.${ext}`, {
     maxZoom: 19, maxNativeZoom: 18, bounds: SWISS, attribution: '© <a href="https://www.swisstopo.admin.ch/">swisstopo</a>',
@@ -168,10 +168,14 @@
   }
 
   /** Shows a base map; "myforrest" falls back to OpenStreetMap until (or unless) the vector map is ready. */
+  let asked = 0;
   async function setBase(key) {
     if (!BASES[key]) key = 'myforrest';
+    const my = ++asked;
     try { localStorage.setItem(STORE, key); } catch { /* private mode */ }
     const want = key === 'myforrest' ? ((await loadGl()) || osm) : BASES[key].layer;
+    // A later choice (e.g. from a link) while the vector map was loading wins.
+    if (my !== asked) return;
     const shown = current === 'myforrest' ? (gl || osm) : BASES[current].layer;
     if (shown !== want && map.hasLayer(shown)) map.removeLayer(shown);
     if (!map.hasLayer(want)) want.addTo(map);
@@ -205,11 +209,15 @@
   new Control().addTo(map);
 
   // Once the server said which style to use.
+  let started = false;
   const wait = setInterval(() => {
     if (!state.config || !('basemap' in state.config)) return;
     clearInterval(wait);
+    started = true;
     setBase(pref);
   }, 200);
+  /** A base map asked for by a link (layers.js): now, or once the start above sets the base map. */
+  const prefer = (key) => { if (started) setBase(key); else pref = key; };
 
-  window.Basemap = { setBase, theme, kindOf, current: () => current };
+  window.Basemap = { setBase, prefer, theme, kindOf, current: () => current };
 })();

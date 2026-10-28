@@ -83,7 +83,7 @@ const RADIUS_KM = 5;
 // time dimension; their years and tile addresses are in the WMTS capabilities.
 const ZEITREISE_CAPABILITIES = 'https://wmts.geo.admin.ch/EPSG/3857/1.0.0/WMTSCapabilities.xml';
 const SEARCH = 'https://api3.geo.admin.ch/rest/services/api/SearchServer';
-const { lv95ToWgs84, wgs84ToLv95, inLv95Area } = require('../lv95');
+const { wgs84ToLv95 } = require('../lv95');
 const { renderReportPdf } = require('../landschaft-pdf');
 
 // Map excerpts of the PDF report: width of the area (m) and size (px, twice the size on paper).
@@ -105,24 +105,16 @@ const ORIGINS = {
   sn25: 'Ort', address: 'Adresse', parcel: 'Parzelle',
 };
 
+const Coords = require('../../public/coords.js');
+const KINDS = { lv95: 'LV95', lv03: 'LV03', wgs84: 'WGS84', mgrs: 'MGRS' };
 /**
- * Coordinates typed into the search: «46.6, 8.4» (WGS84, latitude first) or «2'600'000 1'200'000» (LV95, east
- * first, in either order). Null when the text is no pair of numbers or the place is not in Switzerland.
+ * Coordinates typed into the search, in the formats map.geo.admin.ch reads (public/coords.js): WGS84 in decimal
+ * degrees or with minutes and seconds, LV95, LV03, MGRS. Null when the text is none of them or (for plain numbers)
+ * the place is not in Switzerland.
  */
 function parseCoordinates(text) {
-  const nums = String(text).replace(/['’\s](?=\d{3}(?!\d))/g, '').match(/-?\d+(?:\.\d+)?/g);
-  if (!nums || nums.length !== 2 || !/^[\s\d.,;/'’°NnEeOo-]+$/.test(text)) return null;
-  let [a, b] = nums.map(Number);
-  if (a > 1e6 && b > 1e6) {
-    if (b > a) [a, b] = [b, a]; // LV95: E (2.4–2.9 million) is larger than N (1.0–1.3 million)
-    const [lat, lon] = lv95ToWgs84(a, b);
-    return inLv95Area(lat, lon) ? { lat, lon, label: `LV95 ${Math.round(a)} / ${Math.round(b)}` } : null;
-  }
-  if (Math.abs(a) <= 90 && Math.abs(b) <= 180) {
-    if (!inLv95Area(a, b) && inLv95Area(b, a)) [a, b] = [b, a]; // «8.4, 46.6»: longitude first
-    return inLv95Area(a, b) ? { lat: a, lon: b, label: `${a}° N, ${b}° O` } : null;
-  }
-  return null;
+  const p = Coords.parse(text);
+  return p ? { lat: p.lat, lon: p.lon, label: `${KINDS[p.kind]} ${String(text).trim()}` } : null;
 }
 
 /** A label of the SearchServer as text: «<b>Zürich</b> (ZH)» → «Zürich (ZH)». */

@@ -272,8 +272,53 @@
     const year = Number(q.get('jahr'));
     const view = q.get('ansicht') || 'zeitreise';
     if (year && state.maps.timeline.some((t) => t.id === view && t.zeitreise)) showTimeline(view, { year, compare: Number(q.get('vergleich')) || null });
-    else showTimeline(state.maps.timeline.some((t) => t.id === state.timeline) ? state.timeline : 'heute');
+    else if (!fromGeoadmin()) showTimeline(state.maps.timeline.some((t) => t.id === state.timeline) ? state.timeline : 'heute');
   }
+
+  /*
+   * Links in the syntax of map.geo.admin.ch (public/geoadmin-link.js): `?layers=ch.swisstopo.zeitreihen@year=1864`
+   * and the like open the matching map of the timeline (and a theme layer), `center` and `z` the place.
+   */
+  const LAYER_STOPS = { 'ch.swisstopo.zeitreihen': 'zeitreise', 'ch.swisstopo.swissimage-product': 'luftbild' };
+  const stopLayers = (t) => (t.zeitreise ? Object.keys(LAYER_STOPS).filter((k) => LAYER_STOPS[k] === t.id) : t.layer ? [t.layer.name] : []);
+  function fromGeoadmin() {
+    const g = GeoadminLink.read(location.search);
+    if (g.lat !== null) map.setView([g.lat, g.lon], Number.isFinite(g.zoom) ? Math.round(g.zoom) : 12);
+    let shown = false;
+    for (const l of g.layers.filter((x) => !x.external)) {
+      const stop = state.maps.timeline.find((t) => stopLayers(t).includes(l.id));
+      if (stop && !shown) {
+        showTimeline(stop.id, { year: Number.isFinite(l.params.year) ? l.params.year : null });
+        if (Number.isFinite(l.opacity)) { $('ln-opacity').value = String(l.opacity); timeLayer?.setOpacity(l.opacity); }
+        shown = true;
+        continue;
+      }
+      const t = state.maps.themes.find((x) => x.layers.some((y) => y.name === l.id));
+      if (t) {
+        const value = `${t.id}:${t.layers.findIndex((y) => y.name === l.id)}`;
+        $('ln-theme').value = value;
+        showTheme(value);
+      }
+    }
+    return shown;
+  }
+  /** The map shown here, as a link of map.geo.admin.ch: the map of the timeline (with its year) and the theme. */
+  function geoadminHref() {
+    const stop = state.maps?.timeline.find((t) => t.id === state.timeline);
+    const layers = [];
+    const opacity = Number($('ln-opacity').value);
+    if (stop?.zeitreise) {
+      const y = stop.zeitreise.years[zeit.index];
+      layers.push({ id: stopLayers(stop)[0], visible: true, opacity, params: { year: y.year } });
+    } else if (stop?.layer) layers.push({ id: stop.layer.name, visible: true, opacity, params: {} });
+    const [t, i] = (state.theme || '').split(':');
+    const theme = state.maps?.themes.find((x) => x.id === t)?.layers[Number(i)];
+    if (theme) layers.push({ id: theme.name, visible: true, opacity: 0.75, params: {} });
+    // The chosen place in the middle, with the cross of map.geo.admin.ch on it.
+    const c = state.place ? { lat: state.place.lat, lng: state.place.lon } : map.getCenter();
+    return `${GeoadminLink.link({ lat: c.lat, lon: c.lng, zoom: map.getZoom(), layers, bgLayer: 'ch.swisstopo.pixelkarte-grau' })}${state.place ? '&crosshair=marker' : ''}`;
+  }
+  $('ln-geoadmin').addEventListener('click', (e) => { e.currentTarget.href = geoadminHref(); });
 
   /* Glacier outlines of the inventories on this server (/api/glaciers), over every map of the timeline: one colour
      per inventory, the old ones light and dashed, the newest dark. A year in the legend shows that inventory alone. */

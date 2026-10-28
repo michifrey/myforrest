@@ -44,6 +44,7 @@
           <div id="ln-timeline" class="ln-timeline" role="radiogroup" aria-labelledby="ln-time-title"></div>
           <label class="ln-row" for="ln-opacity">Deckkraft <input type="range" id="ln-opacity" min="0" max="1" step="0.05" value="0.85"></label>
           <div id="ln-time-info" class="ln-info" aria-live="polite"></div>
+          <a id="ln-geoadmin" class="ln-geoadmin small" href="https://map.geo.admin.ch/" target="_blank" rel="noopener">Diese Karte in map.geo.admin.ch öffnen</a>
         </section>
         <section id="ln-glaciers" aria-labelledby="ln-glaciers-title" hidden>
           <h2 id="ln-glaciers-title">Gletscher</h2>
@@ -117,6 +118,9 @@
   </main>
 
   <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/mgrs/mgrs.min.js"></script>
+  <script src="coords.js"></script>
+  <script src="geoadmin-link.js"></script>
   <script src="landschaft.js"></script>
 </body>
 </html>

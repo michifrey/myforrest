@@ -219,6 +219,7 @@ function createApp({
   });
   app.use(express.static(path.join(__dirname, '..', 'public')));
   app.use('/vendor/leaflet', express.static(path.dirname(require.resolve('leaflet/dist/leaflet.js'))));
+  app.use('/vendor/mgrs', express.static(path.dirname(require.resolve('mgrs/dist/mgrs.min.js')), { maxAge: '30d' }));
   app.use('/vendor/maplibre', express.static(path.dirname(require.resolve('maplibre-gl/dist/maplibre-gl.js')), { maxAge: '30d' }));
   // deck.gl (standalone bundle) for the 3D Tiles of buildings and trees in the 3D map, loaded only when switched on.
   app.use('/vendor/maplibre-leaflet', express.static(path.dirname(require.resolve('@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js')), { maxAge: '30d' }));
@@ -1379,7 +1380,7 @@ function createApp({
 
   require('./routes/species')(app, { db, spotRadiusM, visibleSql: accounts.visibleSql });
   // Map layers from external sources for the panel «Ebenen» (src/routes/layers.js).
-  const layersApi = require('./routes/layers')(app, { fetchImpl: layersFetch, ...layersOptions });
+  const layersApi = require('./routes/layers')(app, { fetchImpl: layersFetch, elevation: elevationService, ...layersOptions });
   // Tree species near a spot from a public tree inventory (src/treeinventory.js; by default Geneva, SITG).
   // Geneva (or BAUMINVENTAR_URL) first, then the tree register of the city of Zürich (BAUMKATASTER_ZUERICH=, empty = off).
   const zurichUrl = treeInventoryZurich ?? process.env.BAUMKATASTER_ZUERICH ?? require('./treeinventory').ZURICH.url;

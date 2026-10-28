@@ -185,6 +185,7 @@ Die feste Adresse lässt sich als Variable `APP_URL` in die Android-App bauen, d
 | `ORTSSUCHE_URL` | SearchServer von geo.admin.ch | Ortssuche in [Landschaft im Wandel](landschaft.md) (Namen und Adressen); leer = nur Koordinaten |
 | `ZEITREISE_WMTS_URL` | WMTS-Capabilities von geo.admin.ch (EPSG:3857) | Woher die Jahre der *Zeitreise der Landeskarte* und der *historischen Luftbilder* in [Landschaft im Wandel](landschaft.md) kommen (einmal am Tag gelesen); leer = beide aus |
 | `EBENEN_IDENTIFY_URL` | Identify-Dienst von geo.admin.ch | Für *Was ist hier?* bei Ebenen von geo.admin.ch |
+| `EBENEN_HOEHE_URL` | Höhendienst von geo.admin.ch (`rest/services/height`) | Höhe im Koordinaten-Popup (swissALTI3D); leer = nur das Geländemodell von Open-Meteo |
 | `EBENEN_REGIONAL` | Baumkataster Zürich, SITG Genf, EFFIS | Regionale WMS-Dienste als JSON-Liste `[{ "url", "group", "bbox": [W, S, O, N], "attribution" }]`; alle ihre Ebenen erscheinen, wenn die Karte im Gebiet steht |
 | `FIRMS_MAP_KEY` | – | Schlüssel von [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/api/map_key/): aktive Feuer (MODIS, VIIRS) als Ebene |
 | `BAUMKATASTER_ZUERICH` | WFS des Baumkatasters der Stadt Zürich | Zweites Bauminventar für die [Baumart-Vorschläge](funktionen.md#vorschläge-aus-dem-bauminventar); leer = aus |

@@ -9,12 +9,18 @@
  *
  *   GET /api/layers                  groups of layers: { id, title, layers: [{ id, url, name, title, attribution, bbox, legend }] }
  *   GET /api/layers/info?lat&lon&layers=id,id   what the layers say at a point
+ *   GET /api/layers/geoadmin?q=…|ids=a,b  any layer of geo.admin.ch, by words (as the layer search of
+ *                                    map.geo.admin.ch) or by name (layers of a shared link); ids `ga:<name>`
+ *   GET /api/layers/hoehe?lat&lon    height of a point: swissALTI3D through geo.admin.ch in Switzerland, else the
+ *                                    terrain model of Open-Meteo
  */
 
 const { parseCapabilities } = require('../dwd');
 
 const GEOADMIN_WMS = 'https://wms.geo.admin.ch/';
 const IDENTIFY = 'https://api3.geo.admin.ch/rest/services/api/MapServer/identify';
+const HEIGHT = 'https://api3.geo.admin.ch/rest/services/height';
+const { wgs84ToLv95, inLv95Area } = require('../lv95');
 const TTL = 24 * 3600000;
 const PER_GROUP = 30;
 
@@ -68,6 +74,7 @@ module.exports = function registerLayers(app, {
   identifyUrl = (process.env.EBENEN_IDENTIFY_URL ?? IDENTIFY) || null,
   regional = process.env.EBENEN_REGIONAL ? JSON.parse(process.env.EBENEN_REGIONAL) : DEFAULT_REGIONAL,
   firmsKey = process.env.FIRMS_MAP_KEY || '',
+  heightUrl = (process.env.EBENEN_HOEHE_URL ?? HEIGHT) || null, elevation = null,
 }) {
   const sources = [
     ...(geoadminUrl ? [{ url: geoadminUrl, geoadmin: true, attribution: '© geo.admin.ch' }] : []),
@@ -149,7 +156,7 @@ module.exports = function registerLayers(app, {
     const c = await catalogue();
     res.set('Cache-Control', 'public, max-age=3600');
     res.json({
-      groups: c.groups.map((g) => ({ ...g, layers: g.layers.map(({ identify, ...l }) => ({ ...l, info: Boolean(identify) })) })),
+      groups: c.groups.map((g) => ({ ...g, layers: g.layers.map(({ identify, ...l }) => ({ ...l, info: Boolean(identify), geoadmin: identify === 'geoadmin' })) })),
       ...(c.errors.length ? { errors: c.errors } : {}),
     });
   });
@@ -165,7 +172,7 @@ module.exports = function registerLayers(app, {
     const lon = Number(req.query.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return res.status(400).json({ error: 'lat und lon angeben' });
     const c = await catalogue();
-    const layers = String(req.query.layers || '').split(',').map((id) => c.byId.get(id)).filter(Boolean).slice(0, 6);
+    const layers = String(req.query.layers || '').split(',').map((id) => c.byId.get(id) || geoadminById(c, id)).filter(Boolean).slice(0, 8);
     const items = [];
     const geo = layers.filter((l) => l.identify === 'geoadmin');
     for (const hit of await identify(lat, lon, geo.map((l) => l.name))) {
@@ -215,6 +222,59 @@ module.exports = function registerLayers(app, {
       return []; // no answer: nothing to say
     }
   }
+
+  /** A layer of geo.admin.ch outside the panel's groups, by id `ga:<name>` (from the search or a shared link). */
+  function geoadminById(c, id) {
+    if (!String(id).startsWith('ga:')) return null;
+    const l = (c.all || []).find((x) => x.name === id.slice(3));
+    return l ? { ...l, id, bbox: null, identify: 'geoadmin' } : null;
+  }
+  const gaJson = ({ identify, ...l }) => ({ ...l, info: Boolean(identify), geoadmin: true });
+
+  app.get('/api/layers/geoadmin', async (req, res) => {
+    const c = await catalogue();
+    if (req.query.ids !== undefined) {
+      const ids = String(req.query.ids).split(',').map((n) => n.trim()).filter((n) => /^[a-z][\w.-]{2,120}$/i.test(n)).slice(0, 20);
+      const layers = ids.map((n) => geoadminById(c, `ga:${n}`)).filter(Boolean).map(gaJson);
+      return res.json({ layers, missing: ids.filter((n) => !layers.some((l) => l.name === n)) });
+    }
+    // Every word in the title or the name, the title first.
+    const words = String(req.query.q || '').toLowerCase().split(/\s+/).filter((w) => w.length >= 2).slice(0, 5);
+    if (!words.length) return res.status(400).json({ error: 'q oder ids angeben' });
+    const hit = (l) => words.every((w) => l.title.toLowerCase().includes(w) || l.name.toLowerCase().includes(w));
+    const layers = (c.all || []).filter(hit)
+      .sort((a, b) => Number(words.every((w) => b.title.toLowerCase().includes(w))) - Number(words.every((w) => a.title.toLowerCase().includes(w))) || a.title.localeCompare(b.title, 'de'))
+      .slice(0, 30).map((l) => gaJson({ ...l, id: `ga:${l.name}`, bbox: null, identify: 'geoadmin' }));
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.json({ layers });
+  });
+
+  // Heights of points, kept for a day (people click the same places again).
+  const heights = new Map();
+  app.get('/api/layers/hoehe', async (req, res) => {
+    const lat = Number(req.query.lat);
+    const lon = Number(req.query.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return res.status(400).json({ error: 'lat und lon angeben' });
+    const key = `${lat.toFixed(5)},${lon.toFixed(5)}`;
+    const hit = heights.get(key);
+    if (hit && now() - hit.at < 86400000) return res.json(hit.value);
+    let value = null;
+    if (heightUrl && inLv95Area(lat, lon)) {
+      try {
+        const [e, n] = wgs84ToLv95(lat, lon);
+        const r = await fetchImpl(`${heightUrl}?easting=${e.toFixed(1)}&northing=${n.toFixed(1)}&sr=2056`, { signal: AbortSignal.timeout(10000) });
+        const h = r.ok ? Number((await r.json()).height) : NaN;
+        if (Number.isFinite(h)) value = { elevation: Math.round(h * 10) / 10, source: 'swissALTI3D (swisstopo)' };
+      } catch { /* the terrain model below */ }
+    }
+    if (!value && elevation) {
+      try { value = { elevation: await elevation.lookup(lat, lon), source: 'Copernicus DEM (Open-Meteo)' }; } catch { /* none */ }
+    }
+    if (!value) return res.json({ elevation: null, source: null });
+    if (heights.size > 2000) heights.clear();
+    heights.set(key, { at: now(), value });
+    res.json(value);
+  });
 
   /** All layers of geo.admin.ch from its capabilities (cached with the panel's catalogue). */
   const geoadminLayers = async () => (await catalogue()).all || [];
