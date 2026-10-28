@@ -120,9 +120,10 @@ Bevölkerung pro Hektare, Bodennutzung (Arealstatistik), Verkehrsbelastung und L
 Baumkataster der Stadt Zürich und Stadtklima-Karten von Genf, dazu Waldbrände in Europa (EFFIS); die Suche findet
 jede Ebene von geo.admin.ch. Bis zu acht zugleich, mit Deckkraft, Legende, Ein/Aus, Reihenfolge und Jahr; ein Klick
 auf die Karte zeigt, was sie an dieser Stelle sagen. Wie auf **map.geo.admin.ch**: Links mit `layers=…` öffnen sich in
-beiden Richtungen, ein Rechtsklick zeigt die Stelle in LV95, LV03, WGS 84, UTM und MGRS mit Höhe, und **Messen** misst
-Strecken, Richtungen und Flächen. Dazu andere WMS/WMTS (Liste mit Waldgrenzen, Naturgefahren, Kantonen) und KML-, GPX-
-oder GeoJSON-Dateien als Ebene, ein **Vergleich mit Regler** für jede Ebene und ein **Kurzlink mit QR-Code** ([Details](docs/funktionen.md#ebenen-karten-aus-offiziellen-quellen); im
+beiden Richtungen, ein Rechtsklick zeigt die Stelle in LV95, LV03, WGS 84, UTM und MGRS mit Höhe, **Messen** misst
+Strecken, Richtungen und Flächen, und **Zeichnen** legt Punkte, Linien und Flächen in Farbe mit Namen auf die Karte,
+als KML zum Herunterladen. Dazu andere WMS/WMTS (Liste mit Waldgrenzen, Naturgefahren, Kantonen) und KML-, KMZ-, GPX-
+oder GeoJSON-Dateien als Ebene (in ihren Farben), ein **Vergleich mit Regler** für jede Ebene und ein **Kurzlink mit QR-Code** ([Details](docs/funktionen.md#ebenen-karten-aus-offiziellen-quellen); im
 Screenshot Demo-Daten).
 
 ### 2. Zeitreise an einem Spot
