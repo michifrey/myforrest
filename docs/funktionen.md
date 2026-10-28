@@ -298,9 +298,16 @@ die Karte. Von einem WMTS gehen die Ebenen in Web Mercator; Zeitstände eines Di
 Capabilities liest der Browser direkt, der Server ruft keine eingegebenen Adressen ab; lässt ein Dienst das nicht zu
 (CORS), sagt das Panel es. Die eingebundenen Ebenen kommen mit dem Gerät und mit Links wieder (`WMS|…`, `WMTS|…`).
 
-Eine **Datei als Ebene**: KML (Punkte, Linien, Flächen mit Löchern, MultiGeometry, Tracks), GPX (Wegpunkte, Tracks,
-Routen) und GeoJSON, z. B. die Fläche eines Windwurfs aus dem Forstplan oder eine Route. Die Datei bleibt auf dem
-Gerät; Namen und Beschreibungen erscheinen beim Klick auf ein Objekt, die Karte zoomt auf die Datei.
+Eine **Datei als Ebene**, z. B. die Fläche eines Windwurfs aus dem Forstplan oder eine Route. Diese Formate gehen:
+
+- KML: Punkte, Linien, Flächen mit Löchern, MultiGeometry und Tracks.
+- KMZ: die gezippte KML, wie sie Google Earth und viele Geoportale abgeben. MyForrest liest daraus die `doc.kml`.
+- GPX: Wegpunkte, Tracks und Routen.
+- GeoJSON.
+
+Die Datei bleibt auf dem Gerät. Die Objekte erscheinen in den Farben der Datei: aus den Stilen der KML oder aus den
+Angaben `stroke` und `fill` im GeoJSON (*simplestyle*). Namen und Beschreibungen erscheinen beim Klick auf ein Objekt,
+und die Karte zoomt auf die Datei.
 
 ![Eine KML-Datei als Ebene: Windwurffläche, Wurzelteller, Rückegasse](screenshots/ebenen-datei.jpg)
 
@@ -340,6 +347,24 @@ flächentreuen Kugel mit authalischer Breite; gegenüber pyproj weichen sie um w
 Messens nehmen Spots keine Klicks an.
 
 ![Messen: eine Fläche von 9,84 ha mit 1,26 km Umfang](screenshots/messen.jpg)
+
+**Zeichnen.** Der Knopf *Zeichnen* zeichnet auf der Karte, wie das Zeichenwerkzeug von map.geo.admin.ch, etwa eine
+Windwurffläche, eine Rückegasse oder ein Käfernest:
+
+- **Punkt**: ein Klick setzt ihn.
+- **Linie**: Klicks setzen die Punkte, ein Doppelklick beendet die Linie.
+- **Fläche**: wie die Linie; ein Klick auf den ersten Punkt oder ein Doppelklick schliesst sie.
+
+Sieben Farben stehen zur Wahl. Jedes Objekt hat einen Namen und eine Notiz, bei Linien steht die Länge und bei Flächen
+die Fläche daneben, gerechnet wie beim Messen. ✕ löscht ein Objekt, *Rückgängig* nimmt den letzten Punkt einer
+angefangenen Linie oder Fläche zurück, Escape bricht sie ab.
+
+Die Zeichnung bleibt auf dem Gerät und auf der Karte, bis sie gelöscht wird. *KML herunterladen* speichert sie als
+KML-Datei mit Namen, Notizen und Farben. Diese Datei lesen map.geo.admin.ch (*Import*), QGIS und Google Earth, und das
+Panel *Ebenen* liest sie wieder ein. Während des Zeichnens nehmen Spots keine Klicks an; Zeichnen und Messen schliessen
+sich gegenseitig aus.
+
+![Zeichnen: eine Windwurffläche in Grün, eine Rückegasse in Blau und ein Käfernest in Rot, mit Namen und Grösse](screenshots/zeichnen.jpg)
 
 ![Bodennutzung (Arealstatistik) und Strassenbäume des Baumkatasters über den Spots](screenshots/ebenen-nutzung.jpg)
 

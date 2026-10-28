@@ -2158,9 +2158,10 @@ html.basemap-vector .leaflet-tile-pane { filter: none; }
 .where dd { margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 0.3rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .where-copy { min-width: 26px; min-height: 26px; padding: 0; font-size: 0.85rem; }
 .measure-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
-.measuring .leaflet-container { cursor: crosshair; }
-/* While measuring, spots and other map objects do not take the clicks. */
-.measuring .leaflet-marker-pane, .measuring .leaflet-shadow-pane, .measuring .leaflet-interactive:not(.measure-point) { pointer-events: none !important; }
+.measuring .leaflet-container, .drawing .leaflet-container { cursor: crosshair; }
+/* While measuring or drawing, spots and other map objects do not take the clicks. */
+.measuring .leaflet-marker-pane, .measuring .leaflet-shadow-pane, .measuring .leaflet-interactive:not(.measure-point),
+.drawing .leaflet-marker-pane, .drawing .leaflet-shadow-pane, .drawing .leaflet-interactive:not(.draw-point) { pointer-events: none !important; }
 .measure-line { stroke: #c0392b; stroke-width: 3; stroke-dasharray: 6 5; fill: none; }
 .measure-line.closed { fill: #c0392b; fill-opacity: 0.15; }
 .measure-point { stroke: #fff; stroke-width: 2; fill: #c0392b; fill-opacity: 1; }
@@ -2168,6 +2169,30 @@ html.basemap-vector .leaflet-tile-pane { filter: none; }
 .measure-box { position: fixed; z-index: 1000; left: 50%; bottom: 1.2rem; transform: translateX(-50%); max-width: min(420px, calc(100% - 2rem)); padding: 0.7rem 0.9rem; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgb(0 0 0 / 0.2); }
 .measure-box p { margin: 0.15rem 0; }
 .measure-tools { display: flex; gap: 0.4rem; margin-top: 0.4rem; }
+
+/* Drawing: the box of the tool, like the one of «Messen», with the list of what was drawn. */
+.draw-draft { stroke-width: 3; stroke-dasharray: 6 5; fill: none; }
+.draw-point { stroke: #fff; stroke-width: 2; }
+.draw-point.first { cursor: pointer; }
+/* At the bottom left, beside the zoom buttons, so the middle of the map stays free for the drawing. */
+.draw-box { position: fixed; z-index: 1000; left: 4.2rem; bottom: 1.2rem; width: min(400px, calc(100% - 5.2rem)); max-height: min(60vh, 520px); overflow-y: auto; padding: 0.7rem 0.9rem; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgb(0 0 0 / 0.2); }
+.draw-box p { margin: 0.15rem 0; }
+.draw-modes { display: flex; gap: 0.3rem; margin: 0.3rem 0; }
+.draw-modes button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.draw-colours { display: flex; gap: 0.35rem; margin: 0.4rem 0; }
+.draw-swatch { width: 28px; height: 28px; min-height: 28px; padding: 0; border-radius: 999px; border: 2px solid var(--surface); background: var(--swatch); box-shadow: 0 0 0 1px var(--border); cursor: pointer; }
+.draw-swatch[aria-checked="true"] { box-shadow: 0 0 0 2px var(--text); }
+.draw-hint { color: var(--muted); }
+.draw-list { list-style: none; margin: 0.4rem 0; padding: 0; display: grid; gap: 0.3rem; }
+.draw-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 0.45rem; padding: 0.3rem 0; border-top: 1px solid var(--border); }
+.draw-fields { display: grid; gap: 0.2rem; }
+.draw-fields input { width: 100%; min-height: 30px; padding: 0 0.4rem; font-size: 0.85rem; }
+.draw-kind { width: 16px; height: 16px; background: var(--swatch); }
+.draw-kind.Point { border-radius: 999px; }
+.draw-kind.LineString { height: 4px; border-radius: 2px; }
+.draw-kind.Polygon { border-radius: 3px; opacity: 0.75; }
+.draw-del { min-width: 30px; min-height: 30px; padding: 0; border: none; background: none; color: var(--muted); cursor: pointer; }
+.draw-tools { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }
 
 /* ---------- Ebenen: compare, other services and files, short link ---------- */
 .layer-tools { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }

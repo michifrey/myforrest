@@ -376,6 +376,32 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await settle(link, 800);
     await link.screenshot({ path: out('messen.jpg'), ...jpg });
     await link.click('#measure-toggle');
+    // Drawing: a windthrow area in green, a skid trail in blue and a beetle nest in red, with names.
+    await link.click('#draw-toggle');
+    const drawName = async (name) => {
+      await link.fill('.draw-list li:last-child input:first-child', name);
+      await link.evaluate(() => document.querySelector('.draw-list li:last-child input').dispatchEvent(new Event('change')));
+    };
+    await link.click('.draw-modes button:has-text("Fläche")');
+    await link.click('.draw-swatch[aria-label="Grün"]');
+    for (const [x, y] of [[520, 360], [700, 330], [740, 470], [560, 500]]) { await link.mouse.click(x, y); await settle(link, 250); }
+    await link.mouse.click(520, 360);
+    await drawName('Windwurf Februar');
+    await link.click('.draw-modes button:has-text("Linie")');
+    await link.click('.draw-swatch[aria-label="Blau"]');
+    for (const [x, y] of [[560, 640], [600, 520], [660, 420]]) { await link.mouse.click(x, y); await settle(link, 250); }
+    await link.mouse.dblclick(820, 380);
+    await drawName('Rückegasse');
+    await link.click('.draw-modes button:has-text("Punkt")');
+    await link.click('.draw-swatch[aria-label="Rot"]');
+    await link.mouse.click(860, 300);
+    await drawName('Käfernest');
+    await settle(link, 800);
+    await link.screenshot({ path: out('zeichnen.jpg'), ...jpg });
+    // Clear the drawing again for the pictures below.
+    link.once('dialog', (d) => d.accept());
+    await link.click('.draw-tools button:has-text("Alles löschen")');
+    await link.click('.draw-tools button:has-text("Fertig")');
     // Another service (a canton's WMS, demo) as a layer, compared with the slider against the map below it.
     await link.click('#layers-toggle');
     await link.evaluate(() => { document.getElementById('layers-import').open = true; });

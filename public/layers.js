@@ -42,10 +42,18 @@
   /* ---------- Active layers ---------- */
 
   const FILE_COLOUR = '#c0392b';
-  /** The style of a file layer at an opacity (points solid, areas light). */
-  const fileStyle = (opacity) => (f) => (f?.geometry?.type === 'Point'
-    ? { radius: 6, color: '#fff', weight: 2, fillColor: FILE_COLOUR, opacity, fillOpacity: opacity }
-    : { color: FILE_COLOUR, weight: 2.5, opacity, fillColor: FILE_COLOUR, fillOpacity: 0.25 * opacity });
+  /** The style of a file layer at an opacity (points solid, areas light), in the colours of the file if it has any. */
+  const fileStyle = (opacity) => (f) => {
+    const p = f?.properties || {};
+    if (f?.geometry?.type === 'Point') {
+      const c = p['marker-color'] || p.stroke || FILE_COLOUR;
+      return { radius: 6, color: '#fff', weight: 2, fillColor: c, opacity, fillOpacity: opacity };
+    }
+    return {
+      color: p.stroke || FILE_COLOUR, weight: p['stroke-width'] ?? 2.5, opacity: (p['stroke-opacity'] ?? 1) * opacity,
+      fillColor: p.fill || p.stroke || FILE_COLOUR, fillOpacity: (p['fill-opacity'] ?? 0.25) * opacity,
+    };
+  };
   function vectorLayer(l, a) {
     return L.geoJSON(l.data, {
       style: fileStyle(a.opacity),
@@ -423,9 +431,9 @@
     box.replaceChildren(...[search, layerList(list.map((x) => serviceLayer(c, x)))].filter(Boolean));
   }
 
-  /** A KML, GPX or GeoJSON as a layer (`sourceUrl` when it came from an address, so a link can carry it). */
-  function fileLayer(text, filename, sourceUrl = null) {
-    const f = FileLayer.toGeoJson(text, filename);
+  /** A KML, KMZ, GPX or GeoJSON as a layer (`sourceUrl` when it came from an address, so a link can carry it). */
+  async function fileLayer(bytes, filename, sourceUrl = null) {
+    const f = await FileLayer.read(bytes, filename);
     return {
       id: `file:${sourceUrl || `${filename}:${Date.now()}`}`, kind: 'vector', geoadmin: false, info: false, name: f.name, title: f.name,
       format: f.format, data: f.collection, bbox: null, fileBbox: f.bbox, count: f.collection.features.length, sourceUrl, attribution: `${f.format}: ${filename}`,
@@ -434,13 +442,13 @@
   async function fileFromUrl(url) {
     const r = await fetch(url, { signal: AbortSignal.timeout(20000) });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return fileLayer(await r.text(), new URL(url).pathname.split('/').pop() || url, url);
+    return fileLayer(await r.arrayBuffer(), new URL(url).pathname.split('/').pop() || url, url);
   }
   async function addFile(file) {
     const status = $('layers-import-status');
     try {
       if (file.size > 20 * 1024 * 1024) throw new Error('Datei grösser als 20 MB');
-      const l = fileLayer(await file.text(), file.name);
+      const l = await fileLayer(await file.arrayBuffer(), file.name);
       if (addLayer(l, { opacity: 0.9 }) === false) return;
       const b = l.fileBbox;
       if (b) map.fitBounds([[b[1], b[0]], [b[3], b[2]]], { padding: [40, 40], maxZoom: 17 });
@@ -489,7 +497,7 @@
     ]);
     const url = el('input', { type: 'url', id: 'layers-service-url', placeholder: 'oder Adresse eines WMS/WMTS', 'aria-label': 'Adresse eines WMS oder WMTS' });
     select.addEventListener('change', () => { if (select.value) { url.value = select.value; loadService(select.value); } });
-    const file = el('input', { type: 'file', id: 'layers-file', accept: '.kml,.gpx,.geojson,.json,application/vnd.google-earth.kml+xml,application/gpx+xml,application/geo+json' });
+    const file = el('input', { type: 'file', id: 'layers-file', accept: '.kml,.kmz,.gpx,.geojson,.json,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/gpx+xml,application/geo+json' });
     file.addEventListener('change', () => { if (file.files[0]) addFile(file.files[0]); file.value = ''; });
     return el('details', { class: 'layer-group layers-import', id: 'layers-import' }, [
       el('summary', {}, [el('span', { text: 'Weitere Karten und Dateien' })]),

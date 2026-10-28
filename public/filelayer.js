@@ -1,8 +1,9 @@
 /*
- * Files as a layer of the map, as map.geo.admin.ch imports them: KML (placemarks with points, lines and polygons,
- * also in MultiGeometry, gx:Track), GPX (waypoints, tracks, routes) and GeoJSON, each turned into GeoJSON with the
- * name and description of each object. Read in the browser (window.FileLayer); the file never leaves the device.
- * Runs in Node for the tests.
+ * Files as a layer of the map, as map.geo.admin.ch imports them: KML and KMZ (placemarks with points, lines and
+ * polygons, also in MultiGeometry, gx:Track, with the colours of their styles), GPX (waypoints, tracks, routes) and
+ * GeoJSON, each turned into GeoJSON with the name and description of each object. The colours go into the properties
+ * of the simplestyle spec (stroke, stroke-width, stroke-opacity, fill, fill-opacity, marker-color). Read in the
+ * browser (window.FileLayer); the file never leaves the device. Runs in Node for the tests.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -43,12 +44,52 @@
     return out;
   }
 
+  /** KML colour aabbggrr → ['#rrggbb', opacity]. */
+  function kmlColour(s) {
+    const m = /^\s*([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})\s*$/i.exec(s || '');
+    return m ? [`#${m[4]}${m[3]}${m[2]}`.toLowerCase(), Math.round((parseInt(m[1], 16) / 255) * 100) / 100] : null;
+  }
+  /** The colours of a <Style> as simplestyle properties. */
+  function styleProps(style) {
+    const out = {};
+    const line = text(style, 'LineStyle');
+    const poly = text(style, 'PolyStyle');
+    const icon = text(style, 'IconStyle');
+    const lc = kmlColour(line && text(line, 'color'));
+    if (lc) [out.stroke, out['stroke-opacity']] = lc;
+    const w = Number(line && text(line, 'width'));
+    if (w > 0) out['stroke-width'] = Math.min(w, 20);
+    const pc = kmlColour(poly && text(poly, 'color'));
+    if (pc) [out.fill, out['fill-opacity']] = pc;
+    if (poly && text(poly, 'fill') === '0') out['fill-opacity'] = 0;
+    const ic = kmlColour(icon && text(icon, 'color'));
+    if (ic) out['marker-color'] = ic[0];
+    return out;
+  }
+  /** Shared styles of a document by id, the normal style of a StyleMap included. */
+  function kmlStyles(xml) {
+    const styles = {};
+    for (const m of xml.matchAll(/<(?:[\w-]+:)?Style\b[^>]*\bid\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/(?:[\w-]+:)?Style>/g)) styles[m[1]] = styleProps(m[2]);
+    for (const m of xml.matchAll(/<(?:[\w-]+:)?StyleMap\b[^>]*\bid\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/(?:[\w-]+:)?StyleMap>/g)) {
+      const normal = all(m[2], 'Pair').find((p) => text(p, 'key') === 'normal');
+      const url = normal && text(normal, 'styleUrl');
+      if (url) styles[m[1]] = styles[url.replace(/^.*#/, '')] || {};
+    }
+    return styles;
+  }
+
   function fromKml(xml) {
     const features = [];
+    const styles = kmlStyles(xml);
     for (const pm of all(xml, 'Placemark')) {
       const geoms = kmlGeometries(pm);
       if (!geoms.length) continue;
-      const properties = { name: text(pm, 'name'), description: plain(text(pm, 'description')) };
+      const url = text(pm, 'styleUrl');
+      const inline = all(pm, 'Style')[0];
+      const properties = {
+        name: text(pm, 'name'), description: plain(text(pm, 'description')),
+        ...(url ? styles[url.replace(/^.*#/, '')] : null), ...(inline ? styleProps(inline) : null),
+      };
       features.push({ type: 'Feature', properties, geometry: geoms.length === 1 ? geoms[0] : { type: 'GeometryCollection', geometries: geoms } });
     }
     return { name: text(xml.split(/<Placemark\b/)[0], 'name'), features };
@@ -111,5 +152,66 @@
     return { name: r.name || filename.replace(/\.[^.]+$/, '') || format, format, collection, bbox: bboxOf(collection), truncated: r.features.length > MAX_FEATURES };
   }
 
-  return { toGeoJson, bboxOf, MAX_FEATURES };
+  /* ---------- KMZ: a ZIP with the KML (and its pictures) ---------- */
+
+  const MAX_UNZIPPED = 50 * 1024 * 1024;
+  /** The entries of a ZIP (central directory): [{ name, method, data (compressed bytes), size }]. */
+  function zipEntries(bytes) {
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let eocd = -1;
+    for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    if (eocd < 0) throw new Error('Keine gültige KMZ-Datei (ZIP)');
+    const out = [];
+    let p = dv.getUint32(eocd + 16, true);
+    for (let n = dv.getUint16(eocd + 10, true); n > 0; n--) {
+      if (p + 46 > bytes.length || dv.getUint32(p, true) !== 0x02014b50) throw new Error('Beschädigte KMZ-Datei');
+      const nameLen = dv.getUint16(p + 28, true);
+      const local = dv.getUint32(p + 42, true);
+      const start = local + 30 + dv.getUint16(local + 26, true) + dv.getUint16(local + 28, true);
+      out.push({
+        name: new TextDecoder().decode(bytes.subarray(p + 46, p + 46 + nameLen)), method: dv.getUint16(p + 10, true),
+        data: bytes.subarray(start, start + dv.getUint32(p + 20, true)), size: dv.getUint32(p + 24, true),
+      });
+      p += 46 + nameLen + dv.getUint16(p + 30, true) + dv.getUint16(p + 32, true);
+    }
+    return out;
+  }
+  /** The bytes of an entry: stored as is, or inflated (deflate) with the stream of the browser, at most 50 MB. */
+  async function inflate(entry) {
+    if (entry.method === 0) return entry.data;
+    if (entry.method !== 8) throw new Error('KMZ mit unbekannter Kompression');
+    if (entry.size > MAX_UNZIPPED) throw new Error('KML in der KMZ-Datei grösser als 50 MB');
+    const reader = new Blob([entry.data]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+    const parts = [];
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.length;
+      if (total > MAX_UNZIPPED) { reader.cancel(); throw new Error('KML in der KMZ-Datei grösser als 50 MB'); }
+      parts.push(value);
+    }
+    const out = new Uint8Array(total);
+    let at = 0;
+    for (const part of parts) { out.set(part, at); at += part.length; }
+    return out;
+  }
+
+  /**
+   * The bytes of a file (KML, KMZ, GPX, GeoJSON) → as toGeoJson. A KMZ is a ZIP: its main KML is doc.kml, else the
+   * first .kml at the top level, else the first anywhere.
+   */
+  async function read(buffer, filename = '') {
+    const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+    if (bytes[0] === 0x50 && bytes[1] === 0x4b) {
+      const kmls = zipEntries(bytes).filter((e) => /\.kml$/i.test(e.name));
+      const main = kmls.find((e) => /(^|\/)doc\.kml$/i.test(e.name)) || kmls.find((e) => !e.name.includes('/')) || kmls[0];
+      if (!main) throw new Error('Keine KML-Datei in der KMZ-Datei');
+      const r = toGeoJson(new TextDecoder().decode(await inflate(main)), filename.replace(/\.kmz$/i, '.kml'));
+      return { ...r, format: 'KMZ' };
+    }
+    return toGeoJson(new TextDecoder().decode(bytes), filename);
+  }
+
+  return { toGeoJson, read, bboxOf, kmlColour, MAX_FEATURES };
 }));

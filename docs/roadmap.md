@@ -147,8 +147,8 @@ Als Nächstes:
   Bewässerung.
 - **Aus map.geo.admin.ch weiter übernehmen**: den Katalog `layersConfig` von geo.admin.ch statt der Suche in den
   Capabilities (mit den Zeitständen jeder Ebene, für einen Regler bei jeder Ebene mit Zeitreihe); externe WMS/WMTS
-  aus der Liste mit den echten Diensten prüfen (welche Anbieter Capabilities aus dem Browser erlauben, CORS); KMZ
-  (gezippte KML) als Ebene; Zeichnen auf der Karte mit Export als KML. Die Höhe im Koordinaten-Popup und das Jahr
+  aus der Liste mit den echten Diensten prüfen (welche Anbieter Capabilities aus dem Browser erlauben, CORS); eine
+  Zeichnung über einen Link teilen (die KML auf dem Server ablegen, wie map.geo.admin.ch). Die Höhe im Koordinaten-Popup und das Jahr
   (`TIME`) der WMS-Ebenen mit den echten Diensten prüfen.
 - **Ortssuche mit dem echten Dienst prüfen** (gebaut nach dem Antwortformat des SearchServers von geo.admin.ch,
   getestet mit nachgebauten Antworten).
@@ -179,6 +179,9 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
   OSM, Landeskarte und Luftbild; Panel *Ebenen* mit Wald und Waldbrand, Bevölkerung, Bodennutzung, Verkehr von
   geo.admin.ch, Baumkataster Zürich, SITG Genf, EFFIS und NASA FIRMS, mit *Was ist hier?*; Baumkataster Zürich auch
   als Baumart-Vorschlag
+- Zeichnen auf der Karte wie auf map.geo.admin.ch (Punkte, Linien, Flächen in sieben Farben, mit Name, Notiz,
+  Länge und Fläche), auf dem Gerät gespeichert und als KML herunterladbar; KMZ als Ebene und die Farben aus KML-Stilen
+  und GeoJSON (simplestyle)
 - Landschaft im Wandel: Karte aufgebaut wie map.geo.admin.ch: Menü mit «Aktive Karten» (Ein- und Ausblenden,
   Deckkraft, Reihenfolge, Info mit Legende, Vergleichen, Entfernen) und dem Katalog «Karten anzeigen» in Ordnern,
   beliebig viele Karten übereinander, Hintergrund wählbar (Landeskarte, grau, Luftbild, keiner), Zeitleiste für

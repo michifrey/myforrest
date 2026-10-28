@@ -108,6 +108,7 @@
   }
 
   function start() {
+    if (typeof Draw !== 'undefined' && Draw.active()) Draw.stop();
     T.on = true;
     T.points = [];
     T.closed = false;
@@ -120,12 +121,13 @@
     T.box.className = 'measure-box';
     T.box.setAttribute('role', 'status');
     T.box.setAttribute('aria-live', 'polite');
-    map.getContainer().append(T.box);
-    L.DomEvent.disableClickPropagation(T.box);
+    // Outside the map: its buttons are re-drawn on a click, and Leaflet would take such a click for one on the map.
+    document.body.append(T.box);
     show();
   }
 
   function stop() {
+    if (!T.on) return;
     T.on = false;
     T.line?.remove();
     T.marks?.remove();
@@ -190,5 +192,5 @@
     T.box.append(tools);
   }
 
-  return { inverse, length, area, fmtLength, fmtArea, fmtAzimuth, mount, active: () => T.on };
+  return { inverse, length, area, fmtLength, fmtArea, fmtAzimuth, mount, stop, active: () => T.on };
 }));
