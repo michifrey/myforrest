@@ -10,6 +10,7 @@
  *                                            Landeskarte and of the aerial images), the layers per theme and the
  *                                            years of the glacier inventories (outlines from /api/glaciers)
  *   GET /api/landschaft/bericht?lat&lon      what the layers, the inventories and the spots say about a place
+ *   GET /api/landschaft/suche?q              places by name (SearchServer of geo.admin.ch) or coordinates (WGS84, LV95)
  */
 
 // Maps through time, in this order; a stop is offered when its layer exists (the Landeskarte always).
@@ -80,6 +81,37 @@ const RADIUS_KM = 5;
 // swisstopo's «Zeitreise» (the Landeskarte of each year) and the aerial images of each flight: WMTS layers with a
 // time dimension; their years and tile addresses are in the WMTS capabilities.
 const ZEITREISE_CAPABILITIES = 'https://wmts.geo.admin.ch/EPSG/3857/1.0.0/WMTSCapabilities.xml';
+const SEARCH = 'https://api3.geo.admin.ch/rest/services/api/SearchServer';
+const { lv95ToWgs84, inLv95Area } = require('../lv95');
+
+// What a hit of the SearchServer is, by its `origin`.
+const ORIGINS = {
+  gg25: 'Gemeinde', district: 'Bezirk', kantone: 'Kanton', zipcode: 'Postleitzahl', gazetteer: 'Ort',
+  sn25: 'Ort', address: 'Adresse', parcel: 'Parzelle',
+};
+
+/**
+ * Coordinates typed into the search: «46.6, 8.4» (WGS84, latitude first) or «2'600'000 1'200'000» (LV95, east
+ * first, in either order). Null when the text is no pair of numbers or the place is not in Switzerland.
+ */
+function parseCoordinates(text) {
+  const nums = String(text).replace(/['’\s](?=\d{3}(?!\d))/g, '').match(/-?\d+(?:\.\d+)?/g);
+  if (!nums || nums.length !== 2 || !/^[\s\d.,;/'’°NnEeOo-]+$/.test(text)) return null;
+  let [a, b] = nums.map(Number);
+  if (a > 1e6 && b > 1e6) {
+    if (b > a) [a, b] = [b, a]; // LV95: E (2.4–2.9 million) is larger than N (1.0–1.3 million)
+    const [lat, lon] = lv95ToWgs84(a, b);
+    return inLv95Area(lat, lon) ? { lat, lon, label: `LV95 ${Math.round(a)} / ${Math.round(b)}` } : null;
+  }
+  if (Math.abs(a) <= 90 && Math.abs(b) <= 180) {
+    if (!inLv95Area(a, b) && inLv95Area(b, a)) [a, b] = [b, a]; // «8.4, 46.6»: longitude first
+    return inLv95Area(a, b) ? { lat: a, lon: b, label: `${a}° N, ${b}° O` } : null;
+  }
+  return null;
+}
+
+/** A label of the SearchServer as text: «<b>Zürich</b> (ZH)» → «Zürich (ZH)». */
+const plain = (html) => String(html || '').replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
 const DAY = 24 * 3600000;
 
 /**
@@ -111,6 +143,7 @@ function pick(layers, theme) {
 module.exports = function registerLandschaft(app, {
   db, layers, glaciers = null, glamos = null, fetchImpl = fetch, now = () => Date.now(),
   zeitreiseUrl = (process.env.ZEITREISE_WMTS_URL ?? ZEITREISE_CAPABILITIES) || null,
+  searchUrl = (process.env.ORTSSUCHE_URL ?? SEARCH) || null,
 }) {
   let wmts = { at: 0, layers: {} };
   /** The time layers of the timeline from the WMTS capabilities, read once a day; the last good ones when it fails. */
@@ -208,8 +241,36 @@ module.exports = function registerLandschaft(app, {
     }
     res.json({ lat, lon, themes, glacier, observed: observed(lat, lon) });
   });
+
+
+  // Places by name or coordinates; answers kept for an hour (people type the same names).
+  const searches = new Map();
+  app.get('/api/landschaft/suche', async (req, res) => {
+    const q = String(req.query.q || '').trim().slice(0, 100);
+    if (q.length < 2) return res.status(400).json({ error: 'Mindestens zwei Zeichen eingeben' });
+    const coords = parseCoordinates(q);
+    if (coords) return res.json({ results: [{ ...coords, kind: 'Koordinaten' }] });
+    if (!searchUrl) return res.json({ results: [], error: 'Ortssuche nicht eingerichtet' });
+    const key = q.toLowerCase();
+    const hit = searches.get(key);
+    if (hit && now() - hit.at < 3600000) return res.json({ results: hit.results });
+    try {
+      const params = new URLSearchParams({ searchText: q, type: 'locations', sr: '4326', limit: '8' });
+      const r = await fetchImpl(`${searchUrl}?${params}`, { signal: AbortSignal.timeout(10000) });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const results = ((await r.json()).results || []).map(({ attrs = {} }) => ({
+        label: plain(attrs.label), kind: ORIGINS[attrs.origin] || 'Ort', lat: Number(attrs.lat), lon: Number(attrs.lon),
+      })).filter((x) => x.label && Number.isFinite(x.lat) && Number.isFinite(x.lon));
+      if (searches.size > 500) searches.clear();
+      searches.set(key, { at: now(), results });
+      res.json({ results });
+    } catch (err) {
+      res.json({ results: [], error: `Ortssuche nicht verfügbar: ${err.message}` });
+    }
+  });
 };
 
 module.exports.TIMELINE = TIMELINE;
 module.exports.wmtsLayer = wmtsLayer;
 module.exports.THEMES = THEMES;
+module.exports.parseCoordinates = parseCoordinates;

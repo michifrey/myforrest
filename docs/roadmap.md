@@ -145,7 +145,9 @@ Als Nächstes:
   prüfen (gebaut nach den Kennungen von swisstopo und BAFU, getestet mit einer nachgebauten Liste) und die
   Identify-Antworten der Themenkarten im Bericht lesbar beschriften (Codes der Höhenstufen und der Arealstatistik).
 - **Wasser und Landwirtschaft vertiefen**: Abflüsse aus Hydro-CH2018, Bodenfeuchte und Trockenheit aus den Messnetzen,
-  Bewässerung; Ortssuche statt Klick.
+  Bewässerung.
+- **Ortssuche mit dem echten Dienst prüfen** (gebaut nach dem Antwortformat des SearchServers von geo.admin.ch,
+  getestet mit nachgebauten Antworten).
 - **Bericht als PDF auf dem Server** (für Gemeinden und Forstdienste), mit festem Layout und Kartenausschnitten pro Thema.
 
 ## Bereits umgesetzt
@@ -174,6 +176,7 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
   OSM, Landeskarte und Luftbild; Panel *Ebenen* mit Wald und Waldbrand, Bevölkerung, Bodennutzung, Verkehr von
   geo.admin.ch, Baumkataster Zürich, SITG Genf, EFFIS und NASA FIRMS, mit *Was ist hier?*; Baumkataster Zürich auch
   als Baumart-Vorschlag
+- Landschaft im Wandel: Ortssuche nach Gemeinde, Ort, Adresse oder Koordinaten (WGS84, LV95), Ortsname im Bericht und im Link
 - Landschaft im Wandel: Gletscherumrisse der Inventare als Ebene über allen Karten, Fläche pro Inventar im Bericht
 - Landschaft im Wandel: zwei Jahre nebeneinander (Zeitreise und Luftbilder), mit verschiebbarer Linie und beiden Jahren im Link
 - Landschaft im Wandel: historische Luftbilder von swisstopo (SWISSIMAGE Zeitreise, seit 1926), Flug für Flug mit Regler

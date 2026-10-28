@@ -132,7 +132,7 @@
   function zeitHash(stop) {
     // The view, the year and the comparison year in the address, so the view can be shared.
     const years = stop.zeitreise.years;
-    const q = new URLSearchParams(state.place ? { lat: state.place.lat, lon: state.place.lon } : {});
+    const q = new URLSearchParams(state.place ? placeQuery() : {});
     q.set('ansicht', stop.id);
     q.set('jahr', years[zeit.index].year);
     if (swipe.layer) q.set('vergleich', years[swipe.index].year);
@@ -322,17 +322,81 @@
   $('ln-glacier-toggle').addEventListener('change', (e) => showGlaciers(e.target.checked));
   map.on('moveend', () => { clearTimeout(glacier.timer); glacier.timer = setTimeout(refreshGlaciers, 250); });
 
-  function setPlace(lat, lon, { pan = false } = {}) {
-    state.place = { lat: Math.round(lat * 1e5) / 1e5, lon: Math.round(lon * 1e5) / 1e5 };
+  const coords = (p) => `${fmt(p.lat, 4)}° N, ${fmt(p.lon, 4)}° O`;
+  /** The place for the report; `name` when it came from the search (it goes into the address and the report title). */
+  function setPlace(lat, lon, { pan = false, name = null, zoom = 11 } = {}) {
+    state.place = { lat: Math.round(lat * 1e5) / 1e5, lon: Math.round(lon * 1e5) / 1e5, name };
     if (!marker) marker = L.marker([lat, lon]).addTo(map);
     marker.setLatLng([lat, lon]);
-    if (pan) map.setView([lat, lon], 11);
-    $('ln-place').textContent = `${fmt(state.place.lat, 4)}° N, ${fmt(state.place.lon, 4)}° O`;
-    $('ln-to-report').href = `#bericht?lat=${state.place.lat}&lon=${state.place.lon}`;
+    if (pan) map.setView([lat, lon], zoom);
+    $('ln-place').textContent = name ? `${name} · ${coords(state.place)}` : coords(state.place);
+    $('ln-to-report').href = `#bericht?${placeQuery()}`;
     document.querySelector('.ln-tabs a[data-view="bericht"]').href = $('ln-to-report').href;
     $('ln-to-report').hidden = false;
   }
+  const placeQuery = () => new URLSearchParams({ lat: state.place.lat, lon: state.place.lon, ...(state.place.name ? { ort: state.place.name } : {}) });
   map.on('click', (e) => setPlace(e.latlng.lat, e.latlng.lng));
+
+  /* Search by place name, address or coordinates (/api/landschaft/suche): the hits below the field, arrow keys and
+     Enter to choose; the chosen place becomes the place of the report. */
+  const search = { timer: null, results: [], active: -1, seq: 0 };
+  function renderHits(message = '') {
+    const list = $('ln-search-results');
+    list.replaceChildren(...search.results.map((h, i) => el('li', {
+      id: `ln-hit-${i}`, role: 'option', 'aria-selected': String(i === search.active),
+      on: { mousedown: (e) => { e.preventDefault(); choose(i); } },
+    }, [el('span', { text: h.label }), el('span', { class: 'ln-hit-kind', text: h.kind })])));
+    if (message) list.append(el('li', { class: 'ln-hit-note', text: message }));
+    list.hidden = !search.results.length && !message;
+    $('ln-search-q').setAttribute('aria-expanded', String(!list.hidden));
+    if (search.active >= 0) $('ln-search-q').setAttribute('aria-activedescendant', `ln-hit-${search.active}`);
+    else $('ln-search-q').removeAttribute('aria-activedescendant');
+  }
+  async function runSearch(q) {
+    const n = ++search.seq;
+    const r = await api(`/api/landschaft/suche?q=${encodeURIComponent(q)}`).catch((err) => ({ results: [], error: err.message }));
+    if (n !== search.seq) return; // a newer search is under way
+    search.results = r.results;
+    search.active = r.results.length ? 0 : -1;
+    renderHits(r.error || (r.results.length ? '' : 'Nichts gefunden'));
+  }
+  function choose(i) {
+    const h = search.results[i];
+    if (!h) return;
+    // Communes, districts and cantons are large: a wider view than for an address.
+    const zoom = { Kanton: 9, Bezirk: 10, Gemeinde: 12, Postleitzahl: 12, Koordinaten: 13, Adresse: 15, Parzelle: 16 }[h.kind] ?? 13;
+    setPlace(h.lat, h.lon, { pan: true, zoom, name: h.kind === 'Koordinaten' ? null : h.label });
+    // The place (and the year of the «Zeitreise») in the address, so the search result can be shared.
+    const stop = state.maps?.timeline.find((t) => t.id === state.timeline);
+    if (stop?.zeitreise) zeitHash(stop); else history.replaceState(null, '', `#karte?${placeQuery()}`);
+    $('ln-search-q').value = h.label;
+    search.results = [];
+    search.active = -1;
+    renderHits();
+  }
+  $('ln-search-q').addEventListener('input', (e) => {
+    clearTimeout(search.timer);
+    const q = e.target.value.trim();
+    if (q.length < 2) { search.seq += 1; search.results = []; renderHits(); return; }
+    search.timer = setTimeout(() => runSearch(q), 250);
+  });
+  $('ln-search-q').addEventListener('keydown', (e) => {
+    const n = search.results.length;
+    if (e.key === 'ArrowDown' && n) { e.preventDefault(); search.active = (search.active + 1) % n; renderHits(); }
+    else if (e.key === 'ArrowUp' && n) { e.preventDefault(); search.active = (search.active - 1 + n) % n; renderHits(); }
+    else if (e.key === 'Escape') { search.results = []; search.active = -1; renderHits(); }
+  });
+  $('ln-search-q').addEventListener('blur', () => { search.results = []; search.active = -1; renderHits(); });
+  $('ln-search').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const q = $('ln-search-q').value.trim();
+    if (q.length < 2) return;
+    // Enter before the hits arrived: search now and take the first.
+    if (!search.results.length) { clearTimeout(search.timer); await runSearch(q); }
+    choose(Math.max(0, search.active));
+  });
+  L.DomEvent.disableClickPropagation($('ln-search'));
+  L.DomEvent.disableScrollPropagation($('ln-search'));
   $('ln-opacity').addEventListener('input', (e) => {
     timeLayer?.setOpacity(Number(e.target.value));
     swipe.layer?.setOpacity(Number(e.target.value));
@@ -469,9 +533,10 @@
     $('ln-report-body').replaceChildren(...body);
   }
 
-  async function showReport(lat, lon) {
-    $('ln-report-title').textContent = `${fmt(lat, 4)}° N, ${fmt(lon, 4)}° O`;
-    $('ln-report-meta').textContent = `Stand ${new Date().toLocaleDateString('de-CH', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+  async function showReport(lat, lon, name = null) {
+    $('ln-report-title').textContent = name || coords({ lat, lon });
+    const stand = `Stand ${new Date().toLocaleDateString('de-CH', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+    $('ln-report-meta').textContent = name ? `${coords({ lat, lon })} · ${stand}` : stand;
     $('ln-report-body').replaceChildren(el('p', { class: 'ln-muted', text: 'Daten werden zusammengestellt …' }));
     if (!reportMap) {
       reportMap = L.map('ln-report-map', { zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, attributionControl: true });
@@ -552,10 +617,10 @@ GROUP BY 1 ORDER BY 2 DESC;`;
     const lat = Number(q.get('lat'));
     const lon = Number(q.get('lon'));
     const hasPlace = q.has('lat') && Number.isFinite(lat) && Number.isFinite(lon);
-    if (hasPlace) setPlace(lat, lon, { pan: view === 'karte' });
+    if (hasPlace) setPlace(lat, lon, { pan: view === 'karte', name: q.get('ort')?.slice(0, 120) || null });
     if (view === 'karte') setTimeout(() => map.invalidateSize(), 0);
     if (view === 'bericht' && state.place) {
-      showReport(state.place.lat, state.place.lon);
+      showReport(state.place.lat, state.place.lon, state.place.name);
     }
   }
   window.addEventListener('hashchange', showView);
