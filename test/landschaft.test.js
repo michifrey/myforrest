@@ -35,6 +35,11 @@ async function withServer(fn, { wmts = null, glacierFiles = '' } = {}) {
       if (names.includes('ch.bfs.arealstatistik')) results.push({ layerBodId: 'ch.bfs.arealstatistik', layerName: 'Arealstatistik', attributes: { nutzung: 'Wald' } });
       return Response.json({ results });
     }
+    if (url.startsWith('https://wms.example/') && /REQUEST=GetMap/.test(url)) {
+      identified.push(['GetMap', new URL(url).searchParams.get('LAYERS')]);
+      const png = await require('sharp')({ create: { width: 40, height: 20, channels: 4, background: { r: 120, g: 160, b: 90, alpha: 0.8 } } }).png().toBuffer();
+      return new Response(png, { headers: { 'content-type': 'image/png' } });
+    }
     if (url.startsWith('https://wms.example/')) return new Response(CAPS);
     if (wmts && url === 'https://wmts.example/WMTSCapabilities.xml') return new Response(wmts);
     return new Response('', { status: 503 });
@@ -227,4 +232,24 @@ test('Landschaft im Wandel: places by name from the search service of geo.admin.
     app.locals.db.close();
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
+});
+
+test('Landschaft im Wandel: the report as a PDF made on the server, with map excerpts of the place', async () => {
+  await withServer(async (base, db, asked) => {
+    const r = await fetch(`${base}/api/landschaft/bericht.pdf?lat=46.4&lon=8.0&ort=${encodeURIComponent('Zürich (ZH)')}`);
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get('content-type'), 'application/pdf');
+    assert.match(r.headers.get('content-disposition'), /filename="landschaft-im-wandel-zuerich-zh\.pdf"/);
+    const pdf = Buffer.from(await r.arrayBuffer());
+    assert.equal(pdf.subarray(0, 5).toString(), '%PDF-');
+    const text = pdf.toString('latin1');
+    assert.ok((text.match(/\/Type \/Page\b/g) || []).length >= 2, 'more than one page');
+    // The overview on the Landeskarte, and one map per theme that has a layer (no water layer in these capabilities).
+    const maps = asked.filter((a) => a[0] === 'GetMap').map((a) => a[1]);
+    assert.equal(maps.filter((n) => n === 'ch.swisstopo.pixelkarte-farbe').length, 4);
+    assert.deepEqual(maps.filter((n) => n !== 'ch.swisstopo.pixelkarte-farbe').sort(),
+      ['ch.bafu.wald-vegetationshoehenstufen_1975', 'ch.bfs.arealstatistik', 'ch.meteoschweiz.klimanormwerte-temperatur_aktuelle_periode']);
+    assert.equal((text.match(/\/Subtype \/Image/g) || []).length, 4);
+    assert.equal((await fetch(`${base}/api/landschaft/bericht.pdf?lat=x&lon=8`)).status, 400);
+  });
 });

@@ -10,6 +10,7 @@
  *                                            Landeskarte and of the aerial images), the layers per theme and the
  *                                            years of the glacier inventories (outlines from /api/glaciers)
  *   GET /api/landschaft/bericht?lat&lon      what the layers, the inventories and the spots say about a place
+ *   GET /api/landschaft/bericht.pdf?lat&lon&ort   the report as a PDF (A4), with map excerpts of the place per theme
  *   GET /api/landschaft/suche?q              places by name (SearchServer of geo.admin.ch) or coordinates (WGS84, LV95)
  */
 
@@ -82,7 +83,21 @@ const RADIUS_KM = 5;
 // time dimension; their years and tile addresses are in the WMTS capabilities.
 const ZEITREISE_CAPABILITIES = 'https://wmts.geo.admin.ch/EPSG/3857/1.0.0/WMTSCapabilities.xml';
 const SEARCH = 'https://api3.geo.admin.ch/rest/services/api/SearchServer';
-const { lv95ToWgs84, inLv95Area } = require('../lv95');
+const { lv95ToWgs84, wgs84ToLv95, inLv95Area } = require('../lv95');
+const { renderReportPdf } = require('../landschaft-pdf');
+
+// Map excerpts of the PDF report: width of the area (m) and size (px, twice the size on paper).
+const PDF_MAPS = {
+  overview: { widthM: 6000, px: [990, 420] },
+  klima: { widthM: 30000, px: [990, 340] },
+  wasser: { widthM: 8000, px: [990, 340] },
+  wald: { widthM: 5000, px: [990, 340] },
+  boden: { widthM: 5000, px: [990, 340] },
+};
+const BASE_MAPS = ['ch.swisstopo.pixelkarte-farbe', 'ch.swisstopo.pixelkarte-grau'];
+/** A file name without umlauts and spaces: «Zürich (ZH)» → «zuerich-zh». */
+const slug = (s) => String(s).toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9.]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
 
 // What a hit of the SearchServer is, by its `origin`.
 const ORIGINS = {
@@ -141,7 +156,7 @@ function pick(layers, theme) {
 }
 
 module.exports = function registerLandschaft(app, {
-  db, layers, glaciers = null, glamos = null, fetchImpl = fetch, now = () => Date.now(),
+  db, layers, glaciers = null, glamos = null, klima = null, fetchImpl = fetch, now = () => Date.now(),
   zeitreiseUrl = (process.env.ZEITREISE_WMTS_URL ?? ZEITREISE_CAPABILITIES) || null,
   searchUrl = (process.env.ORTSSUCHE_URL ?? SEARCH) || null,
 }) {
@@ -218,13 +233,19 @@ module.exports = function registerLandschaft(app, {
     };
   }
 
-  app.get('/api/landschaft/bericht', async (req, res) => {
+  /** lat and lon of a request, or null (after answering 400). */
+  function placeOf(req, res) {
     const lat = Number(req.query.lat);
     const lon = Number(req.query.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
-      return res.status(400).json({ error: 'lat und lon angeben' });
+      res.status(400).json({ error: 'lat und lon angeben' });
+      return null;
     }
-    const all = await layers.geoadminLayers();
+    return { lat, lon };
+  }
+
+  /** What the layers of each theme, the glacier inventories and the spots say about a place. */
+  async function report(lat, lon, all) {
     const chosen = THEMES.map((t) => ({ theme: t, layers: pick(all, t) }));
     // One identify per theme (geo.admin.ch answers for several layers at once), all at the same time.
     const answers = await Promise.all(chosen.map(({ layers: ls }) => layers.identify(lat, lon, ls.map((l) => l.name))));
@@ -239,7 +260,90 @@ module.exports = function registerLandschaft(app, {
       const g = glaciers.at(lat, lon, { radiusM: RADIUS_KM * 1000 });
       if (g) glacier = { ...g, length: glamos?.forGlacier(g) || null };
     }
-    res.json({ lat, lon, themes, glacier, observed: observed(lat, lon) });
+    return { lat, lon, themes, glacier, observed: observed(lat, lon) };
+  }
+
+  app.get('/api/landschaft/bericht', async (req, res) => {
+    const at = placeOf(req, res);
+    if (!at) return;
+    res.json(await report(at.lat, at.lon, await layers.geoadminLayers()));
+  });
+
+  /** A WMS map of geo.admin.ch (PNG) for a box in LV95, or null. */
+  async function getMap(layer, box, [w, h]) {
+    const q = new URLSearchParams({
+      SERVICE: 'WMS', VERSION: '1.3.0', REQUEST: 'GetMap', LAYERS: layer.name, STYLES: '', CRS: 'EPSG:2056',
+      BBOX: box.join(','), WIDTH: String(w), HEIGHT: String(h), FORMAT: 'image/png', TRANSPARENT: 'true',
+    });
+    try {
+      const r = await fetchImpl(`${layer.url}${layer.url.includes('?') ? '&' : '?'}${q}`, { signal: AbortSignal.timeout(20000) });
+      if (!r.ok || !/image/.test(r.headers.get('content-type') || '')) return null;
+      return Buffer.from(await r.arrayBuffer());
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * A map excerpt around the place for the PDF: the Landeskarte, a theme layer over it (70 % opaque) and a mark at
+   * the place, as JPEG; null when neither map came.
+   */
+  async function mapExcerpt(lat, lon, { widthM, px }, base, overlay) {
+    const sharp = require('sharp');
+    const [e, n] = wgs84ToLv95(lat, lon);
+    const half = [widthM / 2, (widthM / 2) * (px[1] / px[0])];
+    const box = [e - half[0], n - half[1], e + half[0], n + half[1]].map((v) => Math.round(v));
+    const [b, o] = await Promise.all([base ? getMap(base, box, px) : null, overlay ? getMap(overlay, box, px) : null]);
+    if (!b && !o) return null;
+    try {
+      const layersOn = [];
+      if (o) {
+        // 70 % of the theme layer's own transparency.
+        const faded = await sharp(o).ensureAlpha().resize(px[0], px[1], { fit: 'fill' }).linear([1, 1, 1, 0.7], [0, 0, 0, 0]).png().toBuffer();
+        layersOn.push({ input: faded });
+      }
+      const [cx, cy] = [px[0] / 2, px[1] / 2];
+      layersOn.push({ input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${px[0]}" height="${px[1]}">
+        <circle cx="${cx}" cy="${cy}" r="13" fill="none" stroke="#fff" stroke-width="7"/>
+        <circle cx="${cx}" cy="${cy}" r="13" fill="none" stroke="#c0392b" stroke-width="4"/>
+        <circle cx="${cx}" cy="${cy}" r="3.5" fill="#c0392b"/></svg>`) });
+      const ground = b ? sharp(b).resize(px[0], px[1], { fit: 'fill' }) : sharp({ create: { width: px[0], height: px[1], channels: 3, background: '#ffffff' } });
+      return await ground.flatten({ background: '#ffffff' }).composite(layersOn).jpeg({ quality: 82 }).toBuffer();
+    } catch {
+      return null;
+    }
+  }
+
+  app.get('/api/landschaft/bericht.pdf', async (req, res) => {
+    const at = placeOf(req, res);
+    if (!at) return;
+    const name = String(req.query.ort || '').trim().slice(0, 120) || null;
+    const all = await layers.geoadminLayers();
+    const base = BASE_MAPS.map((b) => all.find((l) => l.name === b)).find(Boolean) || null;
+    const km = (m) => `${String(m / 1000).replace('.', ',')} km`;
+    const [r, d, ...pictures] = await Promise.allSettled([
+      report(at.lat, at.lon, all),
+      klima ? klima.dossier(req, at) : Promise.reject(new Error('Klima-Dossier nicht eingerichtet')),
+      mapExcerpt(at.lat, at.lon, PDF_MAPS.overview, base, null),
+      // A theme without a layer gets no map (the Landeskarte alone is the overview).
+      ...THEMES.map((t) => (pick(all, t)[0] ? mapExcerpt(at.lat, at.lon, PDF_MAPS[t.id], base, pick(all, t)[0]) : null)),
+    ]);
+    if (r.status !== 'fulfilled') return res.status(502).json({ error: `Bericht nicht verfügbar: ${r.reason.message}` });
+    const png = (i) => (pictures[i].status === 'fulfilled' ? pictures[i].value : null);
+    const baseName = base ? `${base.title} (${base.name})` : 'ohne Landeskarte';
+    const maps = { overview: png(0) && { png: png(0), caption: `Lage: ${baseName}, Ausschnitt ${km(PDF_MAPS.overview.widthM)} · © swisstopo` } };
+    THEMES.forEach((t, i) => {
+      const layer = pick(all, t)[0];
+      if (layer && png(i + 1)) maps[t.id] = { png: png(i + 1), caption: `Karte: ${layer.title} (${layer.name}) über der Landeskarte, Ausschnitt ${km(PDF_MAPS[t.id].widthM)} · ${layer.attribution || '© geo.admin.ch'}` };
+    });
+    const q = new URLSearchParams({ lat: at.lat, lon: at.lon, ...(name ? { ort: name } : {}) });
+    const pdf = await renderReportPdf({
+      place: { ...at, name }, report: r.value,
+      dossier: d.status === 'fulfilled' ? d.value : null, dossierError: d.status === 'fulfilled' ? d.value.climateError : d.reason.message,
+      maps, url: `${req.protocol}://${req.get('host')}/landschaft.html#bericht?${q}`,
+    });
+    const file = `landschaft-im-wandel-${slug(name || `${at.lat.toFixed(4)}-${at.lon.toFixed(4)}`)}.pdf`;
+    res.set('Content-Disposition', `inline; filename="${file}"`).type('application/pdf').send(pdf);
   });
 
 

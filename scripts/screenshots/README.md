@@ -17,7 +17,7 @@ ohne echte Fotos, ohne Netz und ohne API-Schlüssel reproduzierbar sind.
 | `glacier-demo.js` | Der erfundene Demo-Gletscher: Umrisse 1850, 1973 und 2016, heutiges Eis und See, Gelände, GLAMOS-Längenänderung und ein Archiv-Katalog |
 | `seed-gletscher.js` | Eigener Datensatz für die Gletscher- und Gebirge-Bilder: Inventare, Fotos seit 2017, zwei Archivfotos, eine Alpweide, Schnee- und Eisanteil |
 
-Voraussetzungen: Node.js ≥ 22.5, `ffmpeg`, ImageMagick (`convert`) und Playwright mit Chromium.
+Voraussetzungen: Node.js ≥ 22.5, `ffmpeg`, ImageMagick (`convert`), `pdftoppm` (Poppler, für `landschaft-pdf.jpg`) und Playwright mit Chromium.
 
 ```bash
 npm install --no-save playwright          # Chromium ggf. mit: npx playwright install chromium

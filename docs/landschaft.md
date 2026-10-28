@@ -90,7 +90,16 @@ wählt ebenfalls einen Ort. *Bericht für diesen Ort* öffnet den Bericht, mit d
 ![Bericht für einen Ort: Klima, Gletscher und Wasser, Wald, Landwirtschaft und Boden, Beobachtungen, Quellen](screenshots/landschaft-bericht.jpg)
 
 Der Bericht fasst zusammen, was die Quellen an einem Ort sagen, mit Lage auf der Landeskarte, Höhe und Datum.
-*Drucken / PDF* gibt ihn ohne Navigation aus, schwarz auf weiss.
+*Drucken* gibt ihn aus dem Browser aus, ohne Navigation, schwarz auf weiss.
+
+**PDF-Bericht.** Für Gemeinden und Forstdienste macht der Server denselben Bericht als PDF (A4, festes Layout,
+Manrope und Fraunces wie die App): Kopf mit Ortsname, Höhe und Datum, ein Kartenausschnitt der Lage auf der
+Landeskarte (6 km), dann die Abschnitte wie auf der Seite, jedes Thema mit einem Kartenausschnitt seiner ersten
+Ebene über der Landeskarte (Klima 30 km, Gletscher und Wasser 8 km, Wald und Boden 5 km), am Ende Quellen, Link
+zur Seite und Seitenzahlen. Die Kartenausschnitte holt der Server als WMS von geo.admin.ch (LV95); fehlt eine Karte,
+fehlt nur ihr Bild. Adresse: `/api/landschaft/bericht.pdf?lat=…&lon=…&ort=…`.
+
+![PDF-Bericht: Seite 1 mit Lage und Klima, Seite 3 mit dem Wald und seinem Kartenausschnitt (Demo-Daten)](screenshots/landschaft-pdf.jpg)
 
 | Abschnitt | Inhalt | Quellen |
 |-----------|--------|---------|
@@ -119,7 +128,7 @@ unter [Offene Geodaten](funktionen.md#offene-geodaten-für-gis-und-geoportale).
 ## Technik
 
 - `src/routes/landschaft.js`: `GET /api/landschaft/karten` (Karten durch die Zeit und Ebenen pro Thema, aus der
-  Ebenenliste von geo.admin.ch; die Jahre der Zeitreise und der Luftbilder aus den WMTS-Capabilities, die Jahre der Gletscherinventare) `GET /api/landschaft/suche?q=` (Ortssuche über den SearchServer von geo.admin.ch, Koordinaten direkt) und `GET /api/landschaft/bericht?lat=&lon=` (Identify pro Thema, Gletscher aus den
+  Ebenenliste von geo.admin.ch; die Jahre der Zeitreise und der Luftbilder aus den WMTS-Capabilities, die Jahre der Gletscherinventare) `GET /api/landschaft/bericht.pdf?lat=&lon=&ort=` (der Bericht als PDF mit PDFKit, `src/landschaft-pdf.js`, Kartenausschnitte als WMS), `GET /api/landschaft/suche?q=` (Ortssuche über den SearchServer von geo.admin.ch, Koordinaten direkt) und `GET /api/landschaft/bericht?lat=&lon=` (Identify pro Thema, Gletscher aus den
   Inventaren mit GLAMOS, Fotos, Befunde und Neophyten im Umkreis). Die Ebenenliste und der Identify-Dienst kommen aus
   `src/routes/layers.js` (Panel *Ebenen*).
 - `public/landschaft.html`, `landschaft.js`, `landschaft.css`: Leaflet mit den Kacheln von swisstopo und den WMS von

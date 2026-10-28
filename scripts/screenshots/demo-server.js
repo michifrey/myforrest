@@ -382,7 +382,11 @@ const DEMO_WMS_LAYERS = [
   ['ch.bfs.volkszaehlung-bevoelkerungsstatistik_einwohner', 'Bevölkerung pro Hektare (Demo)'],
   ['ch.bfs.arealstatistik', 'Arealstatistik: Bodennutzung (Demo)'],
   ['ch.are.belastung-personenverkehr-strasse', 'Personenverkehr auf der Strasse (Demo)'],
+  // The Landeskarte as WMS: the ground of the map excerpts in the PDF report of «Landschaft im Wandel».
+  ['ch.swisstopo.pixelkarte-farbe', 'Landeskarte (Demo)'],
 ];
+// The demo Landeskarte: light colours per land cover, contour lines every 50 m.
+const MAP_COLOURS = { wood: [196, 221, 166], grass: [246, 243, 226], land: [246, 243, 226], residential: [232, 214, 208], water: [176, 208, 234], ice: [246, 249, 252], rock: [226, 224, 220] };
 const ZH_LAYERS = [['baumkataster_baumstandorte', 'Baumstandorte (Demo)']];
 // Residents of a hectare cell in the demo village (none in the forest).
 const residents = (lat, lon) => (tiles.classAt(lat, lon) === 'residential' ? 8 + Math.floor(hash(`${Math.floor(lat * 900)}|${Math.floor(lon * 660)}`) * 70) : 0);
@@ -426,13 +430,16 @@ async function demoWms(url) {
   const [x0, y0, x1, y1] = get('BBOX').split(',').map(Number);
   const w = Number(get('WIDTH')); const h = Number(get('HEIGHT'));
   const layer = get('LAYERS');
+  // Web Mercator (the map) or LV95 (the map excerpts of the PDF report).
+  const lv95 = /2056/.test(get('CRS') || '');
   const shift = layer.endsWith('2085_trocken') ? 600 : layer.endsWith('2085_weniger_trocken') ? 350 : 0;
   const R = 6378137;
   const px = Buffer.alloc(w * h * 4);
   for (let j = 0; j < h; j += 2) {
-    const lat = (Math.atan(Math.sinh((y1 - (j / h) * (y1 - y0)) / R)) * 180) / Math.PI;
+    const yM = y1 - (j / h) * (y1 - y0);
     for (let i = 0; i < w; i += 2) {
-      const lon = ((x0 + (i / w) * (x1 - x0)) / R) * 180 / Math.PI;
+      const xM = x0 + (i / w) * (x1 - x0);
+      const [lat, lon] = lv95 ? lv95ToWgs84(xM, yM) : [(Math.atan(Math.sinh(yM / R)) * 180) / Math.PI, (xM / R) * 180 / Math.PI];
       const z = elevation(lat, lon);
       let c;
       let alpha = 170;
@@ -466,6 +473,10 @@ async function demoWms(url) {
         const mpp = (x1 - x0) / w;
         const hit = STREET_TREES.some((t) => Math.hypot((t.lat - lat) * 111320, (t.lon - lon) * 75500) < Math.max(4, mpp * 2.2));
         c = hit ? [40, 120, 50] : null;
+        alpha = 255;
+      } else if (layer.includes('pixelkarte')) {
+        const line = Math.abs(((z % 50) + 50) % 50) < 2.5;
+        c = line ? [196, 160, 120] : MAP_COLOURS[tiles.classAt(lat, lon)] || MAP_COLOURS.grass;
         alpha = 255;
       } else if (layer.includes('eiszeit-lgm')) {
         c = [236, 243, 248];

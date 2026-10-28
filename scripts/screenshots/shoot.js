@@ -127,6 +127,20 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await settle(page, 1200);
     await page.locator('#daten').screenshot({ path: out('landschaft-daten.jpg'), ...jpg });
     await page.close();
+    // The report as a PDF from the server: the first and the third page side by side (needs pdftoppm of poppler).
+    const pdf = path.join(WORK, 'bericht.pdf');
+    fs.writeFileSync(pdf, Buffer.from(await (await fetch(`${BASE}/api/landschaft/bericht.pdf?lat=47.37&lon=8.54&ort=${encodeURIComponent('Zürich (ZH)')}`)).arrayBuffer()));
+    try {
+      execFileSync('pdftoppm', ['-r', '110', '-png', '-f', '1', '-l', '3', pdf, path.join(WORK, 'bericht')]);
+      const sharp = require('sharp');
+      const pages = ['bericht-1.png', 'bericht-3.png'].map((f) => path.join(WORK, f));
+      const { width, height } = await sharp(pages[0]).metadata();
+      await sharp({ create: { width: width * 2 + 72, height: height + 48, channels: 3, background: '#d9d2bd' } })
+        .composite(pages.map((p, i) => ({ input: p, left: 24 + i * (width + 24), top: 24 })))
+        .jpeg({ quality: 82 }).toFile(out('landschaft-pdf.jpg'));
+    } catch (err) {
+      console.log('landschaft-pdf.jpg übersprungen (pdftoppm fehlt?):', err.message);
+    }
   }
 
   if (want('map')) {

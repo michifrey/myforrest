@@ -143,12 +143,12 @@ Als Nächstes:
 
 - **Mit dem echten Dienst prüfen**: die Ebenen der Karten und Themen gegen die aktuelle Ebenenliste von geo.admin.ch
   prüfen (gebaut nach den Kennungen von swisstopo und BAFU, getestet mit einer nachgebauten Liste) und die
-  Identify-Antworten der Themenkarten im Bericht lesbar beschriften (Codes der Höhenstufen und der Arealstatistik).
+  Identify-Antworten der Themenkarten im Bericht lesbar beschriften (Codes der Höhenstufen und der Arealstatistik);
+  die Kartenausschnitte des PDF-Berichts mit den echten WMS-Karten ansehen (Massstab, Lesbarkeit der Ebenen).
 - **Wasser und Landwirtschaft vertiefen**: Abflüsse aus Hydro-CH2018, Bodenfeuchte und Trockenheit aus den Messnetzen,
   Bewässerung.
 - **Ortssuche mit dem echten Dienst prüfen** (gebaut nach dem Antwortformat des SearchServers von geo.admin.ch,
   getestet mit nachgebauten Antworten).
-- **Bericht als PDF auf dem Server** (für Gemeinden und Forstdienste), mit festem Layout und Kartenausschnitten pro Thema.
 
 ## Bereits umgesetzt
 
@@ -176,6 +176,7 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
   OSM, Landeskarte und Luftbild; Panel *Ebenen* mit Wald und Waldbrand, Bevölkerung, Bodennutzung, Verkehr von
   geo.admin.ch, Baumkataster Zürich, SITG Genf, EFFIS und NASA FIRMS, mit *Was ist hier?*; Baumkataster Zürich auch
   als Baumart-Vorschlag
+- Landschaft im Wandel: Bericht als PDF vom Server (A4, festes Layout, Kartenausschnitte der Lage und pro Thema)
 - Landschaft im Wandel: Ortssuche nach Gemeinde, Ort, Adresse oder Koordinaten (WGS84, LV95), Ortsname im Bericht und im Link
 - Landschaft im Wandel: Gletscherumrisse der Inventare als Ebene über allen Karten, Fläche pro Inventar im Bericht
 - Landschaft im Wandel: zwei Jahre nebeneinander (Zeitreise und Luftbilder), mit verschiebbarer Linie und beiden Jahren im Link
