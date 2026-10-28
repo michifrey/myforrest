@@ -354,6 +354,7 @@
       start: new Date(`${$('tour-sun-date').value}T${$('tour-sun-time').value || '09:00'}`).getTime(),
       speedKmh: Math.max(1, Math.min(60, Number($('tour-sun-speed').value) || 4.5)),
       recorded,
+      slope: $('tour-sun-slope').checked,
     };
   }
 
@@ -399,6 +400,8 @@
       const samples = RouteSun.sample(pts);
       const src = await sunSamplers(samples, progress);
       if (my !== sunToken) return;
+      // Heights along the route, for the pace on slopes.
+      for (const s of samples) s.z = src.ground(s.lat, s.lon);
       // The horizons in slices, so the page stays responsive.
       const hz = [];
       for (let i = 0; i < samples.length; i += 40) {
@@ -435,7 +438,7 @@
         + (sum.schatten ? ` (Gelände ${pct(f('gelaende'))}, Bäume und Häuser ${pct(f('baeume'))})` : '')
         + (sum.nacht ? ` · ${pct(f('nacht'))} nach Sonnenuntergang` : '')]),
       bar, strip,
-      el('p', { class: 'muted small', text: `${opts.recorded ? 'Wie aufgezeichnet' : `Start ${clockOf(startT)}, ${opts.speedKmh.toLocaleString('de-CH')} km/h`}, Ziel um ${clockOf(endT)}` }),
+      el('p', { class: 'muted small', text: `${opts.recorded ? 'Wie aufgezeichnet' : `Start ${clockOf(startT)}, ${opts.speedKmh.toLocaleString('de-CH')} km/h${opts.slope ? ' in der Ebene, nach Steigung' : ''}`}, Ziel um ${clockOf(endT)}` }),
       el('ul', { class: 'sun-legend small' }, ['sonne', 'gelaende', 'baeume', 'nacht'].map((k) => el('li', {}, [el('i', { style: `background: ${SUN_COLORS[k]}` }), SUN_LABEL[k]]))),
     ];
     if (!opts.recorded) {
@@ -445,7 +448,7 @@
       const from = Number.isFinite(t.sunrise) ? t.sunrise : day.getTime();
       const to = Number.isFinite(t.sunset) ? t.sunset : day.getTime() + 86400000;
       const q = 15 * 60000;
-      const st = RouteSun.starts(samples, hz, { from: Math.ceil(from / q) * q, to, speedKmh: opts.speedKmh });
+      const st = RouteSun.starts(samples, hz, { from: Math.ceil(from / q) * q, to, speedKmh: opts.speedKmh, slope: opts.slope });
       if (st.list.length > 1) {
         const W = 300; const H = 48;
         const x = (i) => (i / (st.list.length - 1)) * W;
@@ -1177,6 +1180,9 @@
             el('label', { class: 'small' }, ['Start ', el('input', { type: 'time', id: 'tour-sun-time', step: '900' })]),
             el('label', { class: 'small' }, ['km/h ', el('input', { type: 'number', id: 'tour-sun-speed', min: '1', max: '60', step: '0.5', value: '4.5' })]),
           ]),
+          el('label', { class: 'toggle small', title: 'Bergauf langsamer, leicht bergab am schnellsten (Wanderfunktion nach Tobler); km/h gilt dann für die Ebene' }, [
+            el('input', { type: 'checkbox', id: 'tour-sun-slope', checked: '' }), ' Tempo nach Steigung',
+          ]),
           el('label', { class: 'toggle small', id: 'tour-sun-recorded-wrap', hidden: '' }, [el('input', { type: 'checkbox', id: 'tour-sun-recorded' }), ' Zeiten der Aufzeichnung nehmen']),
           el('button', { type: 'button', id: 'tour-sun-go', class: 'secondary wide', text: 'Sonne und Schatten berechnen' }),
           el('div', { id: 'tour-sun-result', 'aria-live': 'polite' }),
@@ -1346,7 +1352,7 @@
   $('tour-name').addEventListener('input', (e) => { T.route.name = e.target.value; });
   $('tour-sun-go').addEventListener('click', () => (T.sun ? renderSun() : computeSun()));
   // A new time or pace only needs the sun positions again; the horizons stay.
-  for (const id of ['tour-sun-date', 'tour-sun-time', 'tour-sun-speed', 'tour-sun-recorded']) {
+  for (const id of ['tour-sun-date', 'tour-sun-time', 'tour-sun-speed', 'tour-sun-recorded', 'tour-sun-slope']) {
     $(id).addEventListener('change', () => {
       if (id === 'tour-sun-speed') $(id).dataset.touched = '1';
       if (T.sun) renderSun();

@@ -337,12 +337,36 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.waitForSelector('.layer-popup dl', { timeout: 30000 });
     await settle(page, 1200);
     await page.screenshot({ path: out('ebenen.jpg'), ...jpg });
-    await page.evaluate(() => { document.querySelectorAll('#layers-active button').forEach((b) => b.click()); map.closePopup(); });
+    await page.evaluate(() => { document.querySelectorAll('#layers-active button.link').forEach((b) => b.click()); map.closePopup(); });
     for (const title of ['Arealstatistik: Bodennutzung (Demo)', 'Baumstandorte (Demo)']) await page.evaluate((t) => window.Layers.add(t), title);
     await settle(page, 3500);
     await page.screenshot({ path: out('ebenen-nutzung.jpg'), ...jpg });
-    await page.evaluate(() => document.querySelectorAll('#layers-active button').forEach((b) => b.click()));
+    await page.evaluate(() => document.querySelectorAll('#layers-active button.link').forEach((b) => b.click()));
     await page.close();
+    // A link in the syntax of map.geo.admin.ch: place, zoom and layers (one hidden, one at 60 %).
+    const link = await ctx.newPage();
+    await link.goto(`${BASE}/?center=2685400,1247600&z=9.4&layers=ch.bafu.gefahren-waldbrand_warnung,,0.6;ch.bfs.volkszaehlung-bevoelkerungsstatistik_einwohner;ch.bfs.arealstatistik,f;ch.bav.haltestellen-oev&bgLayer=ch.swisstopo.pixelkarte-farbe`);
+    await settle(link, 3000);
+    await link.evaluate(() => document.querySelector('#explore').scrollIntoView());
+    await settle(link, 1500);
+    await link.click('#layers-toggle');
+    await link.waitForSelector('#layers-active li', { timeout: 60000 });
+    await settle(link, 3500);
+    await link.screenshot({ path: out('ebenen-link.jpg'), ...jpg });
+    // The location popup: a right click on the map.
+    await link.click('#layers-toggle');
+    await link.mouse.click(600, 640, { button: 'right' });
+    await link.waitForFunction(() => /m ü\. M\./.test(document.querySelector('.where-popup')?.textContent || ''), null, { timeout: 30000 });
+    await settle(link, 800);
+    await link.screenshot({ path: out('koordinaten.jpg'), ...jpg });
+    await link.evaluate(() => map.closePopup());
+    // Measuring: a clearing as an area (four points, then the first one again).
+    await link.click('#measure-toggle');
+    for (const [x, y] of [[560, 330], [760, 300], [800, 470], [600, 520]]) { await link.mouse.click(x, y); await settle(link, 250); }
+    await link.mouse.click(560, 330);
+    await settle(link, 800);
+    await link.screenshot({ path: out('messen.jpg'), ...jpg });
+    await link.close();
   }
 
   if (want('gebaeude3d')) {

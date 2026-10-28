@@ -254,6 +254,10 @@ test('dossier API: observations of the spots in the region, per year and spot', 
     photo(b, '2022-07-01T10:00:00Z', { irregularities: [{ type: 'trockenheit', severity: 'hinweis' }] }); // a mere note does not count
     photo(b, '2023-06-01T10:00:00Z', { irregularities: [] });
     photo(far, '2022-08-01T10:00:00Z', { irregularities: [drought] });
+    // Bark beetle photographed at spot a twice in 2023: one spot.
+    for (const iso of ['2023-07-01T10:00:00Z', '2023-07-02T10:00:00Z']) {
+      db.prepare("INSERT INTO photo_tags (photo_id, tag) VALUES (?, 'borkenkaefer')").run(photo(a, iso, {}).lastInsertRowid);
+    }
     db.close();
     const d = await (await fetch(`${base}/api/klima?lat=47.37&lon=8.55&radius=5`)).json();
     assert.equal(d.spots, 2);
@@ -261,7 +265,10 @@ test('dossier API: observations of the spots in the region, per year and spot', 
       photos: 3, spots: 2, visited: 2, notes: { trockenheit: 1, waerme: 1 }, heatSpots: 1, neophytes: 0,
       storms: [{ date: '2022-02-17', gust: 118, windthrow: true }],
     });
-    assert.equal(d.observations['2023'].visited, 1);
+    assert.equal(d.observations['2023'].visited, 2);
+    assert.equal(d.observations['2023'].beetleSpots, 1, 'bark beetle: spots per year');
+    assert.equal(d.observations['2022'].beetleSpots, undefined);
+    assert.ok(d.years.some((r) => Number.isFinite(r.beetleDD)), 'the warmth for the generations per year');
     const heat = d.synthesis.find((s) => s.title === 'Hitzesommer in den Fotos');
     assert.match(heat.text, /2022 \(Sommer .*0 % Regen\) zeigten die Fotos an 1 von 2 besuchten Spots/);
   });
@@ -406,7 +413,29 @@ test('dossier API: scenarios and the meaning for the forest, with the trees of t
     db.prepare(`INSERT INTO photos (spot_id, file, taken_at, lat, lon, location_source, created_at) VALUES (?, 'a.jpg', ?, 47.37, 8.55, 'exif', 0)`).run(id, Date.UTC(2024, 6, 1));
     db.prepare("INSERT INTO spot_species (spot_id, scientific_name, source, created_at) VALUES (?, 'Picea abies', 'manual', 0)").run(id);
     db.close();
+    // Without cells of the climate map there are no analogues yet.
+    const before = await (await fetch(`${base}/api/klima?spot=${id}`)).json();
+    assert.deepEqual([before.analogs.cells, before.analogs.levels.every((l) => !l.places.length)], [0, true]);
+    // Cells of the climate map (as /api/klima/karte stores them), one per warming level that fits and some that do not.
+    const target = (lv) => before.levels.find((l) => l.level === lv).indicators.find((i) => i.key === 'tmean').value;
+    const lastYear = new Date(Date.now() - 7 * 86400000).getUTCFullYear() - 1;
+    const db2 = new DatabaseSync(path.join(dataDir, 'myforrest.db'));
+    const cell = (lat, lon, tmean) => db2.prepare('INSERT INTO weather_cache (key, json, fetched_at) VALUES (?, ?, 0)')
+      .run(`klima:cell:v1:${lat.toFixed(3)},${lon.toFixed(3)}:${lastYear}`, JSON.stringify({ lat, lon, elevation: 300, tmean, hotDays: 12 }));
+    cell(46.25, 8.95, target('GWL2.0') + 0.1); // far, fits +2 °C
+    cell(47.05, 8.25, target('GWL2.0') - 0.2); // nearer, fits +2 °C a bit less (other 0,1 °C step)
+    cell(46.95, 8.15, target('GWL3.0'));
+    cell(47.37, 8.56, target('GWL2.0')); // too close (< 5 km)
+    cell(47.0, 8.0, target('GWL2.0') + 3); // too warm
+    db2.prepare('INSERT INTO weather_cache (key, json, fetched_at) VALUES (?, ?, 0)').run('klima:cell:v1:47.150,8.350:1999', JSON.stringify({ lat: 47.15, lon: 8.35, tmean: target('GWL2.0') }));
+    db2.close();
     const d = await (await fetch(`${base}/api/klima?spot=${id}`)).json();
+    assert.equal(d.analogs.cells, 5, 'only the cells of the current year');
+    const two = d.analogs.levels.find((l) => l.level === 'GWL2.0');
+    assert.equal(two.target, target('GWL2.0'));
+    assert.deepEqual(two.places.map((p) => [p.lat, p.lon]), [[46.25, 8.95], [47.05, 8.25]], 'best match first, then by distance');
+    assert.ok(two.places[0].distanceKm > 100 && two.places[0].hotDays === 12);
+    assert.deepEqual(d.analogs.levels.find((l) => l.level === 'GWL3.0').places.map((p) => p.lat), [46.95]);
     assert.equal(d.centre.elevation, 520);
     assert.deepEqual(d.levels.map((l) => l.level), ['GWL1.5', 'GWL2.0', 'GWL3.0']);
     assert.deepEqual(d.species, [{ scientificName: 'Picea abies', name: 'Fichte', drought: 'hoch' }]);

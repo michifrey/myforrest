@@ -35,9 +35,11 @@ test('GeoParquet: typed nullable columns, WKB points and polygons, geo metadata,
     })),
   };
   for (const compression of ['gzip', 'none']) {
-    const { rows, geo, meta } = await readParquet(geoParquet(layer, { compression }));
-    assert.equal(rows.length, 20);
-    assert.deepEqual(meta.schema.map((s) => s.name), ['schema', 'name', 'n', 'x', 'geometry']);
+    const { rows: sorted, geo, meta } = await readParquet(geoParquet(layer, { compression }));
+    assert.equal(sorted.length, 20);
+    assert.deepEqual(meta.schema.map((s) => s.name), ['schema', 'name', 'n', 'x', 'geometry', 'bbox', 'xmin', 'ymin', 'xmax', 'ymax']);
+    // Rows come sorted by place; here back in the order they were written.
+    const rows = [...sorted].sort((a, b) => a.x - b.x);
     assert.equal(rows[0].name, null);
     assert.equal(rows[1].name, 'Föhre 1');
     assert.equal(rows[5].n, null);
@@ -65,6 +67,33 @@ test('GeoParquet: typed nullable columns, WKB points and polygons, geo metadata,
   }));
   assert.deepEqual(poly.geo.columns.geometry.geometry_types, ['MultiPolygon']);
   assert.deepEqual(poly.rows[0].geometry, { type: 'MultiPolygon', coordinates: [[[[0, 0], [1, 0], [1, 1], [0, 0]]]] });
+});
+
+test('GeoParquet: rows sorted by place in row groups, a bbox column as covering with min/max per group', async () => {
+  // A 10 × 10 grid of points; ten row groups of ten.
+  const features = Array.from({ length: 100 }, (_, i) => ({
+    geometry: { type: 'Point', coordinates: [8 + (i % 10) / 10, 47 + Math.floor(i / 10) / 10] },
+    properties: { n: i },
+  }));
+  const { rows, geo, meta } = await readParquet(geoParquet({ geometryType: 'POINT', fields: { n: 'INTEGER' }, features }, { rowGroupSize: 10 }));
+  assert.equal(rows.length, 100);
+  assert.equal(meta.row_groups.length, 10);
+  assert.deepEqual(geo.columns.geometry.covering, { bbox: { xmin: ['bbox', 'xmin'], ymin: ['bbox', 'ymin'], xmax: ['bbox', 'xmax'], ymax: ['bbox', 'ymax'] } });
+  const p = rows.find((r) => r.n === 37n);
+  assert.deepEqual(p.bbox, { xmin: 8.7, ymin: 47.3, xmax: 8.7, ymax: 47.3 });
+  // Each row group covers a small part of the grid: on a Hilbert curve ten neighbours span at most 4 × 4 cells.
+  for (const g of meta.row_groups) {
+    const stat = (k) => g.columns.find((c) => c.meta_data.path_in_schema.join('.') === `bbox.${k}`).meta_data.statistics;
+    assert.ok(stat('xmax').max_value - stat('xmin').min_value <= 0.4 + 1e-9, 'compact in x');
+    assert.ok(stat('ymax').max_value - stat('ymin').min_value <= 0.4 + 1e-9, 'compact in y');
+  }
+  // The statistics say which groups a query box needs: the corner 8.0–8.1 / 47.0–47.1 lies in one group only.
+  const hits = meta.row_groups.filter((g) => {
+    const s = (k) => g.columns.find((c) => c.meta_data.path_in_schema.join('.') === `bbox.${k}`).meta_data.statistics;
+    return s('xmin').min_value <= 8.1 && s('xmax').max_value >= 8.0 && s('ymin').min_value <= 47.1 && s('ymax').max_value >= 47.0;
+  });
+  assert.equal(hits.length, 1);
+  assert.throws(() => geoParquet({ geometryType: 'POINT', fields: { bbox: 'TEXT' }, features: [] }), /reserviert/);
 });
 
 function seed(db) {

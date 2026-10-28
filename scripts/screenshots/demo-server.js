@@ -584,11 +584,14 @@ const app = createApp({
   // The base map «MyForrest» from demo vector tiles, and the panel «Ebenen» from the demo WMS and identify.
   basemapStyle: `http://localhost:${Number(process.env.PORT) || 3123}/demo-vt/style.json`,
   basemapAttribution: 'Demo-Vektorkacheln im Format von OpenMapTiles',
-  layersFetch: async (url, opts) => (url.startsWith('http://demo.invalid/identify') ? demoIdentify(url)
+  layersFetch: async (url, opts) => (url.startsWith('http://demo.invalid/height') ? demoHeight(url)
+    : url.startsWith('http://demo.invalid/identify') ? demoIdentify(url)
     : url.includes('/demo-wmts/') || url.includes('/demo-search/') ? fetch(url, opts) : demoWms(url)),
   layersOptions: {
     geoadminUrl: `http://localhost:${Number(process.env.PORT) || 3123}/demo-wms`,
     identifyUrl: 'http://demo.invalid/identify',
+    // Heights of the location popup from the demo terrain, answered like the height service of geo.admin.ch.
+    heightUrl: 'http://demo.invalid/height',
     regional: [{ url: `http://localhost:${Number(process.env.PORT) || 3123}/demo-wms?src=zh`, group: 'Bäume Stadt Zürich', bbox: [8.44, 47.32, 8.63, 47.44], attribution: 'Demo im Format des Baumkatasters der Stadt Zürich' }],
   },
   // Landschaft im Wandel: the years of the «Zeitreise» from a demo WMTS capabilities document.
@@ -624,6 +627,12 @@ app.get('/demo-wmts/WMTSCapabilities.xml', (req, res) => {
 <ResourceURL format="image/jpeg" resourceType="tile" template="https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage-product/default/{Time}/{TileMatrixSet}/{TileMatrix}/{TileCol}/{TileRow}.jpeg"/></Layer>
 </Contents></Capabilities>`);
 });
+/** The height service of geo.admin.ch for the demo terrain: LV95 easting/northing → { height }. */
+function demoHeight(url) {
+  const q = new URL(url).searchParams;
+  const [lat, lon] = lv95ToWgs84(Number(q.get('easting')), Number(q.get('northing')));
+  return Response.json({ height: elevation(lat, lon).toFixed(1) });
+}
 // The search of geo.admin.ch (SearchServer) with a few places around the demo forest, in its answer format.
 const DEMO_PLACES = [
   ['gg25', '<b>Zürich</b> (ZH)', 47.3769, 8.5417],

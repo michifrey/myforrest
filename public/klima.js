@@ -24,6 +24,7 @@
   const rainColour = (pct) => RAIN[Math.max(0, Math.min(7, Math.floor((pct - 40) / 20)))];
   const KIND = { klima: 'Klima', beobachtung: 'Fotos', satellit: 'Satellit', phaenologie: 'Phänologie', zukunft: 'Ausblick' };
   const RADII = [5, 15, 30];
+  const BEETLE_DD = 557; // degree days for one bark-beetle generation (PHENIPS, as src/klima.js)
   const HEAT_NOTES = ['trockenheit', 'waerme', 'fruehe_verfaerbung', 'borkenkaefer_risiko', 'nadelverfaerbung'];
   const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 
@@ -160,6 +161,12 @@
         const pct = (v / nP) * 100;
         return { fill: rainColour(pct), tip: `Sommerregen ${y}: ${fmt(v)} mm (${fmt(pct)} %)` };
       } },
+      { label: 'Käfergenerationen', note: 'Borkenkäfer, aus der Wärme des Jahres', cell: (y) => {
+        const dd = byYear.get(y)?.beetleDD; if (!Number.isFinite(dd)) return null;
+        const g = dd / BEETLE_DD;
+        // Brown, the darker the more generations (1 … 3).
+        return { fill: `rgb(139 90 43 / ${Math.max(0.1, Math.min(1, (g - 0.5) / 2.5)).toFixed(2)})`, tip: `Borkenkäfer ${y}: Wärme für ${fmt(g, 1)} Generationen (${fmt(dd)} °C-Tage über 8,3 °C, Apr–Sep)` };
+      } },
       { label: 'Fotos', obs: true, cell: (y) => (obs[y]?.photos ? { text: String(obs[y].photos), cls: 'k-n', tip: `${obs[y].photos} Fotos, ${obs[y].spots || 0} neue Spots` } : null) },
       { label: 'Trockenheit & Hitze', note: 'Hinweise der Fotos', obs: true, cell: (y) => {
         const n = heat(obs[y]); return n ? { text: String(n), cls: 'k-n heat', tip: Object.entries(obs[y].notes).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(', ') } : null;
@@ -176,6 +183,7 @@
       { label: 'Verfärbung Buche', note: 'Stationen der Region', obs: true, cell: (y) => pheno(y, 'colour', 'Blattverfärbung') },
       { label: 'Schneeschmelze', note: 'Gebirge-Spots', obs: true, cell: (y) => (Number.isFinite(obs[y]?.meltMonth) ? { text: MONTHS[Math.round(obs[y].meltMonth) - 1], cls: 'k-n snow', tip: `Aper ${y} im ${MONTHS[Math.round(obs[y].meltMonth) - 1]}` } : null) },
       { label: 'Eis im Spätsommer', note: 'Gletscher-Spots', obs: true, cell: (y) => (Number.isFinite(obs[y]?.iceShare) ? { text: `${Math.round(obs[y].iceShare * 100)}`, cls: 'k-n ice', tip: `Schnee und Eis ${y}: ${Math.round(obs[y].iceShare * 100)} %` } : null) },
+      { label: 'Borkenkäfer', note: 'Spots mit Befall', obs: true, cell: (y) => (obs[y]?.beetleSpots ? { text: String(obs[y].beetleSpots), cls: 'k-n beetle-seen', tip: `Borkenkäfer ${y}: an ${obs[y].beetleSpots} Spot${obs[y].beetleSpots === 1 ? '' : 's'} fotografiert${Number.isFinite(byYear.get(y)?.beetleDD) ? `, Wärme für ${fmt(byYear.get(y).beetleDD / BEETLE_DD, 1)} Generationen` : ''}` } : null) },
       { label: 'Neophyten', note: 'Funde', obs: true, cell: (y) => (obs[y]?.neophytes ? { text: String(obs[y].neophytes), cls: 'k-n neo', tip: `${obs[y].neophytes} Funde invasiver Neophyten` } : null) },
     ].filter((l) => cols.some((y) => l.cell(y)));
     const grid = el('div', { class: 'k-timeline', style: `--cols:${cols.length}`, role: 'table', 'aria-label': 'Zeitachse: Klima und Beobachtungen der Region' });
@@ -299,12 +307,35 @@
           row('Frosttage', get(l, 'frostDays'), ''),
           row('Tage mit Neuschnee', get(l, 'snowDays')?.normal >= 1 ? get(l, 'snowDays') : null, ''),
           row('Sommerregen', get(l, 'summerP'), '', 0, true),
-          dd ? el('div', {}, [el('dt', { text: 'Käfergenerationen' }), el('dd', { text: `${fmt(dd.normal / 557, 1)} → ${fmt(dd.value / 557, 1)}` })]) : '',
+          dd ? el('div', {}, [el('dt', { text: 'Käfergenerationen' }), el('dd', { text: `${fmt(dd.normal / BEETLE_DD, 1)} → ${fmt(dd.value / BEETLE_DD, 1)}` })]) : '',
           Number.isFinite(l.shiftM) ? el('div', {}, [el('dt', { text: 'Klima wie heute' }), el('dd', { text: `${fmt(l.shiftM)} m tiefer` })]) : '',
         ]),
         el('p', { class: 'k-src', text: l.source === 'CH2025' ? 'Quelle: CH2025' : `aus den Modellen skaliert (Faktor ${fmt(l.factor, 2)})` }),
       ]);
     }));
+  }
+
+  /**
+   * Climate analogues: where the climate map already finds today the mean temperature this place reaches at each
+   * level. A place opens its own dossier.
+   */
+  function analogList(a) {
+    if (!a) return '';
+    const head = el('h4', { text: 'Wo es heute schon so warm ist' });
+    if (!a.cells) return el('div', { class: 'k-analogs' }, [head, el('p', { class: 'muted small', text: 'Noch keine Zellen der Klimakarte berechnet. Die Klimakarte füllt sie beim Ansehen; danach zeigt das Dossier hier Orte, die heute schon das künftige Klima dieses Orts haben.' })]);
+    const coords = (p) => `${fmt(p.lat, 2)}° N, ${fmt(p.lon, 2)}° O`;
+    return el('div', { class: 'k-analogs' }, [
+      head,
+      el('p', { class: 'muted small', text: `Orte der Klimakarte (${a.cells} berechnete Zellen), deren Jahresmittel 1991–2020 dem künftigen Jahresmittel hier entspricht (±0,4 °C), die nächsten zuerst. Nur die Temperatur zählt; Regen, Boden und Exposition können anders sein.` }),
+      el('ul', {}, a.levels.map((l) => el('li', {}, [
+        el('strong', { text: `${l.title}${Number.isFinite(l.target) ? ` (${fmt(l.target, 1)} °C)` : ''}: ` }),
+        ...(l.places.length ? l.places.flatMap((p, i) => [i ? ', ' : '', el('button', {
+          type: 'button', class: 'link', title: 'Klima-Dossier dieses Orts öffnen',
+          text: `${coords(p)}${Number.isFinite(p.elevation) ? `, ${fmt(p.elevation)} m` : ''} (${fmt(p.distanceKm)} km)`,
+          onclick: () => open({ lat: p.lat, lon: p.lon }, current?.radius),
+        })]) : ['in den berechneten Zellen noch kein Ort']),
+      ]))),
+    ]);
   }
 
   const SEVERITY = { gering: 'gering', mittel: 'mittel', hoch: 'hoch', chance: 'Chance' };
@@ -419,7 +450,7 @@
       parts.push(section('k-levels', 'Drei Szenarien für die Region',
         'Die Klimaszenarien der Schweiz (CH2025) rechnen mit Stufen der globalen Erwärmung gegenüber 1850–1900. ' +
         (d.levels[0].source === 'CH2025' ? 'Die Zahlen stammen aus CH2025.' : 'Ohne geladene CH2025-Daten skaliert MyForrest die Änderung der Klimamodelle mit der globalen Erwärmung (Pattern Scaling); 2031–2050 entsprechen auf dem hohen Emissionspfad etwa +2 °C.'),
-        levelCards(d.levels)));
+        levelCards(d.levels), analogList(d.analogs)));
     }
     if (d.forest?.length) {
       parts.push(section('k-forest', 'Was das für den Wald bedeutet',

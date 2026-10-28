@@ -70,6 +70,8 @@ h1, h2, h3 { margin: 0; }
 .ln-glacier-legend button::before { content: ''; width: 12px; height: 12px; border-radius: 3px; background: var(--swatch); }
 .ln-glacier-legend button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
 
+.ln-geoadmin { display: inline-block; margin-top: 8px; font-weight: 700; }
+
 /* The «Zeitreise»: year, play button, slider. */
 .ln-zeit { margin: 8px 0 4px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
 .ln-zeit-row { display: flex; align-items: center; gap: 12px; }

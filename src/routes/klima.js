@@ -42,6 +42,9 @@ const FAILED_RETRY = 10 * 60000;
 const CELL = 0.1;
 const MODEL_CELL = 0.5;
 const MAX_CELLS = 80;
+// Climate analogues: how close the mean temperature must be (°C), and how far away a cell must at least lie (km).
+const ANALOG_TOLERANCE = 0.4;
+const ANALOG_MIN_KM = 5;
 const DEFAULT_MAP_MODELS = 3; // the first models of KLIMA_MODELS; fewer requests per cell
 // Official maps from geo.admin.ch (WMS): layers found in the capabilities by name.
 const DEFAULT_WMS = 'https://wms.geo.admin.ch/';
@@ -297,6 +300,16 @@ module.exports = function registerKlima(app, {
       for (const e of storms.values()) {
         of(Number(e.date.slice(0, 4))).storms.push({ date: e.date, gust: e.gust, windthrow: windthrow.has(e.date) });
       }
+      // Bark beetle: spots with a photo tagged «borkenkaefer» per year (next to the generations the warmth allowed).
+      const hasTags = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'photo_tags'").get();
+      if (hasTags) {
+        for (const r of db.prepare(`SELECT p.taken_at, p.spot_id FROM photo_tags t JOIN photos p ON p.id = t.photo_id
+          WHERE t.tag = 'borkenkaefer' AND p.spot_id IN (${marks}) AND ${visible(req, 'p')} AND p.taken_at > 0`).all(...ids)) {
+          const y = yearOfMs(r.taken_at);
+          (of(y).beetleSet ||= new Set()).add(r.spot_id);
+        }
+        for (const o of Object.values(obs)) if (o.beetleSet) { o.beetleSpots = o.beetleSet.size; delete o.beetleSet; }
+      }
       // Neophyte finds (one per photo and species).
       for (const r of db.prepare(`SELECT p.taken_at FROM identifications i JOIN photos p ON p.id = i.photo_id
         WHERE p.spot_id IN (${marks}) AND i.neophyte IS NOT NULL AND ${visible(req, 'p')}`).all(...ids)) {
@@ -381,6 +394,34 @@ module.exports = function registerKlima(app, {
   });
 
   /**
+   * Climate analogues: per warming level the cells of the climate map (those computed so far) whose mean
+   * temperature 1991–2020 is what this place reaches at that level, nearest match first, at least ANALOG_MIN_KM away.
+   * { cells, levels: [{ level, title, target, places: [{ lat, lon, elevation, tmean, hotDays, distanceKm }] }] }
+   * or null without levels.
+   */
+  const cellsOfYear = db.prepare("SELECT json FROM weather_cache WHERE key LIKE 'klima:cell:v1:%' AND key LIKE ?");
+  function analogsFor(at, levels) {
+    if (!levels?.length) return null;
+    const cells = cellsOfYear.all(`%:${lastYear()}`).map((r) => JSON.parse(r.json)).filter((c) => Number.isFinite(c.tmean));
+    const km = (c) => Math.round(Math.hypot((c.lat - at.lat) * 111.32, (c.lon - at.lon) * 111.32 * Math.cos((at.lat * Math.PI) / 180)));
+    return {
+      cells: cells.length,
+      levels: levels.map((l) => {
+        const t = l.indicators.find((i) => i.key === 'tmean');
+        const target = t && Number.isFinite(t.value) ? t.value : null;
+        const places = target === null ? [] : cells
+          .map((c) => ({ c, diff: Math.abs(c.tmean - target), distanceKm: km(c) }))
+          .filter((x) => x.diff <= ANALOG_TOLERANCE && x.distanceKm >= ANALOG_MIN_KM)
+          // Within 0,1 °C a near place beats a slightly better match far away.
+          .sort((a, b) => Math.round(a.diff * 10) - Math.round(b.diff * 10) || a.distanceKm - b.distanceKm)
+          .slice(0, 3)
+          .map(({ c, distanceKm }) => ({ lat: c.lat, lon: c.lon, elevation: c.elevation, tmean: c.tmean, hotDays: c.hotDays, distanceKm }));
+        return { level: l.level, title: l.title, target, places };
+      }),
+    };
+  }
+
+  /**
    * The climate dossier of a place (or a spot): climate then and now, scenarios, what they mean for the forest, the
    * spots and observations in the region. Also used by the PDF report of «Landschaft im Wandel».
    */
@@ -415,6 +456,7 @@ module.exports = function registerKlima(app, {
     const levels = klima.scenarioLevels(projection, ch2025Of(scenarios));
     // For a spot its own trees, else those of the spots in the region.
     const species = speciesOf(spotId ? [{ id: spotId }] : spots);
+    const analogs = analogsFor(at, levels);
     return {
       centre: { lat: at.lat, lon: at.lon, elevation: elev },
       spot: spotId,
@@ -431,6 +473,7 @@ module.exports = function registerKlima(app, {
       levels,
       species: species.map((t) => ({ scientificName: t.sci, name: t.de, drought: t.drought })),
       forest: klima.forestImpacts({ elevation: elev, levels, species }),
+      analogs,
       observations: obs,
       phenoStations: pheno,
       synthesis: klima.synthesize({ climate, rows, obs, projection, station }),

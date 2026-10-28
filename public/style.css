@@ -2021,6 +2021,10 @@ html.klima-open { overflow: hidden; }
 .k-n.pheno.late { color: var(--damage); font-weight: 600; }
 .k-n.snow, .k-n.ice { color: var(--ice); }
 .k-n.neo { color: var(--neo); }
+.k-n.beetle-seen { color: #8b5a2b; }
+.k-analogs { margin-top: 1rem; }
+.k-analogs ul { margin: 0.4rem 0 0; padding-left: 1.1rem; display: grid; gap: 0.3rem; }
+.k-analogs button.link { padding: 0 0.1rem; font-size: inherit; color: var(--accent); }
 .k-divider { grid-column: 1 / -1; margin: 0.6rem 0 0.2rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); border-top: 1px dashed var(--border); padding-top: 0.5rem; }
 .k-synth { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr)); gap: 0.9rem; }
 .k-synth li { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: var(--radius); padding: 0.8rem 1rem; }
@@ -2136,3 +2140,31 @@ html.basemap-vector .leaflet-tile-pane { filter: none; }
 .layer-popup dd { margin: 0; }
 .pill-btn.layers-btn svg { stroke: var(--accent); }
 .pill-btn.layers-btn[aria-expanded="true"] svg { stroke: currentColor; }
+
+/* ---------- Ebenen: on/off, order, sharing; location popup; measuring ---------- */
+.layers-active .layer-head { display: flex; align-items: center; gap: 0.35rem; }
+.layers-active .layer-head strong { flex: 1; min-width: 0; }
+.layers-active .layer-order { display: inline-flex; gap: 0.1rem; }
+.layers-active .icon { min-width: 30px; min-height: 30px; padding: 0; }
+.layers-active .icon[disabled] { opacity: 0.35; cursor: default; }
+.layers-active li.layer-off strong { color: var(--muted); text-decoration: line-through; }
+.layer-eye[aria-pressed="true"] { color: var(--accent); }
+.layers-active input[type="number"] { width: 6.5rem; }
+.layers-share { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; margin: 0.4rem 0 0.8rem; }
+.layers-paste { display: flex; gap: 0.4rem; margin: 0.8rem 0 0.4rem; }
+.layers-paste input { flex: 1; min-width: 0; }
+.where dl { display: grid; gap: 0.1rem; margin: 0; font-size: 0.85rem; }
+.where dt { color: var(--muted); font-size: 0.74rem; margin-top: 0.3rem; }
+.where dd { margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 0.3rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.where-copy { min-width: 26px; min-height: 26px; padding: 0; font-size: 0.85rem; }
+.measure-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.measuring .leaflet-container { cursor: crosshair; }
+/* While measuring, spots and other map objects do not take the clicks. */
+.measuring .leaflet-marker-pane, .measuring .leaflet-shadow-pane, .measuring .leaflet-interactive:not(.measure-point) { pointer-events: none !important; }
+.measure-line { stroke: #c0392b; stroke-width: 3; stroke-dasharray: 6 5; fill: none; }
+.measure-line.closed { fill: #c0392b; fill-opacity: 0.15; }
+.measure-point { stroke: #fff; stroke-width: 2; fill: #c0392b; fill-opacity: 1; }
+.measure-point.first { cursor: pointer; }
+.measure-box { position: fixed; z-index: 1000; left: 50%; bottom: 1.2rem; transform: translateX(-50%); max-width: min(420px, calc(100% - 2rem)); padding: 0.7rem 0.9rem; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgb(0 0 0 / 0.2); }
+.measure-box p { margin: 0.15rem 0; }
+.measure-tools { display: flex; gap: 0.4rem; margin-top: 0.4rem; }

@@ -177,7 +177,8 @@ map.on('mouseout', () => map.scrollWheelZoom.disable());
 const LOCATE_KEY = 'myforrest.standort';
 // Deep links (walk-through, spot, filter) bring their own view; plain section anchors like #how do not.
 const fromLink = new URLSearchParams(location.search);
-let viewTouched = /=/.test(location.hash) || fromLink.has('spot') || fromLink.has('filter');
+// A shared map view (layers.js, in the syntax of map.geo.admin.ch) brings its own place too.
+let viewTouched = /=/.test(location.hash) || fromLink.has('spot') || fromLink.has('filter') || fromLink.has('center') || fromLink.has('layers');
 let ownView = false;
 map.on('dragstart', () => { viewTouched = true; });
 map.getContainer().addEventListener('wheel', () => { viewTouched = true; }, { passive: true });

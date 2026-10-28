@@ -146,11 +146,36 @@
     return 'sonne';
   }
 
-  /** When each sample is passed: its recorded time (`recorded`), else start + distance at `speedKmh`. */
-  function timesOf(samples, { start, speedKmh, recorded = false }) {
+  /**
+   * Pace on a slope relative to the flat, after Tobler's hiking function (Tobler 1993: 6·e^(−3,5·|m + 0,05|) km/h
+   * for a gradient m): fastest slightly downhill, slower uphill and on steep descents. 1 on the flat.
+   */
+  const toblerRel = (m) => Math.exp(-3.5 * Math.abs(Math.max(-1, Math.min(1, m)) + 0.05)) / Math.exp(-3.5 * 0.05);
+
+  /** Gradient at each sample, over ±50 m (the terrain grid is coarser than the samples), from `z`; 0 where unknown. */
+  function gradients(samples) {
+    return samples.map((s, i) => {
+      const a = samples[Math.max(0, i - 2)]; const b = samples[Math.min(samples.length - 1, i + 2)];
+      const run = b.d - a.d;
+      return run > 0 && Number.isFinite(a.z) && Number.isFinite(b.z) ? (b.z - a.z) / run : 0;
+    });
+  }
+
+  /**
+   * When each sample is passed: its recorded time (`recorded`), else start + distance at `speedKmh`; with `slope`
+   * and heights (`z`) on the samples the pace follows the gradient (speedKmh is then the pace on the flat).
+   */
+  function timesOf(samples, { start, speedKmh, recorded = false, slope = false }) {
     if (recorded && samples.every((s) => Number.isFinite(s.time))) return samples.map((s) => s.time);
     const v = (speedKmh * 1000) / 3600000; // m per ms
-    return samples.map((s) => start + s.d / v);
+    if (!slope || !samples.some((s) => Number.isFinite(s.z))) return samples.map((s) => start + s.d / v);
+    const m = gradients(samples);
+    const out = [start];
+    for (let i = 1; i < samples.length; i++) {
+      const rel = (toblerRel(m[i - 1]) + toblerRel(m[i])) / 2;
+      out.push(out[i - 1] + (samples[i].d - samples[i - 1].d) / (v * rel));
+    }
+    return out;
   }
 
   /**
@@ -178,12 +203,11 @@
    * only among starts that end before the sun sets (no night on the way);
    * null when there is none.
    */
-  function starts(samples, hz, { from, to, speedKmh, stepMin = 15 }) {
+  function starts(samples, hz, { from, to, speedKmh, slope = false, stepMin = 15 }) {
     const list = [];
-    const v = (speedKmh * 1000) / 3600000;
-    const duration = (samples.at(-1)?.d || 0) / v;
+    const duration = samples.length ? timesOf(samples, { start: 0, speedKmh, slope }).at(-1) : 0;
     for (let t = from; t <= to; t += stepMin * 60000) {
-      const { sum } = along(samples, hz, { start: t, speedKmh });
+      const { sum } = along(samples, hz, { start: t, speedKmh, slope });
       const f = (x) => (sum.total ? x / sum.total : 0);
       list.push({ start: t, end: t + duration, sonne: f(sum.sonne), schatten: f(sum.schatten), nacht: f(sum.nacht) });
     }
@@ -232,5 +256,5 @@
     return [...set];
   }
 
-  return { sample, horizons, light, along, starts, timesOf, tileSampler, tilesNear, angleAt, SPEEDS, DIRS, SAMPLE_M, OBJECT_REACH_M };
+  return { sample, horizons, light, along, starts, timesOf, toblerRel, gradients, tileSampler, tilesNear, angleAt, SPEEDS, DIRS, SAMPLE_M, OBJECT_REACH_M };
 }));

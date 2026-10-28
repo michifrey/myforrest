@@ -98,6 +98,44 @@ test('what is here: geo.admin.ch layers through identify, others through GetFeat
   });
 });
 
+test('every layer of geo.admin.ch by search or by name (shared links), identify for them, heights of points', async () => {
+  const asked = [];
+  const layersFetch = async (url) => {
+    asked.push(url);
+    if (url.includes('GetCapabilities')) return new Response(GEOADMIN);
+    if (url.startsWith('https://identify.example/')) return Response.json({ results: [{ layerBodId: 'ch.are.gueteklassen_oev', layerName: 'ÖV-Güteklassen', attributes: { klasse: 'B' } }] });
+    if (url.startsWith('https://height.example/')) {
+      const q = new URL(url).searchParams;
+      return Number(q.get('easting')) > 2700000 ? new Response('', { status: 500 }) : Response.json({ height: '408.7' });
+    }
+    return new Response('', { status: 404 });
+  };
+  const layersOptions = { geoadminUrl: 'https://wms.example/', identifyUrl: 'https://identify.example/identify', heightUrl: 'https://height.example/height', regional: [] };
+  await withServer({ layersFetch, layersOptions }, async (base) => {
+    // The search: every word in the title or name, titles first; the base maps are found too.
+    const s = await (await fetch(`${base}/api/layers/geoadmin?q=${encodeURIComponent('güte')}`)).json();
+    assert.deepEqual(s.layers.map((l) => [l.id, l.name, l.title, l.geoadmin, l.info]), [['ga:ch.are.gueteklassen_oev', 'ch.are.gueteklassen_oev', 'ÖV-Güteklassen', true, true]]);
+    assert.match(s.layers[0].legend, /GetLegendGraphic/);
+    assert.equal((await (await fetch(`${base}/api/layers/geoadmin?q=landeskarte`)).json()).layers[0].name, 'ch.swisstopo.pixelkarte-farbe');
+    assert.equal((await fetch(`${base}/api/layers/geoadmin`)).status, 400);
+    // By name, as a link of map.geo.admin.ch names them; unknown ones are listed.
+    const ids = await (await fetch(`${base}/api/layers/geoadmin?ids=ch.are.gueteklassen_oev,ch.bav.haltestellen-oev,<script>`)).json();
+    assert.deepEqual(ids.layers.map((l) => l.id), ['ga:ch.are.gueteklassen_oev']);
+    assert.deepEqual(ids.missing, ['ch.bav.haltestellen-oev']);
+    // What is here also for those layers.
+    const d = await (await fetch(`${base}/api/layers/info?lat=47.37&lon=8.54&layers=ga:ch.are.gueteklassen_oev`)).json();
+    assert.deepEqual(d.items, [{ id: 'ga:ch.are.gueteklassen_oev', title: 'ÖV-Güteklassen', attributes: [['klasse', 'B']] }]);
+    // Height: swissALTI3D through geo.admin.ch in LV95; where it fails, the terrain model (offline here: none).
+    const h = await (await fetch(`${base}/api/layers/hoehe?lat=47.37&lon=8.54`)).json();
+    assert.deepEqual(h, { elevation: 408.7, source: 'swissALTI3D (swisstopo)' });
+    const q = new URL(asked.find((u) => u.startsWith('https://height.example/'))).searchParams;
+    assert.equal(q.get('sr'), '2056');
+    assert.ok(Math.abs(Number(q.get('easting')) - 2683000) < 1000);
+    assert.deepEqual(await (await fetch(`${base}/api/layers/hoehe?lat=46.5&lon=9.9`)).json(), { elevation: null, source: null });
+    assert.equal((await fetch(`${base}/api/layers/hoehe?lat=x&lon=1`)).status, 400);
+  });
+});
+
 test('config names the vector style of the base map; maplibre-gl-leaflet is served', async () => {
   await withServer({}, async (base) => {
     const { basemap } = await (await fetch(`${base}/api/config`)).json();
