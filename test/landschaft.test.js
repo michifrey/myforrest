@@ -117,6 +117,10 @@ test('Landschaft im Wandel is a page of its own, linked from the start page and 
   await withServer(async (base) => {
     const html = await (await fetch(`${base}/landschaft.html`)).text();
     for (const id of ['karte', 'bericht', 'daten']) assert.ok(html.includes(`id="${id}"`), id);
+    // The map as on Outdooractive: search and chips at the top, place on the left, drawer and buttons on the right.
+    for (const id of ['ln-search-q', 'ln-chips', 'ln-fullscreen', 'ln-content-toggle', 'ln-region', 'ln-placepanel', 'ln-menu', 'ln-menu-toggle', 'ln-fab-functions', 'ln-fab-report', 'ln-bg']) {
+      assert.ok(html.includes(`id="${id}"`), id);
+    }
     for (const file of ['landschaft.js', 'landschaft.css', 'vendor/leaflet/leaflet.js']) {
       assert.ok(html.includes(file), file);
       assert.equal((await fetch(`${base}/${file}`)).status, 200, file);
