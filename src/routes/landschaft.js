@@ -12,7 +12,16 @@
  *   GET /api/landschaft/bericht?lat&lon      what the layers, the inventories and the spots say about a place
  *   GET /api/landschaft/bericht.pdf?lat&lon&ort   the report as a PDF (A4), with map excerpts of the place per theme
  *   GET /api/landschaft/suche?q              places by name (SearchServer of geo.admin.ch) or coordinates (WGS84, LV95)
+ *   GET /api/landschaft/region?lat&lon       the commune, district and canton of a place (boundaries of swisstopo,
+ *                                            identify of geo.admin.ch), for the name of the region under the map
  */
+
+// The boundaries of swisstopo for the name of a region (commune, district, canton).
+const REGION_LAYERS = {
+  gemeinde: 'ch.swisstopo.swissboundaries3d-gemeinde-flaeche.fill',
+  bezirk: 'ch.swisstopo.swissboundaries3d-bezirk-flaeche.fill',
+  kanton: 'ch.swisstopo.swissboundaries3d-kanton-flaeche.fill',
+};
 
 // Maps through time, in this order; a stop is offered when its layer exists (the Landeskarte always).
 const TIMELINE = [
@@ -340,6 +349,35 @@ module.exports = function registerLandschaft(app, {
 
 
   // Places by name or coordinates; answers kept for an hour (people type the same names).
+  /*
+   * The commune, district and canton of a place, from the boundaries of swisstopo (swissBOUNDARIES3D) through the
+   * identify service of geo.admin.ch; cached for a day per ~100 m. Outside Switzerland (or without an answer) all
+   * three are null.
+   */
+  const regions = new Map();
+  app.get('/api/landschaft/region', async (req, res) => {
+    const at = placeOf(req, res);
+    if (!at) return;
+    const key = `${at.lat.toFixed(3)},${at.lon.toFixed(3)}`;
+    const hit = regions.get(key);
+    if (hit && now() - hit.at < 86400000) return res.json(hit.region);
+    const answers = await layers.identify(at.lat, at.lon, Object.values(REGION_LAYERS));
+    const attr = (name, ...keys) => {
+      const a = new Map(answers.find((x) => x.name === name)?.attributes || []);
+      for (const k of keys) if (a.get(k)) return a.get(k);
+      return null;
+    };
+    const region = {
+      gemeinde: attr(REGION_LAYERS.gemeinde, 'gemname', 'name'),
+      bezirk: attr(REGION_LAYERS.bezirk, 'name', 'bezirksname'),
+      kanton: attr(REGION_LAYERS.kanton, 'name', 'kantonsname'),
+      kantonKurz: attr(REGION_LAYERS.kanton, 'ak') || attr(REGION_LAYERS.gemeinde, 'kanton'),
+    };
+    if (regions.size > 5000) regions.clear();
+    regions.set(key, { at: now(), region });
+    res.json(region);
+  });
+
   const searches = new Map();
   app.get('/api/landschaft/suche', async (req, res) => {
     const q = String(req.query.q || '').trim().slice(0, 100);
@@ -367,6 +405,7 @@ module.exports = function registerLandschaft(app, {
 };
 
 module.exports.TIMELINE = TIMELINE;
+module.exports.REGION_LAYERS = REGION_LAYERS;
 module.exports.wmtsLayer = wmtsLayer;
 module.exports.THEMES = THEMES;
 module.exports.parseCoordinates = parseCoordinates;

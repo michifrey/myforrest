@@ -32,6 +32,9 @@ async function withServer(fn, { wmts = null, glacierFiles = '' } = {}) {
       const results = [];
       if (names.includes('ch.bafu.wald-vegetationshoehenstufen_1975')) results.push({ layerBodId: 'ch.bafu.wald-vegetationshoehenstufen_1975', layerName: 'Vegetationshöhenstufen', attributes: { id: 7, hoehenstufe: 'obermontan' } });
       if (names.includes('ch.bafu.wald-vegetationshoehenstufen_2085_trocken')) results.push({ layerBodId: 'ch.bafu.wald-vegetationshoehenstufen_2085_trocken', layerName: 'Vegetationshöhenstufen 2085 trocken', attributes: { hoehenstufe: 'submontan' } });
+      if (names.includes('ch.swisstopo.swissboundaries3d-gemeinde-flaeche.fill')) results.push({ layerBodId: 'ch.swisstopo.swissboundaries3d-gemeinde-flaeche.fill', attributes: { gemname: 'Wettingen', kanton: 'AG' } });
+      if (names.includes('ch.swisstopo.swissboundaries3d-bezirk-flaeche.fill')) results.push({ layerBodId: 'ch.swisstopo.swissboundaries3d-bezirk-flaeche.fill', attributes: { name: 'Baden' } });
+      if (names.includes('ch.swisstopo.swissboundaries3d-kanton-flaeche.fill')) results.push({ layerBodId: 'ch.swisstopo.swissboundaries3d-kanton-flaeche.fill', attributes: { name: 'Aargau', ak: 'AG' } });
       if (names.includes('ch.bfs.arealstatistik')) results.push({ layerBodId: 'ch.bfs.arealstatistik', layerName: 'Arealstatistik', attributes: { nutzung: 'Wald' } });
       return Response.json({ results });
     }
@@ -251,5 +254,17 @@ test('Landschaft im Wandel: the report as a PDF made on the server, with map exc
       ['ch.bafu.wald-vegetationshoehenstufen_1975', 'ch.bfs.arealstatistik', 'ch.meteoschweiz.klimanormwerte-temperatur_aktuelle_periode']);
     assert.equal((text.match(/\/Subtype \/Image/g) || []).length, 4);
     assert.equal((await fetch(`${base}/api/landschaft/bericht.pdf?lat=x&lon=8`)).status, 400);
+  });
+});
+
+test('Landschaft im Wandel: the commune, district and canton of a place, from the boundaries of swisstopo', async () => {
+  await withServer(async (base, db, identified) => {
+    const r = await (await fetch(`${base}/api/landschaft/region?lat=47.46&lon=8.32`)).json();
+    assert.deepEqual(r, { gemeinde: 'Wettingen', bezirk: 'Baden', kanton: 'Aargau', kantonKurz: 'AG' });
+    // The same place again comes from the cache.
+    const asked = identified.length;
+    await fetch(`${base}/api/landschaft/region?lat=47.4601&lon=8.3201`);
+    assert.equal(identified.length, asked);
+    assert.equal((await fetch(`${base}/api/landschaft/region?lat=x`)).status, 400);
   });
 });
