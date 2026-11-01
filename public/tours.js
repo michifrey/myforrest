@@ -1142,6 +1142,17 @@
       setTab('auftraege');
     },
   };
+  /**
+   * «Route hierhin» of the place panel (mapui.js): the planner with this place as the next point, after the own
+   * position when the route is empty and the position is known.
+   */
+  Tours.routeTo = async (p, from = null) => {
+    if (!T.open) toggle(true);
+    setTab('route');
+    if (T.route.raw) clearRoute();
+    if (!T.route.waypoints.length && from) await addWaypoint(from);
+    await addWaypoint(p);
+  };
   /** The current route as points ({ lat, lon }), e.g. for the 3D map. */
   Tours.points = () => routePoints();
   window.Tours = Tours;

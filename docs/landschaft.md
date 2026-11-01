@@ -83,7 +83,7 @@ Dazu kommen die Ordner der vier Themen:
 - *Landwirtschaft und Boden*: Arealstatistik, Fruchtfolgeflächen, landwirtschaftliche Zonen.
 
 Der Server sucht alle Ebenen nach Namen in der Ebenenliste von geo.admin.ch. Er liest sie einmal am Tag (WMS), wie das
-Panel *Ebenen* der Karte. Es erscheint, was geo.admin.ch anbietet; fehlt eine Ebene, fehlt nur ihr Eintrag.
+Panel *Karten und Ebenen* der Karte. Es erscheint, was geo.admin.ch anbietet; fehlt eine Ebene, fehlt nur ihr Eintrag.
 
 **Zeitleiste.** Liegt eine Karte mit Jahren oben, erscheint unten auf der Karte die Zeitleiste:
 
@@ -211,7 +211,7 @@ unter [Offene Geodaten](funktionen.md#offene-geodaten-für-gis-und-geoportale).
 - `src/routes/landschaft.js`: `GET /api/landschaft/karten` (Karten durch die Zeit und Ebenen pro Thema, aus der
   Ebenenliste von geo.admin.ch; die Jahre der Zeitreise und der Luftbilder aus den WMTS-Capabilities, die Jahre der Gletscherinventare) `GET /api/landschaft/bericht.pdf?lat=&lon=&ort=` (der Bericht als PDF mit PDFKit, `src/landschaft-pdf.js`, Kartenausschnitte als WMS), `GET /api/landschaft/suche?q=` (Ortssuche über den SearchServer von geo.admin.ch, Koordinaten direkt) und `GET /api/landschaft/bericht?lat=&lon=` (Identify pro Thema, Gletscher aus den
   Inventaren mit GLAMOS, Fotos, Befunde und Neophyten im Umkreis). Die Ebenenliste und der Identify-Dienst kommen aus
-  `src/routes/layers.js` (Panel *Ebenen*).
+  `src/routes/layers.js` (Panel *Karten und Ebenen*).
 - `public/landschaft.html`, `landschaft.js`, `landschaft.css`: Leaflet mit den Kacheln von swisstopo und den WMS von
   geo.admin.ch; der Klima-Teil des Berichts kommt aus dem Klima-Dossier (`/api/klima`).
 - Tests in `test/landschaft.test.js`, mit nachgebauter Ebenenliste und Identify-Antwort.

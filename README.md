@@ -103,19 +103,39 @@ jederzeit wieder. Der Standort bleibt im Browser.
 Ältere Spots (oder Fotos ohne Kompass) können Fotos in verschiedene Richtungen mischen. Dann bietet der
 Spot an, sich **aufzuteilen**: ein Spot pro Blickrichtung, jeder für sich ausgerichtet und verglichen,
 oder nur das gezeigte Foto abzutrennen.
-Die Leiste oben links filtert die Karte nach Beobachtungen und Meldungen und schaltet *Sonne & Wetter*,
-*Arten & Neophyten* und *Touren & Aufträge* ein (Abschnitte 7, 8 und 10), mit Gletscherinventaren auch
-*Gletscher* (Abschnitt 14); *Klima* öffnet das Klima-Dossier der Region (Abschnitt 15). Gelbe Kamera-Pins sind Fotoaufträge. Rechts fasst eine schmale Explorer-Karte
-Kennzahlen, die zuletzt fotografierten Spots als Bilder und die Legende zusammen.
+Die Karte ist aufgebaut wie die von **Outdooractive**:
+
+- **Oben** sucht ein Feld nach Orten, Adressen und Koordinaten. Darunter filtern **Kategorien** die Spots nach
+  Beobachtungen und Meldungen.
+- Ein Knopf schaltet auf **Vollbild**, *Inhalt ausblenden* zeigt nur die Karte, und unten steht der Name der
+  **Region**.
+- **Rechts unten** liegen runde Knöpfe:
+  - *Funktionen* klappt die Werkzeuge auf: *Sonne & Wetter*, *Arten & Neophyten*, *Messen*, *Zeichnen*, *Klima*,
+    *3D*, mit Gletscherinventaren auch *Gletscher* (Abschnitte 7, 8, 14 und 15).
+  - *Touren & Aufträge* öffnet die Tourenplanung (Abschnitt 10).
+  - *Karten und Ebenen* öffnet die Wahl der Karten.
+- Ein **Klick auf die Karte** zeigt links den Ort: Gemeinde, Höhe, LV95, *Route hierhin*, *Foto hier beitragen*,
+  was die Ebenen dort sagen und die **Spots in der Nähe** als Bildkarten.
+- Sonst fasst links der Explorer Kennzahlen, die zuletzt fotografierten Spots als Bilder und die Legende zusammen.
+- Gelbe Kamera-Pins sind Fotoaufträge.
+
+![Ein Ort auf der Karte: Gemeinde, Höhe, LV95 und Spots in der Nähe, rechts die Funktionen](docs/screenshots/karte-ort.jpg)
 
 Die **Grundkarte** ist eine eigene Vektorkarte in den Farben der App (Daten OpenStreetMap über OpenFreeMap): Wald in
-Moosgrün, Land in Leinen, Wege braun gestrichelt, ohne Laden- und Haltestellen-Symbole, nachts dunkel. Unten rechts
-wechselt man zu OpenStreetMap, zur Landeskarte oder zum Luftbild von swisstopo
-([Details](docs/funktionen.md#grundkarte)).
+Moosgrün, Land in Leinen, Wege braun gestrichelt, ohne Laden- und Haltestellen-Symbole, nachts dunkel. Im Panel
+**Karten und Ebenen** wählt man wie bei Outdooractive aus Bildkacheln:
 
-![Ebenen: Waldbrandgefahr und Bevölkerung über den Spots, mit der Antwort auf einen Klick](docs/screenshots/ebenen.jpg)
+- **Karten**: OpenStreetMap und die Landeskarte von swisstopo (Sommer, Winter, grau) oder das Luftbild.
+- **Wegenetze**: Wanderwege, Velo, Mountainbike, Schneeschuh, Skitouren.
+- **Zusatzebenen**: Hangneigung, Waldbrandgefahr, Wildruhezonen, Waldmischung, Vegetationshöhe, ÖV-Haltestellen.
 
-**Ebenen** legt Karten aus offiziellen Quellen über die Spots: Waldbrandgefahr, Waldmischung und Vegetationshöhe,
+Mehr steht unter [Details](docs/funktionen.md#grundkarte).
+
+![Karten und Ebenen: Grundkarten, Wegenetze und Zusatzebenen als Kacheln](docs/screenshots/karte-kacheln.jpg)
+
+![Ebenen: Waldbrandgefahr und Bevölkerung über den Spots, links die Antwort auf einen Klick](docs/screenshots/ebenen.jpg)
+
+**Karten und Ebenen** legt Karten aus offiziellen Quellen über die Spots: Waldbrandgefahr, Waldmischung und Vegetationshöhe,
 Bevölkerung pro Hektare, Bodennutzung (Arealstatistik), Verkehrsbelastung und Lärm von geo.admin.ch, regional den
 Baumkataster der Stadt Zürich und Stadtklima-Karten von Genf, dazu Waldbrände in Europa (EFFIS); die Suche findet
 jede Ebene von geo.admin.ch. Bis zu acht zugleich, mit Deckkraft, Legende, Ein/Aus, Reihenfolge und Jahr; ein Klick

@@ -22,8 +22,10 @@
   const BASES = {
     myforrest: { label: 'MyForrest', layer: null },
     osm: { label: 'OpenStreetMap', layer: osm },
-    landeskarte: { label: 'Landeskarte (CH)', layer: swisstopo('ch.swisstopo.pixelkarte-farbe', 'jpeg') },
-    luftbild: { label: 'Luftbild (CH)', layer: swisstopo('ch.swisstopo.swissimage', 'jpeg') },
+    landeskarte: { label: 'Landeskarte', layer: swisstopo('ch.swisstopo.pixelkarte-farbe', 'jpeg'), id: 'ch.swisstopo.pixelkarte-farbe' },
+    winter: { label: 'Landeskarte Winter', layer: swisstopo('ch.swisstopo.pixelkarte-farbe-winter', 'jpeg'), id: 'ch.swisstopo.pixelkarte-farbe-winter' },
+    grau: { label: 'Landeskarte grau', layer: swisstopo('ch.swisstopo.pixelkarte-grau', 'jpeg'), id: 'ch.swisstopo.pixelkarte-grau' },
+    luftbild: { label: 'Luftbild', layer: swisstopo('ch.swisstopo.swissimage', 'jpeg'), id: 'ch.swisstopo.swissimage' },
   };
   let current = 'osm';
   let gl = null; // the MapLibre layer once loaded
@@ -181,8 +183,7 @@
     if (!map.hasLayer(want)) want.addTo(map);
     current = key;
     document.documentElement.classList.toggle('basemap-vector', want === gl);
-    const sel = $('basemap-select');
-    if (sel) sel.value = key;
+    document.dispatchEvent(new CustomEvent('basemap', { detail: key }));
   }
 
   // Dark mode follows the system: repaint the vector map.
@@ -193,20 +194,7 @@
   addEventListener('offline', () => { if (current === 'myforrest' && gl && map.hasLayer(gl)) { map.removeLayer(gl); osm.addTo(map); } });
   addEventListener('online', () => { if (current === 'myforrest' && gl && !map.hasLayer(gl)) { map.removeLayer(osm); gl.addTo(map); } });
 
-  /* ---------- Control ---------- */
-
-  const Control = L.Control.extend({
-    options: { position: 'bottomright' },
-    onAdd() {
-      const select = el('select', { id: 'basemap-select', 'aria-label': 'Grundkarte' },
-        Object.entries(BASES).map(([k, b]) => el('option', { value: k, text: b.label })));
-      select.addEventListener('change', () => setBase(select.value));
-      const box = el('label', { class: 'basemap-control' }, [el('span', { class: 'sr-only', text: 'Grundkarte' }), select]);
-      L.DomEvent.disableClickPropagation(box);
-      return box;
-    },
-  });
-  new Control().addTo(map);
+  /* The choice of the base map is in the panel «Karten und Ebenen» (mapui.js): the map tiles of Outdooractive. */
 
   // Once the server said which style to use.
   let started = false;
@@ -219,5 +207,7 @@
   /** A base map asked for by a link (layers.js): now, or once the start above sets the base map. */
   const prefer = (key) => { if (started) setBase(key); else pref = key; };
 
-  window.Basemap = { setBase, prefer, theme, kindOf, current: () => current };
+  /** The base maps for the chooser: [{ key, label, id (layer of geo.admin.ch, if any) }]. */
+  const list = () => Object.entries(BASES).map(([key, b]) => ({ key, label: b.label, id: b.id || null }));
+  window.Basemap = { setBase, prefer, theme, kindOf, list, current: () => current };
 })();

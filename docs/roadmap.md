@@ -150,6 +150,9 @@ Als Nächstes:
   aus der Liste mit den echten Diensten prüfen (welche Anbieter Capabilities aus dem Browser erlauben, CORS); eine
   Zeichnung über einen Link teilen (die KML auf dem Server ablegen, wie map.geo.admin.ch). Die Höhe im Koordinaten-Popup und das Jahr
   (`TIME`) der WMS-Ebenen mit den echten Diensten prüfen.
+- **Wie Outdooractive weiter**: *Landschaft im Wandel* im selben Stil (Knöpfe, Kacheln, Ort-Panel); die Namen von
+  Bezirken und Kantonen gegen die echten Attribute von swissBOUNDARIES3D prüfen; Touren in der Nähe im Ort-Panel;
+  Bilder der Wegenetze statt Piktogrammen.
 - **Ortssuche mit dem echten Dienst prüfen** (gebaut nach dem Antwortformat des SearchServers von geo.admin.ch,
   getestet mit nachgebauten Antworten).
 
@@ -179,6 +182,10 @@ Aus früheren Versionen dieser Roadmap, nach Themen:
   OSM, Landeskarte und Luftbild; Panel *Ebenen* mit Wald und Waldbrand, Bevölkerung, Bodennutzung, Verkehr von
   geo.admin.ch, Baumkataster Zürich, SITG Genf, EFFIS und NASA FIRMS, mit *Was ist hier?*; Baumkataster Zürich auch
   als Baumart-Vorschlag
+- Hauptkarte aufgebaut wie Outdooractive: Suche mit Kategorien, Vollbild, *Inhalt ausblenden*, Name der Region
+  (Gemeinde, Bezirk, Kanton aus swissBOUNDARIES3D), runde Knöpfe rechts unten mit *Funktionen*, Ort-Panel nach
+  einem Klick (Höhe, LV95, Route hierhin, Spots in der Nähe, was die Ebenen sagen), Grundkarten, Wegenetze und
+  Zusatzebenen als Bildkacheln
 - Zeichnen auf der Karte wie auf map.geo.admin.ch (Punkte, Linien, Flächen in sieben Farben, mit Name, Notiz,
   Länge und Fläche), auf dem Gerät gespeichert und als KML herunterladbar; KMZ als Ebene und die Farben aus KML-Stilen
   und GeoJSON (simplestyle)

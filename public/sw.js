@@ -23,7 +23,7 @@
 
 importScripts('offline-queue.js');
 
-const SHELL_VERSION = 'v38';
+const SHELL_VERSION = 'v39';
 const DATA_VERSION = 'v1';
 const CACHE = {
   shell: `myforrest-shell-${SHELL_VERSION}`,
@@ -78,6 +78,7 @@ const PRECACHE = [
   'filelayer.js',
   'measure.js',
   'draw.js',
+  'mapui.js',
   'vendor/mgrs/mgrs.min.js',
   'features.js',
   'basemap.js',
