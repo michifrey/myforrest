@@ -79,8 +79,8 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.locator('#perspektiven').screenshot({ path: out('perspektiven.jpg'), ...jpg });
     await page.close();
 
-    // Landschaft im Wandel, laid out as map.geo.admin.ch: maps from the catalog under «Aktive Karten» over the grey
-    // Landeskarte, the settings of a map, the background chooser, the time slider of the «Zeitreise».
+    // Landschaft im Wandel, laid out as Outdooractive: the maps through time as chips, the place on the left, the
+    // drawer «Karten und Ebenen» (backgrounds as tiles, active maps, catalog), the time slider of the «Zeitreise».
     page = await ctx.newPage();
     const place = 'lat=47.37&lon=8.54';
     const open = async (hash, steps = async () => {}, wait = 2500) => {
@@ -91,17 +91,18 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
       await settle(page, wait);
       await page.evaluate(() => window.scrollTo(0, 0));
     };
-    const entry = (text) => page.locator('#ln-catalog .ln-entry', { hasText: text }).locator('input').first();
-    // The Dufour map with its settings and its info.
+    const chip = (text) => page.locator('#ln-chips button', { hasText: text }).first();
+    // The Dufour map with its settings in the drawer «Karten und Ebenen».
     await open('&layers=ch.swisstopo.hiks-dufour', async () => {
+      await page.click('#ln-menu-toggle');
       await page.click('#ln-active .ln-icon[aria-controls]');
-      await page.click('#ln-active .ln-icon[aria-pressed]');
     });
     await page.screenshot({ path: out('landschaft.jpg'), ...jpg });
     // Two maps on top of each other: the Siegfried map, half transparent, over the forest belts 2085; the backgrounds.
     await open('', async () => {
-      await entry('Höhenstufen 2085 (RCP8.5)').check();
-      await entry('Siegfriedkarte').check();
+      await chip('Höhenstufen 2085 (RCP8.5)').click();
+      await chip('Siegfriedkarte').click();
+      await page.click('#ln-menu-toggle');
       await page.click('#ln-active .ln-icon[aria-controls]');
       await page.evaluate(() => {
         const range = document.querySelector('#ln-active .ln-opacity input');
@@ -109,10 +110,9 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
         range.dispatchEvent(new Event('input'));
         range.dispatchEvent(new Event('change'));
       });
-      await page.click('.ln-bg-current');
     });
     await page.screenshot({ path: out('landschaft-ebenen.jpg'), ...jpg });
-    await open('', async () => { await entry('Höhenstufen 2085 (RCP8.5)').check(); });
+    await open('', async () => { await chip('Höhenstufen 2085 (RCP8.5)').click(); });
     await page.screenshot({ path: out('landschaft-2085.jpg'), ...jpg });
     // The «Zeitreise»: the Landeskarte of 1900, with the time slider.
     await open('&layers=ch.swisstopo.zeitreihen@year=1900', async () => {}, 6000);
@@ -841,6 +841,7 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.goto(`${GB}/landschaft.html#karte?lat=46.592&lon=8.4&layers=ch.swisstopo.swissimage-product@year=1956`);
     await settle(page, 2500);
     // The inventories from the catalog («Gletscher und Wasser»), with their years in the settings.
+    await page.click('#ln-menu-toggle');
     await page.click('#ln-catalog summary:has-text("Gletscher und Wasser")');
     await page.locator('#ln-catalog .ln-entry', { hasText: 'Gletscherinventare' }).locator('input').check();
     await page.click('.leaflet-control-zoom-in');

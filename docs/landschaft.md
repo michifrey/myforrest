@@ -18,17 +18,28 @@ Die zweite Perspektive ist eine eigene Seite, `/landschaft.html`, mit drei Teile
 
 ## Karte
 
-![Karte: die Dufourkarte um 1850 über der grauen Landeskarte, links das Menü mit den aktiven Karten und dem Katalog, rechts die Info zur Karte](screenshots/landschaft.jpg)
+![Karte: die Dufourkarte um 1850, links der Ort, rechts «Karten und Ebenen» mit den Einstellungen der Karte](screenshots/landschaft.jpg)
 
-Die Karte ist aufgebaut wie [map.geo.admin.ch](https://map.geo.admin.ch/):
+Die Karte ist aufgebaut wie die Hauptkarte, nach dem Vorbild von [Outdooractive](https://www.outdooractive.com). Den
+Katalog und die Einstellungen pro Karte hat sie von [map.geo.admin.ch](https://map.geo.admin.ch/):
 
-- Das Suchfeld steht in der Kopfzeile.
-- Die Karte füllt die Seite.
-- Links liegt das Menü über der Karte, mit *Menü ausblenden* lässt es sich zuklappen. Es hat drei Teile:
-  - **Aktive Karten**: was gerade über dem Hintergrund liegt, die oberste Karte zuoberst.
-  - **Karten anzeigen**: der Katalog, in Ordnern wie der Themenkatalog von geo.admin.ch.
-  - **Ort und Bericht**.
-- Unten rechts wählt man den Hintergrund, unten in der Mitte erscheint bei Karten mit Jahren die Zeitleiste.
+- **Oben** liegt das Suchfeld für Orte, Adressen und Koordinaten. Darunter stehen die **Karten durch die Zeit** als
+  Knöpfe: Ein Klick legt die Karte über den Hintergrund, ein zweiter nimmt sie weg. Daneben ist der Knopf für das
+  **Vollbild**.
+- **Inhalt ausblenden** zeigt nur die Karten, ohne Ort, Schublade und Info.
+- **Links** steht der **Ort** nach einem Klick in die Karte oder einer Suche (siehe *Ort* unten).
+- **Rechts unten** liegen runde Knöpfe:
+  - **Funktionen** klappt *Link kopieren*, *In map.geo.admin.ch öffnen* und *Daten holen* auf.
+  - **Bericht** öffnet den Bericht für den gewählten Ort.
+  - **Karten und Ebenen** öffnet rechts die Schublade mit drei Teilen:
+    - **Hintergrund**: die Grundkarten als Bildkacheln.
+    - **Aktive Karten**: was gerade über dem Hintergrund liegt, die oberste Karte zuoberst.
+    - **Karten anzeigen**: der Katalog, in Ordnern wie der Themenkatalog von geo.admin.ch.
+- **Unten in der Mitte** steht der Name der **Region**: die Gemeinde, der Bezirk oder der Kanton, je nach Zoom.
+  Darüber erscheint bei Karten mit Jahren die **Zeitleiste**.
+
+Auf dem Handy steht die Karte oben und Ort und Schublade folgen darunter. Die Knöpfe liegen unten rechts auf der
+Karte.
 
 **Karten anzeigen.** Ein Häkchen im Katalog legt eine Karte über die anderen, ein zweites Häkchen nimmt sie wieder weg.
 Es lassen sich beliebig viele Karten kombinieren, etwa die Siegfriedkarte halb durchsichtig über den Höhenstufen 2085.
@@ -52,10 +63,10 @@ Legende und einem Link auf dieselbe Ebene in map.geo.admin.ch.
   - **Vergleichen**: Eine Linie teilt die Karte, links liegt alles ohne diese Karte, rechts mit ihr. Die Linie lässt
     sich mit Maus, Finger oder Pfeiltasten verschieben.
 
-![Zwei aktive Karten: die Siegfriedkarte mit 50 % Deckkraft über den Höhenstufen 2085, die Einstellungen geöffnet, unten rechts die Wahl des Hintergrunds](screenshots/landschaft-ebenen.jpg)
+![Zwei aktive Karten: die Siegfriedkarte mit 50 % Deckkraft über den Höhenstufen 2085, oben in der Schublade die Hintergründe als Kacheln](screenshots/landschaft-ebenen.jpg)
 
-**Hintergrund.** Unten rechts zeigt ein Bild den aktuellen Hintergrund. Ein Klick darauf öffnet die Auswahl, wie bei
-map.geo.admin.ch:
+**Hintergrund.** Oben in *Karten und Ebenen* stehen die Hintergründe als Bildkacheln, wie die Karten bei
+Outdooractive:
 
 - *Landeskarte* (farbig)
 - *Landeskarte grau*, der Standard, weil sich darauf alte Karten und Themen am besten lesen lassen
@@ -128,7 +139,7 @@ Eintrag *Gletscherinventare*:
 
 ![Gletscher: die Umrisse der Inventare 1850, 1973 und 2016 über dem Luftbild von 1956, links die Jahre der Inventare in den Einstellungen](screenshots/landschaft-gletscher.jpg)
 
-**Ort.** Das Suchfeld in der Kopfzeile findet über den Suchdienst von geo.admin.ch (über den Server, `ORTSSUCHE_URL`):
+**Ort.** Das Suchfeld oben auf der Karte findet über den Suchdienst von geo.admin.ch (über den Server, `ORTSSUCHE_URL`):
 
 - Gemeinden, Bezirke, Kantone und Postleitzahlen,
 - Orts- und Flurnamen,
@@ -145,8 +156,17 @@ map.geo.admin.ch:
 | LV03 | `600'000 200'000` |
 | MGRS | `32T MT 65298 47262` |
 
-Ein Klick in die Karte wählt ebenfalls einen Ort. *Bericht für diesen Ort* öffnet den Bericht, mit dem Namen des Orts
-als Titel.
+Ein Klick in die Karte wählt ebenfalls einen Ort. Links erscheint dann, wie bei Outdooractive:
+
+- die **Gemeinde** als Titel (oder der Name aus der Suche), mit Bezirk und Kanton aus den Grenzen von swisstopo
+  (`/api/landschaft/region`),
+- die **Höhe** und die Koordinaten in **LV95**,
+- **Bericht für diesen Ort**,
+- **Koordinaten kopieren** und ein Link zu dieser Stelle in **map.geo.admin.ch**,
+- **Was die Karten hier sagen**: die Angaben der eingeblendeten Karten von geo.admin.ch an dieser Stelle, etwa die
+  Höhenstufe des Waldes.
+
+Der Bericht trägt den Namen des Orts als Titel.
 
 **Teilen und map.geo.admin.ch.** Die Adresse hält die ganze Ansicht fest:
 

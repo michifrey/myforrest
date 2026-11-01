@@ -19,11 +19,6 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 5 12h4l-4 6h6v4h2v-4h6l-4-6h4z"/></svg>
       MyForrest <span>Landschaft im Wandel</span>
     </a>
-    <form id="ln-search" class="ln-search" role="search" autocomplete="off">
-      <label class="sr-only" for="ln-search-q">Ort suchen</label>
-      <input type="search" id="ln-search-q" placeholder="Ort, Adresse oder Koordinaten suchen" aria-controls="ln-search-results" aria-autocomplete="list">
-      <ul id="ln-search-results" class="ln-search-results" role="listbox" aria-label="Gefundene Orte" hidden></ul>
-    </form>
     <nav class="ln-tabs" aria-label="Landschaft im Wandel">
       <a href="#karte" data-view="karte">Karte</a>
       <a href="#bericht" data-view="bericht">Bericht</a>
@@ -33,11 +28,40 @@
 
   <main>
     <!-- ---------- Karte ---------- -->
+    <!-- Laid out as Outdooractive: search and maps as chips at the top, the place on the left, the maps in a drawer
+         on the right, round buttons at the bottom right, the region and the time slider at the bottom. -->
     <section id="karte" class="ln-view ln-mapview" aria-label="Karte">
       <div id="ln-map" class="ln-map" aria-label="Karte der Schweiz"></div>
-      <aside id="ln-menu" class="ln-menu" aria-label="Menü der Karte">
-        <button type="button" id="ln-menu-toggle" class="ln-menu-toggle" aria-expanded="true" aria-controls="ln-menu-body"><span class="ln-chevron" aria-hidden="true"></span><span>Menü ausblenden</span></button>
+      <div class="ln-topbar">
+        <div class="ln-topbar-row">
+          <form id="ln-search" class="ln-search" role="search" autocomplete="off">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.5 12.5 17 17"/></svg>
+            <label class="sr-only" for="ln-search-q">Ort suchen</label>
+            <input type="search" id="ln-search-q" placeholder="Suche nach Orten, Adressen, Koordinaten …" aria-controls="ln-search-results" aria-autocomplete="list" aria-expanded="false">
+            <ul id="ln-search-results" class="ln-search-results" role="listbox" aria-label="Gefundene Orte" hidden></ul>
+          </form>
+          <button type="button" id="ln-fullscreen" class="ln-round" aria-pressed="false" aria-label="Vollbild" title="Vollbild">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8V3h5M12 3h5v5M17 12v5h-5M8 17H3v-5"/></svg>
+          </button>
+        </div>
+        <div id="ln-chips" class="ln-mapchips" role="group" aria-label="Karten durch die Zeit"></div>
+      </div>
+      <button type="button" id="ln-content-toggle" class="ln-pill ln-content-toggle" aria-pressed="false">Inhalt ausblenden</button>
+
+      <aside id="ln-placepanel" class="ln-placepanel" aria-labelledby="ln-place-title" hidden></aside>
+
+      <aside id="ln-menu" class="ln-menu" aria-labelledby="ln-menu-title" hidden>
+        <header class="ln-menu-head">
+          <h2 id="ln-menu-title">Karten und Ebenen</h2>
+          <button type="button" id="ln-menu-close" class="ln-icon" aria-label="Schliessen">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7l1.4-1.4 6.3 6.3 6.3-6.3z"/></svg>
+          </button>
+        </header>
         <div id="ln-menu-body" class="ln-menu-body">
+          <section class="ln-pad">
+            <h3 class="ln-tiles-title">Hintergrund</h3>
+            <div id="ln-bg" class="ln-tiles" role="radiogroup" aria-label="Hintergrund"></div>
+          </section>
           <details class="ln-section-box" open>
             <summary>Aktive Karten <span id="ln-active-count" class="ln-count">0</span></summary>
             <ul id="ln-active" class="ln-active"></ul>
@@ -47,23 +71,42 @@
             <p class="ln-muted small ln-pad">Amtliche Karten von swisstopo, BAFU und MeteoSchweiz, über dem Hintergrund.</p>
             <div id="ln-catalog" class="ln-catalog"></div>
           </details>
-          <details class="ln-section-box" open>
-            <summary>Ort und Bericht</summary>
-            <div class="ln-pad">
-              <p id="ln-place" class="ln-muted">Ort oben suchen oder in die Karte klicken; daraus wird der Bericht.</p>
-              <a id="ln-to-report" class="ln-btn" href="#bericht" hidden>Bericht für diesen Ort</a>
-            </div>
-          </details>
-          <div class="ln-menu-foot">
-            <button type="button" id="ln-share" class="ln-link">Link kopieren</button>
-            <a id="ln-geoadmin" class="ln-link" href="https://map.geo.admin.ch/" target="_blank" rel="noopener">In map.geo.admin.ch öffnen</a>
-          </div>
           <p id="ln-status" class="ln-muted small ln-pad" aria-live="polite"></p>
         </div>
       </aside>
+
       <section id="ln-info" class="ln-infobox" aria-label="Info zur Karte" aria-live="polite" hidden></section>
       <div id="ln-timebar" class="ln-timebar" aria-label="Zeitreise" role="group" hidden></div>
-      <div id="ln-bg" class="ln-bg"></div>
+      <div id="ln-region" class="ln-pill ln-region" aria-live="polite" hidden></div>
+
+      <div id="ln-fabs" class="ln-fabs">
+        <div id="ln-fab-more" class="ln-fab-more" hidden>
+          <button type="button" id="ln-share" class="ln-fab">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 12a3.5 3.5 0 0 0 5 0l3-3a3.5 3.5 0 0 0-5-5l-1 1M12 8a3.5 3.5 0 0 0-5 0l-3 3a3.5 3.5 0 0 0 5 5l1-1"/></svg>
+            <span class="ln-fab-label">Link kopieren</span>
+          </button>
+          <a id="ln-geoadmin" class="ln-fab" href="https://map.geo.admin.ch/" target="_blank" rel="noopener">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4v12h12v-4M11 3h6v6M17 3l-8 8"/></svg>
+            <span class="ln-fab-label">In map.geo.admin.ch öffnen</span>
+          </a>
+          <a class="ln-fab" href="#daten">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10M6 9l4 4 4-4M4 16h12"/></svg>
+            <span class="ln-fab-label">Daten holen</span>
+          </a>
+        </div>
+        <button type="button" id="ln-fab-functions" class="ln-fab ln-fab-main" aria-expanded="false" aria-controls="ln-fab-more">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="4.5" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="10" cy="15.5" r="1.6"/></svg>
+          <span class="ln-fab-label">Funktionen</span>
+        </button>
+        <a id="ln-fab-report" class="ln-fab ln-fab-main" href="#bericht" aria-disabled="true">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2.5h7l3.5 3.5v11.5H5z"/><path d="M12 2.5V6h3.5M7.5 10h5M7.5 13h5"/></svg>
+          <span class="ln-fab-label">Bericht</span>
+        </a>
+        <button type="button" id="ln-menu-toggle" class="ln-fab ln-fab-main" aria-expanded="false" aria-controls="ln-menu">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 18 6.5 10 10.5 2 6.5z"/><path d="M2 10l8 4 8-4M2 13.5l8 4 8-4"/></svg>
+          <span class="ln-fab-label">Karten und Ebenen</span>
+        </button>
+      </div>
     </section>
 
     <!-- ---------- Bericht ---------- -->

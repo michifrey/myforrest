@@ -562,10 +562,12 @@ function demoIdentify(url) {
       results.push({ layerBodId: n, layerName: label, attributes: { hoehenstufe: stufe } });
     }
     if (n.includes('klimanormwerte')) results.push({ layerBodId: n, layerName: 'Klimanormwerte Temperatur 1991–2020 (Demo)', attributes: { jahresmittel: `${(11 - (elevation(lat, lon) - 400) * 0.0055).toFixed(1)} °C` } });
-    // The boundaries of swisstopo: the demo forest lies in the city of Zürich.
-    if (n.includes('swissboundaries3d-gemeinde')) results.push({ layerBodId: n, layerName: 'Gemeindegrenzen', attributes: { gemname: lon < 8.62 ? 'Zürich' : 'Dübendorf', kanton: 'ZH' } });
-    if (n.includes('swissboundaries3d-bezirk')) results.push({ layerBodId: n, layerName: 'Bezirksgrenzen', attributes: { name: lon < 8.62 ? 'Zürich' : 'Uster' } });
-    if (n.includes('swissboundaries3d-kanton')) results.push({ layerBodId: n, layerName: 'Kantonsgrenzen', attributes: { name: 'Zürich', ak: 'ZH' } });
+    // The boundaries of swisstopo: the demo forest lies in the city of Zürich, the demo glacier in Uri (a canton
+    // without districts).
+    const alps = lat < 47;
+    if (n.includes('swissboundaries3d-gemeinde')) results.push({ layerBodId: n, layerName: 'Gemeindegrenzen', attributes: { gemname: alps ? 'Göschenen' : lon < 8.62 ? 'Zürich' : 'Dübendorf', kanton: alps ? 'UR' : 'ZH' } });
+    if (n.includes('swissboundaries3d-bezirk') && !alps) results.push({ layerBodId: n, layerName: 'Bezirksgrenzen', attributes: { name: lon < 8.62 ? 'Zürich' : 'Uster' } });
+    if (n.includes('swissboundaries3d-kanton')) results.push({ layerBodId: n, layerName: 'Kantonsgrenzen', attributes: alps ? { name: 'Uri', ak: 'UR' } : { name: 'Zürich', ak: 'ZH' } });
     if (n.includes('arealstatistik')) results.push({ layerBodId: n, layerName: 'Arealstatistik: Bodennutzung (Demo)', attributes: { nutzung: AREAL[tiles.classAt(lat, lon)][1], erhebung: '2013/18' } });
   }
   return Response.json({ results });

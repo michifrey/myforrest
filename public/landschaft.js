@@ -52,9 +52,9 @@
     { id: 'ch.swisstopo.swissimage', title: 'Luftbild' },
     { id: 'void', title: 'Kein Hintergrund' },
   ];
-  // The tile of each background over central Switzerland, as its picture in the chooser.
-  const bgThumb = (id) => (id === 'void' ? null : `https://wmts.geo.admin.ch/1.0.0/${id}/default/current/3857/8/133/90.jpeg`);
-  const bg = { id: 'ch.swisstopo.pixelkarte-grau', layer: null, open: false };
+  // A tile of each background (the forest above Zürich, zoom 13) as its picture in the chooser.
+  const bgThumb = (id) => (id === 'void' ? null : `https://wmts.geo.admin.ch/1.0.0/${id}/default/current/3857/13/4291/2858.jpeg`);
+  const bg = { id: 'ch.swisstopo.pixelkarte-grau', layer: null };
 
   /** Every map that can be shown, by key: { key, title, when, text, kind ('wms', 'zeit', 'glacier'), layer, zeitreise, link, opacity }. */
   const catalog = new Map();
@@ -100,20 +100,15 @@
     renderBackgrounds();
     writeHash();
   }
+  /** The backgrounds as picture tiles at the top of «Karten und Ebenen», as the maps of Outdooractive. */
   function renderBackgrounds() {
-    const current = BACKGROUNDS.find((b) => b.id === bg.id);
-    const thumb = (b) => el('span', { class: `ln-bg-thumb${b.id === 'void' ? ' void' : ''}`, style: bgThumb(b.id) ? `background-image:url(${bgThumb(b.id)})` : null });
-    $('ln-bg').replaceChildren(
-      el('div', { id: 'ln-bg-list', class: 'ln-bg-list', role: 'radiogroup', 'aria-label': 'Hintergrund', hidden: !bg.open },
-        BACKGROUNDS.map((b) => el('button', {
-          type: 'button', role: 'radio', 'aria-checked': String(b.id === bg.id), class: 'ln-bg-choice',
-          on: { click: () => { bg.open = false; setBackground(b.id); } },
-        }, [thumb(b), el('span', { text: b.title })]))),
-      el('button', {
-        type: 'button', class: 'ln-bg-current', 'aria-expanded': String(bg.open), 'aria-controls': 'ln-bg-list', title: 'Hintergrund wählen',
-        on: { click: () => { bg.open = !bg.open; renderBackgrounds(); } },
-      }, [thumb(current), el('span', { text: current.title })]),
-    );
+    $('ln-bg').replaceChildren(...BACKGROUNDS.map((b) => el('button', {
+      type: 'button', role: 'radio', 'aria-checked': String(b.id === bg.id), class: 'ln-tile',
+      on: { click: () => setBackground(b.id) },
+    }, [
+      el('span', { class: `ln-tile-pic${b.id === 'void' ? ' void' : ''}`, style: bgThumb(b.id) ? `background-image:url(${bgThumb(b.id)})` : null }),
+      el('span', { text: b.title }),
+    ])));
   }
 
   /* ----- Active maps ----- */
@@ -198,9 +193,23 @@
     }
     renderActive();
     renderCatalog();
+    renderChips();
     renderTimebar();
     clipSwipe();
     writeHash();
+  }
+
+  /** The maps through time as chips over the map: one click shows a map, a second one takes it away. */
+  function renderChips() {
+    const keys = groups.find((g) => g.id === 'zeit')?.keys || [];
+    $('ln-chips').replaceChildren(...keys.map((key) => {
+      const item = catalog.get(key);
+      const on = active.some((a) => a.key === key);
+      return el('button', {
+        type: 'button', 'aria-pressed': String(on), title: item.when ? `${item.title} · ${item.when}` : item.title, text: item.title,
+        on: { click: () => (on ? removeMap(key) : addMap(key)) },
+      });
+    }));
   }
 
   const icon = (d) => {
@@ -601,22 +610,101 @@
     return `${GeoadminLink.link({ lat: c.lat, lon: c.lng, zoom: map.getZoom(), layers, bgLayer: bg.id })}${state.place ? '&crosshair=marker' : ''}`;
   }
   $('ln-geoadmin').addEventListener('click', (e) => { e.currentTarget.href = geoadminHref(); });
-  $('ln-share').addEventListener('click', async () => {
+  $('ln-share').addEventListener('click', async (e) => {
     writeHash();
+    const label = e.currentTarget.querySelector('.ln-fab-label');
     try {
       await navigator.clipboard.writeText(location.href);
-      $('ln-status').textContent = 'Link kopiert.';
+      label.textContent = 'Link kopiert';
     } catch {
-      $('ln-status').textContent = `Link: ${location.href}`;
+      prompt('Link:', location.href);
+    }
+    setTimeout(() => { label.textContent = 'Link kopieren'; }, 1500);
+  });
+
+  /* ----- The round buttons at the bottom right, the drawer «Karten und Ebenen» ----- */
+
+  function setMenu(open) {
+    $('ln-menu').hidden = !open;
+    $('ln-menu-toggle').setAttribute('aria-expanded', String(open));
+    $('karte').classList.toggle('menu-open', open);
+  }
+  $('ln-menu-toggle').addEventListener('click', () => setMenu($('ln-menu').hidden));
+  $('ln-menu-close').addEventListener('click', () => { setMenu(false); $('ln-menu-toggle').focus(); });
+  function setMore(open) {
+    $('ln-fab-more').hidden = !open;
+    $('ln-fab-functions').setAttribute('aria-expanded', String(open));
+  }
+  $('ln-fab-functions').addEventListener('click', () => setMore($('ln-fab-more').hidden));
+  $('ln-fab-more').addEventListener('click', () => setTimeout(() => setMore(false), 0));
+  document.addEventListener('click', (e) => { if (!$('ln-fab-more').hidden && !e.target.closest('#ln-fabs')) setMore(false); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!$('ln-fab-more').hidden) setMore(false);
+    else if (!$('ln-menu').hidden) setMenu(false);
+  });
+  $('ln-fab-report').addEventListener('click', (e) => {
+    if (state.place) return;
+    e.preventDefault();
+    $('ln-search-q').focus();
+    $('ln-search-q').placeholder = 'Zuerst einen Ort suchen oder in die Karte klicken';
+  });
+
+  /* ----- Full screen, «Inhalt ausblenden», the region in view ----- */
+
+  const view = $('karte');
+  function fullscreenChanged(on) {
+    view.classList.toggle('is-fullscreen', on);
+    $('ln-fullscreen').setAttribute('aria-pressed', String(on));
+    $('ln-fullscreen').setAttribute('aria-label', on ? 'Vollbild beenden' : 'Vollbild');
+    setTimeout(() => map.invalidateSize(), 50);
+  }
+  $('ln-fullscreen').addEventListener('click', async () => {
+    if (document.fullscreenElement) { await document.exitFullscreen(); return; }
+    if (view.classList.contains('is-fullscreen-fallback')) {
+      view.classList.remove('is-fullscreen-fallback');
+      fullscreenChanged(false);
+      return;
+    }
+    try {
+      await view.requestFullscreen();
+    } catch {
+      view.classList.add('is-fullscreen-fallback');
+      fullscreenChanged(true);
     }
   });
-  $('ln-menu-toggle').addEventListener('click', (e) => {
-    const open = e.currentTarget.getAttribute('aria-expanded') !== 'true';
-    e.currentTarget.setAttribute('aria-expanded', String(open));
-    e.currentTarget.lastChild.textContent = open ? 'Menü ausblenden' : 'Menü einblenden';
-    $('ln-menu').classList.toggle('collapsed', !open);
+  document.addEventListener('fullscreenchange', () => fullscreenChanged(document.fullscreenElement === view));
+  $('ln-content-toggle').addEventListener('click', (e) => {
+    const hide = !view.classList.contains('content-hidden');
+    view.classList.toggle('content-hidden', hide);
+    e.currentTarget.setAttribute('aria-pressed', String(hide));
+    e.currentTarget.textContent = hide ? 'Inhalt einblenden' : 'Inhalt ausblenden';
   });
-  for (const id of ['ln-menu', 'ln-bg', 'ln-timebar', 'ln-info']) {
+
+  const regions = new Map();
+  function regionAt(lat, lon) {
+    const key = `${lat.toFixed(3)},${lon.toFixed(3)}`;
+    if (!regions.has(key)) regions.set(key, api(`/api/landschaft/region?lat=${lat.toFixed(5)}&lon=${lon.toFixed(5)}`).catch(() => null));
+    return regions.get(key);
+  }
+  const bezirk = (r) => (r?.bezirk ? (/^bezirk\b/i.test(r.bezirk) ? r.bezirk : `Bezirk ${r.bezirk}`) : null);
+  const inCh = (lat, lon) => lat >= 45.8 && lat <= 47.85 && lon >= 5.9 && lon <= 10.55;
+  let regionSeq = 0;
+  async function showRegion() {
+    const n = ++regionSeq;
+    const c = map.getCenter();
+    const z = map.getZoom();
+    const r = z >= 8 && inCh(c.lat, c.lng) ? await regionAt(c.lat, c.lng) : null;
+    if (n !== regionSeq) return;
+    const text = !inCh(c.lat, c.lng) ? null : z < 8 ? 'Schweiz' : z >= 12 ? r?.gemeinde : z >= 10 ? bezirk(r) : r?.kanton && `Kanton ${r.kanton}`;
+    $('ln-region').hidden = !text;
+    if (text) $('ln-region').replaceChildren(icon('M3 6.5 9 4.5l6 2.5 6-2.5v13l-6 2.5-6-2.5-6 2.5zM9 4.5v13M15 7v13'), text);
+  }
+  let regionTimer = null;
+  map.on('moveend', () => { clearTimeout(regionTimer); regionTimer = setTimeout(showRegion, 400); });
+  setTimeout(showRegion, 1200);
+
+  for (const id of ['ln-menu', 'ln-timebar', 'ln-info', 'ln-placepanel', 'ln-fabs', 'ln-content-toggle']) {
     L.DomEvent.disableClickPropagation($(id));
     L.DomEvent.disableScrollPropagation($(id));
   }
@@ -669,19 +757,99 @@
   });
 
   const coords = (p) => `${fmt(p.lat, 4)}° N, ${fmt(p.lon, 4)}° O`;
-  /** The place for the report; `name` when it came from the search (it goes into the address and the report title). */
+  const swiss = (v) => Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "'");
+  /** LV95 after swisstopo's approximate formulas (as public/coords.js). */
+  function lv95(lat, lon) {
+    const phi = (lat * 3600 - 169028.66) / 10000;
+    const lambda = (lon * 3600 - 26782.5) / 10000;
+    return [
+      2600072.37 + 211455.93 * lambda - 10938.51 * lambda * phi - 0.36 * lambda * phi * phi - 44.54 * lambda ** 3,
+      1200147.07 + 308807.95 * phi + 3745.25 * lambda * lambda + 76.63 * phi * phi - 194.56 * lambda * lambda * phi + 119.79 * phi ** 3,
+    ];
+  }
+  /**
+   * The place for the report, shown on the left as on Outdooractive: the commune (or the name from the search), the
+   * district and canton, the height and LV95, the report and what the maps shown say there.
+   */
+  let placeSeq = 0;
   function setPlace(lat, lon, { pan = false, name = null, zoom = 11 } = {}) {
+    const n = ++placeSeq;
     state.place = { lat: Math.round(lat * 1e5) / 1e5, lon: Math.round(lon * 1e5) / 1e5, name };
     if (!marker) marker = L.marker([lat, lon]).addTo(map);
     marker.setLatLng([lat, lon]);
     if (pan) map.setView([lat, lon], zoom);
-    $('ln-place').textContent = name ? `${name} · ${coords(state.place)}` : coords(state.place);
-    $('ln-to-report').href = `#bericht?${placeQuery()}`;
-    document.querySelector('.ln-tabs a[data-view="bericht"]').href = $('ln-to-report').href;
-    $('ln-to-report').hidden = false;
+    const href = `#bericht?${placeQuery()}`;
+    document.querySelector('.ln-tabs a[data-view="bericht"]').href = href;
+    $('ln-fab-report').href = href;
+    $('ln-fab-report').removeAttribute('aria-disabled');
+    const [e, nn] = lv95(lat, lon);
+    const where = inCh(lat, lon) ? `${swiss(e)} E ${swiss(nn)} N` : `${fmt(lat, 5)}, ${fmt(lon, 5)}`;
+    const title = el('h2', { id: 'ln-place-title', text: name || 'Ort' });
+    const sub = el('p', { class: 'ln-muted small', hidden: true });
+    const meta = el('p', { class: 'ln-place-meta', text: where });
+    const said = el('div', { class: 'ln-place-said' });
+    const copy = el('button', {
+      type: 'button', class: 'ln-chip-btn', text: 'Koordinaten kopieren',
+      on: {
+        click: async (ev) => {
+          const b = ev.currentTarget;
+          try { await navigator.clipboard.writeText(where); b.textContent = 'Kopiert'; } catch { prompt('Koordinaten:', where); }
+          setTimeout(() => { b.textContent = 'Koordinaten kopieren'; }, 1500);
+        },
+      },
+    });
+    $('ln-placepanel').replaceChildren(
+      el('header', { class: 'ln-place-head' }, [
+        el('div', {}, [title, sub, meta]),
+        iconButton('Ort schliessen', ICON.close, clearPlace),
+      ]),
+      el('a', { id: 'ln-to-report', class: 'ln-btn', href, text: 'Bericht für diesen Ort' }),
+      el('div', { class: 'ln-place-actions' }, [
+        copy,
+        el('a', { class: 'ln-chip-btn', href: `${geoadminHref()}`, target: '_blank', rel: 'noopener', text: 'map.geo.admin.ch' }),
+      ]),
+      said,
+      el('p', { class: 'ln-muted small', text: 'Der Bericht fasst zusammen, was Karten, Messreihen, Klimaszenarien, Gletscherinventare und MyForrest hier sagen.' }),
+    );
+    $('ln-placepanel').hidden = false;
+    api(`/api/layers/hoehe?lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}`).then((h) => {
+      if (n === placeSeq && Number.isFinite(h.elevation)) meta.textContent = `${fmt(Math.round(h.elevation))} m · ${where}`;
+    }).catch(() => {});
+    if (inCh(lat, lon)) {
+      regionAt(lat, lon).then((r) => {
+        if (n !== placeSeq || !r?.gemeinde) return;
+        if (!name) title.textContent = r.gemeinde;
+        sub.textContent = [bezirk(r), r.kanton && `Kanton ${r.kanton}`].filter(Boolean).join(' · ');
+        sub.hidden = false;
+      });
+    }
+    // What the maps shown say here (identify of geo.admin.ch, the maps through time with years have nothing to say).
+    const ids = active.filter((a) => a.visible && catalog.get(a.key)?.kind === 'wms').map((a) => `ga:${catalog.get(a.key).layer.name}`);
+    if (ids.length) {
+      api(`/api/layers/info?lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}&layers=${ids.map(encodeURIComponent).join(',')}`).then((d) => {
+        if (n !== placeSeq || !d.items.length) return;
+        said.replaceChildren(el('h3', { text: 'Was die Karten hier sagen' }), ...d.items.map((it) => el('section', {}, [
+          el('strong', { text: it.title }),
+          el('dl', {}, it.attributes.flatMap(([k, v]) => [el('dt', { text: k }), el('dd', { text: v })])),
+        ])));
+      }).catch(() => {});
+    }
   }
   const placeQuery = () => new URLSearchParams({ lat: state.place.lat, lon: state.place.lon, ...(state.place.name ? { ort: state.place.name } : {}) });
-  map.on('click', (e) => { setPlace(e.latlng.lat, e.latlng.lng); writeHash(); });
+  function clearPlace() {
+    state.place = null;
+    marker?.remove();
+    marker = null;
+    $('ln-placepanel').hidden = true;
+    $('ln-fab-report').setAttribute('aria-disabled', 'true');
+    $('ln-fab-report').href = '#bericht';
+    writeHash();
+  }
+  map.on('click', (e) => {
+    if (e.originalEvent?.target?.closest?.('.leaflet-interactive')) return;
+    setPlace(e.latlng.lat, e.latlng.lng);
+    writeHash();
+  });
 
   /* Search by place name, address or coordinates (/api/landschaft/suche): the hits below the field, arrow keys and
      Enter to choose; the chosen place becomes the place of the report. */
