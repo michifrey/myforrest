@@ -30,6 +30,8 @@
         ...(a.layer.capsUrl ? { capsUrl: a.layer.capsUrl, kind: a.layer.kind } : {}),
       }))));
     } catch { /* private mode */ }
+    // The tiles of «Karten und Ebenen» (mapui.js) follow the active layers.
+    document.dispatchEvent(new Event('layers-change'));
   };
 
   const inView = (l) => {
@@ -288,8 +290,8 @@
 
   /* ---------- Links in the syntax of map.geo.admin.ch ---------- */
 
-  const BG = { landeskarte: 'ch.swisstopo.pixelkarte-farbe', luftbild: 'ch.swisstopo.swissimage' };
-  const BG_BACK = { 'ch.swisstopo.pixelkarte-farbe': 'landeskarte', 'ch.swisstopo.pixelkarte-grau': 'landeskarte', 'ch.swisstopo.swissimage': 'luftbild' };
+  const BG = { landeskarte: 'ch.swisstopo.pixelkarte-farbe', winter: 'ch.swisstopo.pixelkarte-farbe-winter', grau: 'ch.swisstopo.pixelkarte-grau', luftbild: 'ch.swisstopo.swissimage' };
+  const BG_BACK = Object.fromEntries(Object.entries(BG).map(([k, v]) => [v, k]));
 
   /** The active layers for a link: geo.admin.ch by name, others as external WMS. */
   function linkLayers() {
@@ -524,8 +526,8 @@
     const share = el('button', { type: 'button', class: 'secondary small', text: 'Link kopieren', onclick: (e) => copy(shareUrl(), e.currentTarget) });
     panel.replaceChildren(
       el('header', { class: 'sun-head' }, [
-        el('div', {}, [el('p', { class: 'eyebrow', text: 'Karten und Daten' }), el('h2', { id: 'layers-title', text: 'Ebenen' }),
-          el('p', { class: 'muted small', text: 'Offizielle Karten über den Spots: Wald und Waldbrand, Bevölkerung, Bodennutzung, Verkehr; regional mehr. Die Suche findet jede Ebene von geo.admin.ch.' })]),
+        el('div', {}, [el('p', { class: 'eyebrow', text: 'Karten und Daten' }), el('h2', { id: 'layers-title', text: 'Karten und Ebenen' }),
+          el('p', { class: 'muted small', text: 'Grundkarte, Wegenetze und Zusatzebenen; darunter alle Ebenen von geo.admin.ch, andere Kartendienste und eigene Dateien.' })]),
         el('button', { type: 'button', class: 'icon', 'aria-label': 'Schliessen', text: '×', onclick: () => toggle(false) }),
       ]),
       el('ul', { id: 'layers-active', class: 'layers-active', hidden: '' }),
@@ -550,6 +552,7 @@
   /* ---------- What is here? ---------- */
 
   async function info(e) {
+    if (window.MapUI) return; // the place panel of mapui.js asks identify() itself
     const on = [...L_.active.values()].filter((a) => a.visible);
     if (!on.length || !L_.open || !$('pick-hint')?.hidden || document.querySelector('.tour-drawing') || window.Measure?.active()) return;
     const ids = on.filter((a) => a.layer.info).map((a) => a.layer.id);
@@ -593,7 +596,7 @@
     const wide = innerWidth > 860;
     L.popup({
       minWidth: 280, maxWidth: 340, className: 'layer-popup where-popup',
-      autoPanPaddingTopLeft: wide ? [450, 240] : [16, 16], autoPanPaddingBottomRight: wide ? [380, 24] : [16, 16],
+      autoPanPaddingTopLeft: wide ? [400, 200] : [16, 16], autoPanPaddingBottomRight: wide ? [520, 140] : [16, 16],
     }).setLatLng(e.latlng).setContent(box).openOn(map);
     try {
       const h = await api(`/api/layers/hoehe?lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}`);
@@ -629,9 +632,47 @@
   if (fromLink.layers.length || fromLink.lat !== null) setTimeout(() => applyLink(location.search), 300);
   else if (saved.length) setTimeout(() => load(), 1500);
 
-  window.Layers = { toggle, applyLink, shareUrl, add: (title) => {
-    const l = allLayers().find((x) => x.title === title);
-    if (l) { addLayer(l); render(); }
-    return Boolean(l);
-  } };
+  /* ---------- For the map tiles and the place panel (mapui.js) ---------- */
+
+  async function ensure() {
+    if (!$('layerpanel').childElementCount) buildPanel();
+    await load();
+  }
+  /** A layer of geo.admin.ch by its name, from the panel's groups or the whole list of geo.admin.ch. */
+  async function byName(name) {
+    await ensure();
+    const l = allLayers().find((x) => x.geoadmin && x.name === name);
+    if (l) return l;
+    return (await api(`/api/layers/geoadmin?ids=${encodeURIComponent(name)}`).catch(() => ({ layers: [] }))).layers[0] || null;
+  }
+  const activeByName = (name) => [...L_.active.values()].find((a) => a.layer.name === name && a.layer.geoadmin);
+  /** What the visible layers say at a point: [{ title, attributes }] (empty without layers to ask). */
+  async function identify(latlng) {
+    const ids = [...L_.active.values()].filter((a) => a.visible && a.layer.info).map((a) => a.layer.id);
+    if (!ids.length) return [];
+    const d = await api(`/api/layers/info?lat=${latlng.lat.toFixed(6)}&lon=${latlng.lng.toFixed(6)}&layers=${ids.map(encodeURIComponent).join(',')}`);
+    return d.items;
+  }
+
+  window.Layers = {
+    toggle, applyLink, shareUrl, identify,
+    add: (title) => {
+      const l = allLayers().find((x) => x.title === title);
+      if (l) { addLayer(l); render(); }
+      return Boolean(l);
+    },
+    has: (name) => Boolean(activeByName(name)),
+    /** Switches a layer of geo.admin.ch on (false when it does not exist or eight are on). */
+    async addName(name) {
+      const l = await byName(name);
+      const ok = Boolean(l) && addLayer(l, { opacity: 0.8 }) !== false;
+      render();
+      return ok;
+    },
+    removeName(name) {
+      const a = activeByName(name);
+      if (a) removeLayer(a.layer.id);
+      render();
+    },
+  };
 })();

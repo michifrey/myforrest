@@ -24,6 +24,12 @@ async function explore(ctx) {
 }
 const frame = (i) => path.join(WORK, 'frames', `f${i}.png`);
 fs.mkdirSync(path.join(WORK, 'frames'), { recursive: true });
+/** A tool behind «Funktionen» (mapui.js): the list opens first. */
+async function tool(page, name) {
+  await page.waitForTimeout(150); // the list closes just after a tool was chosen
+  if (await page.locator('#fab-more').isHidden()) await page.click('#fab-functions');
+  await page.click(`#${name}-toggle`);
+}
 const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]`);
 
 (async () => {
@@ -155,6 +161,27 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
   if (want('map')) {
     const page = await explore(ctx);
     await page.screenshot({ path: out('map.jpg'), ...jpg });
+    // As on Outdooractive: a click on the map opens the place on the left, «Funktionen» the tools.
+    // (The place as a click there would choose it: beside the spots, so the click does not open one.)
+    await page.evaluate(() => { const at = map.getBounds().getCenter(); window.MapUI.showPlace(at.lat - 0.0012, at.lng + 0.004); });
+    await page.waitForFunction(() => /m ·/.test(document.querySelector('.place-meta')?.textContent || ''), null, { timeout: 30000 });
+    await page.waitForFunction(() => !document.querySelector('#place .muted.small')?.hidden, null, { timeout: 30000 });
+    await page.click('#fab-functions');
+    await page.mouse.move(700, 300);
+    await settle(page, 2000);
+    await page.screenshot({ path: out('karte-ort.jpg'), ...jpg });
+    await page.click('#place .icon');
+    // «Karten und Ebenen»: the base maps, path networks and extra layers as tiles, the hiking trails switched on.
+    await page.click('#layers-toggle');
+    await page.waitForSelector('.map-tiles .map-tile', { timeout: 60000 });
+    await page.locator('.map-tile', { hasText: 'Wanderwege' }).click();
+    await page.locator('.map-tile', { hasText: 'Landeskarte grau' }).click();
+    await page.locator('.map-tile-wrap', { hasText: 'Landeskarte grau' }).locator('.map-tile-info').click();
+    await settle(page, 3500);
+    await page.screenshot({ path: out('karte-kacheln.jpg'), ...jpg });
+    await page.locator('.map-tile', { hasText: 'Wanderwege' }).click();
+    await page.locator('.map-tile', { hasText: 'MyForrest' }).click();
+    await page.click('#layers-toggle');
     await page.close();
   }
 
@@ -234,7 +261,7 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
 
   if (want('sun')) {
     const page = await explore(ctx);
-    await page.click('#sun-toggle');
+    await tool(page, 'sun');
     await settle(page, 1500);
     await page.fill('#sun-date', '2026-06-20');
     await page.dispatchEvent('#sun-date', 'change');
@@ -248,7 +275,7 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
   if (want('schatten')) {
     // Low evening sun: the hill shades the forest to its east; DWD radar on top.
     const page = await explore(ctx);
-    await page.click('#sun-toggle');
+    await tool(page, 'sun');
     await settle(page, 1500);
     await page.fill('#sun-date', '2026-10-09');
     await page.dispatchEvent('#sun-date', 'change');
@@ -275,7 +302,7 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
   if (want('baumschatten')) {
     // Zoomed in on the village and the forest edge: houses and trees throw their shadows (heights from swissSURFACE3D).
     const page = await explore(ctx);
-    await page.click('#sun-toggle');
+    await tool(page, 'sun');
     await settle(page, 1500);
     await page.fill('#sun-date', '2026-10-09');
     await page.dispatchEvent('#sun-date', 'change');
@@ -290,7 +317,7 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
 
   if (want('species')) {
     const page = await explore(ctx);
-    await page.click('#species-toggle');
+    await tool(page, 'species');
     await settle(page, 4000);
     await page.screenshot({ path: out('neophyten-hotspots.jpg'), ...jpg });
     await page.click('[data-tab="spread"]').catch((e) => console.log(e.message));
@@ -314,7 +341,7 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
   if (want('karte3d')) {
     // The 3D map: the spots on the demo terrain, tilted, with the popup of a spot.
     const page = await explore(ctx);
-    await page.click('#map3d-toggle');
+    await tool(page, 'map3d');
     await page.waitForFunction(() => window.Map3D?.map?.loaded(), null, { timeout: 120000, polling: 1000 });
     await page.evaluate(() => window.Map3D.map.jumpTo({ center: [8.5745, 47.3738], zoom: 15.2, pitch: 64, bearing: -32 }));
     await page.waitForFunction(() => window.Map3D.map.areTilesLoaded(), null, { timeout: 120000, polling: 1000 });
@@ -334,7 +361,7 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
   }
 
   if (want('ebenen')) {
-    // Panel «Ebenen»: fire danger and residents over the demo area, the answer of a click; then land use and
+    // Panel «Karten und Ebenen»: fire danger and residents over the demo area, the answer of a click; then land use and
     // the tree register of Zürich (demo services in the format of geo.admin.ch and the city).
     const page = await explore(ctx);
     await page.evaluate(() => map.setView([47.3705, 8.5655], 15, { animate: false }));
@@ -343,9 +370,11 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     for (const title of ['Bevölkerung pro Hektare (Demo)', 'Waldbrandgefahr (Demo)']) await page.evaluate((t) => window.Layers.add(t), title);
     await settle(page, 3500);
     await page.mouse.click(480, 720); // in the village: residents and fire danger
-    await page.waitForSelector('.layer-popup dl', { timeout: 30000 });
+    // The answer in the place panel on the left («Was die Ebenen hier sagen»).
+    await page.waitForSelector('#place .place-info dl', { timeout: 30000 });
     await settle(page, 1200);
     await page.screenshot({ path: out('ebenen.jpg'), ...jpg });
+    await page.click('#place .icon');
     await page.evaluate(() => { document.querySelectorAll('#layers-active button.link').forEach((b) => b.click()); map.closePopup(); });
     for (const title of ['Arealstatistik: Bodennutzung (Demo)', 'Baumstandorte (Demo)']) await page.evaluate((t) => window.Layers.add(t), title);
     await settle(page, 3500);
@@ -370,14 +399,14 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await link.screenshot({ path: out('koordinaten.jpg'), ...jpg });
     await link.evaluate(() => map.closePopup());
     // Measuring: a clearing as an area (four points, then the first one again).
-    await link.click('#measure-toggle');
+    await tool(link, 'measure');
     for (const [x, y] of [[560, 330], [760, 300], [800, 470], [600, 520]]) { await link.mouse.click(x, y); await settle(link, 250); }
     await link.mouse.click(560, 330);
     await settle(link, 800);
     await link.screenshot({ path: out('messen.jpg'), ...jpg });
-    await link.click('#measure-toggle');
+    await tool(link, 'measure');
     // Drawing: a windthrow area in green, a skid trail in blue and a beetle nest in red, with names.
-    await link.click('#draw-toggle');
+    await tool(link, 'draw');
     const drawName = async (name) => {
       await link.fill('.draw-list li:last-child input:first-child', name);
       await link.evaluate(() => document.querySelector('.draw-list li:last-child input').dispatchEvent(new Event('change')));
@@ -442,7 +471,7 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
   if (want('gebaeude3d')) {
     // Buildings and trees as 3D Tiles over the terrain (demo tiles in swisstopo's format), from the windthrow spot.
     const page = await explore(ctx);
-    await page.click('#map3d-toggle');
+    await tool(page, 'map3d');
     await page.waitForFunction(() => window.Map3D?.map?.loaded(), null, { timeout: 120000, polling: 1000 });
     await page.evaluate(() => window.Map3D.map.jumpTo({ center: [8.5736, 47.3747], zoom: 17.1, pitch: 64, bearing: 25 }));
     await page.evaluate(() => window.Map3D.showTiles(['gebaeude', 'baeume']));
@@ -676,7 +705,7 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.keyboard.press('Escape');
     await settle(page, 1000);
     await page.evaluate(() => document.querySelector('#explore').scrollIntoView());
-    await page.click('#mapillary-toggle');
+    await tool(page, 'mapillary');
     await page.evaluate(() => map.setView([47.37388, 8.57279], 17, { animate: false }));
     await settle(page, 3500);
     await page.screenshot({ path: out('mapillary-karte.jpg'), ...jpg });
@@ -700,7 +729,7 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     const page = await explore(ctx);
     // The climate map: hot days at +2 °C in cells of 0.1°, then the forest belts of the (demo) WMS.
     await page.evaluate(() => map.setView([47.37, 8.58], 11, { animate: false }));
-    await page.click('#klima-toggle');
+    await tool(page, 'klima');
     await page.selectOption('#klima-layer', 'hot');
     await page.waitForFunction(() => document.querySelectorAll('.k-cell-rect').length >= 20 && !/berechnet/.test(document.querySelector('#klima-status').textContent), null, { timeout: 180000 });
     await settle(page, 1500);
@@ -746,7 +775,7 @@ const pin = (page, id) => page.locator(`.leaflet-marker-icon[title="Spot ${id}"]
     await page.evaluate(() => document.querySelector('#explore').scrollIntoView());
     await settle(page, 1500);
     // The map with the outlines of the three inventories.
-    await page.click('#glacier-toggle');
+    await tool(page, 'glacier');
     await page.evaluate(() => map.setView([46.6035, 8.4005], 14, { animate: false }));
     await settle(page, 4000);
     await page.screenshot({ path: out('gletscher-karte.jpg'), ...jpg });

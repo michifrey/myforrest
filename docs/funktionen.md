@@ -28,7 +28,7 @@ amtlichen Karten durch die Zeit, Bericht pro Ort und offenen Daten, siehe [Lands
 ![Abschnitt Funktionen der Startseite](screenshots/funktionen.jpg)
 
 Danach zeigt die Startseite nach der Einleitung (*So geht's*) den Abschnitt **Funktionen**: eine Kachel pro Funktion mit
-zwei Sätzen dazu. Ein Klick scrollt zur Karte und öffnet das passende Panel (*Ebenen*, *Klima*, *Sonne & Wetter*,
+zwei Sätzen dazu. Ein Klick scrollt zur Karte und öffnet das passende Panel (*Karten und Ebenen*, *Klima*, *Sonne & Wetter*,
 *Arten & Neophyten*, *Touren & Aufträge*, *3D*, *Gletscher*), den Fahrtmodus, den Upload (Videos und 360°) oder die
 PRO-Mitgliedschaft (vorher die Anmeldung). Kacheln von Funktionen, die der Server nicht eingerichtet hat (3D-Karte
 ohne Gelände, Gletscher ohne Inventar), bleiben wie ihre Kartenknöpfe verborgen. Dazu kommen die offenen Geodaten
@@ -233,10 +233,45 @@ gibt den Platz frei. Die App bittet den Browser, die Daten dauerhaft zu behalten
 Fotos, die innerhalb von 25 m aufgenommen wurden, werden automatisch zu
 einem *Spot* zusammengefasst. Die Farbe zeigt Schäden (orange) oder Neophyten (violett).
 
-Über der Karte liegt oben links eine Leiste mit dem Filter und den Kartenmodi (*Sonne & Wetter*, *Arten &
-Neophyten*, *Touren & Aufträge*, *Ebenen*, *Klima*, *3D*, je nach Daten *Gletscher* und *Mapillary*); auf dem Handy
-scrollt sie seitwärts. Rechts steht der **Explorer**, eine schmale Karte mit Spots, Fotos und Spots mit Befund, den vier
-zuletzt fotografierten Spots als Bildkacheln, der Legende und *Foto beitragen*.
+Die Karte ist aufgebaut wie die von [Outdooractive](https://www.outdooractive.com):
+
+- **Oben**: das Suchfeld für Orte, Adressen und Koordinaten (Suchdienst von geo.admin.ch, Koordinaten in WGS84, LV95,
+  LV03 und MGRS). Darunter stehen die **Kategorien** als Knöpfe: *Alle Spots*, Veränderungen und Auffälligkeiten,
+  Sturm, Satellit, die Landschaften und die Beobachtungen; ein Klick filtert die Spots. Rechts davon schaltet ein
+  Knopf auf **Vollbild**.
+- **Inhalt ausblenden** in der Mitte zeigt nur noch die Karte, ohne Spots, Routen und Panels.
+- **Unten in der Mitte** steht der Name der **Region**, die man gerade sieht: die Gemeinde (ab Zoom 12), den Bezirk
+  (ab 10) oder den Kanton. Die Grenzen kommen von swisstopo (swissBOUNDARIES3D), abgefragt über den Identify-Dienst
+  von geo.admin.ch (`/api/landschaft/region`).
+- **Rechts unten** liegen runde Knöpfe übereinander:
+  - **Funktionen** (⋮) klappt die Werkzeuge mit Beschriftung auf: *Sonne & Wetter*, *Arten & Neophyten*, *Messen*,
+    *Zeichnen*, *Klima*, *3D*, je nach Daten *Gletscher* und *Mapillary*.
+  - **Touren & Aufträge** öffnet die Tourenplanung.
+  - **Karten und Ebenen** öffnet die Wahl der Karten.
+- Die Panels der Werkzeuge öffnen rechts neben den Knöpfen.
+- Zoom steht rechts oben, der Massstab und *Mein Standort* links unten.
+- **Links** steht der **Explorer** mit der Zahl der Spots, Fotos und Spots mit Befund, den vier zuletzt
+  fotografierten Spots als Bildkacheln, der Legende und *Foto beitragen*.
+
+Auf dem Handy steht die Karte oben und die Panels folgen darunter. Die Kategorien lassen sich seitwärts wischen, und
+die Knöpfe liegen unten rechts auf der Karte.
+
+![Ein Ort auf der Karte: links Gemeinde, Höhe, LV95 und die Spots in der Nähe, rechts die aufgeklappten Funktionen](screenshots/karte-ort.jpg)
+
+**Ein Ort.** Ein Klick auf eine freie Stelle der Karte zeigt den Ort links, wie bei Outdooractive:
+
+- die **Gemeinde** als Titel, mit Bezirk und Kanton,
+- die **Höhe** (swissALTI3D über den Höhendienst von geo.admin.ch) und die Koordinaten in **LV95**,
+- **Route hierhin**: Die Tourenplanung nimmt den Ort als nächsten Punkt, bei leerer Route nach dem eigenen
+  Standort, falls bekannt.
+- **Foto hier beitragen** öffnet den Upload mit diesem Ort.
+- **Koordinaten kopieren** und ein Link zu dieser Stelle in **map.geo.admin.ch**.
+- **Was die Ebenen hier sagen**: die Angaben der eingeschalteten Ebenen an dieser Stelle (siehe unten).
+- **Spots in der Nähe**: bis zu sechs Spots im Umkreis von 10 km als Karten, mit Foto, Entfernung, Zahl der Fotos
+  und Zeitraum. Ein Klick öffnet den Spot.
+
+Messen, Zeichnen, die Tourenplanung und die Wahl eines Orts für ein Foto nehmen Klicks auf die Karte weiterhin selbst
+an, und ein Klick auf einen Spot öffnet den Spot.
 
 ### Grundkarte
 
@@ -246,8 +281,10 @@ zeichnet: Land in Leinen, Wald in Moosgrün, Wiesen hell, Gewässer gedämpft bl
 gestrichelt, Beschriftungen in der Schriftfarbe; nachts im dunklen Design. Symbole von Läden, Haltestellen und
 Ähnlichem fallen weg; im Vordergrund stehen Wald, Gelände und die Spots.
 
-Unten rechts wechselt eine Auswahl zu **OpenStreetMap**, zur **Landeskarte** oder zum **Luftbild** von swisstopo
-(beide nur Schweiz); die Wahl merkt sich das Gerät. Ohne WebGL, ohne Netz und solange die Vektorkarte lädt, steht
+Im Panel **Karten und Ebenen** stehen die Grundkarten als Bildkacheln, wie bei Outdooractive. Zur Wahl stehen
+**MyForrest**, **OpenStreetMap**, die **Landeskarte** von swisstopo im Sommer und im **Winter**, die **Landeskarte
+grau** und das **Luftbild** (die Karten von swisstopo nur in der Schweiz). ⓘ erklärt jede Karte. Die Wahl merkt
+sich das Gerät. Ohne WebGL, ohne Netz und solange die Vektorkarte lädt, steht
 OpenStreetMap da; seine Kacheln sind auch die, die *Karte entlang der Route offline speichern* ablegt.
 
 Die Farben setzt die App selbst: Sie liest den Vektorstil (`BASISKARTE_STIL`, Standard der Stil *Positron* von
@@ -257,9 +294,22 @@ eigener Kachelserver.
 
 ### Ebenen: Karten aus offiziellen Quellen
 
-![Ebenen: Waldbrandgefahr und Bevölkerung über den Spots, mit der Antwort auf einen Klick](screenshots/ebenen.jpg)
+![Karten und Ebenen: Grundkarten, Wegenetze und Zusatzebenen als Kacheln, die Wanderwege eingeschaltet](screenshots/karte-kacheln.jpg)
 
-Der Knopf **Ebenen** öffnet ein Panel mit Karten aus offiziellen Quellen, nach Themen:
+Der Knopf **Karten und Ebenen** öffnet das Panel mit den Karten. Oben stehen, wie bei Outdooractive, drei Gruppen
+als Bildkacheln:
+
+- **Karten**: die Grundkarten (siehe oben).
+- **Wegenetze**: Wanderwege, Velo- und Mountainbike-Routen von SchweizMobil, Schneeschuhrouten und Skitouren.
+- **Zusatzebenen**: Hangneigung über 30°, Waldbrandgefahr, Wildruhezonen, Waldmischung, Vegetationshöhe und
+  Haltestellen des öffentlichen Verkehrs.
+
+Ein Klick auf eine Kachel schaltet die Ebene von geo.admin.ch ein oder aus, ⓘ sagt, was sie zeigt und woher sie
+kommt.
+
+![Ebenen: Waldbrandgefahr und Bevölkerung über den Spots, links die Antwort auf einen Klick](screenshots/ebenen.jpg)
+
+Darunter folgen alle Ebenen aus offiziellen Quellen, nach Themen:
 
 | Thema | Beispiele | Quelle |
 |-------|-----------|--------|
@@ -325,7 +375,7 @@ Link.
 ![Kurzlink mit QR-Code im Ebenen-Panel](screenshots/kurzlink.jpg)
 
 **Was ist hier?** Ein Klick auf die Karte fragt die eingeschalteten Ebenen ab und zeigt ihre Angaben an dieser
-Stelle: die Warnstufe der Waldbrandgefahr, die Einwohnerzahl der Hektare, die Bodennutzung, beim Baumkataster Art und
+Stelle im Ort links (*Was die Ebenen hier sagen*): die Warnstufe der Waldbrandgefahr, die Einwohnerzahl der Hektare, die Bodennutzung, beim Baumkataster Art und
 Pflanzjahr des Baums. Bei Ebenen von geo.admin.ch fragt der Server dessen Identify-Dienst, bei den anderen
 GetFeatureInfo des Kartendienstes.
 
@@ -361,7 +411,7 @@ angefangenen Linie oder Fläche zurück, Escape bricht sie ab.
 
 Die Zeichnung bleibt auf dem Gerät und auf der Karte, bis sie gelöscht wird. *KML herunterladen* speichert sie als
 KML-Datei mit Namen, Notizen und Farben. Diese Datei lesen map.geo.admin.ch (*Import*), QGIS und Google Earth, und das
-Panel *Ebenen* liest sie wieder ein. Während des Zeichnens nehmen Spots keine Klicks an; Zeichnen und Messen schliessen
+Panel *Karten und Ebenen* liest sie wieder ein. Während des Zeichnens nehmen Spots keine Klicks an; Zeichnen und Messen schliessen
 sich gegenseitig aus.
 
 ![Zeichnen: eine Windwurffläche in Grün, eine Rückegasse in Blau und ein Käfernest in Rot, mit Namen und Grösse](screenshots/zeichnen.jpg)

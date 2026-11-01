@@ -382,6 +382,9 @@ const DEMO_WMS_LAYERS = [
   ['ch.bfs.volkszaehlung-bevoelkerungsstatistik_einwohner', 'Bevölkerung pro Hektare (Demo)'],
   ['ch.bfs.arealstatistik', 'Arealstatistik: Bodennutzung (Demo)'],
   ['ch.are.belastung-personenverkehr-strasse', 'Personenverkehr auf der Strasse (Demo)'],
+  // «Karten und Ebenen»: a path network and an extra layer as on Outdooractive.
+  ['ch.swisstopo.swisstlm3d-wanderwege', 'Wanderwege (Demo)'],
+  ['ch.swisstopo.hangneigung-ueber_30', 'Hangneigung über 30° (Demo)'],
   // The Landeskarte as WMS: the ground of the map excerpts in the PDF report of «Landschaft im Wandel».
   ['ch.swisstopo.pixelkarte-farbe', 'Landeskarte (Demo)'],
 ];
@@ -469,6 +472,25 @@ async function demoWms(url) {
         const mpp = (x1 - x0) / w;
         c = d < Math.max(6, mpp * 3) ? (m < 0.5 ? [200, 40, 40] : [240, 140, 40]) : null;
         alpha = 230;
+      } else if (layer.includes('wanderwege')) {
+        // The paths and tracks of the demo forest, yellow as the signposts of the Swiss hiking trails.
+        const mpp = (x1 - x0) / w;
+        let d = Infinity;
+        for (const [, pts, kind] of tiles.demoLines()) {
+          if (kind === 'stream') continue;
+          for (let k = 1; k < pts.length; k++) {
+            const [a, b] = [pts[k - 1], pts[k]];
+            const ax = a[1] * 75500, ay = a[0] * 111320, bx = b[1] * 75500, by = b[0] * 111320, x = lon * 75500, y = lat * 111320;
+            const tt = Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2)));
+            d = Math.min(d, Math.hypot(x - ax - tt * (bx - ax), y - ay - tt * (by - ay)));
+          }
+        }
+        c = d < Math.max(4, mpp * 2.5) ? [235, 185, 0] : null;
+        alpha = 240;
+      } else if (layer.includes('hangneigung')) {
+        // Slopes steeper than 30° from the demo terrain, over ~20 m.
+        const s = Math.hypot(elevation(lat + 0.00018, lon) - z, elevation(lat, lon + 0.00026) - z) / 20;
+        c = s > 0.84 ? [200, 40, 120] : s > 0.7 ? [240, 120, 60] : s > 0.58 ? [250, 200, 70] : null;
       } else if (zh) {
         const mpp = (x1 - x0) / w;
         const hit = STREET_TREES.some((t) => Math.hypot((t.lat - lat) * 111320, (t.lon - lon) * 75500) < Math.max(4, mpp * 2.2));
@@ -540,6 +562,10 @@ function demoIdentify(url) {
       results.push({ layerBodId: n, layerName: label, attributes: { hoehenstufe: stufe } });
     }
     if (n.includes('klimanormwerte')) results.push({ layerBodId: n, layerName: 'Klimanormwerte Temperatur 1991–2020 (Demo)', attributes: { jahresmittel: `${(11 - (elevation(lat, lon) - 400) * 0.0055).toFixed(1)} °C` } });
+    // The boundaries of swisstopo: the demo forest lies in the city of Zürich.
+    if (n.includes('swissboundaries3d-gemeinde')) results.push({ layerBodId: n, layerName: 'Gemeindegrenzen', attributes: { gemname: lon < 8.62 ? 'Zürich' : 'Dübendorf', kanton: 'ZH' } });
+    if (n.includes('swissboundaries3d-bezirk')) results.push({ layerBodId: n, layerName: 'Bezirksgrenzen', attributes: { name: lon < 8.62 ? 'Zürich' : 'Uster' } });
+    if (n.includes('swissboundaries3d-kanton')) results.push({ layerBodId: n, layerName: 'Kantonsgrenzen', attributes: { name: 'Zürich', ak: 'ZH' } });
     if (n.includes('arealstatistik')) results.push({ layerBodId: n, layerName: 'Arealstatistik: Bodennutzung (Demo)', attributes: { nutzung: AREAL[tiles.classAt(lat, lon)][1], erhebung: '2013/18' } });
   }
   return Response.json({ results });

@@ -156,7 +156,9 @@ stageObserver.observe($('swipe'));
 /* ---------- Map ---------- */
 
 const map = L.map('map', { zoomControl: false, scrollWheelZoom: false }).setView([47.2, 8.4], 8);
-L.control.zoom({ position: 'bottomleft' }).addTo(map);
+// Zoom at the top right and a scale at the bottom left, as on Outdooractive.
+L.control.zoom({ position: 'topright' }).addTo(map);
+L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
 // OpenStreetMap: shown first, and whenever the vector base map of basemap.js is not available (offline, no WebGL).
 window.osmBase = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
@@ -377,12 +379,12 @@ async function loadSpots({ fit = false } = {}) {
   renderStormBanner(spots);
   loadProtectedCells();
   if (fit && state.spots.length && !(fit === 'start' && ownView)) {
-    // Keep spots clear of the floating toolbar and (on wide screens) the side panel.
+    // Keep spots clear of the search bar, (on wide screens) the explorer on the left and the buttons on the right.
     const wide = window.matchMedia('(min-width: 861px)').matches;
     map.fitBounds(L.latLngBounds(state.spots.map((s) => [s.lat, s.lon])), {
       maxZoom: 16,
-      paddingTopLeft: [40, 150],
-      paddingBottomRight: [wide ? $('welcome').offsetWidth + 60 : 40, 50],
+      paddingTopLeft: [wide ? $('welcome').offsetWidth + 60 : 40, 150],
+      paddingBottomRight: [wide ? 110 : 40, wide ? 170 : 50],
     });
   }
 }

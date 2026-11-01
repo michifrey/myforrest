@@ -206,51 +206,72 @@
 
   <section class="explore" id="explore" aria-label="Karte und Spots">
     <div id="map" aria-label="Karte der Foto-Spots"></div>
-    <div class="map-toolbar">
-      <label class="pill-select">
-        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M6 10h8M9 15h2"/></svg>
-        <span class="sr-only">Filter</span>
-        <select id="tag-filter"><option value="">Alle Spots</option></select>
+    <!-- Over the map as on Outdooractive: search and categories at the top, the buttons at the bottom right. -->
+    <div class="map-topbar" id="map-topbar">
+      <div class="map-topbar-row">
+        <form id="map-search" class="map-search" role="search" autocomplete="off">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.5 12.5 17 17"/></svg>
+          <label class="sr-only" for="map-search-q">Ort suchen</label>
+          <input type="search" id="map-search-q" placeholder="Suche nach Orten, Adressen, Koordinaten …" aria-controls="map-search-results" aria-autocomplete="list" aria-expanded="false">
+          <ul id="map-search-results" class="map-search-results" role="listbox" aria-label="Gefundene Orte" hidden></ul>
+        </form>
+        <button type="button" id="map-fullscreen" class="map-round" aria-pressed="false" aria-label="Vollbild" title="Vollbild">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8V3h5M12 3h5v5M17 12v5h-5M8 17H3v-5"/></svg>
+        </button>
+      </div>
+      <div id="map-chips" class="map-chips" role="group" aria-label="Spots nach Kategorie"></div>
+      <label class="sr-only">Filter
+        <select id="tag-filter" tabindex="-1"><option value="">Alle Spots</option></select>
       </label>
-      <button type="button" id="sun-toggle" class="pill-btn" aria-expanded="false" aria-controls="sunpanel">
+    </div>
+    <button type="button" id="map-content-toggle" class="map-pill map-content-toggle" aria-pressed="false">Inhalt ausblenden</button>
+    <div id="map-region" class="map-pill map-region" aria-live="polite" hidden></div>
+    <div class="map-fabs" id="map-fabs">
+      <div id="fab-more" class="fab-more" hidden>
+      <button type="button" id="sun-toggle" class="fab" aria-expanded="false" aria-controls="sunpanel">
         <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.6"/><path d="M10 1.5v2.4M10 16.1v2.4M1.5 10h2.4M16.1 10h2.4M4 4l1.7 1.7M14.3 14.3 16 16M4 16l1.7-1.7M14.3 5.7 16 4"/></svg>
-        Sonne &amp; Wetter
+        <span class="fab-label">Sonne &amp; Wetter</span>
       </button>
-      <button type="button" id="species-toggle" class="pill-btn species-btn" aria-expanded="false" aria-controls="speciespanel">
+      <button type="button" id="species-toggle" class="fab species-btn" aria-expanded="false" aria-controls="speciespanel">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16C4 9 8 4.5 16 4c.4 7.5-4.2 12-12 12zM4 16l7-7"/></svg>
-        Arten &amp; Neophyten
+        <span class="fab-label">Arten &amp; Neophyten</span>
       </button>
-      <button type="button" id="tours-toggle" class="pill-btn tours-btn" aria-expanded="false" aria-controls="tourpanel">
-        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="4.5" cy="15.5" r="2"/><circle cx="15.5" cy="4.5" r="2"/><path d="M6.5 15.5h5a3 3 0 0 0 0-6h-3a3 3 0 0 1 0-6h5"/></svg>
-        Touren &amp; Aufträge
-      </button>
-      <button type="button" id="layers-toggle" class="pill-btn layers-btn" aria-expanded="false" aria-controls="layerpanel">
-        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 18 6.5 10 10.5 2 6.5z"/><path d="M2 10l8 4 8-4M2 13.5l8 4 8-4"/></svg>
-        Ebenen
-      </button>
-      <button type="button" id="measure-toggle" class="pill-btn measure-btn" aria-pressed="false" title="Strecke, Fläche und Richtung messen">
+      <button type="button" id="measure-toggle" class="fab measure-btn" aria-pressed="false" title="Strecke, Fläche und Richtung messen">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 14.5 14.5 2.5l3 3-12 12z"/><path d="M6 11l1.5 1.5M8.5 8.5 10 10M11 6l1.5 1.5"/></svg>
-        Messen
+        <span class="fab-label">Messen</span>
       </button>
-      <button type="button" id="draw-toggle" class="pill-btn measure-btn draw-btn" aria-pressed="false" title="Punkte, Linien und Flächen zeichnen, als KML speichern">
+      <button type="button" id="draw-toggle" class="fab measure-btn draw-btn" aria-pressed="false" title="Punkte, Linien und Flächen zeichnen, als KML speichern">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 17l1-4 9.5-9.5 3 3L7 16z"/><path d="M11.5 5.5l3 3"/></svg>
-        Zeichnen
+        <span class="fab-label">Zeichnen</span>
       </button>
-      <button type="button" id="klima-toggle" class="pill-btn klima-btn" aria-expanded="false" aria-controls="klimapanel">
+      <button type="button" id="klima-toggle" class="fab klima-btn" aria-expanded="false" aria-controls="klimapanel">
         <svg viewBox="0 0 20 20" aria-hidden="true" class="k-icon"><rect x="2" y="3" width="4" height="14" fill="#2171b5"/><rect x="6" y="3" width="4" height="14" fill="#c6dbef"/><rect x="10" y="3" width="4" height="14" fill="#fb6a4a"/><rect x="14" y="3" width="4" height="14" fill="#a50f15"/></svg>
-        Klima
+        <span class="fab-label">Klima</span>
       </button>
-      <button type="button" id="glacier-toggle" class="pill-btn glacier-btn" aria-pressed="false" hidden>
+      <button type="button" id="glacier-toggle" class="fab glacier-btn" aria-pressed="false" hidden>
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M1.5 16.5 7 6l3 4 2-3 6.5 9.5z"/><path d="M5.2 9.6 7 11l1.4-1.6L10 10"/></svg>
-        Gletscher
+        <span class="fab-label">Gletscher</span>
       </button>
-      <button type="button" id="mapillary-toggle" class="pill-btn mapillary-btn" aria-pressed="false" hidden>
+      <button type="button" id="mapillary-toggle" class="fab mapillary-btn" aria-pressed="false" hidden>
         <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M6.5 12.5 10 6l3.5 6.5"/></svg>
-        Mapillary
+        <span class="fab-label">Mapillary</span>
       </button>
-      <button type="button" id="map3d-toggle" class="pill-btn map3d-btn" hidden>
+      <button type="button" id="map3d-toggle" class="fab map3d-btn" hidden>
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M1.5 16.5 7.5 6l3 4.5 2.5-3 5.5 9z"/><path d="M5 12.5h10"/></svg>
-        3D
+        <span class="fab-label">3D</span>
+      </button>
+      </div>
+      <button type="button" id="fab-functions" class="fab fab-main" aria-expanded="false" aria-controls="fab-more">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="4.5" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="10" cy="15.5" r="1.6"/></svg>
+        <span class="fab-label">Funktionen</span>
+      </button>
+      <button type="button" id="tours-toggle" class="fab fab-main tours-btn" aria-expanded="false" aria-controls="tourpanel">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="4.5" cy="15.5" r="2"/><circle cx="15.5" cy="4.5" r="2"/><path d="M6.5 15.5h5a3 3 0 0 0 0-6h-3a3 3 0 0 1 0-6h5"/></svg>
+        <span class="fab-label">Touren &amp; Aufträge</span>
+      </button>
+      <button type="button" id="layers-toggle" class="fab fab-main layers-btn" aria-expanded="false" aria-controls="layerpanel">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 18 6.5 10 10.5 2 6.5z"/><path d="M2 10l8 4 8-4M2 13.5l8 4 8-4"/></svg>
+        <span class="fab-label">Karten und Ebenen</span>
       </button>
     </div>
     <section id="sunpanel" class="sunpanel" hidden aria-labelledby="sun-title">
@@ -756,6 +777,7 @@
   <script src="layers.js"></script>
   <script src="measure.js"></script>
   <script src="draw.js"></script>
+  <script src="mapui.js"></script>
   <script src="features.js"></script>
   <script src="offline-queue.js"></script>
   <script src="drive-select.js"></script>
